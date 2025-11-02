@@ -195,31 +195,6 @@
                         <td x-text="apn"></td>
                       </tr>
                       <tr>
-                        <th scope="row">Network Mode</th>
-                        <td x-text="networkMode"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Bands</th>
-                        <td x-text="bands"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Bandwidth</th>
-                        <td x-text="bandwidth"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">E/ARFCN<sup>4G/5G</sup></th>
-                        <td x-text="earfcns"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">PCI</th>
-                        <td
-                          x-show="sccPCI != '-'"
-                          x-text="pccPCI + ', ' + sccPCI"
-                        ></td>
-
-                        <td x-show="sccPCI == '-'" x-text="pccPCI"></td>
-                      </tr>
-                      <tr>
                         <th scope="row">IPv<sup>4</sup></th>
                         <td x-text="ipv4"></td>
                       </tr>
@@ -281,6 +256,30 @@
                           x-text="downloadStat + ' DL / ' + uploadStat + ' UL'"
                         ></td>
                       </tr> -->
+                      <tr>
+                        <th scope="row">Network Mode</th>
+                        <td x-text="networkMode"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Bands</th>
+                        <td x-text="bands"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Bandwidth</th>
+                        <td x-text="bandwidth"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">E/ARFCN<sup>4G/5G</sup></th>
+                        <td x-text="earfcns"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">PCI</th>
+                        <td
+                          x-show="sccPCI != '-'"
+                          x-text="pccPCI + ', ' + sccPCI"
+                        ></td>
+                        <td x-show="sccPCI == '-'" x-text="pccPCI"></td>
+                      </tr>
                       <tr x-show="csq != 'NR-SA Mode'">
                         <th scope="row">CSQ</th>
                         <td x-show="csq != '-'" x-text="csq"></td>
