@@ -131,18 +131,6 @@
                       Reset
                     </button>
                   </div>
-                  <div class="form-check">
-                    <input
-                      class="form-check-input"
-                      type="checkbox"
-                      value=""
-                      id="providerBands"
-                      onchange="saveCheckboxState()"
-                    />
-                    <label class="form-check-label" for="providerBands">
-                      Show Provider Supported Bands
-                    </label>
-                  </div>
                 </div>
               </div>
               <div class="card-footer">
@@ -902,7 +890,7 @@
               ATNRMode = `+QNWPREFCFG="nr5g_disable_mode",${nrModeControl}`;
             }
 
-            atcmd = `AT+${atAPN}${atSIM}${ATNetwork}${ATNRMode}`;
+            atcmd = `AT${atAPN}${atSIM}${ATNetwork}${ATNRMode}`;
             // If there is double + (++), remove 1 + from the command
             atcmd = atcmd.replace("+^", "^");
             if (atcmd !== "AT+") {
@@ -1162,28 +1150,6 @@
         loadCheckboxState();
       });
 
-      function saveCheckboxState() {
-        const providerBandsCheckbox = document.getElementById("providerBands");
-        if (!providerBandsCheckbox) {
-          console.warn("Impossibile salvare lo stato: checkbox non trovata.");
-          return;
-        }
-        localStorage.setItem(
-          "providerBandsChecked",
-          providerBandsCheckbox.checked
-        );
-      }
-
-      function loadCheckboxState() {
-        const providerBandsCheckbox = document.getElementById("providerBands");
-        if (!providerBandsCheckbox) {
-          console.warn("Impossibile caricare lo stato: checkbox non trovata.");
-          return;
-        }
-        const isChecked =
-          localStorage.getItem("providerBandsChecked") === "true";
-        providerBandsCheckbox.checked = isChecked;
-      }
     </script>
     <script src="js/atcommand-utils.js"></script>
     <script src="js/dark-mode.js"></script>
