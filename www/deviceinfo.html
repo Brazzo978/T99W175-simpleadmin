@@ -108,25 +108,9 @@
       <td class="col-md-2" x-text="iccid"></td>
     </tr>
     <tr>
-      <th scope="row">IMEI</th>
-      <td class="col-md-2">
-        <input
-          class="form-control"
-          type="text"
-          x-model="newImei"
-          x-bind:placeholder="imei === '-' ? 'Fetching IMEI...' : imei"
-        />
-      </td>
-      <td>
-        <button
-          type="button"
-          class="btn btn-primary"
-          @click="openModal()"
-        >
-          Update
-        </button>
-      </td>
-    </tr>
+  <th scope="row">IMEI</th>
+  <td class="col-md-2" x-text="imei"></td>
+   </tr>
     <tr>
       <th scope="row">LAN IP</th>
       <td class="col-md-2" x-text="lanIp"></td>
@@ -437,8 +421,8 @@
     this.phoneNumber = phoneNumber || "Unknown";
     this.wwanIpv4 = wwanIpv4 || "-";
     this.wwanIpv6 = wwanIpv6 || "-";
-
-    this.simpleAdminVersion = "SimpleAdminRev-Beta-1.0";
+	//definisci qui la versione della gui
+    this.simpleAdminVersion = "T99-BETA011";
     this.showError = false;
   } catch (error) {
     console.error("Errore nel parsing:", error);
