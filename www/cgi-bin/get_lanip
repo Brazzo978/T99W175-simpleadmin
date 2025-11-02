@@ -1,0 +1,20 @@
+#!/bin/bash
+CONFIG_FILE="/etc/data/mobileap_cfg.xml"
+get_xml_value() {
+    local key=$1
+    local file=$2
+    grep "<$key>" "$file" | sed "s/.*<$key>\(.*\)<\/$key>.*/\1/" | tr -d ' '
+}
+current_ip=$(get_xml_value "APIPAddr" "$CONFIG_FILE")
+
+if [ -z "${current_ip}" ]; then
+    current_ip="0"
+fi
+
+echo "Content-type: text/json" 
+echo ""
+cat <<EOT
+{
+    "lanip": "$current_ip"
+}
+EOT
