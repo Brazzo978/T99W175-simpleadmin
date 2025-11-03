@@ -41,11 +41,6 @@
                 <li class="nav-item">
                   <a class="nav-link" href="/network.html">Simple Network</a>
                 </li>
-                <!--
-                <li class="nav-item">
-                  <a class="nav-link" href="/scanner.html">Simple Scan</a>
-                </li>
-                -->
                 <li class="nav-item">
                   <a
                     class="nav-link active"
@@ -79,7 +74,6 @@
               <div class="card-body">
                 <div class="card-text">
                   <div class="form-floating mb-4">
-                    <!-- At commands output here -->
                     <textarea
                       class="form-control"
                       placeholder="ATI"
@@ -106,7 +100,7 @@
                         @keydown.enter="sendATCommand()"
                       />
                       <div id="atCommandInputHelper" class="form-text">
-                        Seperate multiple commands with comma (,).
+                        Separate multiple commands with comma (,).
                       </div>
                     </div>
                     <div
@@ -170,92 +164,7 @@
                             </button>
                           </td>
                         </tr>
-                        <!--<tr>
-                          <th scope="row">IP Passthrough</th>
-                          <td>
-                            <select
-                              class="form-select"
-                              id="ipPassModeSelect"
-                              x-model="ipPassMode"
-                            >
-                              <option selected>Passthrough Mode</option>
-                              <option value="ETH">ETH</option>
-                              <option value="USB">USB (ECM/RNDIS)</option>
-                            </select>
-                          </td>
-                          <td>
-                            <button
-                              type="submit"
-                              class="btn btn-primary"
-                              @click="ipPassThroughEnable()"
-                              x-show="ipPassStatus === false"
-                              :disabled="isLoading"
-                            >
-                              Enable
-                            </button>
-                            <button
-                              type="submit"
-                              class="btn btn-danger"
-                              @click="ipPassThroughDisable()"
-                              x-show="ipPassStatus === true"
-                              :disabled="isLoading"
-                            >
-                              Disable
-                            </button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <th scope="row">USB Modem Protocol</th>
-                          <td>
-                            <select
-                              class="form-select"
-                              id="usbNetModeSelect"
-                              x-model="usbNetMode"
-                            >
-                              <option
-                                selected
-                                x-text="currentUsbNetMode"
-                              ></option>
-                              <option value="RMNET">RMNET</option>
-                              <option value="ECM">ECM (Recommended)</option>
-                              <option value="MBIM">MBIM</option>
-                              <option value="RNDIS">RNDIS</option>
-                            </select>
-                          </td>
-                          <td>
-                            <button
-                              type="submit"
-                              class="btn btn-primary"
-                              @click="usbNetModeChanger()"
-                              :disabled="isLoading"
-                            >
-                              Change
-                            </button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Onboard DNS Proxy</th>
-                          <td>
-                            <button
-                              type="submit"
-                              class="btn btn-primary"
-                              @click="onBoardDNSProxyEnable()"
-                              x-show="DNSProxyStatus === false"
-                              :disabled="isLoading"
-                            >
-                              Enable
-                            </button>
-                            <button
-                              type="submit"
-                              class="btn btn-danger"
-                              @click="onBoardDNSProxyDisable()"
-                              x-show="DNSProxyStatus === true"
-                              :disabled="isLoading"
-                            >
-                              Disable
-                            </button>
-                          </td>
-                        </tr>-->
+
                       </tbody>
                     </table>
                   </div>
@@ -316,12 +225,6 @@
                     </button>
                   </div>
                 </div>
-                <!-- <div class="card-text">
-                  <div class="d-flex flex-row gap-4 w-full">
-                    <p><a class="link-info link-opacity-50-hover link-offset-2" href="/scanner.html">Go to Cell Scanner</a></p>
-                    <p><a class="link-info link-opacity-50-hover link-offset-2" href="/watchcat.html">Go to WatchCat</a></p>
-                  </div>
-                </div> -->
               </div>
             </div>
           </div>
@@ -441,7 +344,7 @@
               if (!result.ok) {
                 const message = result.error
                   ? result.error.message
-                  : "Errore sconosciuto durante l'esecuzione del comando.";
+                  : "Unknown error while executing the command.";
                 this.handleAtError(message, result.data);
                 return;
               }
@@ -451,7 +354,7 @@
               this.isClean = false;
             } catch (error) {
               this.handleAtError(
-                error.message || "Errore di rete durante l'esecuzione del comando."
+                error.message || "Network error while executing the command."
               );
             } finally {
               this.isLoading = false;
@@ -474,7 +377,7 @@
               this.isClean = false;
             } catch (error) {
               this.handleAtError(
-                error.message || "Errore di rete durante l'esecuzione del comando personalizzato."
+                error.message || "Network error while executing the custom command."
               );
             } finally {
               this.isLoading = false;
@@ -591,9 +494,9 @@
               if (!result.ok || !result.data) {
                 const message = result.error
                   ? result.error.message
-                  : 'Impossibile recuperare le impostazioni correnti.';
+                  : 'Unable to fetch current settings.';
                 this.errorMessage = message;
-                console.warn('Errore fetchCurrentSettings:', message);
+                console.warn('fetchCurrentSettings error:', message);
                 return;
               }
 
@@ -631,8 +534,8 @@
 
               this.atcmd = '';
             } catch (error) {
-              this.errorMessage = error.message || 'Errore di rete durante il recupero delle impostazioni correnti.';
-              console.error('Errore in fetchCurrentSettings:', error);
+              this.errorMessage = error.message || 'Network error while retrieving current settings.';
+              console.error('Error in fetchCurrentSettings:', error);
             }
           },
 

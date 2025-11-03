@@ -4,12 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Simple Admin</title>
-    <!-- <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
-      crossorigin="anonymous"
-    /> -->
     <!-- Import all the bootstrap css files from css folder -->
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/bootstrap.min.css" />
@@ -50,11 +44,6 @@
                 <li class="nav-item">
                   <a class="nav-link" href="network.html">Simple Network</a>
                 </li>
-                <!--
-                <li class="nav-item">
-                  <a class="nav-link" href="/scanner.html">Simple Scan</a>
-                </li>
-                -->
                 <li class="nav-item">
                   <a class="nav-link" href="/settings.html">AT Terminal</a>
                 </li>
@@ -252,12 +241,6 @@
                         <th scope="row">Assessment</th>
                         <td x-text="signalAssessment"></td>
                       </tr>
-                     <!-- <tr>
-                        <th scope="row">Traffic Stats</th>
-                        <td
-                          x-text="downloadStat + ' DL / ' + uploadStat + ' UL'"
-                        ></td>
-                      </tr> -->
                       <tr>
                         <th scope="row">Network Mode</th>
                         <td x-text="networkMode"></td>
@@ -299,11 +282,6 @@
                         <th scope="row">TAC<sup>4G/5G</sup></th>
                         <td x-text="tac"></td>
                       </tr>
-                      <!-- <tr x-show="rssi != '-'">
-                        <th scope="row">RSSI<sup>4G</sup></th>
-                        <td x-show="rssi != '-'" x-text="rssi"></td>
-                        <td x-show="rssi == '-'" class="fst-italic">None</td>
-                      </tr> -->
                       <tr x-show="rsrqLTE != '-'">
                         <th scope="row">SS_RSRQ<sup>4G</sup></th>
                         <td
@@ -1408,9 +1386,9 @@
 
                     const networkProviderMap = {
                       ...italianNetworkProviders,
-                      "46000": "中国移动",
-                      "46001": "中国联通",
-                      "46011": "中国电信",
+                      "46000": "China Mobile",
+                      "46001": "China Unicom",
+                      "46011": "China Telecom",
                     };
 
                     this.mccmnc = mccmncCode || "Unknown";
@@ -2074,12 +2052,14 @@
                   }
                 this.lastUpdate = new Date().toLocaleString();
               } catch (parseError) {
-                console.error("Errore durante il parsing della risposta AT", parseError);
-                this.applyFallback('Errore nel parsing della risposta AT.');
+                console.error("Error while parsing the AT response", parseError);
+                this.applyFallback("Failed to parse the AT response.");
               }
             } catch (error) {
-              console.error("Errore durante l'esecuzione del comando AT", error);
-              this.applyFallback(error.message || 'Errore sconosciuto durante la richiesta AT.');
+              console.error("Error while executing the AT command", error);
+              this.applyFallback(
+                error.message || "Unknown error occurred during the AT request."
+              );
             }
           },
 

@@ -5,16 +5,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Simple Admin</title>
-  <!-- 导入自定义和Bootstrap样式 -->
+  
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/bootstrap.min.css" />
-  <!-- 网站图标 -->
+  
   <link rel="icon" href="favicon.ico" />
-  <!-- 导入Bootstrap和Alpine.js脚本 -->
+  
   <script src="js/bootstrap.bundle.min.js"></script>
   <script src="js/alpinejs.min.js" defer></script>
 
-  <!-- Contributed By: snjzb -->
+  
 </head>
 
 <body>
@@ -24,7 +24,7 @@
         <div class="container-fluid">
           <a class="navbar-brand" href="/"><span class="mb-0 h4">Simple Admin</span></a>
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText"
-            aria-controls="navbarText" aria-expanded="false" aria-label="切换导航">
+            aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
           </button>
           <div class="collapse navbar-collapse" id="navbarText">
@@ -35,11 +35,7 @@
               <li class="nav-item">
                 <a class="nav-link" href="/network.html">Simple Network</a>
               </li>
-              <!--
-              <li class="nav-item">
-                <a class="nav-link" href="/scanner.html">Simple Scan</a>
-              </li>
-              -->
+              
               <li class="nav-item">
                 <a class="nav-link" href="/settings.html">AT Terminal</a>
               </li>
@@ -75,15 +71,15 @@
                     </div>
                     <table class="table table-hover border-success" x-show="!isLoading">
                       <tbody>
-                        <!-- 没有消息时显示 -->
-                        <!-- Display when there are no messages -->
+                        
+                        
                         <template x-if="messages.length === 0 && !isLoading">
                           <div>
                             <p>Inbox is Empty</p>
                           </div>
                         </template>
-                        <!-- 循环显示短信消息 -->
-                        <!-- "Loop display SMS messages" -->
+                        
+                        
                         <template x-for="(message, index) in messages" :key="index">
                           <tr>
                             <td>
@@ -111,8 +107,8 @@
                 </div>
               </div>
             </div>
-            <!-- 添加判断，只有当messages数组有内容时才显示全选复选框及其区域 -->
-            <!-- Add a judgment, only when the messages array has content will the select all checkbox and its area be displayed" -->
+            
+            
             <div class="card-body border-top" x-show="messages.length > 0">
               <div class="form-check">
                 <input id="selectAllCheckbox" class="form-check-input" type="checkbox" @change="toggleAll($event)" />
@@ -121,13 +117,13 @@
             </div>
             <div class="card-footer">
               <div class="d-grid gap-2 d-md-flex justify-content-md-start">
-                <!-- 刷新按钮 -->
-                <!-- Refresh button -->
+                
+                
                 <button class="btn btn-success" type="button" @click="init()">
                   Refresh
                 </button>
-                <!-- 删除选中短信按钮 -->
-                <!-- Delete selected SMS button -->
+                
+                
                 <button class="btn btn-danger" type="button" @click="deleteSelectedSMS()">
                   Delete Selected SMS
                 </button>
@@ -174,11 +170,11 @@
         selectedMessages: [],
         phoneNumber: '',
         messageToSend: '',
-        messageIndices: [], // 确保初始化messageIndices数组
+        messageIndices: [], // Ensure the messageIndices array is initialized
         showError: false,
         errorMessage: "",
 
-        // 清除现有数据
+        // Clear existing data
         clearData() {
           this.messages = [];
           this.senders = [];
@@ -200,7 +196,7 @@
           console.error("SMS error:", message);
         },
 
-        // 请求获取短信
+        // Request SMS messages
         async requestSMS() {
           this.isLoading = true;
           const atcmd =
@@ -215,7 +211,7 @@
             if (!result.ok || !result.data) {
               const message = result.error
                 ? result.error.message
-                : "Impossibile recuperare gli SMS dal modem.";
+                : "Unable to retrieve SMS from the modem.";
               this.handleError(message, result.data);
               return;
             }
@@ -230,13 +226,13 @@
             this.showError = false;
             this.errorMessage = "";
           } catch (error) {
-            this.handleError(error.message || "Errore di rete durante il recupero degli SMS.");
+            this.handleError(error.message || "Network error while retrieving SMS.");
           } finally {
             this.isLoading = false;
           }
         },
 
-        // 解析短信数据的方法
+        // Parse SMS data
         parseSMSData(data) {
           const cmglRegex = /^\s*\+CMGL:\s*(\d+),"[^"]*","([^"]*)"[^"]*,"([^"]*)"/gm;
           const cscaRegex = /^\s*\+CSCA:\s*"([^"]*)"/gm;
@@ -283,23 +279,23 @@
           }
         },
 
-        // 将十六进制转换为文本（假设使用 UTF-16BE 编码）
+        // Convert hexadecimal to text (assuming UTF-16BE encoding)
         convertHexToText(hex) {
           const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
           return new TextDecoder('utf-16be').decode(bytes);
         },
 
-        // 自定义解析日期函数
+        // Custom date parsing function
         parseCustomDate(dateStr) {
           const [datePart, timePart] = dateStr.split(',');
           const [day, month, year] = datePart.split('/').map(part => parseInt(part, 10));
           const [hour, minute, second] = timePart.split(':').map(part => parseInt(part, 10));
 
-          // 将日期转换为标准格式的日期对象
+          // Convert the date into a standard Date object
           return new Date(Date.UTC(2000 + year, month - 1, day, hour, minute, second));
         },
 
-        // 自定义格式化日期函数
+        // Custom date formatting function
         formatDate(date) {
           const year = date.getUTCFullYear() - 2000;
           const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
@@ -310,18 +306,18 @@
           return `${day}/${month}/${year},${hour}:${minute}:${second}`;
         },
 
-        // 删除选中的短信
+        // Delete selected SMS messages
         async deleteSelectedSMS() {
           if (this.selectedMessages.length === 0) {
-            console.warn("没有选中的短信");
+            console.warn("No SMS selected.");
             return;
           }
           if (!this.messageIndices || this.messageIndices.length === 0) {
-            console.error("短信索引未正确初始化或为空");
+            console.error("SMS indexes are not initialized correctly or are empty.");
             return;
           }
 
-          // 检查是否全选
+          // Check if all messages are selected
           const isAllSelected = this.selectedMessages.length === this.messages.length;
 
           if (isAllSelected) {
@@ -334,7 +330,7 @@
             indicesToDelete.push(...this.messages[index].indices);
           });
           if (indicesToDelete.length === 0) {
-            console.warn("没有有效的短信索引");
+            console.warn("No valid SMS indexes.");
             return;
           }
 
@@ -351,7 +347,7 @@
             if (!result.ok) {
               const message = result.error
                 ? result.error.message
-                : "Impossibile eliminare gli SMS selezionati.";
+                : "Unable to delete the selected SMS.";
               this.handleError(message, result.data);
               return;
             }
@@ -359,10 +355,10 @@
             this.selectedMessages = [];
             await this.requestSMS();
           } catch (error) {
-            this.handleError(error.message || "Errore di rete durante l'eliminazione degli SMS.");
+            this.handleError(error.message || "Network error while deleting SMS.");
           }
         },
-        // 删除所有短信
+        // Delete all SMS messages
         async deleteAllSMS() {
           try {
             const result = await ATCommandService.execute('AT+CMGD=,4', {
@@ -373,17 +369,17 @@
             if (!result.ok) {
               const message = result.error
                 ? result.error.message
-                : "Impossibile eliminare tutti gli SMS.";
+                : "Unable to delete all SMS.";
               this.handleError(message, result.data);
               return;
             }
 
             await this.requestSMS();
           } catch (error) {
-            this.handleError(error.message || "Errore di rete durante l'eliminazione degli SMS.");
+            this.handleError(error.message || "Network error while deleting SMS.");
           }
         },
-        // 发送短信
+        // Send SMS messages
         encodeUCS2(input) {
           let output = '';
           for (let i = 0; i < input.length; i++) {
@@ -402,8 +398,8 @@
             phoneNumberWithCountryCode = `${serviceCenterPrefix}${this.phoneNumber}`;
           }
           const encodedPhoneNumber = this.encodeUCS2(phoneNumberWithCountryCode);
-          const messageSegments = this.splitMessage(this.messageToSend, 70); // 将消息分段
-          const uid = Math.floor(Math.random() * 256); // 生成随机的UID
+          const messageSegments = this.splitMessage(this.messageToSend, 70); // Split the message into segments
+          const uid = Math.floor(Math.random() * 256); // Generate a random UID
           const totalSegments = messageSegments.length;
           let allSegmentsSent = true;
           let errorCode = null;
@@ -422,17 +418,17 @@
               const data = await response.text();
               console.log("Response from server:", data);
 
-              // 检查返回的数据中是否包含 '+CMS ERROR'
+              // Check whether the response contains '+CMS ERROR'
               if (data.includes('+CMS ERROR')) {
                 errorCode = data.match(/\+CMS ERROR: (\d+)/)?.[1];
                 console.error("SMS send error:", data);
                 allSegmentsSent = false;
-                break; // 停止发送剩余的段
+                break; // Stop sending remaining segments
               }
             } catch (error) {
               console.error("Fetch error:", error);
               allSegmentsSent = false;
-              break; // 停止发送剩余的段
+              break; // Stop sending remaining segments
             }
           }
           if (allSegmentsSent) {
@@ -457,20 +453,20 @@
           notification.style.display = 'block';
           setTimeout(() => {
             notification.style.display = 'none';
-          }, 3000); // 3秒后自动关闭
+          }, 3000); // Automatically hide after 3 seconds
         },
 
-        // 初始化
-        //   Initialize
+        // Initialize
         init() {
           this.clearData();
           this.requestSMS();
         },
 
-        // 全选/取消全选
-        //   Select all/deselect all
+        // Select all or deselect all
         toggleAll(event) {
-          this.selectedMessages = event.target.checked ? this.messages.map((_, index) => index) : [];
+          this.selectedMessages = event.target.checked
+            ? this.messages.map((_, index) => index)
+            : [];
         }
       };
     }

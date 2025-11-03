@@ -47,7 +47,7 @@
     const sanitized = sanitize(atcmd);
 
     if (!sanitized) {
-      return createResult(false, "", new Error("Comando AT vuoto o non valido."), {
+      return createResult(false, "", new Error("Empty or invalid AT command."), {
         busy: false,
         attempts: 0,
       });
@@ -86,14 +86,14 @@
           lastData = text;
 
           if (!text.trim()) {
-            lastError = new Error("Risposta vuota dal modem.");
+            lastError = new Error("Empty response from the modem.");
           } else if (isBusyResponse(text)) {
             busy = true;
-            lastError = new Error("Il modem è occupato, riprovare più tardi.");
+            lastError = new Error("The modem is busy. Try again later.");
           } else {
             const hasErrorToken = text.includes("ERROR");
 
-            return createResult(!hasErrorToken, text, hasErrorToken ? new Error("Il modem ha restituito ERROR.") : null, {
+            return createResult(!hasErrorToken, text, hasErrorToken ? new Error("The modem returned ERROR.") : null, {
               busy: false,
               attempts: attempt,
             });
@@ -101,7 +101,7 @@
         }
       } catch (error) {
         if (error.name === "AbortError") {
-          lastError = new Error("Timeout della richiesta AT.");
+          lastError = new Error("AT request timed out.");
         } else {
           lastError = error;
         }

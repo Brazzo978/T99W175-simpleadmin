@@ -12,7 +12,7 @@ function populateCheckboxes(
 
   if (!checkboxesForm || !networkModeElement) {
     console.warn(
-      "Impossibile popolare le checkbox: elementi richiesti mancanti."
+      "Unable to populate the checkboxes: required elements are missing."
     );
     return;
   }

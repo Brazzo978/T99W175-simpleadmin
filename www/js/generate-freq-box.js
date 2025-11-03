@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (!freqNumbersContainer || !cellNumInput) {
     console.warn(
-      "Impossibile inizializzare i campi delle frequenze: elementi richiesti mancanti."
+      "Unable to initialize frequency fields: required elements are missing."
     );
     return;
   }
