@@ -603,6 +603,139 @@
             </div>
           </div>
         </div>
+
+        <div class="row mt-4">
+          <div class="col-12">
+            <div class="card">
+              <div
+                class="card-header d-flex justify-content-between align-items-center"
+              >
+                <span>Dettaglio Segnali Avanzato</span>
+                <button
+                  class="btn btn-sm btn-outline-primary"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#advancedSignalCollapse"
+                  aria-expanded="false"
+                  aria-controls="advancedSignalCollapse"
+                >
+                  Mostra dettagli
+                </button>
+              </div>
+              <div id="advancedSignalCollapse" class="collapse">
+                <div class="card-body">
+                  <template x-if="detailedSignals.length === 0">
+                    <p class="mb-0 text-muted">
+                      Nessun dettaglio avanzato disponibile.
+                    </p>
+                  </template>
+
+                  <template x-for="(entry, index) in detailedSignals" :key="entry.id ?? index">
+                    <div
+                      class="mb-4 pb-3 border-bottom"
+                      :class="{ 'border-0 pb-0 mb-0': index === detailedSignals.length - 1 }"
+                    >
+                      <div
+                        class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-2"
+                      >
+                        <div>
+                          <h5 class="mb-1" x-text="entry.title"></h5>
+                          <p class="mb-0 text-muted">
+                            <span x-text="'Tecnologia: ' + entry.technology"></span>
+                            <span class="ms-3" x-text="'Banda: ' + entry.bandDisplay"></span>
+                          </p>
+                        </div>
+                        <div class="text-md-end text-muted small">
+                          <div x-text="'PCI: ' + entry.pciDisplay"></div>
+                          <div x-text="'Canale: ' + entry.channelDisplay"></div>
+                        </div>
+                      </div>
+
+                      <div class="row small text-muted mt-2">
+                        <div class="col-md-6">
+                          <p class="mb-1" x-text="'Larghezza banda: ' + entry.bandwidthDisplay"></p>
+                        </div>
+                        <div class="col-md-6 text-md-end" x-show="entry.rxDiversityDisplay">
+                          <p class="mb-1" x-text="'RX Diversity: ' + entry.rxDiversityDisplay"></p>
+                        </div>
+                      </div>
+
+                      <div class="mt-3">
+                        <template x-for="metric in entry.metrics" :key="metric.key">
+                          <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                              <span class="fw-semibold" x-text="metric.label"></span>
+                              <span x-text="metric.display"></span>
+                            </div>
+                            <template x-if="metric.percentage > 0">
+                              <div
+                                class="progress"
+                                style="height: 18px"
+                                role="progressbar"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                :aria-valuenow="metric.percentage"
+                              >
+                                <div
+                                  class="progress-bar"
+                                  :class="getProgressBarClass(metric.percentage)"
+                                  :style="'width: ' + metric.percentage + '%'"
+                                >
+                                  <span
+                                    x-text="metric.display + ' / ' + metric.percentage + '%'"
+                                  ></span>
+                                </div>
+                              </div>
+                            </template>
+                            <template x-if="metric.percentage === 0">
+                              <span class="fst-italic text-muted">Valore non disponibile</span>
+                            </template>
+                          </div>
+                        </template>
+                        <div class="small text-muted" x-show="entry.rssiDisplay">
+                          <span x-text="'RSSI: ' + entry.rssiDisplay"></span>
+                        </div>
+                      </div>
+
+                      <template x-if="entry.antennas && entry.antennas.length">
+                        <div class="mt-3">
+                          <h6 class="fw-semibold">RSRP per antenna</h6>
+                          <template x-for="antenna in entry.antennas" :key="antenna.label">
+                            <div class="mb-2">
+                              <div class="d-flex justify-content-between small">
+                                <span x-text="antenna.label"></span>
+                                <span x-text="antenna.display"></span>
+                              </div>
+                              <template x-if="antenna.percentage > 0">
+                                <div
+                                  class="progress"
+                                  style="height: 12px"
+                                  role="progressbar"
+                                  aria-valuemin="0"
+                                  aria-valuemax="100"
+                                  :aria-valuenow="antenna.percentage"
+                                >
+                                  <div
+                                    class="progress-bar"
+                                    :class="getProgressBarClass(antenna.percentage)"
+                                    :style="'width: ' + antenna.percentage + '%'"
+                                  ></div>
+                                </div>
+                              </template>
+                              <template x-if="antenna.percentage === 0">
+                                <span class="fst-italic text-muted">Valore non disponibile</span>
+                              </template>
+                            </div>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
     <script src="js/atcommand-utils.js"></script>
@@ -656,6 +789,7 @@
           nonNrUpload: "0",
           downloadStat: "0",
           uploadStat: "0",
+          detailedSignals: [],
           intervalId: null,
         };
 
@@ -678,6 +812,10 @@
               },
               overrides
             );
+
+            this.detailedSignals = Array.isArray(overrides.detailedSignals)
+              ? [...overrides.detailedSignals]
+              : [];
           },
 
           applyFallback(message) {
@@ -727,6 +865,376 @@
                   const lines = rawdata.split("\n");
 
                   console.log(lines);
+
+                  const buildDetailedSignals = () => {
+                    const details = [];
+                    let currentEntry = null;
+                    let scellCounter = 0;
+                    let entryCounter = 0;
+                    let pendingLteAntennas = [];
+                    let pendingLteDiversity = null;
+
+                    const roundValue = (value) => {
+                      if (typeof value !== "number" || Number.isNaN(value)) {
+                        return null;
+                      }
+                      return Math.round(value * 10) / 10;
+                    };
+
+                    const parseAntennaLine = (line, prefix) => {
+                      const match = line.match(/\(([^)]+)\)/);
+                      if (!match) {
+                        return [];
+                      }
+
+                      return match[1].split(",").map((item, index) => {
+                        const trimmed = item.trim();
+                        const numeric = parseFloat(trimmed);
+                        return {
+                          label: `${prefix} ${index + 1}`,
+                          value: Number.isNaN(numeric) ? null : numeric,
+                        };
+                      });
+                    };
+
+                    const finalizeEntry = () => {
+                      if (!currentEntry) {
+                        return;
+                      }
+
+                      const bandDisplay = currentEntry.band
+                        ? currentEntry.technology === "LTE"
+                          ? `Band ${currentEntry.band}`
+                          : currentEntry.band
+                        : "N/A";
+
+                      let title = "";
+                      if (currentEntry.technology === "LTE") {
+                        if (currentEntry.role === "primary") {
+                          title = "Primaria 4G";
+                        } else {
+                          title = currentEntry.caIndex
+                            ? `CA 4G #${currentEntry.caIndex}`
+                            : "CA 4G";
+                        }
+                      } else {
+                        title = "Primaria 5G";
+                      }
+
+                      if (bandDisplay !== "N/A") {
+                        title += ` (${bandDisplay})`;
+                      }
+
+                      const detail = {
+                        id: currentEntry.id,
+                        title,
+                        technology: currentEntry.technology,
+                        bandDisplay,
+                        bandwidthDisplay: currentEntry.bandwidth || "N/A",
+                        channelDisplay: currentEntry.channel || "N/A",
+                        pciDisplay: currentEntry.pci || "N/A",
+                        rxDiversityDisplay: currentEntry.rxDiversity || "",
+                        metrics: [],
+                        antennas: [],
+                        rssiDisplay: "",
+                      };
+
+                      const addMetric = (key, label, value, unit, calculator) => {
+                        const normalized = roundValue(value);
+                        if (normalized === null) {
+                          detail.metrics.push({
+                            key,
+                            label,
+                            display: "N/A",
+                            percentage: 0,
+                          });
+                          return;
+                        }
+
+                        const displayValue = unit ? `${normalized} ${unit}` : `${normalized}`;
+                        const percentage = typeof calculator === "function"
+                          ? calculator.call(this, normalized)
+                          : 0;
+
+                        detail.metrics.push({
+                          key,
+                          label,
+                          display: displayValue,
+                          percentage,
+                        });
+                      };
+
+                      addMetric(
+                        "rsrp",
+                        currentEntry.technology === "NR" ? "SS_RSRP" : "RSRP",
+                        currentEntry.metricsData.rsrp,
+                        "dBm",
+                        this.calculateRSRPPercentage
+                      );
+                      addMetric(
+                        "rsrq",
+                        currentEntry.technology === "NR" ? "SS_RSRQ" : "RSRQ",
+                        currentEntry.metricsData.rsrq,
+                        "dB",
+                        this.calculateRSRQPercentage
+                      );
+                      addMetric(
+                        "sinr",
+                        currentEntry.technology === "NR" ? "SS_SINR" : "SINR",
+                        currentEntry.metricsData.sinr,
+                        "dB",
+                        this.calculateSINRPercentage
+                      );
+
+                      if (
+                        typeof currentEntry.metricsData.rssi === "number" &&
+                        !Number.isNaN(currentEntry.metricsData.rssi)
+                      ) {
+                        const normalizedRssi = roundValue(currentEntry.metricsData.rssi);
+                        if (normalizedRssi !== null) {
+                          detail.rssiDisplay = `${normalizedRssi} dBm`;
+                        }
+                      }
+
+                      detail.antennas = (currentEntry.antennas || []).map((antenna, index) => {
+                        const normalized = roundValue(antenna.value);
+                        const label = antenna.label || `Antenna ${index + 1}`;
+                        if (normalized === null) {
+                          return {
+                            label,
+                            display: "N/A",
+                            percentage: 0,
+                          };
+                        }
+
+                        return {
+                          label,
+                          display: `${normalized} dBm`,
+                          percentage: this.calculateRSRPPercentage(normalized),
+                        };
+                      });
+
+                      details.push(detail);
+                      currentEntry = null;
+                    };
+
+                    for (const rawLine of lines) {
+                      const line = rawLine.trim();
+                      if (!line) {
+                        continue;
+                      }
+
+                      if (line.startsWith("lte_ant_rsrp")) {
+                        pendingLteAntennas = parseAntennaLine(line, "Antenna");
+                        const diversityMatch = line.match(/rx_diversity:([0-9]+)/i);
+                        if (diversityMatch) {
+                          pendingLteDiversity = diversityMatch[1];
+                        }
+                        continue;
+                      }
+
+                      if (line.startsWith("pcell:")) {
+                        finalizeEntry();
+                        currentEntry = {
+                          id: `lte-primary-${entryCounter++}`,
+                          technology: "LTE",
+                          role: "primary",
+                          band: null,
+                          bandwidth: null,
+                          channel: null,
+                          pci: null,
+                          rxDiversity: pendingLteDiversity,
+                          antennas: pendingLteAntennas,
+                          metricsData: {},
+                        };
+                        pendingLteAntennas = [];
+                        pendingLteDiversity = null;
+
+                        const bandMatch = line.match(/lte_band:(\d+)/i);
+                        if (bandMatch) {
+                          currentEntry.band = bandMatch[1];
+                        }
+                        const bwMatch = line.match(/lte_band_width:([^\s]+)/i);
+                        if (bwMatch) {
+                          currentEntry.bandwidth = bwMatch[1];
+                        }
+                        continue;
+                      }
+
+                      if (line.startsWith("scell:")) {
+                        finalizeEntry();
+                        scellCounter += 1;
+                        currentEntry = {
+                          id: `lte-scell-${entryCounter++}`,
+                          technology: "LTE",
+                          role: "secondary",
+                          caIndex: scellCounter,
+                          band: null,
+                          bandwidth: null,
+                          channel: null,
+                          pci: null,
+                          rxDiversity: null,
+                          antennas: [],
+                          metricsData: {},
+                        };
+
+                        const bandMatch = line.match(/lte_band:(\d+)/i);
+                        if (bandMatch) {
+                          currentEntry.band = bandMatch[1];
+                        }
+                        const bwMatch = line.match(/lte_band_width:([^\s]+)/i);
+                        if (bwMatch) {
+                          currentEntry.bandwidth = bwMatch[1];
+                        }
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("channel:") &&
+                        currentEntry &&
+                        currentEntry.technology === "LTE"
+                      ) {
+                        const channelMatch = line.match(/channel:(\d+)/i);
+                        if (channelMatch) {
+                          currentEntry.channel = channelMatch[1];
+                        }
+                        const pciMatch = line.match(/pci:(\d+)/i);
+                        if (pciMatch) {
+                          currentEntry.pci = pciMatch[1];
+                        }
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("lte_rsrp:") &&
+                        currentEntry &&
+                        currentEntry.technology === "LTE"
+                      ) {
+                        const rsrpMatch = line.match(/lte_rsrp:([\-\d\.]+)/i);
+                        if (rsrpMatch) {
+                          currentEntry.metricsData.rsrp = parseFloat(rsrpMatch[1]);
+                        }
+                        const rsrqMatch = line.match(/rsrq:([\-\d\.]+)/i);
+                        if (rsrqMatch) {
+                          currentEntry.metricsData.rsrq = parseFloat(rsrqMatch[1]);
+                        }
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("lte_rssi:") &&
+                        currentEntry &&
+                        currentEntry.technology === "LTE"
+                      ) {
+                        const rssiMatch = line.match(/lte_rssi:([\-\d\.]+)/i);
+                        if (rssiMatch) {
+                          currentEntry.metricsData.rssi = parseFloat(rssiMatch[1]);
+                        }
+                        const snrMatch = line.match(/lte_snr:([\-\d\.]+)/i);
+                        if (snrMatch) {
+                          currentEntry.metricsData.sinr = parseFloat(snrMatch[1]);
+                        }
+                        continue;
+                      }
+
+                      if (line.startsWith("nr_band:")) {
+                        finalizeEntry();
+                        currentEntry = {
+                          id: `nr-primary-${entryCounter++}`,
+                          technology: "NR",
+                          role: "primary",
+                          band: null,
+                          bandwidth: null,
+                          channel: null,
+                          pci: null,
+                          rxDiversity: null,
+                          antennas: [],
+                          metricsData: {},
+                        };
+                        const bandMatch = line.match(/nr_band:([^\s]+)/i);
+                        if (bandMatch) {
+                          currentEntry.band = bandMatch[1];
+                        }
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("nr_band_width:") &&
+                        currentEntry &&
+                        currentEntry.technology === "NR"
+                      ) {
+                        const parts = line.split(":");
+                        currentEntry.bandwidth = parts.length > 1 ? parts[1].trim() : null;
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("nr_channel:") &&
+                        currentEntry &&
+                        currentEntry.technology === "NR"
+                      ) {
+                        const parts = line.split(":");
+                        currentEntry.channel = parts.length > 1 ? parts[1].trim() : null;
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("nr_pci:") &&
+                        currentEntry &&
+                        currentEntry.technology === "NR"
+                      ) {
+                        const parts = line.split(":");
+                        currentEntry.pci = parts.length > 1 ? parts[1].trim() : null;
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("nr_rsrp:") &&
+                        currentEntry &&
+                        currentEntry.technology === "NR"
+                      ) {
+                        const rsrpMatch = line.match(/nr_rsrp:([\-\d\.]+)/i);
+                        if (rsrpMatch) {
+                          currentEntry.metricsData.rsrp = parseFloat(rsrpMatch[1]);
+                        }
+                        const diversityMatch = line.match(/rx_diversity:\s*([\d]+)/i);
+                        if (diversityMatch) {
+                          currentEntry.rxDiversity = diversityMatch[1];
+                        }
+                        currentEntry.antennas = parseAntennaLine(line, "Antenna");
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("nr_rsrq:") &&
+                        currentEntry &&
+                        currentEntry.technology === "NR"
+                      ) {
+                        const rsrqMatch = line.match(/nr_rsrq:([\-\d\.]+)/i);
+                        if (rsrqMatch) {
+                          currentEntry.metricsData.rsrq = parseFloat(rsrqMatch[1]);
+                        }
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("nr_snr:") &&
+                        currentEntry &&
+                        currentEntry.technology === "NR"
+                      ) {
+                        const snrMatch = line.match(/nr_snr:([\-\d\.]+)/i);
+                        if (snrMatch) {
+                          currentEntry.metricsData.sinr = parseFloat(snrMatch[1]);
+                        }
+                        continue;
+                      }
+                    }
+
+                    finalizeEntry();
+                    return details;
+                  };
+
+                  this.detailedSignals = buildDetailedSignals();
 
                   // --- Temperature ---
                   // find this example value from lines "+QTEMP:"cpuss-0-usr","50"
@@ -1537,6 +2045,15 @@
             // Get the average of the RSRP Percentage and SINR Percentage
             let average = (rsrpNRPercentage + sinrNRPercentage) / 2;
             return Math.round(average);
+          },
+
+          getProgressBarClass(percentage) {
+            if (percentage >= 60) {
+              return "bg-success is-medium";
+            } else if (percentage >= 40) {
+              return "bg-warning is-warning is-medium";
+            }
+            return "bg-danger is-medium";
           },
 
           signalQuality(percentage) {
