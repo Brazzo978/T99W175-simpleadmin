@@ -311,7 +311,7 @@
                           x-data="{ getProgressBarClass: function() {
                           // Remove the percentage sign and convert to integer
                           var percentage = parseInt(this.rsrqLTEPercentage);
-                          
+
                           if (percentage >= 60) {
                               return 'progress-bar bg-success is-medium';
                           } else if (percentage >= 40) {
@@ -349,50 +349,6 @@
                           </span>
                         </td>
                       </tr>
-                      <tr x-show="rsrqNR != '-'">
-                        <th scope="row">SS_RSRQ<sup>5G</sup></th>
-                        <td
-                          x-data="{ getProgressBarClass: function() {
-                          // Remove the percentage sign and convert to integer
-                          var percentage = parseInt(this.rsrqNRPercentage);
-                          
-                          if (percentage >= 60) {
-                              return 'progress-bar bg-success is-medium';
-                          } else if (percentage >= 40) {
-                              return 'progress-bar bg-warning is-warning is-medium';
-                          } else {
-                              return 'progress-bar bg-danger is-medium';
-                          }
-                      } }"
-                        >
-                          <div
-                            x-show="rsrqNR != '-' && rsrqNRPercentage != '0'"
-                            class="progress w-100"
-                            role="progressbar"
-                            aria-label="RSRQ BAR"
-                            :aria-valuenow="rsrqNRPercentage"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                            style="height: 18px"
-                          >
-                            <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + rsrqNRPercentage + '%'"
-                            >
-                              <span
-                                x-text="rsrqNR + ' / ' + rsrqNRPercentage + '%'"
-                              ></span>
-                            </div>
-                          </div>
-                          <span
-                            x-show="rsrqNRPercentage == '0'"
-                            x-text="rsrqNR"
-                          ></span>
-                          <span x-show="rsrqNR == '-'" class="fst-italic">
-                            None
-                          </span>
-                        </td>
-                      </tr>
                       <tr x-show="rsrpLTE != '-'">
                         <th scope="row">RSRP<sup>4G</sup></th>
                         <td
@@ -401,7 +357,7 @@
                           getProgressBarClass: function() {
                               // Remove the percentage sign and convert to integer
                               var percentage = parseInt(this.rsrpLTEPercentage);
-                              
+
                               if (percentage >= 60) {
                                   return 'progress-bar bg-success is-medium';
                               } else if (percentage >= 40) {
@@ -440,15 +396,14 @@
                           </span>
                         </td>
                       </tr>
-                      <tr x-show="rsrpNR != '-'">
-                        <th scope="row">SS_RSRP<sup>5G</sup></th>
+                      <tr x-show="rssiLTE != '-'">
+                        <th scope="row">RSSI<sup>4G</sup></th>
                         <td
                           class="gap-4 align-items-center"
                           x-data="{
                           getProgressBarClass: function() {
-                              // Remove the percentage sign and convert to integer
-                              var percentage = parseInt(this.rsrpNRPercentage);
-                              
+                              var percentage = parseInt(this.rssiLTEPercentage);
+
                               if (percentage >= 60) {
                                   return 'progress-bar bg-success is-medium';
                               } else if (percentage >= 40) {
@@ -460,29 +415,29 @@
                         }"
                         >
                           <div
-                            x-show="rsrpNR != '-' && rsrpNRPercentage != '0'"
+                            x-show="rssiLTE != '-' && rssiLTEPercentage != '0'"
                             class="progress w-100"
                             role="progressbar"
-                            aria-label="RSRP BAR"
-                            :aria-valuenow="rsrpNRPercentage"
+                            aria-label="RSSI BAR"
+                            :aria-valuenow="rssiLTEPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
                             style="height: 18px"
                           >
                             <div
                               :class="getProgressBarClass()"
-                              :style="'width: ' + rsrpNRPercentage + '%'"
+                              :style="'width: ' + rssiLTEPercentage + '%'"
                             >
                               <span
-                                x-text="rsrpNR + ' / ' + rsrpNRPercentage + '%'"
+                                x-text="rssiLTE + ' dBm / ' + rssiLTEPercentage + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
-                            x-show="rsrpNRPercentage == '0'"
-                            x-text="rsrpNR"
+                            x-show="rssiLTEPercentage == '0'"
+                            x-text="rssiLTE"
                           ></span>
-                          <span x-show="rsrpNR == '-'" class="fst-italic">
+                          <span x-show="rssiLTE == '-'" class="fst-italic">
                             None
                           </span>
                         </td>
@@ -495,7 +450,7 @@
                           getProgressBarClass: function() {
                               // Remove the percentage sign and convert to integer
                               var percentage = parseInt(this.sinrLTEPercentage);
-                              
+
                               if (percentage >= 60) {
                                   return 'progress-bar bg-success is-medium';
                               } else if (percentage >= 40) {
@@ -534,6 +489,143 @@
                           </span>
                         </td>
                       </tr>
+                      <tr x-show="rsrqNR != '-'">
+                        <th scope="row">SS_RSRQ<sup>5G</sup></th>
+                        <td
+                          x-data="{ getProgressBarClass: function() {
+                          // Remove the percentage sign and convert to integer
+                          var percentage = parseInt(this.rsrqNRPercentage);
+
+                          if (percentage >= 60) {
+                              return 'progress-bar bg-success is-medium';
+                          } else if (percentage >= 40) {
+                              return 'progress-bar bg-warning is-warning is-medium';
+                          } else {
+                              return 'progress-bar bg-danger is-medium';
+                          }
+                      } }"
+                        >
+                          <div
+                            x-show="rsrqNR != '-' && rsrqNRPercentage != '0'"
+                            class="progress w-100"
+                            role="progressbar"
+                            aria-label="RSRQ BAR"
+                            :aria-valuenow="rsrqNRPercentage"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            style="height: 18px"
+                          >
+                            <div
+                              :class="getProgressBarClass()"
+                              :style="'width: ' + rsrqNRPercentage + '%'"
+                            >
+                              <span
+                                x-text="rsrqNR + ' / ' + rsrqNRPercentage + '%'"
+                              ></span>
+                            </div>
+                          </div>
+                          <span
+                            x-show="rsrqNRPercentage == '0'"
+                            x-text="rsrqNR"
+                          ></span>
+                          <span x-show="rsrqNR == '-'" class="fst-italic">
+                            None
+                          </span>
+                        </td>
+                      </tr>
+                      <tr x-show="rsrpNR != '-'">
+                        <th scope="row">SS_RSRP<sup>5G</sup></th>
+                        <td
+                          class="gap-4 align-items-center"
+                          x-data="{
+                          getProgressBarClass: function() {
+                              // Remove the percentage sign and convert to integer
+                              var percentage = parseInt(this.rsrpNRPercentage);
+
+                              if (percentage >= 60) {
+                                  return 'progress-bar bg-success is-medium';
+                              } else if (percentage >= 40) {
+                                  return 'progress-bar bg-warning is-warning is-medium';
+                              } else {
+                                  return 'progress-bar bg-danger is-medium';
+                              }
+                          }
+                        }"
+                        >
+                          <div
+                            x-show="rsrpNR != '-' && rsrpNRPercentage != '0'"
+                            class="progress w-100"
+                            role="progressbar"
+                            aria-label="RSRP BAR"
+                            :aria-valuenow="rsrpNRPercentage"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            style="height: 18px"
+                          >
+                            <div
+                              :class="getProgressBarClass()"
+                              :style="'width: ' + rsrpNRPercentage + '%'"
+                            >
+                              <span
+                                x-text="rsrpNR + ' / ' + rsrpNRPercentage + '%'"
+                              ></span>
+                            </div>
+                          </div>
+                          <span
+                            x-show="rsrpNRPercentage == '0'"
+                            x-text="rsrpNR"
+                          ></span>
+                          <span x-show="rsrpNR == '-'" class="fst-italic">
+                            None
+                          </span>
+                        </td>
+                      </tr>
+                      <tr x-show="rssiNR != '-'">
+                        <th scope="row">RSSI<sup>5G</sup></th>
+                        <td
+                          class="gap-4 align-items-center"
+                          x-data="{
+                          getProgressBarClass: function() {
+                              var percentage = parseInt(this.rssiNRPercentage);
+
+                              if (percentage >= 60) {
+                                  return 'progress-bar bg-success is-medium';
+                              } else if (percentage >= 40) {
+                                  return 'progress-bar bg-warning is-warning is-medium';
+                              } else {
+                                  return 'progress-bar bg-danger is-medium';
+                              }
+                          }
+                        }"
+                        >
+                          <div
+                            x-show="rssiNR != '-' && rssiNRPercentage != '0'"
+                            class="progress w-100"
+                            role="progressbar"
+                            aria-label="RSSI BAR"
+                            :aria-valuenow="rssiNRPercentage"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            style="height: 18px"
+                          >
+                            <div
+                              :class="getProgressBarClass()"
+                              :style="'width: ' + rssiNRPercentage + '%'"
+                            >
+                              <span
+                                x-text="rssiNR + ' dBm / ' + rssiNRPercentage + '%'"
+                              ></span>
+                            </div>
+                          </div>
+                          <span
+                            x-show="rssiNRPercentage == '0'"
+                            x-text="rssiNR"
+                          ></span>
+                          <span x-show="rssiNR == '-'" class="fst-italic">
+                            None
+                          </span>
+                        </td>
+                      </tr>
                       <tr x-show="sinrNR != '-'">
                         <th scope="row">SINR<sup>5G</sup></th>
                         <td
@@ -542,7 +634,7 @@
                           getProgressBarClass: function() {
                               // Remove the percentage sign and convert to integer
                               var percentage = parseInt(this.sinrNRPercentage);
-                              
+
                               if (percentage >= 60) {
                                   return 'progress-bar bg-success is-medium';
                               } else if (percentage >= 40) {
@@ -677,9 +769,6 @@
                             </template>
                           </div>
                         </template>
-                        <div class="small text-muted" x-show="entry.rssiDisplay">
-                          <span x-text="'RSSI: ' + entry.rssiDisplay"></span>
-                        </div>
                       </div>
 
                       <template x-if="entry.antennas && entry.antennas.length">
@@ -781,7 +870,10 @@
           eNBID: "Unknown",
           tac: "Unknown",
           csq: "-",
-          // rssi: "-",
+          rssiLTE: "-",
+          rssiNR: "-",
+          rssiLTEPercentage: "0%",
+          rssiNRPercentage: "0%",
           rsrpLTE: "-",
           rsrpNR: "-",
           rsrpLTEPercentage: "0%",
@@ -953,7 +1045,6 @@
                         rxDiversityDisplay: currentEntry.rxDiversity || "",
                         metrics: [],
                         antennas: [],
-                        rssiDisplay: "",
                       };
 
                       const addMetric = (key, label, value, unit, calculator) => {
@@ -982,6 +1073,13 @@
                       };
 
                       addMetric(
+                        "rsrq",
+                        currentEntry.technology === "NR" ? "SS_RSRQ" : "RSRQ",
+                        currentEntry.metricsData.rsrq,
+                        "dB",
+                        this.calculateRSRQPercentage
+                      );
+                      addMetric(
                         "rsrp",
                         currentEntry.technology === "NR" ? "SS_RSRP" : "RSRP",
                         currentEntry.metricsData.rsrp,
@@ -989,11 +1087,11 @@
                         this.calculateRSRPPercentage
                       );
                       addMetric(
-                        "rsrq",
-                        currentEntry.technology === "NR" ? "SS_RSRQ" : "RSRQ",
-                        currentEntry.metricsData.rsrq,
-                        "dB",
-                        this.calculateRSRQPercentage
+                        "rssi",
+                        "RSSI",
+                        currentEntry.metricsData.rssi,
+                        "dBm",
+                        this.calculateRSSIPercentage
                       );
                       addMetric(
                         "sinr",
@@ -1002,16 +1100,6 @@
                         "dB",
                         this.calculateSINRPercentage
                       );
-
-                      if (
-                        typeof currentEntry.metricsData.rssi === "number" &&
-                        !Number.isNaN(currentEntry.metricsData.rssi)
-                      ) {
-                        const normalizedRssi = roundValue(currentEntry.metricsData.rssi);
-                        if (normalizedRssi !== null) {
-                          detail.rssiDisplay = `${normalizedRssi} dBm`;
-                        }
-                      }
 
                       detail.antennas = (currentEntry.antennas || []).map((antenna, index) => {
                         const normalized = roundValue(antenna.value);
@@ -1230,6 +1318,18 @@
                         const rsrqMatch = line.match(/nr_rsrq:([\-\d\.]+)/i);
                         if (rsrqMatch) {
                           currentEntry.metricsData.rsrq = parseFloat(rsrqMatch[1]);
+                        }
+                        continue;
+                      }
+
+                      if (
+                        line.startsWith("nr_rssi:") &&
+                        currentEntry &&
+                        currentEntry.technology === "NR"
+                      ) {
+                        const rssiMatch = line.match(/nr_rssi:([\-\d\.]+)/i);
+                        if (rssiMatch) {
+                          currentEntry.metricsData.rssi = parseFloat(rssiMatch[1]);
                         }
                         continue;
                       }
@@ -1671,6 +1771,16 @@
                           : "-";
                       }
 
+                      const lteRssiLine = lines.find((line) =>
+                        line.includes('lte_rssi:')
+                      );
+                      if (lteRssiLine) {
+                        const rssiMatch = lteRssiLine.match(/lte_rssi:([^,\s]+)/i);
+                        this.rssiLTE = rssiMatch ? rssiMatch[1].trim() : "-";
+                      } else {
+                        this.rssiLTE = "-";
+                      }
+
                       this.rsrpLTEPercentage = this.calculateRSRPPercentage(
                         parseFloat(this.rsrpLTE)
                       );
@@ -1679,6 +1789,9 @@
                       );
                       this.sinrLTEPercentage = this.calculateSINRPercentage(
                         parseFloat(this.sinrLTE)
+                      );
+                      this.rssiLTEPercentage = this.calculateRSSIPercentage(
+                        parseFloat(this.rssiLTE)
                       );
 
                       const lteSignal = this.calculateSignalPercentage(
@@ -1744,6 +1857,16 @@
                         this.sinrNR = snrSegment ? snrSegment.trim() : "-";
                       }
 
+                      const nrRssiLine = lines.find((line) =>
+                        line.includes('nr_rssi:')
+                      );
+                      if (nrRssiLine) {
+                        const rssiMatch = nrRssiLine.match(/nr_rssi:([^,\s]+)/i);
+                        this.rssiNR = rssiMatch ? rssiMatch[1].trim() : "-";
+                      } else {
+                        this.rssiNR = "-";
+                      }
+
                       this.rsrpNRPercentage = this.calculateRSRPPercentage(
                         parseFloat(this.rsrpNR)
                       );
@@ -1752,6 +1875,9 @@
                       );
                       this.sinrNRPercentage = this.calculateSINRPercentage(
                         parseFloat(this.sinrNR)
+                      );
+                      this.rssiNRPercentage = this.calculateRSSIPercentage(
+                        parseFloat(this.rssiNR)
                       );
 
                       const nrSignal = this.calculateSignalPercentage(
@@ -1842,11 +1968,11 @@
                       .split(",")[12]
                       .replace(/"/g, "");
 
-                    // // RSSI LTE
-                    // this.rssi = lines
-                    //   .find((line) => line.includes('+QENG: "LTE"'))
-                    //   .split(",")[13]
-                    //   .replace(/"/g, "");
+                    // RSSI LTE
+                    this.rssiLTE = lines
+                      .find((line) => line.includes('+QENG: "LTE"'))
+                      .split(",")[13]
+                      .replace(/"/g, "");
 
                     // SINR LTE
                     this.sinrLTE = lines
@@ -1867,6 +1993,11 @@
                     // Calculate the SINR LTE Percentage
                     this.sinrLTEPercentage = this.calculateSINRPercentage(
                       parseInt(this.sinrLTE)
+                    );
+
+                    // Calculate the RSSI LTE Percentage
+                    this.rssiLTEPercentage = this.calculateRSSIPercentage(
+                      parseInt(this.rssiLTE)
                     );
 
                     // Calculate the Signal Percentage
@@ -1895,6 +2026,15 @@
                       .split(",")[6]
                       .replace(/"/g, "");
 
+                    try {
+                      this.rssiNR = lines
+                        .find((line) => line.includes('+QENG: "NR5G-NSA"'))
+                        .split(",")[7]
+                        .replace(/"/g, "");
+                    } catch (error) {
+                      this.rssiNR = "-";
+                    }
+
                     // Calculate the RSRP NR Percentage
                     this.rsrpNRPercentage = this.calculateRSRPPercentage(
                       parseInt(this.rsrpNR)
@@ -1908,6 +2048,11 @@
                     // Calculate the SINR NR Percentage
                     this.sinrNRPercentage = this.calculateSINRPercentage(
                       parseInt(this.sinrNR)
+                    );
+
+                    // Calculate the RSSI NR Percentage
+                    this.rssiNRPercentage = this.calculateRSSIPercentage(
+                      parseInt(this.rssiNR)
                     );
 
                     // Calculate the Signal Percentage
@@ -1994,6 +2139,32 @@
               14: 400,
             };
             return NR_BANDWIDTH_MAP[nr_bw];
+          },
+
+          calculateRSSIPercentage(rssi) {
+            const RSSI_MIN = -110;
+            const RSSI_MAX = -30;
+
+            if (isNaN(rssi)) {
+              return 0;
+            }
+
+            if (rssi <= RSSI_MIN) {
+              return 0;
+            }
+
+            let percentage =
+              ((rssi - RSSI_MIN) / (RSSI_MAX - RSSI_MIN)) * 100;
+
+            if (percentage > 100) {
+              percentage = 100;
+            }
+
+            if (percentage < 15) {
+              percentage = 15;
+            }
+
+            return Math.round(percentage);
           },
 
           calculateRSRPPercentage(rsrp) {
