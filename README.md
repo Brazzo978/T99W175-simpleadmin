@@ -1,3 +1,3 @@
 # T99W175-simpleadmin
 
-Interfaccia web "Simple Admin" per il modem/router T99W175, composta da pagine statiche HTML/JS e script CGI in Bash che dialogano con i servizi di rete del dispositivo. Per una descrizione approfondita di ogni file e delle funzionalità correnti consultare [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md).
+"Simple Admin" web interface for the T99W175 modem/router, composed of static HTML/JS pages and Bash CGI scripts that interact with the device's networking services. For a detailed description of each file and the available features, see [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md).

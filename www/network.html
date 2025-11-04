@@ -139,7 +139,7 @@
                       :class="{ active: activeUtilityTab === 'apn' }"
                       @click="activeUtilityTab = 'apn'"
                     >
-                      Impostazioni APN
+                      APN Settings
                     </button>
                   </li>
                   <li class="nav-item" role="presentation">
@@ -149,7 +149,7 @@
                       :class="{ active: activeUtilityTab === 'sim' }"
                       @click="activeUtilityTab = 'sim'"
                     >
-                      Gestione SIM
+                      SIM Management
                     </button>
                   </li>
                 </ul>
@@ -222,7 +222,7 @@
                   <div class="row">
                     <div class="col-lg-6">
                       <p class="text-muted">
-                        SIM attualmente attiva:
+                        Currently active SIM:
                         <span class="fw-semibold" x-text="formatActiveSimLabel()"></span>
                       </p>
                       <div class="form-check mb-2">
@@ -252,8 +252,7 @@
                         </label>
                       </div>
                       <small class="text-body-secondary"
-                        >Seleziona la SIM da utilizzare e premi "Applica" per
-                        confermare.</small
+                        >Select the SIM to use and press "Apply" to confirm.</small
                       >
                     </div>
                   </div>
@@ -275,7 +274,7 @@
                   x-show="activeUtilityTab === 'sim'"
                   :disabled="isApplyingSimChange || !canApplySimSelection()"
                 >
-                  Applica
+                  Apply
                 </button>
               </div>
             </div>
@@ -903,7 +902,7 @@
 
             // Check if both values are null then show the error message
             if (selectedMode === null || newCheckedValues.length === 0) {
-              alert("Seleziona almeno una banda da bloccare.");
+              alert("Select at least one band to lock.");
             } else {
               if (selectedMode === "LTE") {
                 let bandss = newCheckedValues
@@ -989,7 +988,7 @@
             const targetSlot = this.pendingSimSlot;
 
             if (!this.isValidSimCommandValue(targetSlot)) {
-              alert("Seleziona una SIM valida prima di continuare.");
+              alert("Select a valid SIM before continuing.");
               return;
             }
 
@@ -1001,7 +1000,7 @@
             }
 
             if (currentSlot !== null && currentSlot === targetSlot) {
-              alert("La SIM selezionata è già attiva.");
+              alert("The selected SIM is already active.");
               return;
             }
 
@@ -1016,8 +1015,8 @@
               this.isApplyingSimChange = false;
               this.showModal = false;
               alert(
-                this.lastErrorMessage ||
-                  "Impossibile cambiare SIM. Riprova."
+                  this.lastErrorMessage ||
+                    "Unable to change SIM. Please try again."
               );
               return;
             }
@@ -1081,7 +1080,7 @@
               if (["1", "3"].includes(selectedApnType)) {
                 targetApnType = selectedApnType;
               } else {
-                alert("Seleziona un tipo PDP valido.");
+                alert("Select a valid PDP type.");
                 return;
               }
             }

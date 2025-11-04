@@ -665,7 +665,7 @@
               <div
                 class="card-header d-flex justify-content-between align-items-center"
               >
-                <span>Dettaglio Segnali Avanzato</span>
+                <span>Advanced Signal Details</span>
                 <button
                   class="btn btn-sm btn-outline-primary"
                   type="button"
@@ -674,14 +674,14 @@
                   aria-expanded="false"
                   aria-controls="advancedSignalCollapse"
                 >
-                  Mostra dettagli
+                  Show details
                 </button>
               </div>
               <div id="advancedSignalCollapse" class="collapse">
                 <div class="card-body">
                   <template x-if="detailedSignals.length === 0">
                     <p class="mb-0 text-muted">
-                      Nessun dettaglio avanzato disponibile.
+                      No advanced details available.
                     </p>
                   </template>
 
@@ -696,19 +696,19 @@
                         <div>
                           <h5 class="mb-1" x-text="entry.title"></h5>
                           <p class="mb-0 text-muted">
-                            <span x-text="'Tecnologia: ' + entry.technology"></span>
-                            <span class="ms-3" x-text="'Banda: ' + entry.bandDisplay"></span>
+                            <span x-text="'Technology: ' + entry.technology"></span>
+                            <span class="ms-3" x-text="'Band: ' + entry.bandDisplay"></span>
                           </p>
                         </div>
                         <div class="text-md-end text-muted small">
                           <div x-text="'PCI: ' + entry.pciDisplay"></div>
-                          <div x-text="'Canale: ' + entry.channelDisplay"></div>
+                          <div x-text="'Channel: ' + entry.channelDisplay"></div>
                         </div>
                       </div>
 
                       <div class="row small text-muted mt-2">
                         <div class="col-md-6">
-                          <p class="mb-1" x-text="'Larghezza banda: ' + entry.bandwidthDisplay"></p>
+                          <p class="mb-1" x-text="'Bandwidth: ' + entry.bandwidthDisplay"></p>
                         </div>
                         <div class="col-md-6 text-md-end" x-show="entry.rxDiversityDisplay">
                           <p class="mb-1" x-text="'RX Diversity: ' + entry.rxDiversityDisplay"></p>
@@ -743,7 +743,7 @@
                               </div>
                             </template>
                             <template x-if="metric.percentage === 0">
-                              <span class="fst-italic text-muted">Valore non disponibile</span>
+                              <span class="fst-italic text-muted">Value not available</span>
                             </template>
                           </div>
                         </template>
@@ -751,7 +751,7 @@
 
                       <template x-if="entry.antennas && entry.antennas.length">
                         <div class="mt-3">
-                          <h6 class="fw-semibold">RSRP per antenna</h6>
+                          <h6 class="fw-semibold">RSRP per Antenna</h6>
                           <template x-for="antenna in entry.antennas" :key="antenna.label">
                             <div class="mb-2">
                               <div class="d-flex justify-content-between small">
@@ -775,7 +775,7 @@
                                 </div>
                               </template>
                               <template x-if="antenna.percentage === 0">
-                                <span class="fst-italic text-muted">Valore non disponibile</span>
+                                <span class="fst-italic text-muted">Value not available</span>
                               </template>
                             </div>
                           </template>
