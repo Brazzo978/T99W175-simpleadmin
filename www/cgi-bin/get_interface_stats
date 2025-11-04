@@ -1,0 +1,59 @@
+#!/bin/bash
+set -euo pipefail
+
+urldecode() {
+  local data="${1//+/ }"
+  printf '%b' "${data//%/\\x}"
+}
+
+raw_query="${QUERY_STRING:-}"
+iface=""
+
+if [ -n "$raw_query" ]; then
+  IFS='&' read -r -a pairs <<< "$raw_query"
+  for pair in "${pairs[@]}"; do
+    key="${pair%%=*}"
+    value="${pair#*=}"
+    if [ "$key" = "iface" ]; then
+      iface="$(urldecode "$value")"
+    fi
+  done
+fi
+
+if [ -z "$iface" ]; then
+  iface="wwan0"
+fi
+
+if ! [[ "$iface" =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+  printf 'Content-type: application/json\r\n\r\n'
+  printf '{"ok":false,"error":"Invalid interface name"}\n'
+  exit 0
+fi
+
+rx_path="/sys/class/net/$iface/statistics/rx_bytes"
+tx_path="/sys/class/net/$iface/statistics/tx_bytes"
+
+printf 'Content-type: application/json\r\n\r\n'
+
+if [ ! -r "$rx_path" ] || [ ! -r "$tx_path" ]; then
+  printf '{"ok":false,"error":"Interface not found","interface":"%s"}\n' "$iface"
+  exit 0
+fi
+
+if ! read -r rx_bytes < "$rx_path"; then
+  printf '{"ok":false,"error":"Unable to read rx_bytes","interface":"%s"}\n' "$iface"
+  exit 0
+fi
+
+if ! read -r tx_bytes < "$tx_path"; then
+  printf '{"ok":false,"error":"Unable to read tx_bytes","interface":"%s"}\n' "$iface"
+  exit 0
+fi
+
+if ! [[ "$rx_bytes" =~ ^[0-9]+$ ]] || ! [[ "$tx_bytes" =~ ^[0-9]+$ ]]; then
+  printf '{"ok":false,"error":"Invalid counter values","interface":"%s"}\n' "$iface"
+  exit 0
+fi
+
+printf '{"ok":true,"interface":"%s","rx_bytes":%s,"tx_bytes":%s}\n' \
+  "$iface" "$rx_bytes" "$tx_bytes"
