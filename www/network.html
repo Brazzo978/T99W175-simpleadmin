@@ -129,114 +129,156 @@
 
         <div class="row gap-3 mt-4">
           <div class="col">
-            <form>
-              <div class="card">
-                <div class="card-header">Network Utilities</div>
-                <div class="card-body row">
-                  <div class="col">
-                    <div class="mb-4">
-                      <label for="APN" class="form-label">APN</label>
-                      <input
-                        type="text"
-                        class="form-control"
-                        id="APN"
-                        x-model="newApn"
-                        aria-describedby="APN"
-                        maxlength="63"
-                        x-bind:placeholder="apn === '-' ? 'Fetching...' : apn"
-                      />
-                    </div>
-
-                    <div class="mb-4">
-                      <label for="ipForAPN" class="form-label"
-                        >Choose APN PDP Type</label
-                      >
-                      <select
-                        class="form-select"
-                        id="ipAPN"
-                        x-model="newApnIP"
-                        aria-label="ipForAPN"
-                      >
-                        <option
-                          value=""
-                          selected
-                          x-text="apnIP === '-' ? 'Fetching...' : 'Current: ' + apnIP"
-                        ></option>
-                        <option value="1">IPv4 Only</option>
-                        <option value="3">IPv4v6</option>
-                      </select>
-                    </div>
-
-                    <div class="mb-4 input-group grid gap-3">
-                      <label for="SIM1" class="form-label"> Change SIM</label>
-                      <div class="form-check form-check-inline">
+            <div class="card">
+              <div class="card-header pb-0">
+                <ul class="nav nav-tabs card-header-tabs">
+                  <li class="nav-item" role="presentation">
+                    <button
+                      type="button"
+                      class="nav-link"
+                      :class="{ active: activeUtilityTab === 'apn' }"
+                      @click="activeUtilityTab = 'apn'"
+                    >
+                      Impostazioni APN
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button
+                      type="button"
+                      class="nav-link"
+                      :class="{ active: activeUtilityTab === 'sim' }"
+                      @click="activeUtilityTab = 'sim'"
+                    >
+                      Gestione SIM
+                    </button>
+                  </li>
+                </ul>
+              </div>
+              <div class="card-body">
+                <div x-show="activeUtilityTab === 'apn'">
+                  <div class="row">
+                    <div class="col">
+                      <div class="mb-4">
+                        <label for="APN" class="form-label">APN</label>
                         <input
-                          class="form-check-input"
-                          type="radio"
-                          name="inlineRadioOptions"
-                          aria-describedby="SIM1"
-                          id="SIM1"
-                          value="option1"
-                          x-bind:checked="sim === '1'"
-                          x-on:click="newSim = '0'"
+                          type="text"
+                          class="form-control"
+                          id="APN"
+                          x-model="newApn"
+                          aria-describedby="APN"
+                          maxlength="63"
+                          x-bind:placeholder="apn === '-' ? 'Fetching...' : apn"
                         />
-                        <label class="form-check-label" for="inlineRadio1"
-                          >1</label
-                        >
                       </div>
-                      <div class="form-check form-check-inline">
-                        <input
-                          class="form-check-input"
-                          type="radio"
-                          name="inlineRadioOptions"
-                          aria-describedby="SIM2"
-                          id="SIM2"
-                          value="option2"
-                          x-bind:checked="sim === '2'"
-                          x-on:click="newSim = '1'"
-                        />
-                        <label class="form-check-label" for="inlineRadio2"
-                          >2</label
+
+                      <div class="mb-4">
+                        <label for="ipForAPN" class="form-label"
+                          >Choose APN PDP Type</label
                         >
+                        <select
+                          class="form-select"
+                          id="ipAPN"
+                          x-model="newApnIP"
+                          aria-label="ipForAPN"
+                        >
+                          <option
+                            value=""
+                            selected
+                            x-text="apnIP === '-' ? 'Fetching...' : 'Current: ' + apnIP"
+                          ></option>
+                          <option value="1">IPv4 Only</option>
+                          <option value="3">IPv4v6</option>
+                        </select>
                       </div>
                     </div>
-                  </div>
 
-                  <div class="col">
-                    <div class="mb-4">
-                      <label for="prefNetworkMode" class="form-label"
-                        >Select Preferred Network</label
-                      >
-                      <select
-                        class="form-select"
-                        id="prefNetworkMode"
-                        x-model="prefNetworkMode"
-                        aria-label="prefNetworkMode"
-                      >
-                        <option
-                          value=""
-                          selected
-                          x-text="prefNetwork === '-' ? 'Fetching...' : 'Current: ' + prefNetwork"
-                        ></option>
-                        <option value="7">AUTO</option>
-                        <option value="2">LTE Only</option>
-                        <option value="6">NR5G-NSA</option>
-                        <option value="4">NR5G-SA</option>
-                      </select>
+                    <div class="col">
+                      <div class="mb-4">
+                        <label for="prefNetworkMode" class="form-label"
+                          >Select Preferred Network</label
+                        >
+                        <select
+                          class="form-select"
+                          id="prefNetworkMode"
+                          x-model="prefNetworkMode"
+                          aria-label="prefNetworkMode"
+                        >
+                          <option
+                            value=""
+                            selected
+                            x-text="prefNetwork === '-' ? 'Fetching...' : 'Current: ' + prefNetwork"
+                          ></option>
+                          <option value="7">AUTO</option>
+                          <option value="2">LTE Only</option>
+                          <option value="6">NR5G-NSA</option>
+                          <option value="4">NR5G-SA</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div class="card-footer">
-                  <button
-                    type="button"
-                    class="btn btn-primary"
-                    @click="saveChanges()"
-                  >
-                    Save Changes
-                  </button>
+
+                <div x-show="activeUtilityTab === 'sim'">
+                  <div class="row">
+                    <div class="col-lg-6">
+                      <p class="text-muted">
+                        SIM attualmente attiva:
+                        <span class="fw-semibold" x-text="formatActiveSimLabel()"></span>
+                      </p>
+                      <div class="form-check mb-2">
+                        <input
+                          class="form-check-input"
+                          type="radio"
+                          name="simSelection"
+                          id="sim1Option"
+                          value="0"
+                          x-model="pendingSimSlot"
+                        />
+                        <label class="form-check-label" for="sim1Option">
+                          SIM 1
+                        </label>
+                      </div>
+                      <div class="form-check mb-2">
+                        <input
+                          class="form-check-input"
+                          type="radio"
+                          name="simSelection"
+                          id="sim2Option"
+                          value="1"
+                          x-model="pendingSimSlot"
+                        />
+                        <label class="form-check-label" for="sim2Option">
+                          SIM 2 / eSIM
+                        </label>
+                      </div>
+                      <small class="text-body-secondary"
+                        >Seleziona la SIM da utilizzare e premi "Applica" per
+                        confermare.</small
+                      >
+                    </div>
+                  </div>
                 </div>
               </div>
-            </form>
+              <div class="card-footer d-flex justify-content-end gap-2">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  @click="saveChanges()"
+                  x-show="activeUtilityTab === 'apn'"
+                >
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  @click="applySimSelection()"
+                  x-show="activeUtilityTab === 'sim'"
+                  :disabled="isApplyingSimChange || !canApplySimSelection()"
+                >
+                  Applica
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="col-md-4">
@@ -404,6 +446,7 @@
           showModal: false,
           countdown: 0,
           lastErrorMessage: "",
+          activeUtilityTab: "apn",
           networkModeCell: "-",
           earfcn1: null,
           pci1: null,
@@ -443,7 +486,8 @@
           currentNetworkMode: "LTE",
           updatedLockedBands: [],
           sim: "-",
-          newSim: null,
+          pendingSimSlot: null,
+          isApplyingSimChange: false,
           cellLockStatus: "Unknown",
           bands: "Fetching Bands...",
           isGettingBands: false,
@@ -533,6 +577,40 @@
               "4": "PPP",
             };
             return mapping[value] || null;
+          },
+          mapSimDisplayToCommandValue(value) {
+            if (value === "1") {
+              return "0";
+            }
+            if (value === "2") {
+              return "1";
+            }
+            return null;
+          },
+          isValidSimCommandValue(value) {
+            return value === "0" || value === "1";
+          },
+          canApplySimSelection() {
+            if (!this.isValidSimCommandValue(this.pendingSimSlot)) {
+              return false;
+            }
+
+            const current = this.mapSimDisplayToCommandValue(this.sim);
+
+            if (current === null) {
+              return true;
+            }
+
+            return current !== this.pendingSimSlot;
+          },
+          formatActiveSimLabel() {
+            if (this.sim === "1") {
+              return "SIM 1";
+            }
+            if (this.sim === "2") {
+              return "SIM 2 / eSIM";
+            }
+            return "Sconosciuta";
           },
 
           async getSupportedBands() {
@@ -798,6 +876,9 @@
               }
 
               this.sim = settings.sim;
+              this.pendingSimSlot = this.mapSimDisplayToCommandValue(
+                settings.sim
+              );
               this.apn = settings.apn;
               this.apnIP = settings.apnIP;
               this.cellLockStatus = settings.cellLockStatus;
@@ -897,6 +978,58 @@
 
                 // Refresh the page to show the updated bands
                 this.init();
+              }
+            }, 1000);
+          },
+          async applySimSelection() {
+            if (this.isApplyingSimChange) {
+              return;
+            }
+
+            const targetSlot = this.pendingSimSlot;
+
+            if (!this.isValidSimCommandValue(targetSlot)) {
+              alert("Seleziona una SIM valida prima di continuare.");
+              return;
+            }
+
+            let currentSlot = this.mapSimDisplayToCommandValue(this.sim);
+
+            if (currentSlot === null) {
+              await this.getCurrentSettings();
+              currentSlot = this.mapSimDisplayToCommandValue(this.sim);
+            }
+
+            if (currentSlot !== null && currentSlot === targetSlot) {
+              alert("La SIM selezionata è già attiva.");
+              return;
+            }
+
+            this.isApplyingSimChange = true;
+            this.showModal = true;
+
+            const result = await this.sendATcommand(
+              `AT^SWITCH_SLOT=${targetSlot}`
+            );
+
+            if (!result.ok) {
+              this.isApplyingSimChange = false;
+              this.showModal = false;
+              alert(
+                this.lastErrorMessage ||
+                  "Impossibile cambiare SIM. Riprova."
+              );
+              return;
+            }
+
+            this.countdown = 10;
+            const interval = setInterval(() => {
+              this.countdown--;
+              if (this.countdown === 0) {
+                clearInterval(interval);
+                this.showModal = false;
+                this.isApplyingSimChange = false;
+                this.getCurrentSettings();
               }
             }, 1000);
           },
@@ -1005,13 +1138,6 @@
               });
             }
 
-            if (this.newSim === "0" || this.newSim === "1") {
-              commandsToRun.push({
-                command: `AT^SWITCH_SLOT=${this.newSim}`,
-                errorMessage: "Unable to switch SIM.",
-              });
-            }
-
             if (
               this.prefNetworkMode !== null &&
               this.prefNetworkMode !== undefined &&
@@ -1095,7 +1221,6 @@
                 this.newApn = null;
                 this.newApnIP = null;
                 this.prefNetworkMode = null;
-                this.newSim = null;
                 this.init();
               }
             }, 1000);
