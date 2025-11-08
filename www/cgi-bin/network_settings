@@ -1,242 +1,375 @@
-#!/usr/bin/env python3
-import json
-import os
-import re
-import sys
-import urllib.parse
-from pathlib import Path
-from typing import Dict, List, Optional
+#!/bin/bash
+set -eu
 
+CONFIG_FILE="${MOBILEAP_CONFIG_PATH:-/etc/data/mobileap_cfg.xml}"
+TMP_FILE="/tmp/mobileap_cfg_tmp.xml"
 
-DEFAULT_CONFIG_PATH = Path("/etc/data/mobileap_cfg.xml")
+print_headers() {
+    echo "Content-type: application/json"
+    echo
+}
 
+json_escape() {
+    local str="${1:-}"
+    str=${str//\\/\\\\}
+    str=${str//\"/\\\"}
+    str=${str//$'\n'/\\n}
+    str=${str//$'\r'/}
+    str=${str//$'\t'/\\t}
+    echo "$str"
+}
 
-def resolve_config_path() -> Path:
-    override = os.environ.get("MOBILEAP_CONFIG_PATH")
-    if override:
-        return Path(override).expanduser()
+respond() {
+    local success="$1"
+    local message="$2"
+    local data_json="${3:-}"
+    local errors_json="${4:-}"
 
-    return DEFAULT_CONFIG_PATH
+    local escaped_message
+    escaped_message=$(json_escape "$message")
 
+    print_headers
+    printf '{"success":%s,"message":"%s"' "$success" "$escaped_message"
+    if [ -n "$data_json" ]; then
+        printf ',"data":%s' "$data_json"
+    fi
+    if [ -n "$errors_json" ]; then
+        printf ',"errors":%s' "$errors_json"
+    fi
+    printf '}'
+    printf '\n'
+    exit 0
+}
 
-CONFIG_PATH = resolve_config_path()
+config_exists() {
+    [ -f "$CONFIG_FILE" ]
+}
 
+strip_comments() {
+    sed 's/<!--.*-->//g'
+}
 
-def print_headers() -> None:
-    print("Content-type: application/json")
-    print()
+trim() {
+    sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
 
+get_xml_value() {
+    local key="$1"
+    local file="$2"
 
-def respond(success: bool, message: str, *, data: Optional[Dict] = None, errors: Optional[List[str]] = None) -> None:
-    payload = {"success": success, "message": message}
-    if data is not None:
-        payload["data"] = data
-    if errors:
-        payload["errors"] = errors
-    print_headers()
-    json.dump(payload, sys.stdout)
-    sys.stdout.write("\n")
-
-
-def load_configuration() -> str:
-    try:
-        with CONFIG_PATH.open("r", encoding="utf-8") as handle:
-            return handle.read()
-    except OSError:
-        respond(False, f"Configuration file not found at {CONFIG_PATH}.")
-        sys.exit(0)
-
-
-def save_configuration(content: str) -> bool:
-    try:
-        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with CONFIG_PATH.open("w", encoding="utf-8") as handle:
-            handle.write(content)
-        return True
-    except OSError:
-        return False
-
-
-def read_xml_value(content: str, tag: str) -> str:
-    pattern = re.compile(rf"<{tag}>\s*([^<]*)\s*</{tag}>", re.IGNORECASE)
-    match = pattern.search(content)
-    if not match:
-        return ""
-    return match.group(1).strip()
-
-
-def update_xml_value(content: str, tag: str, value: str) -> str:
-    pattern = re.compile(rf"(<{tag}>\s*)([^<]*)(\s*</{tag}>)", re.IGNORECASE)
-    replacement, count = pattern.subn(rf"\g<1>{value}\g<3>", content, count=1)
-    if count == 0:
-        raise ValueError(f"Missing XML element: {tag}")
-    return replacement
-
-
-def parse_params() -> Dict[str, str]:
-    params: Dict[str, str] = {}
-
-    def apply(parsed: Dict[str, List[str]]) -> None:
-        for key, values in parsed.items():
-            if not values:
-                params[key] = ""
-            else:
-                params[key] = values[-1]
-
-    query = os.environ.get("QUERY_STRING", "")
-    if query:
-        apply(urllib.parse.parse_qs(query, keep_blank_values=True))
-
-    if os.environ.get("REQUEST_METHOD", "").upper() == "POST":
-        length = 0
-        try:
-            length = int(os.environ.get("CONTENT_LENGTH", "0") or "0")
-        except ValueError:
-            length = 0
-
-        if length > 0:
-            body = sys.stdin.read(length)
-            if body:
-                apply(urllib.parse.parse_qs(body, keep_blank_values=True))
-
-    return params
-
-
-def is_valid_ip(value: str) -> bool:
-    pattern = re.compile(r"^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$")
-    return bool(pattern.match(value))
-
-
-def is_valid_netmask(value: str) -> bool:
-    valid_masks = {
-        "255.255.255.255",
-        "255.255.255.254",
-        "255.255.255.252",
-        "255.255.255.248",
-        "255.255.255.240",
-        "255.255.255.224",
-        "255.255.255.192",
-        "255.255.255.128",
-        "255.255.255.0",
-        "255.255.254.0",
-        "255.255.252.0",
-        "255.255.248.0",
-        "255.255.240.0",
-        "255.255.224.0",
-        "255.255.192.0",
-        "255.255.128.0",
-        "255.255.0.0",
-        "255.254.0.0",
-        "255.252.0.0",
-        "255.248.0.0",
-        "255.240.0.0",
-        "255.224.0.0",
-        "255.192.0.0",
-        "255.128.0.0",
-        "255.0.0.0",
-        "254.0.0.0",
-        "252.0.0.0",
-        "248.0.0.0",
-        "240.0.0.0",
-        "224.0.0.0",
-        "192.0.0.0",
-        "128.0.0.0",
-        "0.0.0.0",
-    }
-    return value in valid_masks
-
-
-def ip_to_int(value: str) -> int:
-    parts = [int(part) for part in value.split(".")]
-    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3]
-
-
-def same_subnet(ip1: str, ip2: str, netmask: str) -> bool:
-    return (ip_to_int(ip1) & ip_to_int(netmask)) == (ip_to_int(ip2) & ip_to_int(netmask))
-
-
-def handle_get(content: str) -> None:
-    data = {
-        "ipAddress": read_xml_value(content, "APIPAddr"),
-        "subnetMask": read_xml_value(content, "SubNetMask"),
-        "dhcpEnabled": read_xml_value(content, "EnableDHCPServer") == "1",
-        "dhcpStart": read_xml_value(content, "StartIP"),
-        "dhcpEnd": read_xml_value(content, "EndIP"),
-        "dhcpLease": read_xml_value(content, "LeaseTime"),
-    }
-    respond(True, "Network configuration loaded.", data=data)
-
-
-def handle_update(content: str, params: Dict[str, str]) -> None:
-    new_ip = (params.get("ip_address") or "").strip()
-    new_mask = (params.get("subnet_mask") or "").strip()
-    dhcp_enabled = params.get("dhcp_enabled", "1").strip()
-    dhcp_start = (params.get("dhcp_start") or "").strip()
-    dhcp_end = (params.get("dhcp_end") or "").strip()
-    dhcp_lease = (params.get("dhcp_lease") or "").strip()
-
-    errors: List[str] = []
-
-    if not new_ip or not is_valid_ip(new_ip):
-        errors.append("Invalid LAN IP address provided.")
-    if not new_mask or not is_valid_netmask(new_mask):
-        errors.append("Invalid subnet mask provided.")
-
-    if dhcp_enabled not in {"0", "1"}:
-        errors.append("Invalid DHCP server status provided.")
-
-    if dhcp_enabled == "1":
-        if not dhcp_start or not is_valid_ip(dhcp_start):
-            errors.append("Invalid DHCP range start provided.")
-        if not dhcp_end or not is_valid_ip(dhcp_end):
-            errors.append("Invalid DHCP range end provided.")
-        if not dhcp_lease.isdigit() or int(dhcp_lease) <= 0:
-            errors.append("Lease time must be a positive number of seconds.")
-
-        if not errors:
-            if not same_subnet(new_ip, dhcp_start, new_mask):
-                errors.append("The DHCP range start must be in the same subnet as the LAN IP.")
-            if not same_subnet(new_ip, dhcp_end, new_mask):
-                errors.append("The DHCP range end must be in the same subnet as the LAN IP.")
-            if is_valid_ip(dhcp_start) and is_valid_ip(dhcp_end):
-                if ip_to_int(dhcp_start) > ip_to_int(dhcp_end):
-                    errors.append("The DHCP range start must be lower than the end address.")
-
-    if errors:
-        respond(False, "Unable to update the network configuration.", errors=errors)
+    if ! [ -f "$file" ]; then
+        echo ""
         return
+    fi
 
-    updated = content
-    try:
-        updated = update_xml_value(updated, "APIPAddr", new_ip)
-        updated = update_xml_value(updated, "SubNetMask", new_mask)
-        updated = update_xml_value(updated, "EnableDHCPServer", dhcp_enabled)
-        if dhcp_enabled == "1":
-            updated = update_xml_value(updated, "StartIP", dhcp_start)
-            updated = update_xml_value(updated, "EndIP", dhcp_end)
-            updated = update_xml_value(updated, "LeaseTime", dhcp_lease)
-    except ValueError as exc:  # missing tag
-        respond(False, str(exc))
+    local value
+    value=$(sed -n "s/.*<$key>\\(.*\\)<\/$key>.*/\\1/p" "$file" | head -n 1)
+    if [ -z "$value" ]; then
+        echo ""
         return
+    fi
 
-    if not save_configuration(updated):
-        respond(False, "Unable to persist the configuration changes.")
+    value=$(printf '%s' "$value" | strip_comments | tr -d '\r' | trim)
+    echo "$value"
+}
+
+set_xml_value() {
+    local key="$1"
+    local value="$2"
+    local file="$3"
+
+    if ! grep -q "<$key>" "$file"; then
+        return 1
+    fi
+
+    if ! sed "s|<$key>.*</$key>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
+        return 1
+    fi
+
+    if ! mv "$TMP_FILE" "$file"; then
+        return 1
+    fi
+
+    return 0
+}
+
+is_valid_ip() {
+    local value="$1"
+    if [[ $value =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        IFS='.' read -r o1 o2 o3 o4 <<< "$value"
+        for octet in "$o1" "$o2" "$o3" "$o4"; do
+            if ! [[ $octet =~ ^[0-9]+$ ]]; then
+                return 1
+            fi
+            if ((10#$octet < 0 || 10#$octet > 255)); then
+                return 1
+            fi
+        done
+        return 0
+    fi
+    return 1
+}
+
+is_valid_netmask() {
+    local value="$1"
+    case "$value" in
+        255.255.255.255|255.255.255.254|255.255.255.252|255.255.255.248|\
+255.255.255.240|255.255.255.224|255.255.255.192|255.255.255.128|\
+255.255.255.0|255.255.254.0|255.255.252.0|255.255.248.0|255.255.240.0|\
+255.255.224.0|255.255.192.0|255.255.128.0|255.255.0.0|255.254.0.0|\
+255.252.0.0|255.248.0.0|255.240.0.0|255.224.0.0|255.192.0.0|255.128.0.0|\
+255.0.0.0|254.0.0.0|252.0.0.0|248.0.0.0|240.0.0.0|224.0.0.0|192.0.0.0|\
+128.0.0.0|0.0.0.0)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+ip_to_int() {
+    local value="$1"
+    IFS='.' read -r o1 o2 o3 o4 <<< "$value"
+    echo $(( (10#$o1 << 24) + (10#$o2 << 16) + (10#$o3 << 8) + 10#$o4 ))
+}
+
+same_subnet() {
+    local ip1="$1"
+    local ip2="$2"
+    local mask="$3"
+    local i1 i2 m
+    i1=$(ip_to_int "$ip1")
+    i2=$(ip_to_int "$ip2")
+    m=$(ip_to_int "$mask")
+    if [ $((i1 & m)) -eq $((i2 & m)) ]; then
+        return 0
+    fi
+    return 1
+}
+
+urldecode() {
+    local data="${1//+/ }"
+    printf '%b' "${data//%/\\x}"
+}
+
+ACTION="get"
+IP_ADDRESS=""
+SUBNET_MASK=""
+DHCP_ENABLED="1"
+DHCP_START=""
+DHCP_END=""
+DHCP_LEASE=""
+
+apply_params() {
+    local input="$1"
+    [ -z "$input" ] && return
+
+    IFS='&' read -r -a pairs <<< "$input"
+    for pair in "${pairs[@]}"; do
+        [ -z "$pair" ] && continue
+        local key="${pair%%=*}"
+        local value=""
+        if [[ "$pair" == *"="* ]]; then
+            value="${pair#*=}"
+        fi
+        key=$(urldecode "$key")
+        value=$(urldecode "$value")
+        case "$key" in
+            action)
+                ACTION=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
+                ;;
+            ip_address)
+                IP_ADDRESS="$value"
+                ;;
+            subnet_mask)
+                SUBNET_MASK="$value"
+                ;;
+            dhcp_enabled)
+                DHCP_ENABLED="$value"
+                ;;
+            dhcp_start)
+                DHCP_START="$value"
+                ;;
+            dhcp_end)
+                DHCP_END="$value"
+                ;;
+            dhcp_lease)
+                DHCP_LEASE="$value"
+                ;;
+        esac
+    done
+}
+
+read_request() {
+    if [ -n "${QUERY_STRING:-}" ]; then
+        apply_params "$QUERY_STRING"
+    fi
+
+    if [ "${REQUEST_METHOD:-}" = "POST" ]; then
+        local length="${CONTENT_LENGTH:-0}"
+        if [[ "$length" =~ ^[0-9]+$ ]] && [ "$length" -gt 0 ]; then
+            local body
+            body=$(dd bs=1 count="$length" 2>/dev/null)
+            apply_params "$body"
+        fi
+    fi
+}
+
+errors=()
+add_error() {
+    errors+=("$1")
+}
+
+errors_to_json() {
+    if [ ${#errors[@]} -eq 0 ]; then
+        echo ""
         return
+    fi
 
-    respond(True, "Network configuration updated successfully.")
+    local json="["
+    local first=1
+    for err in "${errors[@]}"; do
+        local escaped
+        escaped=$(json_escape "$err")
+        if [ $first -eq 1 ]; then
+            json+="\"$escaped\""
+            first=0
+        else
+            json+=",\"$escaped\""
+        fi
+    done
+    json+="]"
+    echo "$json"
+}
 
+handle_get() {
+    if ! config_exists; then
+        respond false "Configuration file not found at $CONFIG_FILE."
+    fi
 
-def main() -> None:
-    params = parse_params()
-    action = params.get("action", "get").lower()
+    local ip mask dhcp_enable dhcp_start dhcp_end dhcp_lease
+    ip=$(get_xml_value "APIPAddr" "$CONFIG_FILE")
+    mask=$(get_xml_value "SubNetMask" "$CONFIG_FILE")
+    dhcp_enable=$(get_xml_value "EnableDHCPServer" "$CONFIG_FILE")
+    dhcp_start=$(get_xml_value "StartIP" "$CONFIG_FILE")
+    dhcp_end=$(get_xml_value "EndIP" "$CONFIG_FILE")
+    dhcp_lease=$(get_xml_value "LeaseTime" "$CONFIG_FILE")
 
-    content = load_configuration()
+    local dhcp_flag="false"
+    if [ "$dhcp_enable" = "1" ]; then
+        dhcp_flag="true"
+    fi
 
-    if action == "update":
-        handle_update(content, params)
-    else:
-        handle_get(content)
+    local data
+    data=$(printf '{"ipAddress":"%s","subnetMask":"%s","dhcpEnabled":%s,"dhcpStart":"%s","dhcpEnd":"%s","dhcpLease":"%s"}' \
+        "$(json_escape "$ip")" \
+        "$(json_escape "$mask")" \
+        "$dhcp_flag" \
+        "$(json_escape "$dhcp_start")" \
+        "$(json_escape "$dhcp_end")" \
+        "$(json_escape "$dhcp_lease")")
 
+    respond true "Network configuration loaded." "$data"
+}
 
-if __name__ == "__main__":
-    main()
+handle_update() {
+    if ! config_exists; then
+        respond false "Configuration file not found at $CONFIG_FILE."
+    fi
+
+    errors=()
+
+    local ip="${IP_ADDRESS// /}"
+    local mask="${SUBNET_MASK// /}"
+    local dhcp_flag="${DHCP_ENABLED:-1}"
+    local dhcp_start="${DHCP_START// /}"
+    local dhcp_end="${DHCP_END// /}"
+    local dhcp_lease="${DHCP_LEASE// /}"
+
+    if [ -z "$ip" ] || ! is_valid_ip "$ip"; then
+        add_error "Invalid LAN IP address provided."
+    fi
+
+    if [ -z "$mask" ] || ! is_valid_netmask "$mask"; then
+        add_error "Invalid subnet mask provided."
+    fi
+
+    if [ "$dhcp_flag" != "0" ] && [ "$dhcp_flag" != "1" ]; then
+        add_error "Invalid DHCP server status provided."
+    fi
+
+    if [ "$dhcp_flag" = "1" ]; then
+        if [ -z "$dhcp_start" ] || ! is_valid_ip "$dhcp_start"; then
+            add_error "Invalid DHCP range start provided."
+        fi
+        if [ -z "$dhcp_end" ] || ! is_valid_ip "$dhcp_end"; then
+            add_error "Invalid DHCP range end provided."
+        fi
+        if ! [[ "$dhcp_lease" =~ ^[0-9]+$ ]] || [ "$dhcp_lease" -le 0 ]; then
+            add_error "Lease time must be a positive number of seconds."
+        fi
+
+        if [ ${#errors[@]} -eq 0 ]; then
+            if ! same_subnet "$ip" "$dhcp_start" "$mask"; then
+                add_error "The DHCP range start must be in the same subnet as the LAN IP."
+            fi
+            if ! same_subnet "$ip" "$dhcp_end" "$mask"; then
+                add_error "The DHCP range end must be in the same subnet as the LAN IP."
+            fi
+            if is_valid_ip "$dhcp_start" && is_valid_ip "$dhcp_end"; then
+                local start_int end_int
+                start_int=$(ip_to_int "$dhcp_start")
+                end_int=$(ip_to_int "$dhcp_end")
+                if [ "$start_int" -gt "$end_int" ]; then
+                    add_error "The DHCP range start must be lower than the end address."
+                fi
+            fi
+        fi
+    fi
+
+    if [ ${#errors[@]} -gt 0 ]; then
+        local errors_json
+        errors_json=$(errors_to_json)
+        respond false "Unable to update the network configuration." "" "$errors_json"
+    fi
+
+    mkdir -p "$(dirname "$CONFIG_FILE")"
+
+    if ! set_xml_value "APIPAddr" "$ip" "$CONFIG_FILE"; then
+        respond false "Missing XML element: APIPAddr"
+    fi
+    if ! set_xml_value "SubNetMask" "$mask" "$CONFIG_FILE"; then
+        respond false "Missing XML element: SubNetMask"
+    fi
+    if ! set_xml_value "EnableDHCPServer" "$dhcp_flag" "$CONFIG_FILE"; then
+        respond false "Missing XML element: EnableDHCPServer"
+    fi
+
+    if [ "$dhcp_flag" = "1" ]; then
+        if ! set_xml_value "StartIP" "$dhcp_start" "$CONFIG_FILE"; then
+            respond false "Missing XML element: StartIP"
+        fi
+        if ! set_xml_value "EndIP" "$dhcp_end" "$CONFIG_FILE"; then
+            respond false "Missing XML element: EndIP"
+        fi
+        if ! set_xml_value "LeaseTime" "$dhcp_lease" "$CONFIG_FILE"; then
+            respond false "Missing XML element: LeaseTime"
+        fi
+    fi
+
+    respond true "Network configuration updated successfully."
+}
+
+main() {
+    read_request
+
+    case "$ACTION" in
+        update)
+            handle_update
+            ;;
+        *)
+            handle_get
+            ;;
+    esac
+}
+
+main
