@@ -435,6 +435,9 @@
             }
 
             this.isSaving = true;
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+
             try {
               const response = await fetch("/cgi-bin/network_settings", {
                 method: "POST",
@@ -443,6 +446,7 @@
                   Accept: "application/json",
                 },
                 body: params.toString(),
+                signal: controller.signal,
               });
 
               if (!response.ok) {
@@ -466,10 +470,17 @@
               this.successMessage = "";
               this.validationErrors = [];
               this.loadError = "";
-              this.validationErrors.push(
-                error && error.message ? error.message : "Unable to save the network settings."
-              );
+              if (error && error.name === "AbortError") {
+                this.validationErrors.push(
+                  "Saving the network settings timed out. Please verify the connection and try again."
+                );
+              } else {
+                this.validationErrors.push(
+                  error && error.message ? error.message : "Unable to save the network settings."
+                );
+              }
             } finally {
+              window.clearTimeout(timeoutId);
               this.isSaving = false;
             }
           },
