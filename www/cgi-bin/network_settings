@@ -57,20 +57,44 @@ def save_configuration(content: str) -> bool:
         return False
 
 
+def strip_xml_comments(value: str) -> str:
+    """Remove XML comments from a captured XML value."""
+
+    return re.sub(r"<!--.*?-->", "", value, flags=re.DOTALL)
+
+
 def read_xml_value(content: str, tag: str) -> str:
-    pattern = re.compile(rf"<{tag}>\s*([^<]*)\s*</{tag}>", re.IGNORECASE)
+    pattern = re.compile(rf"<{tag}>(.*?)</{tag}>", re.IGNORECASE | re.DOTALL)
     match = pattern.search(content)
     if not match:
         return ""
-    return match.group(1).strip()
+
+    value = strip_xml_comments(match.group(1))
+    return value.strip()
 
 
 def update_xml_value(content: str, tag: str, value: str) -> str:
-    pattern = re.compile(rf"(<{tag}>\s*)([^<]*)(\s*</{tag}>)", re.IGNORECASE)
-    replacement, count = pattern.subn(rf"\g<1>{value}\g<3>", content, count=1)
+    pattern = re.compile(rf"(<{tag}>)(.*?)(</{tag}>)", re.IGNORECASE | re.DOTALL)
+
+    def replacer(match: re.Match[str]) -> str:
+        prefix, current, suffix = match.groups()
+        cleaned = strip_xml_comments(current)
+
+        leading_ws_match = re.match(r"^\s*", current)
+        trailing_ws_match = re.search(r"\s*$", current)
+        leading_ws = leading_ws_match.group(0) if leading_ws_match else ""
+        trailing_ws = trailing_ws_match.group(0) if trailing_ws_match else ""
+
+        if cleaned.strip():
+            # Preserve indentation if the current value spans multiple lines
+            return f"{prefix}{leading_ws}{value}{trailing_ws}{suffix}"
+
+        return f"{prefix}{value}{suffix}"
+
+    updated, count = pattern.subn(replacer, content, count=1)
     if count == 0:
         raise ValueError(f"Missing XML element: {tag}")
-    return replacement
+    return updated
 
 
 def parse_params() -> Dict[str, str]:
