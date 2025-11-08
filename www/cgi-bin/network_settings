@@ -78,15 +78,11 @@ set_xml_value() {
     local value="$2"
     local file="$3"
 
-    if grep -q "<$key>" "$file"; then
-        if ! sed "s|<$key>.*</$key>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
-            return 1
-        fi
-    elif grep -Eq "<$key[[:space:]]*/>" "$file"; then
-        if ! sed "s|<$key[[:space:]]*/>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
-            return 1
-        fi
-    else
+    if ! grep -q "<$key>" "$file"; then
+        return 1
+    fi
+
+    if ! sed "s|<$key>.*</$key>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
         return 1
     fi
 
