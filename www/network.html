@@ -261,6 +261,14 @@
               <div class="card-footer d-flex justify-content-end gap-2">
                 <button
                   type="button"
+                  class="btn btn-danger"
+                  @click="resetApnSettings()"
+                  x-show="activeUtilityTab === 'apn'"
+                >
+                  Reset APN Settings
+                </button>
+                <button
+                  type="button"
                   class="btn btn-primary"
                   @click="saveChanges()"
                   x-show="activeUtilityTab === 'apn'"
@@ -493,19 +501,12 @@
           rawdata: "",
           networkModeListenerAttached: false,
           providerBandsListenerAttached: false,
-          async ensurePrimaryApnProfile() {
-            const response = await this.sendATcommand('AT+CGDCONT?');
-
-            if (!response.ok || !response.data) {
-              return {
-                ok: false,
-                message:
-                  this.lastErrorMessage ||
-                  "Unable to read current APN profiles.",
-              };
+          parseApnContexts(rawData) {
+            if (typeof rawData !== "string") {
+              return [];
             }
 
-            const contexts = response.data
+            return rawData
               .split("\n")
               .map((line) => line.trim())
               .filter((line) => line.startsWith("+CGDCONT:"))
@@ -526,6 +527,20 @@
               })
               .filter(Boolean)
               .sort((a, b) => a.cid - b.cid);
+          },
+          async ensurePrimaryApnProfile() {
+            const response = await this.sendATcommand('AT+CGDCONT?');
+
+            if (!response.ok || !response.data) {
+              return {
+                ok: false,
+                message:
+                  this.lastErrorMessage ||
+                  "Unable to read current APN profiles.",
+              };
+            }
+
+            const contexts = this.parseApnContexts(response.data);
 
             const contextsToDelete = contexts.filter((ctx) => ctx.cid !== 1);
 
@@ -976,6 +991,72 @@
                 this.showModal = false;
 
                 // Refresh the page to show the updated bands
+                this.init();
+              }
+            }, 1000);
+          },
+          async resetApnSettings() {
+            const shouldReset = confirm(
+              "Resetting will delete every configured APN and restart the modem. Continue?"
+            );
+
+            if (!shouldReset) {
+              return;
+            }
+
+            this.showModal = true;
+
+            const response = await this.sendATcommand('AT+CGDCONT?');
+
+            if (!response.ok || !response.data) {
+              this.showModal = false;
+              alert(
+                this.lastErrorMessage ||
+                  "Unable to read current APN profiles."
+              );
+              return;
+            }
+
+            const contexts = this.parseApnContexts(response.data);
+
+            for (const ctx of contexts) {
+              const deleteResult = await this.sendATcommand(
+                `AT+CGDCONT=${ctx.cid}`
+              );
+
+              if (!deleteResult.ok) {
+                this.showModal = false;
+                alert(
+                  this.lastErrorMessage ||
+                    `Unable to remove APN profile ${ctx.cid}.`
+                );
+                return;
+              }
+            }
+
+            const restartResult = await this.sendATcommand('AT+CFUN=1,1');
+
+            if (!restartResult.ok) {
+              this.showModal = false;
+              alert(
+                this.lastErrorMessage ||
+                  "Unable to restart the modem."
+              );
+              return;
+            }
+
+            this.apn = "-";
+            this.apnIP = "-";
+            this.newApn = null;
+            this.newApnIP = null;
+            this.prefNetworkMode = null;
+
+            this.countdown = 60;
+            const interval = setInterval(() => {
+              this.countdown--;
+              if (this.countdown === 0) {
+                clearInterval(interval);
+                this.showModal = false;
                 this.init();
               }
             }, 1000);
