@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple Admin</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="simpleadmin-logo" href="favicon.ico" />
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/alpinejs.min.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <div class="container my-4" x-data="networkSettings()" x-init="init()">
+        <nav class="navbar navbar-expand-lg mt-2">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="/"
+              ><span class="mb-0 h4">Simple Admin</span></a
+            >
+            <button
+              class="navbar-toggler"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#navbarText"
+              aria-controls="navbarText"
+              aria-expanded="false"
+              aria-label="Toggle navigation"
+            >
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarText">
+              <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                  <a class="nav-link" href="/">Home</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/network.html">4G/5G Settings</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link active" aria-current="page" href="/network-settings.html"
+                    >Network Settings</a
+                  >
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/settings.html">AT Terminal</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/sms.html">SMS</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/deviceinfo.html">Device Information</a>
+                </li>
+              </ul>
+              <span class="navbar-text">
+                <button class="btn btn-link text-reset" id="darkModeToggle">
+                  Dark Mode
+                </button>
+              </span>
+            </div>
+          </div>
+        </nav>
+
+        <div class="row mt-5">
+          <div class="col-xl-8 col-lg-9">
+            <div class="card">
+              <div class="card-header">Network Settings</div>
+              <div class="card-body">
+                <template x-if="loadError">
+                  <div class="alert alert-danger" role="alert" x-text="loadError"></div>
+                </template>
+
+                <template x-if="successMessage">
+                  <div class="alert alert-success" role="alert" x-text="successMessage"></div>
+                </template>
+
+                <template x-if="restartMessage">
+                  <div class="alert" :class="restartStatusClass" role="alert" x-text="restartMessage"></div>
+                </template>
+
+                <template x-if="isLoading">
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="spinner-border" role="status" aria-hidden="true"></div>
+                    <span>Loading configuration...</span>
+                  </div>
+                </template>
+
+                <form class="mt-3" x-show="!isLoading" @submit.prevent="saveSettings">
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="ipAddress">LAN IP address</label>
+                      <input
+                        id="ipAddress"
+                        class="form-control"
+                        type="text"
+                        inputmode="decimal"
+                        autocomplete="off"
+                        :disabled="isSaving"
+                        x-model.trim="form.ipAddress"
+                        @change="handleIpChange"
+                      />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="subnetMask">Subnet mask</label>
+                      <input
+                        id="subnetMask"
+                        class="form-control"
+                        type="text"
+                        inputmode="decimal"
+                        autocomplete="off"
+                        :disabled="isSaving"
+                        x-model.trim="form.subnetMask"
+                      />
+                    </div>
+                  </div>
+
+                  <hr class="my-4" />
+
+                  <div class="form-check form-switch mb-3">
+                    <input
+                      id="dhcpEnabled"
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      :disabled="isSaving"
+                      x-model="form.dhcpEnabled"
+                    />
+                    <label class="form-check-label" for="dhcpEnabled">Enable DHCP server</label>
+                  </div>
+
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="dhcpStart">DHCP range start</label>
+                      <input
+                        id="dhcpStart"
+                        class="form-control"
+                        type="text"
+                        inputmode="decimal"
+                        autocomplete="off"
+                        :disabled="isSaving || !form.dhcpEnabled"
+                        x-model.trim="form.dhcpStart"
+                        @input="dhcpRangeEdited = true"
+                      />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="dhcpEnd">DHCP range end</label>
+                      <input
+                        id="dhcpEnd"
+                        class="form-control"
+                        type="text"
+                        inputmode="decimal"
+                        autocomplete="off"
+                        :disabled="isSaving || !form.dhcpEnabled"
+                        x-model.trim="form.dhcpEnd"
+                        @input="dhcpRangeEdited = true"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="row g-3 mt-1">
+                    <div class="col-md-6 col-lg-4">
+                      <label class="form-label" for="dhcpLease">Lease time (seconds)</label>
+                      <input
+                        id="dhcpLease"
+                        class="form-control"
+                        type="number"
+                        min="60"
+                        step="60"
+                        :disabled="isSaving || !form.dhcpEnabled"
+                        x-model.trim="form.dhcpLease"
+                      />
+                    </div>
+                  </div>
+
+                  <template x-if="validationErrors.length">
+                    <div class="alert alert-warning mt-4" role="alert">
+                      <h6 class="alert-heading">Please review the following:</h6>
+                      <ul class="mb-0">
+                        <template x-for="(error, index) in validationErrors" :key="index">
+                          <li x-text="error"></li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+
+                  <p class="text-body-secondary mt-4 mb-2">
+                    Saving the configuration will restart the modem to apply the changes.
+                  </p>
+
+                  <div class="d-flex gap-2 justify-content-end mt-3">
+                    <button type="button" class="btn btn-outline-secondary" :disabled="isSaving" @click="resetForm">
+                      Reset
+                    </button>
+                    <button type="submit" class="btn btn-primary" :disabled="isSaving">
+                      <span x-show="!isSaving">Save changes</span>
+                      <span x-show="isSaving" class="d-flex align-items-center gap-2">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span>Saving...</span>
+                      </span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("networkSettings", () => ({
+          isLoading: false,
+          isSaving: false,
+          loadError: "",
+          successMessage: "",
+          restartMessage: "",
+          restartStatusClass: "alert-info",
+          validationErrors: [],
+          dhcpRangeEdited: false,
+          originalData: null,
+          form: {
+            ipAddress: "",
+            subnetMask: "",
+            dhcpEnabled: true,
+            dhcpStart: "",
+            dhcpEnd: "",
+            dhcpLease: "",
+          },
+          init() {
+            this.fetchConfiguration();
+          },
+          resetMessages() {
+            this.successMessage = "";
+            this.restartMessage = "";
+            this.loadError = "";
+          },
+          setFormData(data) {
+            this.form.ipAddress = data.ipAddress || "";
+            this.form.subnetMask = data.subnetMask || "";
+            this.form.dhcpEnabled = Boolean(data.dhcpEnabled);
+            this.form.dhcpStart = data.dhcpStart || "";
+            this.form.dhcpEnd = data.dhcpEnd || "";
+            this.form.dhcpLease = data.dhcpLease || "";
+            this.originalData = JSON.parse(JSON.stringify(this.form));
+            this.dhcpRangeEdited = false;
+          },
+          handleIpChange() {
+            if (this.dhcpRangeEdited) {
+              return;
+            }
+
+            if (!this.isValidIp(this.form.ipAddress)) {
+              return;
+            }
+
+            const octets = this.form.ipAddress.split(".");
+            if (octets.length !== 4) {
+              return;
+            }
+
+            const networkPrefix = `${octets[0]}.${octets[1]}.${octets[2]}`;
+            this.form.dhcpStart = `${networkPrefix}.20`;
+            this.form.dhcpEnd = `${networkPrefix}.60`;
+          },
+          resetForm() {
+            if (this.originalData) {
+              this.form = JSON.parse(JSON.stringify(this.originalData));
+              this.validationErrors = [];
+              this.successMessage = "";
+              this.restartMessage = "";
+              this.dhcpRangeEdited = false;
+            }
+          },
+          async fetchConfiguration(shouldResetMessages = true) {
+            this.isLoading = true;
+            if (shouldResetMessages) {
+              this.resetMessages();
+            }
+            this.validationErrors = [];
+
+            try {
+              const response = await fetch("/cgi-bin/network_settings?action=get", {
+                headers: {
+                  "Accept": "application/json",
+                },
+              });
+
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+              }
+
+              const payload = await response.json();
+              if (!payload.success) {
+                throw new Error(payload.message || "Unable to read the configuration.");
+              }
+
+              this.setFormData(payload.data || {});
+            } catch (error) {
+              console.error("Failed to load configuration", error);
+              this.loadError =
+                error && error.message
+                  ? `Unable to load the current configuration: ${error.message}`
+                  : "Unable to load the current configuration.";
+            } finally {
+              this.isLoading = false;
+            }
+          },
+          validateForm() {
+            const errors = [];
+
+            if (!this.isValidIp(this.form.ipAddress)) {
+              errors.push("Enter a valid LAN IP address (e.g. 192.168.1.1).");
+            }
+
+            if (!this.isValidNetmask(this.form.subnetMask)) {
+              errors.push("Enter a valid subnet mask (e.g. 255.255.255.0).");
+            }
+
+            if (this.form.dhcpEnabled) {
+              if (!this.isValidIp(this.form.dhcpStart)) {
+                errors.push("Enter a valid DHCP start address.");
+              }
+              if (!this.isValidIp(this.form.dhcpEnd)) {
+                errors.push("Enter a valid DHCP end address.");
+              }
+              const lease = Number(this.form.dhcpLease);
+              if (!Number.isInteger(lease) || lease <= 0) {
+                errors.push("Lease time must be a positive number of seconds.");
+              }
+
+              if (this.isValidIp(this.form.ipAddress) && this.isValidNetmask(this.form.subnetMask)) {
+                if (!this.areInSameSubnet(this.form.ipAddress, this.form.dhcpStart, this.form.subnetMask)) {
+                  errors.push("The DHCP start address must be in the same subnet as the LAN IP.");
+                }
+
+                if (!this.areInSameSubnet(this.form.ipAddress, this.form.dhcpEnd, this.form.subnetMask)) {
+                  errors.push("The DHCP end address must be in the same subnet as the LAN IP.");
+                }
+              }
+
+              if (this.isValidIp(this.form.dhcpStart) && this.isValidIp(this.form.dhcpEnd)) {
+                if (this.ipToNumber(this.form.dhcpStart) > this.ipToNumber(this.form.dhcpEnd)) {
+                  errors.push("The DHCP range start must be lower than the end address.");
+                }
+              }
+            }
+
+            this.validationErrors = errors;
+            return errors.length === 0;
+          },
+          ipToNumber(ip) {
+            const octets = ip.split(".").map((part) => parseInt(part, 10));
+            if (octets.length !== 4 || octets.some((part) => Number.isNaN(part))) {
+              return 0;
+            }
+            return (
+              (octets[0] << 24) +
+              (octets[1] << 16) +
+              (octets[2] << 8) +
+              octets[3]
+            );
+          },
+          areInSameSubnet(ip1, ip2, mask) {
+            const n1 = this.ipToNumber(ip1);
+            const n2 = this.ipToNumber(ip2);
+            const nm = this.ipToNumber(mask);
+            return (n1 & nm) === (n2 & nm);
+          },
+          isValidIp(value) {
+            if (typeof value !== "string") {
+              return false;
+            }
+            const regex = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+            return regex.test(value.trim());
+          },
+          isValidNetmask(value) {
+            if (!this.isValidIp(value)) {
+              return false;
+            }
+            const validMasks = new Set([
+              "255.255.255.255",
+              "255.255.255.254",
+              "255.255.255.252",
+              "255.255.255.248",
+              "255.255.255.240",
+              "255.255.255.224",
+              "255.255.255.192",
+              "255.255.255.128",
+              "255.255.255.0",
+              "255.255.254.0",
+              "255.255.252.0",
+              "255.255.248.0",
+              "255.255.240.0",
+              "255.255.224.0",
+              "255.255.192.0",
+              "255.255.128.0",
+              "255.255.0.0",
+              "255.254.0.0",
+              "255.252.0.0",
+              "255.248.0.0",
+              "255.240.0.0",
+              "255.224.0.0",
+              "255.192.0.0",
+              "255.128.0.0",
+              "255.0.0.0",
+              "254.0.0.0",
+              "252.0.0.0",
+              "248.0.0.0",
+              "240.0.0.0",
+              "224.0.0.0",
+              "192.0.0.0",
+              "128.0.0.0",
+              "0.0.0.0",
+            ]);
+            return validMasks.has(value.trim());
+          },
+          async saveSettings() {
+            this.successMessage = "";
+            this.restartMessage = "";
+
+            if (!this.validateForm()) {
+              return;
+            }
+
+            const params = new URLSearchParams();
+            params.set("action", "update");
+            params.set("ip_address", this.form.ipAddress.trim());
+            params.set("subnet_mask", this.form.subnetMask.trim());
+            params.set("dhcp_enabled", this.form.dhcpEnabled ? "1" : "0");
+            if (this.form.dhcpEnabled) {
+              params.set("dhcp_start", this.form.dhcpStart.trim());
+              params.set("dhcp_end", this.form.dhcpEnd.trim());
+              params.set("dhcp_lease", this.form.dhcpLease.trim());
+            }
+
+            this.isSaving = true;
+            try {
+              const response = await fetch("/cgi-bin/network_settings", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                  Accept: "application/json",
+                },
+                body: params.toString(),
+              });
+
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+              }
+
+              const payload = await response.json();
+              if (!payload.success) {
+                const details = Array.isArray(payload.errors) && payload.errors.length
+                  ? `: ${payload.errors.join(" ")}`
+                  : "";
+                throw new Error(payload.message + details);
+              }
+
+              this.successMessage = payload.message || "Network configuration updated.";
+              await this.handleRestart();
+              await this.fetchConfiguration(false);
+            } catch (error) {
+              console.error("Unable to save network settings", error);
+              this.restartMessage = "";
+              this.successMessage = "";
+              this.validationErrors = [];
+              this.loadError = "";
+              this.validationErrors.push(
+                error && error.message ? error.message : "Unable to save the network settings."
+              );
+            } finally {
+              this.isSaving = false;
+            }
+          },
+          async handleRestart() {
+            try {
+              const result = await ATCommandService.execute("AT+CFUN=1,1", {
+                endpoint: "/cgi-bin/user_atcommand",
+                retries: 0,
+                timeout: 20000,
+              });
+
+              if (result.ok) {
+                this.restartStatusClass = "alert-info";
+                this.restartMessage = "Modem restart command sent. Please wait for the connection to resume.";
+              } else {
+                const reason = result.error && result.error.message ? result.error.message : "unknown error";
+                this.restartStatusClass = "alert-warning";
+                this.restartMessage = `Configuration saved but the modem restart failed: ${reason}`;
+              }
+            } catch (error) {
+              console.error("Unable to restart the modem", error);
+              this.restartStatusClass = "alert-warning";
+              this.restartMessage =
+                error && error.message
+                  ? `Configuration saved but the modem restart failed: ${error.message}`
+                  : "Configuration saved but the modem restart failed.";
+            }
+          },
+        }));
+      });
+    </script>
+    <script src="js/atcommand-utils.js"></script>
+    <script src="js/dark-mode.js"></script>
+  </body>
+</html>
