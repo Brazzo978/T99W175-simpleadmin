@@ -192,11 +192,15 @@
                       Reset
                     </button>
                     <button type="submit" class="btn btn-primary" :disabled="isSaving">
-                      <span x-show="!isSaving">Save changes</span>
-                      <span x-show="isSaving" class="d-flex align-items-center gap-2">
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        <span>Saving...</span>
-                      </span>
+                      <template x-if="!isSaving">
+                        <span>Save changes</span>
+                      </template>
+                      <template x-if="isSaving">
+                        <span class="d-flex align-items-center gap-2">
+                          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                          <span>Saving...</span>
+                        </span>
+                      </template>
                     </button>
                   </div>
                 </form>
