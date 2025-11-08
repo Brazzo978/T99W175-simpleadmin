@@ -17,11 +17,12 @@ def resolve_config_path() -> Path:
         return Path(override).expanduser()
 
     script_path = Path(__file__).resolve()
-    repo_root = script_path.parents[2]
-    fallback_candidates = [
-        DEFAULT_CONFIG_PATH,
-        repo_root / "Default config files" / "mobileap_cfg.xml",
-    ]
+    parents = script_path.parents
+    repo_root = parents[2] if len(parents) > 2 else None
+    fallback_candidates = [DEFAULT_CONFIG_PATH]
+
+    if repo_root is not None:
+        fallback_candidates.append(repo_root / "Default config files" / "mobileap_cfg.xml")
 
     for candidate in fallback_candidates:
         if candidate.exists():
