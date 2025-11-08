@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+import json
+import os
+import re
+import sys
+import urllib.parse
+from typing import Dict, List, Optional
+
+CONFIG_FILE = "/etc/data/mobileap_cfg.xml"
+
+
+def print_headers() -> None:
+    print("Content-type: application/json")
+    print()
+
+
+def respond(success: bool, message: str, *, data: Optional[Dict] = None, errors: Optional[List[str]] = None) -> None:
+    payload = {"success": success, "message": message}
+    if data is not None:
+        payload["data"] = data
+    if errors:
+        payload["errors"] = errors
+    print_headers()
+    json.dump(payload, sys.stdout)
+    sys.stdout.write("\n")
+
+
+def load_configuration() -> str:
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as handle:
+            return handle.read()
+    except OSError:
+        respond(False, "Configuration file not found.")
+        sys.exit(0)
+
+
+def save_configuration(content: str) -> bool:
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        return True
+    except OSError:
+        return False
+
+
+def read_xml_value(content: str, tag: str) -> str:
+    pattern = re.compile(rf"<{tag}>\\s*([^<]*)\\s*</{tag}>", re.IGNORECASE)
+    match = pattern.search(content)
+    if not match:
+        return ""
+    return match.group(1).strip()
+
+
+def update_xml_value(content: str, tag: str, value: str) -> str:
+    pattern = re.compile(rf"(<{tag}>\\s*)([^<]*)(\\s*</{tag}>)", re.IGNORECASE)
+    replacement, count = pattern.subn(rf"\\1{value}\\3", content, count=1)
+    if count == 0:
+        raise ValueError(f"Missing XML element: {tag}")
+    return replacement
+
+
+def parse_params() -> Dict[str, str]:
+    params: Dict[str, str] = {}
+
+    def apply(parsed: Dict[str, List[str]]) -> None:
+        for key, values in parsed.items():
+            if not values:
+                params[key] = ""
+            else:
+                params[key] = values[-1]
+
+    query = os.environ.get("QUERY_STRING", "")
+    if query:
+        apply(urllib.parse.parse_qs(query, keep_blank_values=True))
+
+    if os.environ.get("REQUEST_METHOD", "").upper() == "POST":
+        length = 0
+        try:
+            length = int(os.environ.get("CONTENT_LENGTH", "0") or "0")
+        except ValueError:
+            length = 0
+
+        if length > 0:
+            body = sys.stdin.read(length)
+            if body:
+                apply(urllib.parse.parse_qs(body, keep_blank_values=True))
+
+    return params
+
+
+def is_valid_ip(value: str) -> bool:
+    pattern = re.compile(r"^(25[0-5]|2[0-4]\\d|1?\\d?\\d)(\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)){3}$")
+    return bool(pattern.match(value))
+
+
+def is_valid_netmask(value: str) -> bool:
+    valid_masks = {
+        "255.255.255.255",
+        "255.255.255.254",
+        "255.255.255.252",
+        "255.255.255.248",
+        "255.255.255.240",
+        "255.255.255.224",
+        "255.255.255.192",
+        "255.255.255.128",
+        "255.255.255.0",
+        "255.255.254.0",
+        "255.255.252.0",
+        "255.255.248.0",
+        "255.255.240.0",
+        "255.255.224.0",
+        "255.255.192.0",
+        "255.255.128.0",
+        "255.255.0.0",
+        "255.254.0.0",
+        "255.252.0.0",
+        "255.248.0.0",
+        "255.240.0.0",
+        "255.224.0.0",
+        "255.192.0.0",
+        "255.128.0.0",
+        "255.0.0.0",
+        "254.0.0.0",
+        "252.0.0.0",
+        "248.0.0.0",
+        "240.0.0.0",
+        "224.0.0.0",
+        "192.0.0.0",
+        "128.0.0.0",
+        "0.0.0.0",
+    }
+    return value in valid_masks
+
+
+def ip_to_int(value: str) -> int:
+    parts = [int(part) for part in value.split(".")]
+    return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3]
+
+
+def same_subnet(ip1: str, ip2: str, netmask: str) -> bool:
+    return (ip_to_int(ip1) & ip_to_int(netmask)) == (ip_to_int(ip2) & ip_to_int(netmask))
+
+
+def handle_get(content: str) -> None:
+    data = {
+        "ipAddress": read_xml_value(content, "APIPAddr"),
+        "subnetMask": read_xml_value(content, "SubNetMask"),
+        "dhcpEnabled": read_xml_value(content, "EnableDHCPServer") == "1",
+        "dhcpStart": read_xml_value(content, "StartIP"),
+        "dhcpEnd": read_xml_value(content, "EndIP"),
+        "dhcpLease": read_xml_value(content, "LeaseTime"),
+    }
+    respond(True, "Network configuration loaded.", data=data)
+
+
+def handle_update(content: str, params: Dict[str, str]) -> None:
+    new_ip = (params.get("ip_address") or "").strip()
+    new_mask = (params.get("subnet_mask") or "").strip()
+    dhcp_enabled = params.get("dhcp_enabled", "1").strip()
+    dhcp_start = (params.get("dhcp_start") or "").strip()
+    dhcp_end = (params.get("dhcp_end") or "").strip()
+    dhcp_lease = (params.get("dhcp_lease") or "").strip()
+
+    errors: List[str] = []
+
+    if not new_ip or not is_valid_ip(new_ip):
+        errors.append("Invalid LAN IP address provided.")
+    if not new_mask or not is_valid_netmask(new_mask):
+        errors.append("Invalid subnet mask provided.")
+
+    if dhcp_enabled not in {"0", "1"}:
+        errors.append("Invalid DHCP server status provided.")
+
+    if dhcp_enabled == "1":
+        if not dhcp_start or not is_valid_ip(dhcp_start):
+            errors.append("Invalid DHCP range start provided.")
+        if not dhcp_end or not is_valid_ip(dhcp_end):
+            errors.append("Invalid DHCP range end provided.")
+        if not dhcp_lease.isdigit() or int(dhcp_lease) <= 0:
+            errors.append("Lease time must be a positive number of seconds.")
+
+        if not errors:
+            if not same_subnet(new_ip, dhcp_start, new_mask):
+                errors.append("The DHCP range start must be in the same subnet as the LAN IP.")
+            if not same_subnet(new_ip, dhcp_end, new_mask):
+                errors.append("The DHCP range end must be in the same subnet as the LAN IP.")
+            if is_valid_ip(dhcp_start) and is_valid_ip(dhcp_end):
+                if ip_to_int(dhcp_start) > ip_to_int(dhcp_end):
+                    errors.append("The DHCP range start must be lower than the end address.")
+
+    if errors:
+        respond(False, "Unable to update the network configuration.", errors=errors)
+        return
+
+    updated = content
+    try:
+        updated = update_xml_value(updated, "APIPAddr", new_ip)
+        updated = update_xml_value(updated, "SubNetMask", new_mask)
+        updated = update_xml_value(updated, "EnableDHCPServer", dhcp_enabled)
+        if dhcp_enabled == "1":
+            updated = update_xml_value(updated, "StartIP", dhcp_start)
+            updated = update_xml_value(updated, "EndIP", dhcp_end)
+            updated = update_xml_value(updated, "LeaseTime", dhcp_lease)
+    except ValueError as exc:  # missing tag
+        respond(False, str(exc))
+        return
+
+    if not save_configuration(updated):
+        respond(False, "Unable to persist the configuration changes.")
+        return
+
+    respond(True, "Network configuration updated successfully.")
+
+
+def main() -> None:
+    params = parse_params()
+    action = params.get("action", "get").lower()
+
+    content = load_configuration()
+
+    if action == "update":
+        handle_update(content, params)
+    else:
+        handle_get(content)
+
+
+if __name__ == "__main__":
+    main()
