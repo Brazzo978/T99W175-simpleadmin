@@ -206,6 +206,14 @@ is_valid_netmask() {
     return 1
 }
 
+is_valid_mac() {
+    local value="$1"
+    if [[ "$value" =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]]; then
+        return 0
+    fi
+    return 1
+}
+
 ip_to_int() {
     local value="$1"
     IFS='.' read -r o1 o2 o3 o4 <<< "$value"
@@ -241,6 +249,8 @@ DHCP_LEASE=""
 DMZ_ENABLED="0"
 DMZ_IP=""
 IPV6_ENABLED="1"
+BRIDGE_ENABLED="0"
+BRIDGE_MAC="0"
 
 apply_params() {
     local input="$1"
@@ -286,6 +296,12 @@ apply_params() {
                 ;;
             ipv6_enabled)
                 IPV6_ENABLED="$value"
+                ;;
+            bridge_enabled)
+                BRIDGE_ENABLED="$value"
+                ;;
+            bridge_mac)
+                BRIDGE_MAC="$value"
                 ;;
         esac
     done
@@ -338,7 +354,7 @@ handle_get() {
         respond false "Configuration file not found at $CONFIG_FILE."
     fi
 
-    local ip mask dhcp_enable dhcp_start dhcp_end dhcp_lease dmz_ip ipv6_enable
+    local ip mask dhcp_enable dhcp_start dhcp_end dhcp_lease dmz_ip ipv6_enable bridge_enable bridge_mac
     ip=$(get_xml_value "APIPAddr" "$CONFIG_FILE")
     mask=$(get_xml_value "SubNetMask" "$CONFIG_FILE")
     dhcp_enable=$(get_xml_value "EnableDHCPServer" "$CONFIG_FILE")
@@ -351,6 +367,16 @@ handle_get() {
     fi
     dmz_ip=$(printf '%s' "$dmz_ip" | strip_comments | tr -d '\r' | trim)
     ipv6_enable=$(get_xml_value "EnableIPV6" "$CONFIG_FILE")
+    bridge_enable=$(get_scoped_xml_value "IPPassthroughCfg" "IPPassthroughEnable" "$CONFIG_FILE")
+    if [ -z "$bridge_enable" ]; then
+        bridge_enable=$(get_xml_value "IPPassthroughEnable" "$CONFIG_FILE")
+    fi
+    bridge_enable=$(printf '%s' "$bridge_enable" | strip_comments | tr -d '\r' | trim)
+    bridge_mac=$(get_scoped_xml_value "IPPassthroughCfg" "IPPassthroughMacAddr" "$CONFIG_FILE")
+    if [ -z "$bridge_mac" ]; then
+        bridge_mac=$(get_xml_value "IPPassthroughMacAddr" "$CONFIG_FILE")
+    fi
+    bridge_mac=$(printf '%s' "$bridge_mac" | strip_comments | tr -d '\r' | trim | tr '[:lower:]' '[:upper:]')
 
     local dhcp_flag="false"
     if [ "$dhcp_enable" = "1" ]; then
@@ -369,8 +395,15 @@ handle_get() {
         ipv6_flag="true"
     fi
 
+    local bridge_flag="false"
+    local bridge_value=""
+    if [ "$bridge_enable" = "1" ]; then
+        bridge_flag="true"
+        bridge_value="$bridge_mac"
+    fi
+
     local data
-    data=$(printf '{"ipAddress":"%s","subnetMask":"%s","dhcpEnabled":%s,"dhcpStart":"%s","dhcpEnd":"%s","dhcpLease":"%s","dmzEnabled":%s,"dmzIp":"%s","ipv6Enabled":%s}' \
+    data=$(printf '{"ipAddress":"%s","subnetMask":"%s","dhcpEnabled":%s,"dhcpStart":"%s","dhcpEnd":"%s","dhcpLease":"%s","dmzEnabled":%s,"dmzIp":"%s","ipv6Enabled":%s,"bridgeEnabled":%s,"bridgeMac":"%s"}' \
         "$(json_escape "$ip")" \
         "$(json_escape "$mask")" \
         "$dhcp_flag" \
@@ -379,7 +412,9 @@ handle_get() {
         "$(json_escape "$dhcp_lease")" \
         "$dmz_flag" \
         "$(json_escape "$dmz_value")" \
-        "$ipv6_flag")
+        "$ipv6_flag" \
+        "$bridge_flag" \
+        "$(json_escape "$bridge_value")")
 
     respond true "Network configuration loaded." "$data"
 }
@@ -400,6 +435,9 @@ handle_update() {
     local dmz_flag="${DMZ_ENABLED:-0}"
     local dmz_ip="${DMZ_IP// /}"
     local ipv6_flag="${IPV6_ENABLED:-1}"
+    local bridge_flag="${BRIDGE_ENABLED// /}"
+    [ -z "$bridge_flag" ] && bridge_flag="0"
+    local bridge_mac="${BRIDGE_MAC// /}"
 
     if [ -z "$ip" ] || ! is_valid_ip "$ip"; then
         add_error "Invalid LAN IP address provided."
@@ -468,6 +506,22 @@ handle_update() {
         add_error "Invalid IPv6 status provided."
     fi
 
+    if [ "$bridge_flag" != "0" ] && [ "$bridge_flag" != "1" ]; then
+        add_error "Invalid bridge mode status provided."
+    fi
+
+    if [ "$bridge_flag" = "1" ]; then
+        if [ -z "$bridge_mac" ]; then
+            add_error "Invalid bridge MAC address provided."
+        elif ! is_valid_mac "$bridge_mac"; then
+            add_error "Invalid bridge MAC address provided."
+        else
+            bridge_mac=$(printf '%s' "$bridge_mac" | tr '[:lower:]' '[:upper:]')
+        fi
+    else
+        bridge_mac="0"
+    fi
+
     if [ ${#errors[@]} -gt 0 ]; then
         local errors_json
         errors_json=$(errors_to_json)
@@ -504,6 +558,13 @@ handle_update() {
 
     if ! set_xml_value "EnableIPV6" "$ipv6_flag" "$CONFIG_FILE"; then
         respond false "Missing XML element: EnableIPV6"
+    fi
+
+    if ! set_scoped_xml_value "IPPassthroughCfg" "IPPassthroughEnable" "$bridge_flag" "$CONFIG_FILE"; then
+        respond false "Missing XML element: IPPassthroughEnable"
+    fi
+    if ! set_scoped_xml_value "IPPassthroughCfg" "IPPassthroughMacAddr" "$bridge_mac" "$CONFIG_FILE"; then
+        respond false "Missing XML element: IPPassthroughMacAddr"
     fi
 
     respond true "Network configuration updated successfully."

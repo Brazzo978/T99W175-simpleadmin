@@ -205,6 +205,46 @@
 
                   <div class="form-check form-switch mb-3">
                     <input
+                      id="bridgeEnabled"
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      :disabled="isSaving"
+                      x-model="form.bridgeEnabled"
+                    />
+                    <label class="form-check-label" for="bridgeEnabled">Enable bridge mode (IP passthrough)</label>
+                  </div>
+
+                  <div class="row g-3">
+                    <div class="col-md-6 col-lg-4">
+                      <label class="form-label" for="bridgeMac">Bridge client MAC address</label>
+                      <input
+                        id="bridgeMac"
+                        class="form-control"
+                        type="text"
+                        inputmode="text"
+                        autocomplete="off"
+                        placeholder="AA:BB:CC:DD:EE:FF"
+                        :disabled="isSaving || !form.bridgeEnabled"
+                        x-model.trim="form.bridgeMac"
+                        @input="form.bridgeMac = form.bridgeMac.toUpperCase()"
+                      />
+                      <div class="form-text">
+                        When bridge mode is enabled, the selected device receives the public IP directly and the router interface remains on the LAN subnet.
+                      </div>
+                    </div>
+                  </div>
+
+                  <template x-if="form.bridgeEnabled">
+                    <div class="alert alert-warning mt-3" role="alert">
+                      While bridge mode is active, the selected client will receive its address directly from the mobile network and skip the LAN DHCP pool. Access to the router interface may only be possible from devices that remain on the LAN subnet.
+                    </div>
+                  </template>
+
+                  <hr class="my-4" />
+
+                  <div class="form-check form-switch mb-3">
+                    <input
                       id="ipv6Enabled"
                       class="form-check-input"
                       type="checkbox"
@@ -276,6 +316,8 @@
             dmzEnabled: false,
             dmzIp: "",
             ipv6Enabled: true,
+            bridgeEnabled: false,
+            bridgeMac: "",
           },
           init() {
             this.fetchConfiguration();
@@ -295,6 +337,8 @@
             this.form.dmzEnabled = Boolean(data.dmzEnabled);
             this.form.dmzIp = data.dmzIp || "";
             this.form.ipv6Enabled = Boolean(data.ipv6Enabled);
+            this.form.bridgeEnabled = Boolean(data.bridgeEnabled);
+            this.form.bridgeMac = data.bridgeMac || "";
             this.originalData = JSON.parse(JSON.stringify(this.form));
             this.dhcpRangeEdited = false;
           },
@@ -419,6 +463,12 @@
               }
             }
 
+            if (this.form.bridgeEnabled) {
+              if (!this.isValidMac(this.form.bridgeMac)) {
+                errors.push("Enter a valid bridge client MAC address (AA:BB:CC:DD:EE:FF).");
+              }
+            }
+
             this.validationErrors = errors;
             return errors.length === 0;
           },
@@ -488,12 +538,32 @@
             ]);
             return validMasks.has(value.trim());
           },
+          isValidMac(value) {
+            if (typeof value !== "string") {
+              return false;
+            }
+            const macRegex = /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/;
+            return macRegex.test(value.trim().toUpperCase());
+          },
           async saveSettings() {
             this.successMessage = "";
             this.restartMessage = "";
 
             if (!this.validateForm()) {
               return;
+            }
+
+            if (
+              this.form.bridgeEnabled &&
+              this.originalData &&
+              !this.originalData.bridgeEnabled
+            ) {
+              const confirmed = window.confirm(
+                "Enabling bridge mode will route the public IP directly to the selected client. This may make it harder to access the router interface because it will remain on the LAN subnet. Continue?"
+              );
+              if (!confirmed) {
+                return;
+              }
             }
 
             const params = new URLSearchParams();
@@ -511,6 +581,11 @@
             const dmzIpValue = this.form.dmzEnabled ? this.form.dmzIp.trim() : "0.0.0.0";
             params.set("dmz_ip", dmzIpValue);
             params.set("ipv6_enabled", this.form.ipv6Enabled ? "1" : "0");
+            params.set("bridge_enabled", this.form.bridgeEnabled ? "1" : "0");
+            const bridgeMacValue = this.form.bridgeEnabled
+              ? this.form.bridgeMac.trim().toUpperCase()
+              : "0";
+            params.set("bridge_mac", bridgeMacValue);
 
             this.isSaving = true;
             const controller = new AbortController();
