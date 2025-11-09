@@ -64,7 +64,7 @@
     }
 
     if (!Array.isArray(users) || users.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="2" class="text-center">Nessun utente configurato.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="2" class="text-center">No users configured.</td></tr>';
       return;
     }
 
@@ -94,7 +94,7 @@
 
       const payload = await response.json();
       if (!payload.success || !Array.isArray(payload.data)) {
-        throw new Error("Formato risposta non valido");
+        throw new Error("Invalid response format");
       }
 
       updateTable(payload.data);
@@ -102,8 +102,8 @@
       populateSelect(selectors.roleUserSelect, payload.data);
       populateSelect(selectors.deleteUserSelect, payload.data);
     } catch (error) {
-      console.error("Impossibile caricare gli utenti", error);
-      showFeedback("Errore durante il caricamento degli utenti.", "danger");
+      console.error("Unable to load users", error);
+      showFeedback("Error loading users.", "danger");
     }
   }
 
@@ -132,7 +132,7 @@
 
       const payload = await response.json().catch(() => ({ success: false }));
       if (!response.ok || !payload.success) {
-        showFeedback(payload.message || "Operazione non riuscita.", "danger");
+        showFeedback(payload.message || "Operation failed.", "danger");
         return;
       }
 
@@ -140,8 +140,8 @@
       form.reset();
       await loadUsers();
     } catch (error) {
-      console.error("Operazione credenziali fallita", error);
-      showFeedback("Errore durante l'operazione richiesta.", "danger");
+      console.error("Credential operation failed", error);
+      showFeedback("Error during the requested operation.", "danger");
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
@@ -164,28 +164,28 @@
       const addForm = document.getElementById(selectors.addForm);
       if (addForm) {
         addForm.addEventListener("submit", (event) =>
-          submitForm(event, "add", "Utente aggiunto correttamente.")
+          submitForm(event, "add", "User added successfully.")
         );
       }
 
       const updatePasswordForm = document.getElementById(selectors.updatePasswordForm);
       if (updatePasswordForm) {
         updatePasswordForm.addEventListener("submit", (event) =>
-          submitForm(event, "update_password", "Password aggiornata.")
+          submitForm(event, "update_password", "Password updated.")
         );
       }
 
       const updateRoleForm = document.getElementById(selectors.updateRoleForm);
       if (updateRoleForm) {
         updateRoleForm.addEventListener("submit", (event) =>
-          submitForm(event, "update_role", "Ruolo aggiornato.")
+          submitForm(event, "update_role", "Role updated.")
         );
       }
 
       const deleteForm = document.getElementById(selectors.deleteForm);
       if (deleteForm) {
         deleteForm.addEventListener("submit", (event) =>
-          submitForm(event, "delete", "Utente eliminato.")
+          submitForm(event, "delete", "User removed.")
         );
       }
     });

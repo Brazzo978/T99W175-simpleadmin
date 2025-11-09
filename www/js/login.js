@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const password = formData.get("password");
 
     if (!username || !password) {
-      showAlert("Inserire username e password.");
+      showAlert("Enter username and password.");
       return;
     }
 
@@ -56,14 +56,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const payload = await response.json().catch(() => ({ success: false }));
 
       if (!response.ok || !payload.success) {
-        showAlert(payload.message || "Credenziali non valide.");
+        showAlert(payload.message || "Invalid credentials.");
         return;
       }
 
       window.location.replace("/index.html");
     } catch (error) {
       console.error("Login failed", error);
-      showAlert("Errore durante l'autenticazione.");
+      showAlert("Error during authentication.");
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
