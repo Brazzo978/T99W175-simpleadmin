@@ -172,6 +172,35 @@
                     </div>
                   </div>
 
+                  <hr class="my-4" />
+
+                  <div class="form-check form-switch mb-3">
+                    <input
+                      id="dmzEnabled"
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      :disabled="isSaving"
+                      x-model="form.dmzEnabled"
+                    />
+                    <label class="form-check-label" for="dmzEnabled">Enable DMZ</label>
+                  </div>
+
+                  <div class="row g-3">
+                    <div class="col-md-6 col-lg-4">
+                      <label class="form-label" for="dmzIp">DMZ client IP address</label>
+                      <input
+                        id="dmzIp"
+                        class="form-control"
+                        type="text"
+                        inputmode="decimal"
+                        autocomplete="off"
+                        :disabled="isSaving || !form.dmzEnabled"
+                        x-model.trim="form.dmzIp"
+                      />
+                    </div>
+                  </div>
+
                   <template x-if="validationErrors.length">
                     <div class="alert alert-warning mt-4" role="alert">
                       <h6 class="alert-heading">Please review the following:</h6>
@@ -230,6 +259,8 @@
             dhcpStart: "",
             dhcpEnd: "",
             dhcpLease: "",
+            dmzEnabled: false,
+            dmzIp: "",
           },
           init() {
             this.fetchConfiguration();
@@ -246,6 +277,8 @@
             this.form.dhcpStart = data.dhcpStart || "";
             this.form.dhcpEnd = data.dhcpEnd || "";
             this.form.dhcpLease = data.dhcpLease || "";
+            this.form.dmzEnabled = Boolean(data.dmzEnabled);
+            this.form.dmzIp = data.dmzIp || "";
             this.originalData = JSON.parse(JSON.stringify(this.form));
             this.dhcpRangeEdited = false;
           },
@@ -350,6 +383,26 @@
               }
             }
 
+            if (this.form.dmzEnabled) {
+              if (!this.isValidIp(this.form.dmzIp) || this.form.dmzIp === "0.0.0.0") {
+                errors.push("Enter a valid DMZ client IP address.");
+              }
+
+              if (this.form.dmzIp === this.form.ipAddress) {
+                errors.push("The DMZ client must be different from the LAN IP address.");
+              }
+
+              if (
+                this.isValidIp(this.form.ipAddress) &&
+                this.isValidNetmask(this.form.subnetMask) &&
+                this.isValidIp(this.form.dmzIp)
+              ) {
+                if (!this.areInSameSubnet(this.form.ipAddress, this.form.dmzIp, this.form.subnetMask)) {
+                  errors.push("The DMZ client must be in the same subnet as the LAN IP.");
+                }
+              }
+            }
+
             this.validationErrors = errors;
             return errors.length === 0;
           },
@@ -437,6 +490,10 @@
               params.set("dhcp_end", this.form.dhcpEnd.trim());
               params.set("dhcp_lease", this.form.dhcpLease.trim());
             }
+
+            params.set("dmz_enabled", this.form.dmzEnabled ? "1" : "0");
+            const dmzIpValue = this.form.dmzEnabled ? this.form.dmzIp.trim() : "0.0.0.0";
+            params.set("dmz_ip", dmzIpValue);
 
             this.isSaving = true;
             const controller = new AbortController();

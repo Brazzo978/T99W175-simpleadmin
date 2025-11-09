@@ -79,11 +79,11 @@ set_xml_value() {
     local file="$3"
 
     if grep -q "<$key>" "$file"; then
-        if ! sed "s|<$key>.*</$key>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
+        if ! sed "0,/<$key>/{s|<$key>.*</$key>|<$key>$value</$key>|}" "$file" > "$TMP_FILE"; then
             return 1
         fi
     elif grep -Eq "<$key[[:space:]]*/>" "$file"; then
-        if ! sed "s|<$key[[:space:]]*/>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
+        if ! sed "0,/<$key[[:space:]]*\/>/{s|<$key[[:space:]]*\/>|<$key>$value</$key>|}" "$file" > "$TMP_FILE"; then
             return 1
         fi
     else
@@ -165,6 +165,8 @@ DHCP_ENABLED="1"
 DHCP_START=""
 DHCP_END=""
 DHCP_LEASE=""
+DMZ_ENABLED="0"
+DMZ_IP=""
 
 apply_params() {
     local input="$1"
@@ -201,6 +203,12 @@ apply_params() {
                 ;;
             dhcp_lease)
                 DHCP_LEASE="$value"
+                ;;
+            dmz_enabled)
+                DMZ_ENABLED="$value"
+                ;;
+            dmz_ip)
+                DMZ_IP="$value"
                 ;;
         esac
     done
@@ -253,27 +261,37 @@ handle_get() {
         respond false "Configuration file not found at $CONFIG_FILE."
     fi
 
-    local ip mask dhcp_enable dhcp_start dhcp_end dhcp_lease
+    local ip mask dhcp_enable dhcp_start dhcp_end dhcp_lease dmz_ip
     ip=$(get_xml_value "APIPAddr" "$CONFIG_FILE")
     mask=$(get_xml_value "SubNetMask" "$CONFIG_FILE")
     dhcp_enable=$(get_xml_value "EnableDHCPServer" "$CONFIG_FILE")
     dhcp_start=$(get_xml_value "StartIP" "$CONFIG_FILE")
     dhcp_end=$(get_xml_value "EndIP" "$CONFIG_FILE")
     dhcp_lease=$(get_xml_value "LeaseTime" "$CONFIG_FILE")
+    dmz_ip=$(get_xml_value "DmzIP" "$CONFIG_FILE")
 
     local dhcp_flag="false"
     if [ "$dhcp_enable" = "1" ]; then
         dhcp_flag="true"
     fi
 
+    local dmz_flag="false"
+    local dmz_value=""
+    if [ -n "$dmz_ip" ] && [ "$dmz_ip" != "0.0.0.0" ]; then
+        dmz_flag="true"
+        dmz_value="$dmz_ip"
+    fi
+
     local data
-    data=$(printf '{"ipAddress":"%s","subnetMask":"%s","dhcpEnabled":%s,"dhcpStart":"%s","dhcpEnd":"%s","dhcpLease":"%s"}' \
+    data=$(printf '{"ipAddress":"%s","subnetMask":"%s","dhcpEnabled":%s,"dhcpStart":"%s","dhcpEnd":"%s","dhcpLease":"%s","dmzEnabled":%s,"dmzIp":"%s"}' \
         "$(json_escape "$ip")" \
         "$(json_escape "$mask")" \
         "$dhcp_flag" \
         "$(json_escape "$dhcp_start")" \
         "$(json_escape "$dhcp_end")" \
-        "$(json_escape "$dhcp_lease")")
+        "$(json_escape "$dhcp_lease")" \
+        "$dmz_flag" \
+        "$(json_escape "$dmz_value")")
 
     respond true "Network configuration loaded." "$data"
 }
@@ -291,6 +309,8 @@ handle_update() {
     local dhcp_start="${DHCP_START// /}"
     local dhcp_end="${DHCP_END// /}"
     local dhcp_lease="${DHCP_LEASE// /}"
+    local dmz_flag="${DMZ_ENABLED:-0}"
+    local dmz_ip="${DMZ_IP// /}"
 
     if [ -z "$ip" ] || ! is_valid_ip "$ip"; then
         add_error "Invalid LAN IP address provided."
@@ -333,6 +353,28 @@ handle_update() {
         fi
     fi
 
+    if [ "$dmz_flag" != "0" ] && [ "$dmz_flag" != "1" ]; then
+        add_error "Invalid DMZ status provided."
+    fi
+
+    if [ "$dmz_flag" = "1" ]; then
+        if [ -z "$dmz_ip" ] || ! is_valid_ip "$dmz_ip" || [ "$dmz_ip" = "0.0.0.0" ]; then
+            add_error "Invalid DMZ IP address provided."
+        fi
+        if [ -z "$ip" ] || ! is_valid_ip "$ip" || [ -z "$mask" ] || ! is_valid_netmask "$mask"; then
+            :
+        else
+            if ! same_subnet "$ip" "$dmz_ip" "$mask"; then
+                add_error "The DMZ IP must be in the same subnet as the LAN IP."
+            fi
+        fi
+        if [ "$dmz_ip" = "$ip" ]; then
+            add_error "The DMZ IP cannot be the same as the LAN IP."
+        fi
+    else
+        dmz_ip="0.0.0.0"
+    fi
+
     if [ ${#errors[@]} -gt 0 ]; then
         local errors_json
         errors_json=$(errors_to_json)
@@ -361,6 +403,10 @@ handle_update() {
         if ! set_xml_value "LeaseTime" "$dhcp_lease" "$CONFIG_FILE"; then
             respond false "Missing XML element: LeaseTime"
         fi
+    fi
+
+    if ! set_xml_value "DmzIP" "$dmz_ip" "$CONFIG_FILE"; then
+        respond false "Missing XML element: DmzIP"
     fi
 
     respond true "Network configuration updated successfully."
