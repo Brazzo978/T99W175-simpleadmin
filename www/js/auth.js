@@ -51,32 +51,22 @@
   }
 
   function ensureSession({ refresh = false } = {}) {
-    if (!refresh) {
-      if (state.session) {
-        return Promise.resolve(state.session);
-      }
-
-      if (state.promise) {
-        return state.promise;
-      }
+    if (!refresh && state.promise) {
+      return state.promise;
     }
 
-    state.promise = fetchSession()
-      .then((session) => {
-        state.session = session;
-        state.loaded = true;
-        callbacks.splice(0).forEach((cb) => {
-          try {
-            cb(session);
-          } catch (error) {
-            console.error("Error running auth callback", error);
-          }
-        });
-        return session;
-      })
-      .finally(() => {
-        state.promise = null;
+    state.promise = fetchSession().then((session) => {
+      state.session = session;
+      state.loaded = true;
+      callbacks.splice(0).forEach((cb) => {
+        try {
+          cb(session);
+        } catch (error) {
+          console.error("Error running auth callback", error);
+        }
       });
+      return session;
+    });
 
     return state.promise;
   }
