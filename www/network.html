@@ -12,10 +12,11 @@
     <link rel="simpleadmin-logo" href="favicon.ico" />
 
     <!--  Import BootStrap Javascript -->
+    <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
   </head>
-  <body>
+  <body data-require-auth="true">
     <main>
       <div class="container my-4" x-data="cellLocking()" x-init="init()">
         <nav class="navbar navbar-expand-lg mt-2">
@@ -31,6 +32,7 @@
               aria-controls="navbarText"
               aria-expanded="false"
               aria-label="Toggle navigation"
+              data-allow-user="true"
             >
               <span class="navbar-toggler-icon"></span>
             </button>
@@ -63,12 +65,36 @@
                     >Device Information</a
                   >
                 </li>
+                <li class="nav-item" data-requires-admin="hide">
+                  <a class="nav-link" href="/credentials.html"
+                    >Gestione Credenziali</a
+                  >
+                </li>
               </ul>
-              <span class="navbar-text">
-                <button class="btn btn-link text-reset" id="darkModeToggle">
+              <div
+                class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end"
+              >
+                <span
+                  class="badge rounded-pill fw-semibold text-uppercase d-none"
+                  id="navUserRole"
+                ></span>
+                <span class="fw-semibold" id="navUserName"></span>
+                <button
+                  class="btn btn-outline-secondary btn-sm"
+                  id="logoutButton"
+                  type="button"
+                >
+                  Logout
+                </button>
+                <button
+                  class="btn btn-link text-reset"
+                  id="darkModeToggle"
+                  type="button"
+                  data-allow-user="true"
+                >
                   Dark Mode
                 </button>
-              </span>
+              </div>
             </div>
           </div>
         </nav>
@@ -84,6 +110,7 @@
                       class="form-select"
                       id="networkModeBand"
                       aria-label="LTE"
+                      data-requires-admin
                     >
                       <option selected value="LTE">LTE</option>
                       <option value="NSA">NR5G-NSA</option>
@@ -96,7 +123,11 @@
                 <h5 class="card-subtitle" x-show="isGettingBands === true">
                   Fetching supported bands...
                 </h5>
-                <form id="checkboxForm" x-show="isGettingBands === false"></form>
+                <form
+                  id="checkboxForm"
+                  x-show="isGettingBands === false"
+                  data-requires-admin
+                ></form>
               </div>
               <div class="card-footer">
                 <div class="d-flex align-items-center">
@@ -105,6 +136,7 @@
                       type="button"
                       class="btn btn-primary m-2"
                       @click="lockSelectedBands()"
+                      data-requires-admin
                     >
                       Lock Bands
                     </button>
@@ -112,6 +144,7 @@
                       type="button"
                       class="btn btn-info m-2"
                       id="uncheckAll"
+                      data-requires-admin
                     >
                       Uncheck All
                     </button>
@@ -119,6 +152,7 @@
                       type="button"
                       class="btn btn-danger m-2"
                       @click="resetBandLocking()"
+                      data-requires-admin
                     >
                       Reset
                     </button>
@@ -173,6 +207,7 @@
                           aria-describedby="APN"
                           maxlength="63"
                           x-bind:placeholder="apn === '-' ? 'Fetching...' : apn"
+                          data-requires-admin
                         />
                       </div>
 
@@ -185,6 +220,7 @@
                           id="ipAPN"
                           x-model="newApnIP"
                           aria-label="ipForAPN"
+                          data-requires-admin
                         >
                           <option
                             value=""
@@ -207,6 +243,7 @@
                           id="prefNetworkMode"
                           x-model="prefNetworkMode"
                           aria-label="prefNetworkMode"
+                          data-requires-admin
                         >
                           <option
                             value=""
@@ -238,6 +275,7 @@
                           id="sim1Option"
                           value="0"
                           x-model="pendingSimSlot"
+                          data-requires-admin
                         />
                         <label class="form-check-label" for="sim1Option">
                           SIM 1
@@ -251,6 +289,7 @@
                           id="sim2Option"
                           value="1"
                           x-model="pendingSimSlot"
+                          data-requires-admin
                         />
                         <label class="form-check-label" for="sim2Option">
                           SIM 2 / eSIM
@@ -269,6 +308,7 @@
                   class="btn btn-danger"
                   @click="resetApnSettings()"
                   x-show="activeUtilityTab === 'apn'"
+                  data-requires-admin
                 >
                   Reset APN Settings
                 </button>
@@ -277,6 +317,7 @@
                   class="btn btn-primary"
                   @click="saveChanges()"
                   x-show="activeUtilityTab === 'apn'"
+                  data-requires-admin
                 >
                   Save Changes
                 </button>
@@ -286,6 +327,7 @@
                   @click="applySimSelection()"
                   x-show="activeUtilityTab === 'sim'"
                   :disabled="isApplyingSimChange || !canApplySimSelection()"
+                  data-requires-admin
                 >
                   Apply
                 </button>
@@ -302,6 +344,7 @@
                   id="networkModeCell"
                   x-model="networkModeCell"
                   aria-label="LTE"
+                  data-requires-admin
                 >
                   <option
                     selected
@@ -328,6 +371,7 @@
                         aria-label="NumCells"
                         aria-describedby="basic-addon1"
                         x-model="cellNum"
+                        data-requires-admin
                       />
                     </div>
                   </div>
@@ -348,6 +392,7 @@
                         placeholder="EARFCN"
                         class="form-control"
                         x-model="earfcn1"
+                        data-requires-admin
                       />
                       <input
                         type="text"
@@ -355,6 +400,7 @@
                         placeholder="PCI"
                         class="form-control"
                         x-model="pci1"
+                        data-requires-admin
                       />
                     </div>
 
@@ -366,6 +412,7 @@
                         class="form-select"
                         x-model="scs"
                         aria-label="SCS"
+                        data-requires-admin
                       >
                         <option selected>SCS</option>
                         <option value="0" >15</option>
@@ -380,6 +427,7 @@
                         placeholder="Band"
                         class="form-control"
                         x-model="band"
+                        data-requires-admin
                       />
                     </div>
                   </div>
@@ -389,6 +437,7 @@
                     class="btn btn-primary"
                     x-show="networkModeCell == 'LTE'"
                     @click="cellLockEnableLTE()"
+                    data-requires-admin
                   >
                     Lock LTE Cells
                   </button>
@@ -398,6 +447,7 @@
                     class="btn btn-primary"
                     x-show="networkModeCell == 'NR5G-SA'"
                     @click="cellLockEnableNR()"
+                    data-requires-admin
                   >
                     Lock NR5G-SA Cells
                   </button>
@@ -407,6 +457,7 @@
                     class="btn btn-danger"
                     x-show="networkModeCell == 'Unlock LTE'"
                     @click="cellLockDisableLTE()"
+                    data-requires-admin
                   >
                     Unlock LTE Cells
                   </button>
@@ -416,6 +467,7 @@
                     class="btn btn-danger"
                     x-show="networkModeCell == 'Unlock NR5G-SA'"
                     @click="cellLockDisableNR()"
+                    data-requires-admin
                   >
                     Unlock NR5G-SA Cells
                   </button>

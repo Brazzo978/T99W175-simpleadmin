@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple Admin &mdash; Login</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="icon" href="favicon.ico" />
+    <script src="js/auth.js" defer></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/alpinejs.min.js" defer></script>
+    <script src="js/login.js" defer></script>
+  </head>
+  <body data-require-auth="false">
+    <main>
+      <div class="container my-5">
+        <nav class="navbar navbar-expand-lg mt-2">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="/login.html"
+              ><span class="mb-0 h4">Simple Admin</span></a
+            >
+            <div class="d-flex align-items-center ms-auto">
+              <button
+                class="btn btn-link text-reset"
+                id="darkModeToggle"
+                type="button"
+                data-allow-user="true"
+              >
+                Dark Mode
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        <div class="row justify-content-center mt-5">
+          <div class="col-lg-5 col-md-7">
+            <div class="card shadow-sm">
+              <div class="card-header text-center">
+                <h5 class="mb-0">Accedi a Simple Admin</h5>
+              </div>
+              <div class="card-body">
+                <div
+                  id="loginAlert"
+                  class="alert alert-danger d-none"
+                  role="alert"
+                ></div>
+                <form id="loginForm" autocomplete="off">
+                  <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="username"
+                      name="username"
+                      placeholder="Inserisci username"
+                      required
+                    />
+                  </div>
+                  <div class="mb-4">
+                    <label for="password" class="form-label">Password</label>
+                    <input
+                      type="password"
+                      class="form-control"
+                      id="password"
+                      name="password"
+                      placeholder="Inserisci password"
+                      required
+                    />
+                  </div>
+                  <div class="d-grid gap-2">
+                    <button
+                      type="submit"
+                      class="btn btn-primary"
+                      id="loginSubmit"
+                    >
+                      Accedi
+                    </button>
+                  </div>
+                </form>
+              </div>
+              <div class="card-footer text-body-secondary text-center">
+                <small>
+                  Accesso riservato agli utenti autorizzati. Contatta un
+                  amministratore per ottenere le credenziali.
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script src="js/dark-mode.js"></script>
+  </body>
+</html>

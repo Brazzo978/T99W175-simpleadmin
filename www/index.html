@@ -12,10 +12,11 @@
     <link rel="simpleadmin-logo" href="favicon.ico" />
 
     <!--  Import BootStrap Javascript -->
+    <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
   </head>
-  <body>
+  <body data-require-auth="true">
     <main>
       <div class="container my-4" x-data="processAllInfos()">
         <nav class="navbar navbar-expand-lg mt-2">
@@ -31,6 +32,7 @@
               aria-controls="navbarText"
               aria-expanded="false"
               aria-label="Toggle navigation"
+              data-allow-user="true"
             >
               <span class="navbar-toggler-icon"></span>
             </button>
@@ -58,12 +60,36 @@
                     >Device Information</a
                   >
                 </li>
+                <li class="nav-item" data-requires-admin="hide">
+                  <a class="nav-link" href="/credentials.html"
+                    >Gestione Credenziali</a
+                  >
+                </li>
               </ul>
-              <span class="navbar-text">
-                <button class="btn btn-link text-reset" id="darkModeToggle">
+              <div
+                class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end"
+              >
+                <span
+                  class="badge rounded-pill fw-semibold text-uppercase d-none"
+                  id="navUserRole"
+                ></span>
+                <span class="fw-semibold" id="navUserName"></span>
+                <button
+                  class="btn btn-outline-secondary btn-sm"
+                  id="logoutButton"
+                  type="button"
+                >
+                  Logout
+                </button>
+                <button
+                  class="btn btn-link text-reset"
+                  id="darkModeToggle"
+                  type="button"
+                  data-allow-user="true"
+                >
                   Dark Mode
                 </button>
-              </span>
+              </div>
             </div>
           </div>
         </nav>
@@ -218,11 +244,13 @@
                         min="3"
                         max="60"
                         x-bind:placeholder="refreshRate + 's'"
+                        data-requires-admin
                       />
                       <button
                         @click="updateRefreshRate()"
                         class="btn btn-outline-secondary"
                         type="button"
+                        data-requires-admin
                       >
                         Set
                       </button>

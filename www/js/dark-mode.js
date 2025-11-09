@@ -1,37 +1,33 @@
 // Function to toggle dark mode
-const toggleDarkMode = () => {
-  const html = document.querySelector('html');
-  const currentTheme = html.getAttribute('data-bs-theme');
+const darkModeToggle = document.getElementById('darkModeToggle');
 
-  if (currentTheme === 'dark') {
-    html.removeAttribute('data-bs-theme');
-    darkModeToggle.textContent = 'Dark Mode';
-    localStorage.setItem('theme', 'light'); // Store the theme in localStorage
+if (darkModeToggle) {
+  const toggleDarkMode = () => {
+    const html = document.querySelector('html');
+    const currentTheme = html.getAttribute('data-bs-theme');
+
+    if (currentTheme === 'dark') {
+      html.removeAttribute('data-bs-theme');
+      darkModeToggle.textContent = 'Dark Mode';
+      localStorage.setItem('theme', 'light');
+    } else {
+      html.setAttribute('data-bs-theme', 'dark');
+      darkModeToggle.textContent = 'Light Mode';
+      localStorage.setItem('theme', 'dark');
+    }
+  };
+
+  const storedTheme = localStorage.getItem('theme');
+  const html = document.querySelector('html');
+
+  if (storedTheme) {
+    html.setAttribute('data-bs-theme', storedTheme);
+    darkModeToggle.textContent = storedTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
   } else {
     html.setAttribute('data-bs-theme', 'dark');
     darkModeToggle.textContent = 'Light Mode';
-    localStorage.setItem('theme', 'dark'); // Store the theme in localStorage
+    localStorage.setItem('theme', 'dark');
   }
-};
 
-const darkModeToggle = document.getElementById('darkModeToggle');
-
-// Check if theme preference is stored in localStorage
-const storedTheme = localStorage.getItem('theme');
-const html = document.querySelector('html');
-
-if (storedTheme) {
-  html.setAttribute('data-bs-theme', storedTheme);
-  if (storedTheme === 'dark') {
-    darkModeToggle.textContent = 'Light Mode';
-  } else {
-    darkModeToggle.textContent = 'Dark Mode';
-  }
-} else {
-  // If no preference is stored, default to dark mode
-  html.setAttribute('data-bs-theme', 'dark');
-  darkModeToggle.textContent = 'Light Mode';
-  localStorage.setItem('theme', 'dark');
+  darkModeToggle.addEventListener('click', toggleDarkMode);
 }
-
-darkModeToggle.addEventListener('click', toggleDarkMode);

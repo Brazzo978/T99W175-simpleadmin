@@ -12,12 +12,13 @@
     <link rel="simpleadmin-logo" href="favicon.ico" />
 
     <!--  Import BootStrap Javascript -->
+    <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
-  <body>
+  <body data-require-auth="true">
     <main>
       <div class="container my-4" x-data="cellScanner()">
         <nav class="navbar navbar-expand-lg mt-2">
@@ -33,6 +34,7 @@
               aria-controls="navbarText"
               aria-expanded="false"
               aria-label="Toggle navigation"
+              data-allow-user="true"
             >
               <span class="navbar-toggler-icon"></span>
             </button>
@@ -58,18 +60,42 @@
                     >Device Information</a
                   >
                 </li>
+                <li class="nav-item" data-requires-admin="hide">
+                  <a class="nav-link" href="/credentials.html"
+                    >Gestione Credenziali</a
+                  >
+                </li>
               </ul>
-              <span class="navbar-text">
-                <button class="btn btn-link text-reset" id="darkModeToggle">
+              <div
+                class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end"
+              >
+                <span
+                  class="badge rounded-pill fw-semibold text-uppercase d-none"
+                  id="navUserRole"
+                ></span>
+                <span class="fw-semibold" id="navUserName"></span>
+                <button
+                  class="btn btn-outline-secondary btn-sm"
+                  id="logoutButton"
+                  type="button"
+                >
+                  Logout
+                </button>
+                <button
+                  class="btn btn-link text-reset"
+                  id="darkModeToggle"
+                  type="button"
+                  data-allow-user="true"
+                >
                   Dark Mode
                 </button>
-              </span>
+              </div>
             </div>
           </div>
         </nav>
 
           <div class="col">
-            <div class="card">
+            <div class="card" data-requires-admin>
               <div class="card-header">Live Signal</div>
               <div class="card-body">
                 <div class="row mt-2 mb-2">
@@ -85,7 +111,7 @@
 
         <div class="row mt-3 mb-4">
           <div class="col">
-            <div class="card">
+            <div class="card" data-requires-admin>
               <div class="card-header">Cell Scanner</div>
               <div class="card-body">
                 <div class="card-text">

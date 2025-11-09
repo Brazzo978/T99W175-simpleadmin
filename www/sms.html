@@ -8,23 +8,24 @@
   
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/bootstrap.min.css" />
-  
+
   <link rel="icon" href="favicon.ico" />
-  
+
+  <script src="js/auth.js" defer></script>
   <script src="js/bootstrap.bundle.min.js"></script>
   <script src="js/alpinejs.min.js" defer></script>
 
   
 </head>
 
-<body>
+<body data-require-auth="true">
   <main>
     <div class="container my-4" x-data="fetchSMS()">
       <nav class="navbar navbar-expand-lg mt-2">
         <div class="container-fluid">
           <a class="navbar-brand" href="/"><span class="mb-0 h4">Simple Admin</span></a>
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText"
-            aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+            aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation" data-allow-user="true">
             <span class="navbar-toggler-icon"></span>
           </button>
           <div class="collapse navbar-collapse" id="navbarText">
@@ -48,18 +49,26 @@
               <li class="nav-item">
                 <a class="nav-link" href="/deviceinfo.html">Device Information</a>
               </li>
+              <li class="nav-item" data-requires-admin="hide">
+                <a class="nav-link" href="/credentials.html">Gestione Credenziali</a>
+              </li>
             </ul>
-            <span class="navbar-text">
-              <button class="btn btn-link text-reset" id="darkModeToggle">
+            <div class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end">
+              <span class="badge rounded-pill fw-semibold text-uppercase d-none" id="navUserRole"></span>
+              <span class="fw-semibold" id="navUserName"></span>
+              <button class="btn btn-outline-secondary btn-sm" id="logoutButton" type="button">
+                Logout
+              </button>
+              <button class="btn btn-link text-reset" id="darkModeToggle" type="button" data-allow-user="true">
                 Dark Mode
               </button>
-            </span>
+            </div>
           </div>
         </div>
       </nav>
       <div class="row mt-5 mb-4">
         <div class="col">
-          <div class="card">
+          <div class="card" data-requires-admin>
             <div class="card-header">SMS Inbox</div>
             <div class="card-body">
               <div class="card-text">
@@ -122,11 +131,11 @@
               <div class="d-grid gap-2 d-md-flex justify-content-md-start">
                 
                 
-                <button class="btn btn-success" type="button" @click="init()">
+                <button class="btn btn-success" type="button" @click="init()" data-allow-user="true">
                   Refresh
                 </button>
-                
-                
+
+
                 <button class="btn btn-danger" type="button" @click="deleteSelectedSMS()">
                   Delete Selected SMS
                 </button>
@@ -137,7 +146,7 @@
       </div>
       <div class="row mt-5 mb-4">
         <div class="col">
-          <div class="card">
+          <div class="card" data-requires-admin>
             <div class="card-header">Send Message</div>
             <div class="card-body">
               <div class="mb-3">
