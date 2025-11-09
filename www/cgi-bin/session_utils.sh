@@ -23,7 +23,10 @@ status_text() {
 
 send_json_response() {
     local status="${1:-200}"
-    local payload="${2:-{}}"
+    local payload="{}"
+    if [ $# -ge 2 ] && [ -n "$2" ]; then
+        payload="$2"
+    fi
     echo "Status: ${status} $(status_text "$status")"
     echo "Content-type: application/json"
     echo "Cache-Control: no-store"
