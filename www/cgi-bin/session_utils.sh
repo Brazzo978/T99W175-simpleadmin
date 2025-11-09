@@ -3,7 +3,7 @@ set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-DEFAULT_CONFIG_FILE="$SCRIPT_DIR/../../config/simpleadmin.conf"
+DEFAULT_CONFIG_FILE="$SCRIPT_DIR/../config/simpleadmin.conf"
 if [ -n "${SIMPLEADMIN_CONFIG_FILE:-}" ]; then
     CONFIG_FILE="$SIMPLEADMIN_CONFIG_FILE"
 elif [ -f "$DEFAULT_CONFIG_FILE" ]; then

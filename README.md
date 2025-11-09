@@ -4,4 +4,4 @@
 
 ## Configurazione
 
-Il comportamento dell'autenticazione può essere controllato tramite il file `config/simpleadmin.conf`. La voce `SIMPLEADMIN_ENABLE_LOGIN` è impostata a `1` per richiedere il login degli utenti; impostandola a `0` il login viene disattivato e l'interfaccia web resta accessibile senza credenziali.
+Il comportamento dell'autenticazione può essere controllato tramite il file `www/config/simpleadmin.conf`. La voce `SIMPLEADMIN_ENABLE_LOGIN` è impostata a `1` per richiedere il login degli utenti; impostandola a `0` il login viene disattivato e l'interfaccia web resta accessibile senza credenziali.
