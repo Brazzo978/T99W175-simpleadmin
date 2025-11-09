@@ -1,7 +1,7 @@
-# Detailed documentation for "Simple Admin"
+# Detailed documentation for "Simple T99"
 
 ## Project overview
-"Simple Admin" is a web administration interface designed for modem/routers based on the Quectel T99W175 modem. The application consists of static HTML pages enhanced with Bootstrap 5 and Alpine.js on the client side, together with a collection of Bash CGI scripts that run AT commands, query the system state, and orchestrate utilities such as Watchcat, TTL override, or SMS sending. Every file is intended to be deployed on the device's web partition and executed by the embedded HTTP server.
+"Simple T99" is a web administration interface designed for modem/routers based on the Quectel T99W175 modem. The application consists of static HTML pages enhanced with Bootstrap 5 and Alpine.js on the client side, together with a collection of Bash CGI scripts that run AT commands, query the system state, and orchestrate utilities such as Watchcat, TTL override, or SMS sending. Every file is intended to be deployed on the device's web partition and executed by the embedded HTTP server.
 
 ## Repository structure
 - `README.md`: brief project overview with a reference to this documentation.
