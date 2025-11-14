@@ -351,38 +351,19 @@
               </div>
               <div class="col-12">
                 <label class="form-label" for="remoteInterface"
-                  >AT interface</label
+                  >LTE interface name</label
                 >
                 <input
                   type="text"
                   class="form-control"
                   id="remoteInterface"
                   name="interface"
-                  placeholder="/dev/ttyUSB2"
+                  placeholder="lte1"
                 />
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="remoteTool"
-                  >AT command tool</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
-                  id="remoteTool"
-                  name="at_command_tool"
-                  value="atcli_smd8"
-                />
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="remoteArgs"
-                  >Additional tool arguments</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
-                  id="remoteArgs"
-                  name="at_command_args"
-                />
+                <div class="form-text">
+                  Use the RouterOS LTE interface that exposes the modem (for example
+                  <code>lte1</code>).
+                </div>
               </div>
             </div>
             <div class="mt-3" data-remote-config-status></div>

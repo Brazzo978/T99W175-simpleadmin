@@ -86,19 +86,17 @@ def execute_remote(command: Union[str, Iterable[str]], *, timeout: int = 30) -> 
 def run_at_command(at_command: str, *, timeout: int = 30) -> Tuple[str, str, int]:
     """Execute an AT command on the remote host."""
     cfg = _ensure_config()
-    tool = cfg.get("at_command_tool") or "atcli_smd8"
-    args = cfg.get("at_command_args", "")
     interface = cfg.get("interface", "").strip()
+    if not interface:
+        raise RemoteConnectionError(
+            "Missing LTE interface name in the remote configuration."
+        )
 
-    command_tokens: List[str] = []
-    command_tokens.extend(shlex.split(tool))
-    if args:
-        command_tokens.extend(shlex.split(args))
-    if interface:
-        command_tokens.extend(["-p", interface])
-    command_tokens.append(at_command)
+    escaped_interface = interface.replace('"', '\\"')
+    escaped_command = at_command.replace('"', '\\"')
+    ros_command = f'interface/lte/at-chat "{escaped_interface}" input="{escaped_command}"'
 
-    return execute_remote(command_tokens, timeout=timeout)
+    return execute_remote(ros_command, timeout=timeout)
 
 
 def run_health_check() -> Tuple[str, str, int]:
