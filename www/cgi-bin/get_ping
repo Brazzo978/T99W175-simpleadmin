@@ -1,16 +1,41 @@
-#!/bin/bash
+#!/usr/bin/env python3
+"""Perform remote ping checks via SSH."""
+from __future__ import annotations
 
-# This script will ping 8.8.8.8 and 1.1.1.1 and return the result
-# If both pings are successful, it will return "OK"
-# If either ping fails, it will return "ERROR"
+import os
+import sys
+from pathlib import Path
 
-# Run ping against each target address
-if ping -c 1 8.8.8.8 >/dev/null 2>&1 && ping -c 1 1.1.1.1 >/dev/null 2>&1; then
-    echo "Content-type: text/plain"
-    echo ""
-    echo "OK"
-else
-    echo "Content-type: text/plain"
-    echo ""
-    echo "ERROR"
-fi
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from remote_admin_backend.http_utils import HTTPError, handle_error, send_text  # type: ignore  # noqa: E402
+from remote_admin_backend.ssh_client import RemoteConnectionError, execute_remote  # type: ignore  # noqa: E402
+
+
+def main() -> None:
+    try:
+        stdout, stderr, exit_code = execute_remote(
+            "ping -c 1 8.8.8.8 >/dev/null && ping -c 1 1.1.1.1 >/dev/null && echo OK",
+            timeout=20,
+        )
+    except RemoteConnectionError as exc:
+        raise HTTPError(str(exc), status=500) from exc
+
+    status = "OK" if exit_code == 0 else "ERROR"
+    if "OK" in stdout:
+        status = "OK"
+    elif stderr.strip():
+        status = "ERROR"
+
+    send_text(status)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except HTTPError as error:
+        handle_error(error)
+    except Exception as exc:  # pragma: no cover
+        handle_error(HTTPError(f"Unexpected error: {exc}", status=500))

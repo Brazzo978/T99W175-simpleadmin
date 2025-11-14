@@ -42,9 +42,6 @@
                   <a class="nav-link" href="/network.html">4G/5G Settings</a>
                 </li>
                 <li class="nav-item">
-                  <a class="nav-link" href="/network-settings.html">Network Settings</a>
-                </li>
-                <li class="nav-item">
                   <a
                     class="nav-link active"
                     href="/settings.html"
@@ -52,20 +49,23 @@
                     >AT Terminal</a
                   >
                 </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="/sms.html">SMS</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="/deviceinfo.html"
-                    >Device Information</a
-                  >
-                </li>
               </ul>
-              <span class="navbar-text">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge text-bg-secondary" id="remoteConnectionBadge"
+                  >Remote: not configured</span
+                >
+                <button
+                  class="btn btn-outline-primary btn-sm"
+                  type="button"
+                  data-bs-toggle="modal"
+                  data-bs-target="#remoteConfigModal"
+                >
+                  Remote Connection
+                </button>
                 <button class="btn btn-link text-reset" id="darkModeToggle">
                   Dark Mode
                 </button>
-              </span>
+              </div>
             </div>
           </div>
         </nav>
@@ -281,7 +281,134 @@
         </div>
       </div>
     </main>
+    <div
+      class="modal fade"
+      id="remoteConfigModal"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <form class="modal-content" id="remoteConfigForm">
+          <div class="modal-header">
+            <h1 class="modal-title fs-5">Remote Connection</h1>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning" role="alert">
+              The password is stored locally to authenticate against the remote
+              router. Leave the password field blank to keep the existing one.
+            </div>
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label" for="remoteHost">Remote address</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="remoteHost"
+                  name="host"
+                  placeholder="192.168.1.1"
+                  required
+                />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="remotePort">SSH port</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="remotePort"
+                  name="ssh_port"
+                  min="1"
+                  max="65535"
+                  value="22"
+                  required
+                />
+              </div>
+              <div class="col-md-8">
+                <label class="form-label" for="remoteUser">Username</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="remoteUser"
+                  name="username"
+                  placeholder="root"
+                  required
+                />
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="remotePassword">Password</label>
+                <input
+                  type="password"
+                  class="form-control"
+                  id="remotePassword"
+                  name="password"
+                  autocomplete="current-password"
+                />
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="remoteInterface"
+                  >AT interface</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  id="remoteInterface"
+                  name="interface"
+                  placeholder="/dev/ttyUSB2"
+                />
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="remoteTool"
+                  >AT command tool</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  id="remoteTool"
+                  name="at_command_tool"
+                  value="atcli_smd8"
+                />
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="remoteArgs"
+                  >Additional tool arguments</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  id="remoteArgs"
+                  name="at_command_args"
+                />
+              </div>
+            </div>
+            <div class="mt-3" data-remote-config-status></div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              id="remoteConfigTest"
+            >
+              Test Connection
+            </button>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <script src="js/atcommand-utils.js"></script>
+    <script src="js/remote-config.js"></script>
     <script src="js/dark-mode.js"></script>
     <script>
       function simpleSettings() {
