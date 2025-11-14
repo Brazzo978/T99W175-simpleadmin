@@ -7,7 +7,15 @@ import sys
 
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+def _find_project_root() -> Path:
+    current = Path(__file__).resolve()
+    for candidate in current.parents:
+        if (candidate / "remote_admin_backend").is_dir():
+            return candidate
+    return current.parents[0]
+
+
+ROOT = _find_project_root()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
