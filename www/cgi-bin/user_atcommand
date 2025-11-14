@@ -1,76 +1,64 @@
-#!/bin/bash
-set -u
-set -o pipefail
+#!/usr/bin/env python3
+"""Execute AT commands typed by the user via SSH."""
+from __future__ import annotations
 
-urldecode() {
-    local data="${1//+/ }"
-    printf '%b' "${data//%/\\x}"
-}
+import os
+import sys
+from pathlib import Path
 
-strip_ansi() {
-    sed -E 's/\x1B\[[0-9;]*[mG]//g'
-}
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-print_headers() {
-    printf 'Content-type: text/plain\n\n'
-}
+from remote_admin_backend.http_utils import (  # type: ignore  # noqa: E402
+    HTTPError,
+    decode_param,
+    handle_error,
+    parse_query,
+    send_text,
+)
+from remote_admin_backend.ssh_client import (  # type: ignore  # noqa: E402
+    RemoteCommandError,
+    RemoteConnectionError,
+    run_at_command,
+)
 
-raw_query="${QUERY_STRING:-}"
-clean_query="${raw_query//;/}"
 
-atcmd_param=""
-if [ -n "$clean_query" ]; then
-    IFS='&' read -r -a pairs <<< "$clean_query"
-    for pair in "${pairs[@]}"; do
-        [ -z "$pair" ] && continue
-        key="${pair%%=*}"
-        value=""
-        if [[ "$pair" == *"="* ]]; then
-            value="${pair#*=}"
-        fi
-        if [ "$key" = "atcmd" ]; then
-            atcmd_param="$value"
-            break
-        fi
-    done
-fi
+def main() -> None:
+    environ = os.environ.copy()
 
-if [ -z "$atcmd_param" ]; then
-    print_headers
-    printf 'ERROR\n\nMissing atcmd parameter.\n'
-    exit 0
-fi
+    params = parse_query(environ)
+    atcmd = decode_param(params.get("atcmd", ""))
 
-decoded_atcmd="$(urldecode "$atcmd_param")"
-if [ -z "$decoded_atcmd" ]; then
-    print_headers
-    printf 'ERROR\n\nUnable to decode the atcmd parameter.\n'
-    exit 0
-fi
+    if not atcmd:
+        raise HTTPError("Missing atcmd parameter.")
 
-if ! command -v atcli_smd8 >/dev/null 2>&1; then
-    print_headers
-    printf '%s\n\nERROR: atcli_smd8 command not found.\n' "$decoded_atcmd"
-    exit 0
-fi
+    try:
+        stdout, stderr, exit_code = run_at_command(atcmd)
+    except RemoteConnectionError as exc:
+        raise HTTPError(str(exc), status=500) from exc
+    except RemoteCommandError as exc:  # pragma: no cover
+        raise HTTPError(str(exc), status=500) from exc
 
-command_output=""
-exit_code=0
-if ! command_output=$(atcli_smd8 "$decoded_atcmd" 2>&1); then
-    exit_code=$?
-fi
+    payload = [atcmd, ""]
 
-clean_output=$(printf '%s\n' "$command_output" | strip_ansi)
+    if stdout.strip():
+        payload.append(stdout.strip())
+    if stderr.strip():
+        payload.append(stderr.strip())
+    if not stdout.strip() and not stderr.strip():
+        if exit_code != 0:
+            payload.append(f"ERROR: remote command exited with code {exit_code}.")
+        else:
+            payload.append("ERROR: empty response from modem.")
 
-print_headers
-printf '%s\n\n' "$decoded_atcmd"
+    send_text("\n".join(payload))
 
-if [ -n "$clean_output" ]; then
-    printf '%s\n' "$clean_output"
-else
-    if [ $exit_code -ne 0 ]; then
-        printf 'ERROR: atcli_smd8 exited with code %s.\n' "$exit_code"
-    else
-        printf 'ERROR: empty response from modem.\n'
-    fi
-fi
+
+if __name__ == "__main__":
+    try:
+        main()
+    except HTTPError as error:
+        handle_error(error)
+    except Exception as exc:  # pragma: no cover - unexpected error guard
+        handle_error(HTTPError(f"Unexpected error: {exc}", status=500))
