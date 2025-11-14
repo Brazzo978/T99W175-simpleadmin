@@ -13,8 +13,6 @@ _DEFAULT_CONFIG = {
     "username": "",
     "password": "",
     "interface": "",
-    "at_command_tool": "atcli_smd8",
-    "at_command_args": "",
 }
 
 _LOCK = threading.RLock()

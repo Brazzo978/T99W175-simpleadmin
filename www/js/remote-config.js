@@ -15,8 +15,6 @@
     username: form.querySelector("[name=username]"),
     password: form.querySelector("[name=password]"),
     interface: form.querySelector("[name=interface]"),
-    at_command_tool: form.querySelector("[name=at_command_tool]"),
-    at_command_args: form.querySelector("[name=at_command_args]"),
   };
 
   function setStatus(message, type = "") {
