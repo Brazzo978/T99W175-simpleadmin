@@ -4557,11 +4557,23 @@ def _prepare_assets() -> Iterator[Path]:
         data = base64.b64decode(ASSET_ARCHIVE_B64)
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             archive.extractall(root)
+
+        cgi_root = root / "www" / "cgi-bin"
+        if cgi_root.is_dir():
+            for script in cgi_root.iterdir():
+                if not script.is_file():
+                    continue
+                try:
+                    current_mode = script.stat().st_mode
+                    script.chmod(current_mode | 0o111)
+                except OSError:
+                    continue
         yield root
 
 
 def _make_handler(www_root: Path):
     class EmbeddedCGIHandler(CGIHTTPRequestHandler):
+        have_fork = False
         cgi_directories = ["/cgi-bin"]
 
         def __init__(self, *args, directory: Optional[str] = None, **kwargs) -> None:
