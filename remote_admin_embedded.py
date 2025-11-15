@@ -4604,6 +4604,52 @@ def _make_handler(www_root: Path):
     return EmbeddedCGIHandler
 
 
+def _enable_debug_logging() -> None:
+    """Enable logging of executed remote commands to stdout."""
+
+    try:
+        from remote_admin_backend import ssh_client  # type: ignore
+    except Exception as exc:  # pragma: no cover - import errors should not break runtime
+        print(f"Failed to enable debug logging: {exc}", file=sys.stderr, flush=True)
+        return
+
+    original_execute = ssh_client.execute_remote
+
+    def _format_command(command: object) -> str:
+        serializer = getattr(ssh_client, "_serialize_command", None)
+        if callable(serializer):
+            try:
+                return serializer(command)
+            except Exception:
+                pass
+
+        if isinstance(command, (list, tuple)):
+            return " ".join(str(part) for part in command)
+        return str(command)
+
+    def debug_execute(command, *, timeout: int = 30):  # type: ignore[override]
+        command_repr = _format_command(command)
+        print(f"[remote-admin] Executing command: {command_repr}", flush=True)
+        try:
+            stdout, stderr, exit_code = original_execute(command, timeout=timeout)
+        except Exception as exc:
+            print(f"[remote-admin] Command raised: {exc!r}", flush=True)
+            raise
+
+        print(f"[remote-admin] Exit status: {exit_code}", flush=True)
+        if stdout:
+            print("[remote-admin] STDOUT:", flush=True)
+            print(stdout.rstrip("\n"), flush=True)
+        if stderr:
+            print("[remote-admin] STDERR:", flush=True)
+            print(stderr.rstrip("\n"), flush=True)
+        if not stdout and not stderr:
+            print("[remote-admin] (no output)", flush=True)
+        return stdout, stderr, exit_code
+
+    ssh_client.execute_remote = debug_execute  # type: ignore[assignment]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=SERVER_DESCRIPTION)
     parser.add_argument("--host", default="127.0.0.1", help="Host/IP to bind the local server to.")
@@ -4613,18 +4659,27 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Suppress HTTP request logs.",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Log executed remote commands and their responses to the console.",
+    )
     return parser.parse_args()
 
 
-def run_server(host: str, port: int, quiet: bool = False) -> Tuple[str, int]:
+def run_server(host: str, port: int, quiet: bool = False, debug: bool = False) -> Tuple[str, int]:
     if quiet:
         os.environ["REMOTE_ADMIN_QUIET"] = "1"
+    if debug:
+        os.environ["REMOTE_ADMIN_DEBUG"] = "1"
 
     with _prepare_assets() as asset_root:
         www_root = asset_root / "www"
         backend_root = asset_root
 
         sys.path.insert(0, str(backend_root))
+        if debug:
+            _enable_debug_logging()
 
         config_path = asset_root / "remote_config.json"
         os.environ.setdefault("REMOTE_ADMIN_CONFIG", str(config_path))
@@ -4647,7 +4702,7 @@ def run_server(host: str, port: int, quiet: bool = False) -> Tuple[str, int]:
 
 def main() -> None:
     args = parse_args()
-    run_server(args.host, args.port, quiet=args.quiet)
+    run_server(args.host, args.port, quiet=args.quiet, debug=args.debug)
 
 
 if __name__ == "__main__":
