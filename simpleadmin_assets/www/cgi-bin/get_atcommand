@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Execute AT commands on the remote host via SSH."""
+from __future__ import annotations
+
+import os
+import sys
+
+from pathlib import Path
+
+def _find_project_root() -> Path:
+    current = Path(__file__).resolve()
+    for candidate in current.parents:
+        if (candidate / "remote_admin_backend").is_dir():
+            return candidate
+    return current.parents[0]
+
+
+ROOT = _find_project_root()
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from remote_admin_backend.http_utils import (  # type: ignore  # noqa: E402
+    HTTPError,
+    decode_param,
+    handle_error,
+    parse_query,
+    send_text,
+)
+from remote_admin_backend.ssh_client import (  # type: ignore  # noqa: E402
+    RemoteCommandError,
+    RemoteConnectionError,
+    run_at_command,
+)
+
+
+def main() -> None:
+    environ = os.environ.copy()
+
+    params = parse_query(environ)
+    atcmd = decode_param(params.get("atcmd", ""))
+
+    if not atcmd:
+        raise HTTPError("Missing atcmd parameter.")
+
+    try:
+        stdout, stderr, exit_code = run_at_command(atcmd)
+    except RemoteConnectionError as exc:
+        raise HTTPError(str(exc), status=500) from exc
+    except RemoteCommandError as exc:  # pragma: no cover - reserved for future use
+        raise HTTPError(str(exc), status=500) from exc
+
+    response_lines = [atcmd, "", stdout.strip()]
+    if stderr.strip():
+        response_lines.append(stderr.strip())
+    elif not stdout.strip() and exit_code != 0:
+        response_lines.append(f"ERROR: remote command exited with code {exit_code}.")
+    elif not stdout.strip():
+        response_lines.append("ERROR: empty response from modem.")
+
+    send_text("\n".join(response_lines))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except HTTPError as error:
+        handle_error(error)
+    except Exception as exc:  # pragma: no cover - guard unexpected errors
+        handle_error(HTTPError(f"Unexpected error: {exc}", status=500))
