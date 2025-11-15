@@ -133,6 +133,39 @@ def _ensure_at_prefix(command: str) -> str:
     return f"AT {stripped}" if not stripped.startswith("AT ") else stripped
 
 
+def _response_is_successful(stdout: str, stderr: str, exit_code: int) -> bool:
+    """Determine whether an AT command executed successfully."""
+
+    if exit_code != 0:
+        return False
+
+    stdout_lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    stderr_lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+
+    if not stdout_lines and stderr_lines:
+        return False
+
+    for line in stdout_lines + stderr_lines:
+        if "ERROR" in line.upper():
+            return False
+
+    if not stdout_lines:
+        return True
+
+    last_line = stdout_lines[-1].upper()
+    if last_line == "OK":
+        return True
+
+    for line in stdout_lines:
+        lowered = line.lower()
+        if lowered.startswith("status:") and "ok" in lowered:
+            return True
+        if lowered.endswith(": ok"):
+            return True
+
+    return False
+
+
 def run_at_command(at_command: str, *, timeout: int = 30) -> Tuple[str, str, int]:
     """Execute an AT command on the remote host."""
     cfg = _ensure_config()
@@ -169,7 +202,10 @@ def run_at_command(at_command: str, *, timeout: int = 30) -> Tuple[str, str, int
         if stderr:
             stderr_parts.append(stderr)
 
-        if exit_code != 0 and not stdout:
+        if not _response_is_successful(stdout, stderr, exit_code):
+            stderr_parts.append(
+                f'Aborting remaining commands after failure of "{normalized}".'
+            )
             break
 
     combined_stdout = "\n\n".join(stdout_parts)
