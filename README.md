@@ -18,4 +18,15 @@ This branch ships with a cross-platform launcher that exposes the web interface 
 python remote_admin.py --host 127.0.0.1 --port 8080
 ```
 
+
+### Stand-alone launcher
+
+For environments where distributing the full directory tree is inconvenient (for instance on Windows), the repository now provides `remote_admin_embedded.py`. The script bundles the backend modules and CGI assets and serves them from a temporary directory without writing permanent files. Run it like any other Python module:
+
+```bash
+python remote_admin_embedded.py --host 127.0.0.1 --port 8080 --quiet
+```
+
+Configuration changes are stored in a temporary location for the lifetime of the process. Restarting the launcher resets the settings to their defaults.
+
 Open a browser and navigate to the printed URL. Use the **Remote Connection** button in the top navigation bar to configure the remote modem address, SSH credentials, the preferred AT interface, and the command wrapper. Once saved, the home dashboard, band-locking page, and AT terminal will execute the required commands on the remote device via SSH.
