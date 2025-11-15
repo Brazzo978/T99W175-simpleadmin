@@ -4567,6 +4567,23 @@ def _make_handler(www_root: Path):
         def __init__(self, *args, directory: Optional[str] = None, **kwargs) -> None:
             super().__init__(*args, directory=str(www_root), **kwargs)
 
+        def is_python(self, path: str) -> bool:
+            """Treat extensionless scripts with a python shebang as Python."""
+            if super().is_python(path):
+                return True
+
+            scriptfile = path if os.path.isabs(path) else self.translate_path(path)
+            try:
+                with open(scriptfile, "rb") as candidate:
+                    first_line = candidate.readline()
+            except OSError:
+                return False
+
+            if not first_line.startswith(b"#!"):
+                return False
+
+            return b"python" in first_line.lower()
+
         def log_message(self, format: str, *args) -> None:  # noqa: A003 - match base signature
             if os.environ.get("REMOTE_ADMIN_QUIET"):
                 return
