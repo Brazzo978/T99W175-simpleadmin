@@ -79,12 +79,26 @@
           { signal: controller.signal }
         );
 
-        if (!response.ok) {
-          lastError = new Error(`HTTP ${response.status}`);
-        } else {
-          const text = await response.text();
-          lastData = text;
+        const text = await response.text();
+        lastData = text;
 
+        if (!response.ok) {
+          let message = text.trim();
+          if (!message) {
+            message = `HTTP ${response.status}`;
+          } else {
+            try {
+              const payload = JSON.parse(text);
+              if (payload && payload.message) {
+                message = payload.message;
+              }
+            } catch (_error) {
+              // response body is not JSON, keep original text
+            }
+          }
+
+          lastError = new Error(message);
+        } else {
           if (!text.trim()) {
             lastError = new Error("Empty response from the modem.");
           } else if (isBusyResponse(text)) {
