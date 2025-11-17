@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import sys
 from typing import Any, Dict, Iterable, Tuple
-from urllib.parse import parse_qs, unquote_plus
+from urllib.parse import unquote
 
 
 def send_json(payload: Dict[str, Any], status: int = 200) -> None:
@@ -24,15 +24,33 @@ def send_text(text: str, status: int = 200) -> None:
 
 
 def parse_query(environ: Dict[str, str]) -> Dict[str, str]:
-    """Parse the CGI query string."""
+    """Parse the CGI query string while preserving literal plus signs."""
+
     query = environ.get("QUERY_STRING", "")
-    parsed = parse_qs(query, keep_blank_values=True)
-    return {key: values[0] if values else "" for key, values in parsed.items()}
+    if not query:
+        return {}
+
+    params: Dict[str, str] = {}
+    for chunk in query.split("&"):
+        if not chunk:
+            continue
+
+        key, _, value = chunk.partition("=")
+        decoded_key = unquote(key)
+        decoded_value = unquote(value)
+
+        if decoded_key and decoded_key not in params:
+            params[decoded_key] = decoded_value
+        elif decoded_key:
+            # mimic parse_qs by keeping the first occurrence only
+            continue
+
+    return params
 
 
 def decode_param(value: str) -> str:
-    """Decode a percent-encoded parameter value."""
-    return unquote_plus(value or "")
+    """Decode a percent-encoded parameter value without altering plus signs."""
+    return unquote(value or "")
 
 
 def read_body(environ: Dict[str, str]) -> bytes:
