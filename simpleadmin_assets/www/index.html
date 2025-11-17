@@ -959,25 +959,43 @@
           },
 
           async fetchAllInfo() {
-            this.atcmd =
-              'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;';
+            const commandSequence = ['AT^DEBUG?', 'AT+CSQ', 'AT^TEMP?'];
+            const interCommandDelayMs = 500;
+            this.atcmd = commandSequence.join(' \u2192 ');
 
             try {
-              const result = await ATCommandService.execute(this.atcmd, {
-                retries: 3,
-                timeout: 15000,
-              });
+              const aggregatedResponses = [];
 
-              if (!result.ok) {
-                const fallbackMessage = result.error
-                  ? result.error.message
-                  : 'Risposta AT non valida.';
+              for (let index = 0; index < commandSequence.length; index += 1) {
+                const command = commandSequence[index];
+                const result = await ATCommandService.execute(command, {
+                  retries: 3,
+                  timeout: 15000,
+                });
 
-                this.applyFallback(fallbackMessage);
-                return;
+                if (!result.ok) {
+                  const fallbackMessage = result.error
+                    ? `${command}: ${result.error.message}`
+                    : `Risposta AT non valida (${command}).`;
+
+                  this.applyFallback(fallbackMessage);
+                  return;
+                }
+
+                const chunk =
+                  typeof result.data === 'string' ? result.data.trim() : '';
+
+                if (chunk) {
+                  aggregatedResponses.push(chunk);
+                }
+
+                const isLastCommand = index === commandSequence.length - 1;
+                if (!isLastCommand) {
+                  await ATCommandService.delay(interCommandDelayMs);
+                }
               }
 
-              const rawdata = result.data;
+              const rawdata = aggregatedResponses.join('\n\n');
 
               if (!rawdata || !rawdata.trim()) {
                 this.applyFallback('Risposta AT vuota dal modem.');
