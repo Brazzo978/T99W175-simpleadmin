@@ -43,7 +43,45 @@
     };
   }
 
-  async function execute(atcmd, options = {}) {
+  function ensureAtPrefix(command) {
+    if (!command) {
+      return "";
+    }
+
+    if (/^AT/i.test(command)) {
+      return command;
+    }
+
+    return `AT${command}`;
+  }
+
+  function normalizeCommands(input) {
+    const queue = Array.isArray(input) ? input : [input];
+    const commands = [];
+
+    queue.forEach((entry) => {
+      if (typeof entry !== "string") {
+        return;
+      }
+
+      const sanitized = sanitize(entry);
+      if (!sanitized) {
+        return;
+      }
+
+      sanitized
+        .split(/;|[\r\n]+/)
+        .map((segment) => sanitize(segment))
+        .filter((segment) => segment.length > 0)
+        .forEach((segment) => {
+          commands.push(ensureAtPrefix(segment));
+        });
+    });
+
+    return commands;
+  }
+
+  async function executeSingle(atcmd, options = {}) {
     const sanitized = sanitize(atcmd);
 
     if (!sanitized) {
@@ -53,15 +91,18 @@
       });
     }
 
-    const retries = Number.isInteger(options.retries) && options.retries >= 0
-      ? options.retries
-      : DEFAULT_RETRIES;
-    const timeout = typeof options.timeout === "number" && options.timeout > 0
-      ? options.timeout
-      : DEFAULT_TIMEOUT;
-    const endpoint = typeof options.endpoint === "string" && options.endpoint.trim() !== ""
-      ? options.endpoint.trim()
-      : "/cgi-bin/get_atcommand";
+    const retries =
+      Number.isInteger(options.retries) && options.retries >= 0
+        ? options.retries
+        : DEFAULT_RETRIES;
+    const timeout =
+      typeof options.timeout === "number" && options.timeout > 0
+        ? options.timeout
+        : DEFAULT_TIMEOUT;
+    const endpoint =
+      typeof options.endpoint === "string" && options.endpoint.trim() !== ""
+        ? options.endpoint.trim()
+        : "/cgi-bin/get_atcommand";
 
     let attempt = 0;
     let lastError = null;
@@ -93,10 +134,15 @@
           } else {
             const hasErrorToken = text.includes("ERROR");
 
-            return createResult(!hasErrorToken, text, hasErrorToken ? new Error("The modem returned ERROR.") : null, {
-              busy: false,
-              attempts: attempt,
-            });
+            return createResult(
+              !hasErrorToken,
+              text,
+              hasErrorToken ? new Error("The modem returned ERROR.") : null,
+              {
+                busy: false,
+                attempts: attempt,
+              }
+            );
           }
         }
       } catch (error) {
@@ -120,8 +166,65 @@
     });
   }
 
+  async function executeSequence(commands, options = {}) {
+    const normalized = normalizeCommands(commands);
+
+    if (normalized.length === 0) {
+      return createResult(false, "", new Error("Empty or invalid AT command."), {
+        busy: false,
+        attempts: 0,
+      });
+    }
+
+    if (normalized.length === 1) {
+      return executeSingle(normalized[0], options);
+    }
+
+    const aggregated = [];
+    let totalAttempts = 0;
+    let busy = false;
+
+    for (let index = 0; index < normalized.length; index += 1) {
+      const command = normalized[index];
+      const result = await executeSingle(command, options);
+      totalAttempts += result.attempts || 1;
+      busy = busy || Boolean(result.busy);
+
+      if (!result.ok) {
+        const combinedData = aggregated
+          .concat(
+            typeof result.data === "string" ? result.data.trim() : ""
+          )
+          .filter((chunk) => chunk.length > 0)
+          .join("\n");
+
+        return createResult(false, combinedData, result.error, {
+          busy,
+          attempts: totalAttempts,
+        });
+      }
+
+      const chunk =
+        typeof result.data === "string" ? result.data.trim() : "";
+
+      if (chunk) {
+        aggregated.push(chunk);
+      }
+    }
+
+    return createResult(true, aggregated.join("\n"), null, {
+      busy: false,
+      attempts: totalAttempts,
+    });
+  }
+
+  async function execute(atcmd, options = {}) {
+    return executeSequence(atcmd, options);
+  }
+
   global.ATCommandService = {
     execute,
+    executeSequence,
     splitLines,
     delay,
     sanitize,
