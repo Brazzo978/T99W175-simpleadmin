@@ -133,156 +133,51 @@
         <div class="row gap-3 mt-4">
           <div class="col">
             <div class="card">
-              <div class="card-header pb-0">
-                <ul class="nav nav-tabs card-header-tabs">
-                  <li class="nav-item" role="presentation">
-                    <button
-                      type="button"
-                      class="nav-link"
-                      :class="{ active: activeUtilityTab === 'apn' }"
-                      @click="activeUtilityTab = 'apn'"
-                    >
-                      APN Settings
-                    </button>
-                  </li>
-                  <li class="nav-item" role="presentation">
-                    <button
-                      type="button"
-                      class="nav-link"
-                      :class="{ active: activeUtilityTab === 'sim' }"
-                      @click="activeUtilityTab = 'sim'"
-                    >
-                      SIM Management
-                    </button>
-                  </li>
-                </ul>
-              </div>
+              <div class="card-header">SIM Management</div>
               <div class="card-body">
-                <div x-show="activeUtilityTab === 'apn'">
-                  <div class="row">
-                    <div class="col">
-                      <div class="mb-4">
-                        <label for="APN" class="form-label">APN</label>
-                        <input
-                          type="text"
-                          class="form-control"
-                          id="APN"
-                          x-model="newApn"
-                          aria-describedby="APN"
-                          maxlength="63"
-                          x-bind:placeholder="apn === '-' ? 'Fetching...' : apn"
-                        />
-                      </div>
-
-                      <div class="mb-4">
-                        <label for="ipForAPN" class="form-label"
-                          >Choose APN PDP Type</label
-                        >
-                        <select
-                          class="form-select"
-                          id="ipAPN"
-                          x-model="newApnIP"
-                          aria-label="ipForAPN"
-                        >
-                          <option
-                            value=""
-                            selected
-                            x-text="apnIP === '-' ? 'Fetching...' : 'Current: ' + apnIP"
-                          ></option>
-                          <option value="1">IPv4 Only</option>
-                          <option value="3">IPv4v6</option>
-                        </select>
-                      </div>
+                <div class="row">
+                  <div class="col-lg-6">
+                    <p class="text-muted">
+                      Currently active SIM:
+                      <span class="fw-semibold" x-text="formatActiveSimLabel()"></span>
+                    </p>
+                    <div class="form-check mb-2">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        name="simSelection"
+                        id="sim1Option"
+                        value="0"
+                        x-model="pendingSimSlot"
+                      />
+                      <label class="form-check-label" for="sim1Option">
+                        SIM 1
+                      </label>
                     </div>
-
-                    <div class="col">
-                      <div class="mb-4">
-                        <label for="prefNetworkMode" class="form-label"
-                          >Select Preferred Network</label
-                        >
-                        <select
-                          class="form-select"
-                          id="prefNetworkMode"
-                          x-model="prefNetworkMode"
-                          aria-label="prefNetworkMode"
-                        >
-                          <option
-                            value=""
-                            selected
-                            x-text="prefNetwork === '-' ? 'Fetching...' : 'Current: ' + prefNetwork"
-                          ></option>
-                          <option value="7">AUTO</option>
-                          <option value="2">LTE Only</option>
-                          <option value="6">NR5G-NSA</option>
-                          <option value="4">NR5G-SA</option>
-                        </select>
-                      </div>
+                    <div class="form-check mb-2">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        name="simSelection"
+                        id="sim2Option"
+                        value="1"
+                        x-model="pendingSimSlot"
+                      />
+                      <label class="form-check-label" for="sim2Option">
+                        SIM 2 / eSIM
+                      </label>
                     </div>
-                  </div>
-                </div>
-
-                <div x-show="activeUtilityTab === 'sim'">
-                  <div class="row">
-                    <div class="col-lg-6">
-                      <p class="text-muted">
-                        Currently active SIM:
-                        <span class="fw-semibold" x-text="formatActiveSimLabel()"></span>
-                      </p>
-                      <div class="form-check mb-2">
-                        <input
-                          class="form-check-input"
-                          type="radio"
-                          name="simSelection"
-                          id="sim1Option"
-                          value="0"
-                          x-model="pendingSimSlot"
-                        />
-                        <label class="form-check-label" for="sim1Option">
-                          SIM 1
-                        </label>
-                      </div>
-                      <div class="form-check mb-2">
-                        <input
-                          class="form-check-input"
-                          type="radio"
-                          name="simSelection"
-                          id="sim2Option"
-                          value="1"
-                          x-model="pendingSimSlot"
-                        />
-                        <label class="form-check-label" for="sim2Option">
-                          SIM 2 / eSIM
-                        </label>
-                      </div>
-                      <small class="text-body-secondary"
-                        >Select the SIM to use and press "Apply" to confirm.</small
-                      >
-                    </div>
+                    <small class="text-body-secondary"
+                      >Select the SIM to use and press "Apply" to confirm.</small
+                    >
                   </div>
                 </div>
               </div>
-              <div class="card-footer d-flex justify-content-end gap-2">
-                <button
-                  type="button"
-                  class="btn btn-danger"
-                  @click="resetApnSettings()"
-                  x-show="activeUtilityTab === 'apn'"
-                >
-                  Reset APN Settings
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-primary"
-                  @click="saveChanges()"
-                  x-show="activeUtilityTab === 'apn'"
-                >
-                  Save Changes
-                </button>
+              <div class="card-footer d-flex justify-content-end">
                 <button
                   type="button"
                   class="btn btn-primary"
                   @click="applySimSelection()"
-                  x-show="activeUtilityTab === 'sim'"
                   :disabled="isApplyingSimChange || !canApplySimSelection()"
                 >
                   Apply
@@ -565,7 +460,6 @@
           showModal: false,
           countdown: 0,
           lastErrorMessage: "",
-          activeUtilityTab: "apn",
           networkModeCell: "-",
           earfcn1: null,
           pci1: null,
@@ -589,12 +483,6 @@
           pci10: null,
           scs: null,
           band: null,
-          apn: "-",
-          apnIP: "-",
-          newApnIP: null,
-          newApn: null,
-          prefNetwork: "-",
-          prefNetworkMode: null,
           cellNum: null,
           lte_bands: "",
           nsa_bands: "",
@@ -613,97 +501,6 @@
           rawdata: "",
           networkModeListenerAttached: false,
           providerBandsListenerAttached: false,
-          parseApnContexts(rawData) {
-            if (typeof rawData !== "string") {
-              return [];
-            }
-
-            return rawData
-              .split("\n")
-              .map((line) => line.trim())
-              .filter((line) => line.startsWith("+CGDCONT:"))
-              .map((line) => {
-                const match = line.match(
-                  /\+CGDCONT:\s*(\d+),\"([^\"]*)\",\"([^\"]*)\"/i
-                );
-
-                if (!match) {
-                  return null;
-                }
-
-                return {
-                  cid: parseInt(match[1], 10),
-                  type: match[2],
-                  apn: match[3],
-                };
-              })
-              .filter(Boolean)
-              .sort((a, b) => a.cid - b.cid);
-          },
-          async ensurePrimaryApnProfile() {
-            const response = await this.sendATcommand('AT+CGDCONT?');
-
-            if (!response.ok || !response.data) {
-              return {
-                ok: false,
-                message:
-                  this.lastErrorMessage ||
-                  "Unable to read current APN profiles.",
-              };
-            }
-
-            const contexts = this.parseApnContexts(response.data);
-
-            const contextsToDelete = contexts.filter((ctx) => ctx.cid !== 1);
-
-            for (const ctx of contextsToDelete) {
-              const deleteResult = await this.sendATcommand(
-                `AT+CGDCONT=${ctx.cid}`
-              );
-
-              if (!deleteResult.ok) {
-                return {
-                  ok: false,
-                  message:
-                    this.lastErrorMessage ||
-                    `Unable to remove APN profile ${ctx.cid}.`,
-                };
-              }
-            }
-
-            return { ok: true };
-          },
-          sanitizeApn(apn) {
-            if (typeof apn !== "string") {
-              return "";
-            }
-            return apn.trim();
-          },
-          isValidApn(apn) {
-            return /^[a-zA-Z0-9._-]{1,63}$/.test(apn);
-          },
-          mapApnTypeLabelToValue(label) {
-            const normalized = (label || "")
-              .toString()
-              .trim()
-              .toUpperCase();
-            const mapping = {
-              IPV4: "1",
-              IPV6: "2",
-              IPV4V6: "3",
-              PPP: "4",
-            };
-            return mapping[normalized] || null;
-          },
-          mapApnTypeValueToCommand(value) {
-            const mapping = {
-              "1": "IPV4",
-              "2": "IPV6",
-              "3": "IPV4V6",
-              "4": "PPP",
-            };
-            return mapping[value] || null;
-          },
           mapSimDisplayToCommandValue(value) {
             if (value === "1") {
               return "0";
@@ -985,7 +782,7 @@
           },
           async getCurrentSettings() {
             const atcmd =
-              'AT^SWITCH_SLOT?;+CGCONTRDP=1;+CGDCONT?;^BAND_PREF_EXT?;^CA_INFO?;^SLMODE?';
+              'AT^SWITCH_SLOT?;^BAND_PREF_EXT?;^CA_INFO?';
 
             const result = await this.sendATcommand(atcmd);
 
@@ -1005,10 +802,7 @@
               this.pendingSimSlot = this.mapSimDisplayToCommandValue(
                 settings.sim
               );
-              this.apn = settings.apn;
-              this.apnIP = settings.apnIP;
               this.cellLockStatus = settings.cellLockStatus;
-              this.prefNetwork = settings.prefNetwork;
               this.bands = settings.bands;
             } catch (error) {
               this.lastErrorMessage = error.message || 'Error while parsing the current settings.';
@@ -1107,72 +901,6 @@
               }
             }, 1000);
           },
-          async resetApnSettings() {
-            const shouldReset = confirm(
-              "Resetting will delete every configured APN and restart the modem. Continue?"
-            );
-
-            if (!shouldReset) {
-              return;
-            }
-
-            this.showModal = true;
-
-            const response = await this.sendATcommand('AT+CGDCONT?');
-
-            if (!response.ok || !response.data) {
-              this.showModal = false;
-              alert(
-                this.lastErrorMessage ||
-                  "Unable to read current APN profiles."
-              );
-              return;
-            }
-
-            const contexts = this.parseApnContexts(response.data);
-
-            for (const ctx of contexts) {
-              const deleteResult = await this.sendATcommand(
-                `AT+CGDCONT=${ctx.cid}`
-              );
-
-              if (!deleteResult.ok) {
-                this.showModal = false;
-                alert(
-                  this.lastErrorMessage ||
-                    `Unable to remove APN profile ${ctx.cid}.`
-                );
-                return;
-              }
-            }
-
-            const restartResult = await this.sendATcommand('AT+CFUN=1,1');
-
-            if (!restartResult.ok) {
-              this.showModal = false;
-              alert(
-                this.lastErrorMessage ||
-                  "Unable to restart the modem."
-              );
-              return;
-            }
-
-            this.apn = "-";
-            this.apnIP = "-";
-            this.newApn = null;
-            this.newApnIP = null;
-            this.prefNetworkMode = null;
-
-            this.countdown = 60;
-            const interval = setInterval(() => {
-              this.countdown--;
-              if (this.countdown === 0) {
-                clearInterval(interval);
-                this.showModal = false;
-                this.init();
-              }
-            }, 1000);
-          },
           async applySimSelection() {
             if (this.isApplyingSimChange) {
               return;
@@ -1225,197 +953,6 @@
               }
             }, 1000);
           },
-          async saveChanges() {
-            const commandsToRun = [];
-            const hasApnInput = typeof this.newApn === "string";
-            const sanitizedNewApn = hasApnInput
-              ? this.sanitizeApn(this.newApn)
-              : "";
-
-            if (hasApnInput) {
-              this.newApn = sanitizedNewApn;
-            }
-
-            const selectedApnTypeRaw = this.newApnIP;
-            const selectedApnType =
-              selectedApnTypeRaw === null ||
-              selectedApnTypeRaw === undefined ||
-              selectedApnTypeRaw === ""
-                ? null
-                : selectedApnTypeRaw;
-
-            const currentApnSanitized = this.sanitizeApn(this.apn);
-            const hasCurrentApn =
-              currentApnSanitized.length > 0 &&
-              this.apn !== "-" &&
-              this.apn !== "Failed fetching APN";
-
-            let targetApn = null;
-            let targetApnType = null;
-
-            if (hasApnInput) {
-              if (sanitizedNewApn.length === 0) {
-                alert("APN cannot be empty.");
-                return;
-              }
-
-              if (!this.isValidApn(sanitizedNewApn)) {
-                alert(
-                  "The APN can include only letters, numbers, periods, hyphens, and underscores (max 63 characters)."
-                );
-                return;
-              }
-
-              targetApn = sanitizedNewApn;
-            }
-
-            if (selectedApnType !== null) {
-              if (["1", "3"].includes(selectedApnType)) {
-                targetApnType = selectedApnType;
-              } else {
-                alert("Select a valid PDP type.");
-                return;
-              }
-            }
-
-            if (targetApn !== null && targetApnType === null) {
-              const currentType = this.mapApnTypeLabelToValue(this.apnIP);
-              targetApnType = currentType || "3";
-            }
-
-            if (targetApn === null && targetApnType !== null) {
-              if (!hasCurrentApn) {
-                alert(
-                  "Unable to change the PDP type because the current APN is unavailable."
-                );
-                return;
-              }
-
-              if (!this.isValidApn(currentApnSanitized)) {
-                alert(
-                  "Unable to change the PDP type because the current APN is invalid."
-                );
-                return;
-              }
-
-              targetApn = currentApnSanitized;
-            }
-
-            if (targetApn !== null) {
-              if (targetApnType === null) {
-                const currentType = this.mapApnTypeLabelToValue(this.apnIP);
-
-                if (!currentType) {
-                  alert(
-                    "Unable to determine the current PDP type. Please select a new value."
-                  );
-                  return;
-                }
-
-                targetApnType = currentType;
-              }
-
-              const typeLabel = this.mapApnTypeValueToCommand(targetApnType);
-
-              if (!typeLabel) {
-                alert(
-                  "Unable to build the APN command because the PDP type is invalid."
-                );
-                return;
-              }
-
-              commandsToRun.push({
-                command: `AT+CGDCONT=1,"${typeLabel}","${targetApn}"`,
-                errorMessage: "Unable to configure the APN.",
-              });
-            }
-
-            if (
-              this.prefNetworkMode !== null &&
-              this.prefNetworkMode !== undefined &&
-              this.prefNetworkMode !== ""
-            ) {
-              commandsToRun.push({
-                command: `AT^SLMODE=1,${this.prefNetworkMode}`,
-                errorMessage: "Unable to save the preferred network.",
-              });
-            }
-
-            if (commandsToRun.length === 0) {
-              alert("No changes made");
-              return;
-            }
-
-            const requiresBasebandRestart = commandsToRun.some((step) =>
-              step.command.startsWith("AT+CGDCONT=1")
-            );
-
-            this.showModal = true;
-
-            if (requiresBasebandRestart) {
-              const cleanupResult = await this.ensurePrimaryApnProfile();
-
-              if (!cleanupResult.ok) {
-                this.showModal = false;
-                alert(
-                  cleanupResult.message ||
-                    "Unable to prepare the APN profiles."
-                );
-                return;
-              }
-            }
-
-            for (const step of commandsToRun) {
-              const result = await this.sendATcommand(step.command);
-
-              if (!result.ok) {
-                this.showModal = false;
-                alert(
-                  this.lastErrorMessage ||
-                    step.errorMessage ||
-                    "Unable to execute the requested command."
-                );
-                return;
-              }
-            }
-
-            if (requiresBasebandRestart) {
-              const radioOff = await this.sendATcommand("AT+CFUN=0");
-
-              if (!radioOff.ok) {
-                this.showModal = false;
-                alert(
-                  this.lastErrorMessage ||
-                    "Error while shutting down the baseband."
-                );
-                return;
-              }
-
-              const radioOn = await this.sendATcommand("AT+CFUN=1");
-
-              if (!radioOn.ok) {
-                this.showModal = false;
-                alert(
-                  this.lastErrorMessage ||
-                    "Error while restarting the baseband."
-                );
-                return;
-              }
-            }
-
-            this.countdown = requiresBasebandRestart ? 30 : 15;
-
-            const interval = setInterval(() => {
-              this.countdown--;
-              if (this.countdown === 0) {
-                clearInterval(interval);
-                this.showModal = false;
-                this.newApn = null;
-                this.newApnIP = null;
-                this.prefNetworkMode = null;
-                this.init();
-              }
-            }, 1000);
           },
           async cellLockEnableLTE() {
             const cellNum = this.cellNum;
