@@ -76,32 +76,6 @@
               <div class="card-header">AT Terminal</div>
               <div class="card-body">
                 <div class="card-text">
-                  <div
-                    class="alert alert-danger d-flex gap-2"
-                    role="alert"
-                    x-show="showError"
-                    aria-live="polite"
-                  >
-                    <div class="flex-shrink-0">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        fill="currentColor"
-                        class="bi bi-exclamation-triangle"
-                        viewBox="0 0 16 16"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d="M7.938 2.016a.13.13 0 0 1 .124 0l6.857 11.856c.03.053.03.122 0 .175A.145.145 0 0 1 14.786 14H1.214a.145.145 0 0 1-.133-.077.176.176 0 0 1 0-.175L7.938 2.016zM8 4.54 2.165 14h11.67L8 4.54zm.002 2.918a.905.905 0 0 1 .9.995l-.35 3.507a.552.552 0 0 1-1.102 0l-.35-3.507a.905.905 0 0 1 .902-.995zm0 5.302a1.02 1.02 0 1 1 0 2.04 1.02 1.02 0 0 1 0-2.04z"
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <div class="fw-semibold">Unable to execute AT command.</div>
-                      <p class="mb-0" x-text="errorMessage"></p>
-                    </div>
-                  </div>
                   <div class="form-floating mb-4">
                     <textarea
                       class="form-control"
@@ -423,18 +397,16 @@
                   ? result.error.message
                   : "Unknown error while executing the command.";
                 this.handleAtError(message, result.data);
-                return result;
+                return;
               }
 
               this.atCommandResponse = result.data;
               this.showError = false;
               this.isClean = false;
-              return result;
             } catch (error) {
               this.handleAtError(
                 error.message || "Network error while executing the command."
               );
-              return null;
             } finally {
               this.isLoading = false;
             }
