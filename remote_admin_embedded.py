@@ -3788,6 +3788,7 @@ ASSET_ARCHIVE_B64 = (
     'ACIA6AkAAAc9AwAAAA=='
 )
 
+@contextmanager
 def _prepare_assets() -> Iterator[Path]:
     """Extract embedded assets to a temporary directory."""
     with tempfile.TemporaryDirectory(prefix="simpleadmin-") as tmpdir:
