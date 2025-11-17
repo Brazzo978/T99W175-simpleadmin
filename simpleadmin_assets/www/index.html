@@ -101,28 +101,6 @@
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 384 512"
-                  height="85"
-                  width="85"
-                >
-                  <path
-                    fill="#6a46d8"
-                    d="M64 0H242.7c17 0 33.3 6.7 45.3 18.7L365.3 96c12 12 18.7 28.3 18.7 45.3V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V64C0 28.7 28.7 0 64 0zM96 192c-17.7 0-32 14.3-32 32v32h64V192H96zM64 352h80 96 80V288H240 144 64v64zM320 224c0-17.7-14.3-32-32-32H256v64h64V224zM160 192v64h64V192H160zM288 448c17.7 0 32-14.3 32-32V384H256v64h32zM160 384v64h64V384H160zM64 416c0 17.7 14.3 32 32 32h32V384H64v32z"
-                  />
-                </svg>
-                <h1 class="card-text mt-4" x-text="simStatus"></h1>
-              </div>
-              <div class="card-footer">SIM Status</div>
-            </div>
-          </div>
-
-          <div class="col align-self-center">
-            <div class="card">
-              <div
-                class="card-body d-flex flex-column align-items-center justify-content-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 640 512"
                   height="85"
                   width="85"
@@ -135,31 +113,6 @@
                 <h1 class="card-text mt-4" x-text="signalPercentage + '%'"></h1>
               </div>
               <div class="card-footer">Signal Percentage</div>
-            </div>
-          </div>
-
-          <div class="col align-self-center">
-            <div class="card">
-              <div
-                class="card-body d-flex flex-column align-items-center justify-content-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 640 512"
-                  height="85"
-                  width="85"
-                >
-                  <path
-                    fill="#20c0ae"
-                    d="M0 336c0 79.5 64.5 144 144 144H512c70.7 0 128-57.3 128-128c0-61.9-44-113.6-102.4-125.4c4.1-10.7 6.4-22.4 6.4-34.6c0-53-43-96-96-96c-19.7 0-38.1 6-53.3 16.2C367 64.2 315.3 32 256 32C167.6 32 96 103.6 96 192c0 2.7 .1 5.4 .2 8.1C40.2 219.8 0 273.2 0 336z"
-                  />
-                </svg>
-                <h1
-                  class="card-text mt-4"
-                  x-text="internetConnectionStatus"
-                ></h1>
-              </div>
-              <div class="card-footer">Internet Connection</div>
             </div>
           </div>
         </div>
@@ -183,22 +136,6 @@
                       <tr>
                         <th scope="row">MCCMNC</th>
                         <td x-text="mccmnc"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">APN</th>
-                        <td x-text="apn"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">IPv<sup>4</sup></th>
-                        <td x-text="ipv4"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">IPv<sup>6</sup></th>
-                        <td x-text="ipv6"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Uptime</th>
-                        <td x-text="uptime"></td>
                       </tr>
                     </tbody>
                   </table>
@@ -940,21 +877,16 @@
 
         const defaultDataState = {
           atcmd: "",
-          internetConnectionStatus: "Disconnected",
           temperature: "0",
-          simStatus: "No SIM",
           activeSim: "No SIM",
           networkProvider: "N/A",
           mccmnc: "00000",
-          apn: "Unknown",
           networkMode: "Disconnected",
           bands: "Unknown Bands",
           bandwidth: "Unknown Bandwidth",
           earfcns: "000",
           pccPCI: "0",
           sccPCI: "-",
-          ipv4: "000.000.000.000",
-          ipv6: "0000:0000:0000:0000:0000:0000:0000:0000",
           cellID: "Unknown",
           eNBID: "Unknown",
           tac: "Unknown",
@@ -977,7 +909,6 @@
           sinrNRPercentage: "0%",
           signalPercentage: "0",
           signalAssessment: "Unknown",
-          uptime: "Unknown",
           lastUpdate: new Date().toLocaleString(),
           newRefreshRate: null,
           refreshRate: 3,
@@ -1024,7 +955,6 @@
             this.resetData({
               activeSim: fallbackMessage,
               signalAssessment: "Unknown",
-              internetConnectionStatus: "Disconnected",
             });
           },
 
@@ -1456,21 +1386,6 @@
                       .replace(/"/g, "");
                   }
 
-                  // --- SIM Status ---
-                  // find this example value from lines "+QSIMSTAT: 0,1"
-                  // Only get the last digit of 0,1
-                  const sim_status = lines
-                    .find((line) => line.includes("+CPIN:"))
-                    .split(":")[1]
-                    .replace(/"/g, "")
-                    
-		 // console.log(sim_status)
-                  if (sim_status == "READY") {
-                    this.simStatus = "Active";
-                  } else {
-                    this.simStatus = sim_status;
-                  }
-
                   // --- Active SIM ---
                   // find this example value from lines "+QUIMSLOT: 1"
                   const current_sim = lines
@@ -1510,13 +1425,6 @@
                     this.mccmnc = "Unknown";
                     this.networkProvider = "Unknown";
                   }
-                  // --- APN ---
-                  // find this example value from lines "+CGCONTRDP: 1,0,\"internet.dito.ph\",\"100.65.141.236\",\"36.5.141.64.76.204.39.68.23.210.251.16.49.239.42.149\", \"254.128.0.0.0.0.0.0.0.0.0.0.0.0.0.1\",\"131.226.72.19\",\"131.226.73.19\"\r"
-                  this.apn = lines
-                    .find((line) => line.includes("+CGCONTRDP:"))
-                    .split(",")[2]
-                    .replace(/"/g, "");
-
                   // --- Network Mode ---
                   // find this example value from lines "+QENG: \"servingcell\",\"NOCONN\",\"NR5G-SA\",\"TDD\",515,66,7000C4001,475,702000,620640,78,12,-83,-3,16,1,-\r"
 
@@ -1644,18 +1552,6 @@
                     this.sccPCI = "-";
                   }
 
-                  // --- IPv4 and IPv6 ---
-                  // find the value from line "IPV4"
-                  this.ipv4 = lines
-                    .find((line) => line.includes("+CGCONTRDP:"))
-                    .split(",")[3]
-                    .replace(/"/g, "");
-
-                  // find the value from line "IPV6"
-                  this.ipv6 = lines
-                    .find((line) => line.includes("+CGCONTRDP:"))
-                    .split(",")[4]
-                    .replace(/"/g, "");
 		/*
                   // Traffic Stats
                   // for NR traffic stats: +QGDNRCNT: 3263753367,109876105
@@ -2182,19 +2078,6 @@
             return Math.round(bytes / Math.pow(1024, i), 2) + " " + sizes[i];
           },
 
-          requestPing() {
-            return fetch("/cgi-bin/get_ping")
-              .then((response) => response.text())
-              .then((data) => {
-                return data;
-              })
-              .catch((error) => {
-                console.error("Error:", error);
-                // Throw the error again to ensure it's propagated
-                throw error;
-              });
-          },
-
           calculate_lte_bw(lte_bw) {
             const BANDWIDTH_MAP = {
               0: 1.4,
@@ -2357,159 +2240,6 @@
             }
           },
 
-          fetchUpTime() {
-            // Content-Type: text/plain
-            //
-            // 1 hour 44, minute
-            fetch("/cgi-bin/get_uptime")
-              .then((response) => response.text())
-              .then((data) => {
-                // Example result
-                // 01:17:02 up 3 days,  2:41,  load average: 0.65, 0.66, 0.60
-
-                // Look for xx days in the result
-                const days = data.match(/(\d+) day/);
-                // Do the same for hours
-                const hours = data.match(/(\d+) hour/);
-                // Do the same for minutes
-                const minutes = data.match(/(\d+) min/);
-                // 2:41
-                const hoursAndMinutes = data.match(/(\d+):(\d+),/);
-
-                if (hoursAndMinutes != null) {
-                  if (days != null) {
-                    if (days[1] === "1") {
-                      if (hoursAndMinutes[1] === "1") {
-                        this.uptime =
-                          days[1] +
-                          " day, " +
-                          hoursAndMinutes[1] +
-                          " hour " +
-                          hoursAndMinutes[2] +
-                          " minutes";
-                      } else if (hoursAndMinutes[2] === 1) {
-                        this.uptime =
-                          days[1] +
-                          " day, " +
-                          hoursAndMinutes[1] +
-                          " hours " +
-                          hoursAndMinutes[2] +
-                          " minute";
-                      } else {
-                        this.uptime =
-                          days[1] +
-                          " day, " +
-                          hoursAndMinutes[1] +
-                          " hours " +
-                          hoursAndMinutes[2] +
-                          " minutes";
-                      }
-                    } else {
-                      if (hoursAndMinutes[1] === "1") {
-                        this.uptime =
-                          days[1] +
-                          " days, " +
-                          hoursAndMinutes[1] +
-                          " hour " +
-                          hoursAndMinutes[2] +
-                          " minutes";
-                      } else if (hoursAndMinutes[2] === 1) {
-                        this.uptime =
-                          days[1] +
-                          " days, " +
-                          hoursAndMinutes[1] +
-                          " hours " +
-                          hoursAndMinutes[2] +
-                          " minute";
-                      } else {
-                        this.uptime =
-                          days[1] +
-                          " days, " +
-                          hoursAndMinutes[1] +
-                          " hours " +
-                          hoursAndMinutes[2] +
-                          " minutes";
-                      }
-                    }
-                  } else {
-                    if (hoursAndMinutes[1] === "1") {
-                      this.uptime =
-                        hoursAndMinutes[1] +
-                        " hour " +
-                        hoursAndMinutes[2] +
-                        " minutes";
-                    } else if (hoursAndMinutes[2] === 1) {
-                      this.uptime =
-                        hoursAndMinutes[1] +
-                        " hours " +
-                        hoursAndMinutes[2] +
-                        " minute";
-                    } else {
-                      this.uptime =
-                        hoursAndMinutes[1] +
-                        " hours " +
-                        hoursAndMinutes[2] +
-                        " minutes";
-                    }
-                  }
-                } else if (days != null) {
-                  if (hours != null) {
-                    if (days[1] === "1") {
-                      if (hours[1] === "1") {
-                        this.uptime = days[1] + " day, " + hours[1] + " hour";
-                      } else {
-                        this.uptime = days[1] + " day, " + hours[1] + " hours";
-                      }
-                    } else {
-                      if (hours[1] === "1") {
-                        this.uptime = days[1] + " days, " + hours[1] + " hour";
-                      } else {
-                        this.uptime = days[1] + " days, " + hours[1] + " hours";
-                      }
-                    }
-                  } else if (minutes != null) {
-                    if (days[1] === "1") {
-                      if (minutes[1] === "1") {
-                        this.uptime =
-                          days[1] + " day, " + minutes[1] + " minute";
-                      } else {
-                        this.uptime =
-                          days[1] + " day, " + minutes[1] + " minutes";
-                      }
-                    } else {
-                      if (minutes[1] === "1") {
-                        this.uptime =
-                          days[1] + " days, " + minutes[1] + " minute";
-                      } else {
-                        this.uptime =
-                          days[1] + " days, " + minutes[1] + " minutes";
-                      }
-                    }
-                  } else {
-                    if (days[1] === "1") {
-                      this.uptime = days[1] + " day";
-                    } else {
-                      this.uptime = days[1] + " days";
-                    }
-                  }
-                } else if (hours != null) {
-                  if (hours[1] === "1") {
-                    this.uptime = hours[1] + " hour";
-                  } else {
-                    this.uptime = hours[1] + " hours";
-                  }
-                } else if (minutes != null) {
-                  if (minutes[1] === "1") {
-                    this.uptime = minutes[1] + " minute";
-                  } else {
-                    this.uptime = minutes[1] + " minutes";
-                  }
-                } else {
-                  this.uptime = "Unknown Time";
-                }
-              });
-          },
-
           updateRefreshRate() {
             // Check if the refresh rate is less than 3
             if (this.newRefreshRate < 3) {
@@ -2531,9 +2261,6 @@
           },
 
           init() {
-            // Fetch uptime
-            this.fetchUpTime();
-
             // Retrieve the refresh rate from local storage or session storage
             const storedRefreshRate = localStorage.getItem("refreshRate");
 
@@ -2544,44 +2271,12 @@
 
             this.fetchAllInfo();
 
-            this.requestPing()
-              .then((data) => {
-                const response = data.trim();
-                // Trim any leading/trailing spaces
-                if (response === "OK") {
-                  this.internetConnectionStatus = "Connected";
-                } else {
-                  this.internetConnectionStatus = "Disconnected";
-                }
-              })
-              .catch((error) => {
-                console.error("Error:", error);
-                this.internetConnectionStatus = "Disconnected";
-              });
-
             this.lastUpdate = new Date().toLocaleString();
             console.log("Initialized");
 
             // Set the refresh rate for interval
             this.intervalId = setInterval(() => {
-              this.fetchUpTime();
-
               this.fetchAllInfo();
-
-              this.requestPing()
-                .then((data) => {
-                  const response = data.trim();
-                  // Trim any leading/trailing spaces
-                  if (response === "OK") {
-                    this.internetConnection = "Connected";
-                  } else {
-                    this.internetConnection = "Disconnected";
-                  }
-                })
-                .catch((error) => {
-                  console.error("Error:", error);
-                  this.internetConnection = "Disconnected";
-                });
 
               this.lastUpdate = new Date().toLocaleString();
               console.log("Refreshed");

@@ -175,62 +175,6 @@
               </div>
             </div>
           </div>
-          <div class="col">
-            <div class="card mb-3">
-              <div class="card-header">TTL and Network Scan Settings</div>
-              <div class="card-body">
-                <label for="TTLState" class="form-label"
-                  >TTL State and Value</label
-                >
-                <div class="row">
-                  <div class="col">
-                    <div
-                      class="p-3 text-primary-emphasis bg-primary-subtle border border-primary-subtle rounded-3"
-                      x-show="ttlStatus === true"
-                    >
-                      TTL is Active
-                    </div>
-
-                    <div
-                      class="p-3 text-danger-emphasis bg-danger-subtle border border-danger-subtle rounded-3"
-                      x-show="ttlStatus === false"
-                    >
-                      TTL is Inactive
-                    </div>
-                  </div>
-                  <div class="col">
-                    <div
-                      class="p-3 text-info-emphasis bg-info-subtle border border-info-subtle rounded-3 mb-4"
-                      x-text="ttlvalue"
-                    ></div>
-                  </div>
-                </div>
-                <div class="card-text mb-3">
-                  <div class="mb-4">
-                    <input
-                      type="text"
-                      class="form-control"
-                      id="ttlInput"
-                      placeholder="TTL Value"
-                      x-model="newTTL"
-                    />
-                    <div id="ttlValueHelper" class="form-text">
-                      Set TTL Value to 0 to disable.
-                    </div>
-                  </div>
-                  <div class="d-grid gap-1">
-                    <button
-                      class="btn btn-primary"
-                      type="button"
-                      @click="setTTL()"
-                    >
-                      Update
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- Loading Modal for Reboot -->
@@ -406,10 +350,6 @@
           atCommandResponse: "",
           currentSettingsResponse: "",
           errorMessage: "",
-          ttldata: null,
-          ttlvalue: 0,
-          ttlStatus: false,
-          newTTL: null,
           ipPassMode: "Unspecified",
           ipPassStatus: false,
           usbNetMode: "Unspecified",
@@ -650,41 +590,8 @@
             }
           },
 
-*/
-          fetchTTL() {
-            fetch("/cgi-bin/get_ttl_status")
-              .then((res) => res.json())
-              .then((data) => {
-                this.ttldata = data;
-                this.ttlStatus = this.ttldata.isEnabled;
-                this.ttlvalue = this.ttldata.ttl;
-              });
-          },
-
-          setTTL() {
-            this.isLoading = true; // Set loading state while updating TTL
-            const ttlval = this.newTTL;
-            fetch(
-              "/cgi-bin/set_ttl?" + new URLSearchParams({ ttlvalue: ttlval })
-            )
-              .then((res) => res.text()) // Use res.text() instead of res.json()
-              .then((data) => {
-                // Manually handle the response data
-                console.log("Response from server:", data);
-                // You can try to parse the JSON manually or handle the response as needed
-
-                // Once TTL is updated, fetch the updated TTL data
-                this.fetchTTL();
-                this.isLoading = false; // Set loading state back to false
-              })
-              .catch((error) => {
-                console.error("Error updating TTL: ", error);
-                this.isLoading = false; // Ensure loading state is properly handled in case of error
-              });
-          },
           init() {
-            //this.fetchCurrentSettings();
-            this.fetchTTL();
+            // this.fetchCurrentSettings();
           },
         };
       }
