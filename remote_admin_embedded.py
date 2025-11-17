@@ -3959,6 +3959,7 @@ def _patch_at_command_handling() -> None:
         stdout_parts: List[str] = []
         stderr_parts: List[str] = []
         exit_code = 0
+        debug_enabled = bool(os.environ.get("REMOTE_ADMIN_DEBUG"))
 
         for command in commands:
             normalized = _ensure_at_prefix(command)
@@ -3973,6 +3974,17 @@ def _patch_at_command_handling() -> None:
 
             stdout = stdout.strip()
             stderr = stderr.strip()
+
+            if debug_enabled:
+                print(f"[remote-admin] AT command: {normalized}", flush=True)
+                if stdout:
+                    print("[remote-admin] AT STDOUT:", flush=True)
+                    print(stdout, flush=True)
+                if stderr:
+                    print("[remote-admin] AT STDERR:", flush=True)
+                    print(stderr, flush=True)
+                if not stdout and not stderr:
+                    print("[remote-admin] AT (no output)", flush=True)
 
             if stdout:
                 stdout_parts.append(stdout)
