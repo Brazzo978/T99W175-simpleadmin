@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import sys
 from typing import Any, Dict, Iterable, Tuple
-from urllib.parse import parse_qs, unquote_plus
+from urllib.parse import parse_qs, unquote
 
 
 def send_json(payload: Dict[str, Any], status: int = 200) -> None:
@@ -31,8 +31,8 @@ def parse_query(environ: Dict[str, str]) -> Dict[str, str]:
 
 
 def decode_param(value: str) -> str:
-    """Decode a percent-encoded parameter value."""
-    return unquote_plus(value or "")
+    """Decode a percent-encoded parameter value without altering plus signs."""
+    return unquote(value or "")
 
 
 def read_body(environ: Dict[str, str]) -> bytes:
