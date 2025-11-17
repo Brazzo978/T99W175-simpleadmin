@@ -992,7 +992,18 @@
               try {
                   const lines = rawdata.split("\n");
 
-                  console.log(lines);
+                  const findLineContaining = (needle) =>
+                    lines.find(
+                      (line) => typeof line === "string" && line.includes(needle)
+                    ) || null;
+
+                  const splitSegments = (line, delimiter = ",") =>
+                    line ? line.split(delimiter) : [];
+
+                  const cleanValue = (value) =>
+                    typeof value === "string"
+                      ? value.replace(/"/g, "").trim()
+                      : null;
 
                   const buildDetailedSignals = () => {
                     const details = [];
@@ -1374,30 +1385,38 @@
 
                   // --- Temperature ---
                   // find this example value from lines "+QTEMP:"cpuss-0-usr","50"
-                  try {
-                    this.temperature = lines
-                      .find((line) => line.includes('TSENS:'))
-                      .split(":")[1]
-                      .replace(/"/g, "");
-                  } catch (error) {
-                    this.temperature = lines
-                      .find((line) => line.includes('TSENS:'))
-                      .split(",")[1]
-                      .replace(/"/g, "");
+                  const tsensLine = findLineContaining('TSENS:');
+                  if (tsensLine) {
+                    const temperatureFromColon = cleanValue(
+                      splitSegments(tsensLine, ":")[1]
+                    );
+                    const temperatureFromComma = cleanValue(
+                      splitSegments(tsensLine, ",")[1]
+                    );
+                    this.temperature =
+                      temperatureFromColon ||
+                      temperatureFromComma ||
+                      this.temperature;
+                  } else {
+                    console.warn('Unable to determine modem temperature from AT output.');
                   }
 
                   // --- Active SIM ---
                   // find this example value from lines "+QUIMSLOT: 1"
-                  const current_sim = lines
-                    .find((line) => line.includes("ENABLE"))
-                    .split(" ")[0]
-                    .replace(/\D/g, "");
-                  if (current_sim == 1) {
-                    this.activeSim = "SIM 1";
-                  } else if (current_sim == 2) {
-                    this.activeSim = "SIM 2";
+                  const simStatusLine = findLineContaining('ENABLE');
+                  if (simStatusLine) {
+                    const slotToken = simStatusLine.split(" ")[0] || "";
+                    const current_sim = slotToken.replace(/\D/g, "");
+                    if (current_sim == 1) {
+                      this.activeSim = "SIM 1";
+                    } else if (current_sim == 2) {
+                      this.activeSim = "SIM 2";
+                    } else {
+                      this.activeSim = defaultDataState.activeSim;
+                    }
                   } else {
-                    this.activeSim = "No SIM";
+                    console.warn('Unable to determine active SIM slot from AT output.');
+                    this.activeSim = defaultDataState.activeSim;
                   }
 
                   // --- Network Provider & MCCMNC ---
@@ -1888,172 +1907,92 @@
                       this.signalAssessment = "No Signal";
                     }
                   } else if (currentNetworkMode == "5G NSA") {
-                    // find the value from line "+QENG: \"LTE\" for LTE
-                    // LongCID
-                    const longCID = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[4]
-                      .replace(/"/g, "");
+                    const qengLteLine = findLineContaining('+QENG: "LTE"');
+                    const qengNrLine = findLineContaining('+QENG: "NR5G-NSA"');
 
-                    // Get the eNBID. Its just Cell ID minus the last 2 characters
-                    this.eNBID = parseInt(longCID.substring(0, longCID.length - 2), 16);
+                    const qengLteSegments = splitSegments(qengLteLine);
+                    const qengNrSegments = splitSegments(qengNrLine);
 
-                    // Get the short Cell ID (Last 2 characters of the Cell ID)
-                    const shortCID = longCID.substring(longCID.length - 2);
+                    const longCID = cleanValue(qengLteSegments[4]);
+                    if (longCID) {
+                      const shortCID = longCID.slice(-2);
+                      const eNbHex = longCID.slice(0, -2);
+                      const shortDec = parseInt(shortCID, 16);
+                      const longDec = parseInt(longCID, 16);
+                      const eNbDec = parseInt(eNbHex || "0", 16);
 
-                    // cellID
-                    this.cellID =
-                      "Short " +
-                      shortCID +
-                      "(" +
-                      parseInt(shortCID, 16) +
-                      ")" +
-                      ", " +
-                      "Long " +
-                      longCID +
-                      "(" +
-                      parseInt(longCID, 16) +
-                      ")";
-
-                    // TAC
-                    const localTac = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[10]
-                      .replace(/"/g, "");
-                    this.tac = parseInt(localTac, 16) + " ("+localTac+")";
-
-                    this.cellID =
-                      "Short " +
-                      shortCID +
-                      "(" +
-                      parseInt(shortCID, 16) +
-                      ")" +
-                      ", " +
-                      "Long " +
-                      longCID +
-                      "(" +
-                      parseInt(longCID, 16) +
-                      ")";
-                    // CSQ
-                    this.csq = lines
-                      .find((line) => line.includes("+CSQ:"))
-                      .split(" ")[1]
-                      .replace("+CSQ: ", "")
-                      .replace(/"/g, "");
-
-                    // RSRP LTE
-                    this.rsrpLTE = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[11]
-                      .replace(/"/g, "");
-
-                    // RSRQ LTE
-                    this.rsrqLTE = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[12]
-                      .replace(/"/g, "");
-
-                    // RSSI LTE
-                    this.rssiLTE = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[13]
-                      .replace(/"/g, "");
-
-                    // SINR LTE
-                    this.sinrLTE = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[14]
-                      .replace(/"/g, "");
-
-                    // Calculate the RSRP LTE Percentage
-                    this.rsrpLTEPercentage = this.calculateRSRPPercentage(
-                      parseInt(this.rsrpLTE)
-                    );
-
-                    // Calculate the RSRQ LTE Percentage
-                    this.rsrqLTEPercentage = this.calculateRSRQPercentage(
-                      parseInt(this.rsrqLTE)
-                    );
-
-                    // Calculate the SINR LTE Percentage
-                    this.sinrLTEPercentage = this.calculateSINRPercentage(
-                      parseInt(this.sinrLTE)
-                    );
-
-                    // Calculate the RSSI LTE Percentage
-                    this.rssiLTEPercentage = this.calculateRSSIPercentage(
-                      parseInt(this.rssiLTE)
-                    );
-
-                    // Calculate the Signal Percentage
-                    const lte_signal_percentage =
-                      this.calculateSignalPercentage(
-                        this.rsrpLTEPercentage,
-                        this.sinrLTEPercentage
-                      );
-
-                    // find the value from line "+QENG: \"NR5G-NSA\" for NR5G
-                    // RSRP NR
-                    this.rsrpNR = lines
-                      .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-                      .split(",")[4]
-                      .replace(/"/g, "");
-
-                    // SINR NR
-                    this.sinrNR = lines
-                      .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-                      .split(",")[5]
-                      .replace(/"/g, "");
-
-                    // RSRQ NR
-                    this.rsrqNR = lines
-                      .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-                      .split(",")[6]
-                      .replace(/"/g, "");
-
-                    try {
-                      this.rssiNR = lines
-                        .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-                        .split(",")[7]
-                        .replace(/"/g, "");
-                    } catch (error) {
-                      this.rssiNR = "-";
+                      this.eNBID = Number.isNaN(eNbDec) ? this.eNBID : eNbDec;
+                      this.cellID =
+                        `Short ${shortCID} (${Number.isNaN(shortDec) ? '-' : shortDec}), ` +
+                        `Long ${longCID} (${Number.isNaN(longDec) ? '-' : longDec})`;
                     }
 
-                    // Calculate the RSRP NR Percentage
-                    this.rsrpNRPercentage = this.calculateRSRPPercentage(
-                      parseInt(this.rsrpNR)
+                    const tacHex = cleanValue(qengLteSegments[10]);
+                    if (tacHex) {
+                      const tacDec = parseInt(tacHex, 16);
+                      if (!Number.isNaN(tacDec)) {
+                        this.tac = `${tacDec} (${tacHex})`;
+                      }
+                    }
+
+                    const csqLine = findLineContaining('+CSQ:');
+                    if (csqLine) {
+                      const parts = csqLine.split(/\s+/);
+                      const csqRaw = cleanValue(parts[1] || "");
+                      if (csqRaw) {
+                        const csqValue = csqRaw.replace('+CSQ:', '').trim();
+                        if (csqValue) {
+                          this.csq = csqValue;
+                        }
+                      }
+                    }
+
+                    const updateMetric = (prop, value) => {
+                      if (value || value === 0 || value === '0') {
+                        this[prop] = value;
+                      }
+                    };
+
+                    const updatePercentage = (prop, calculator, rawValue) => {
+                      const numeric = parseInt(rawValue, 10);
+                      if (!Number.isNaN(numeric)) {
+                        this[prop] = calculator.call(this, numeric);
+                      }
+                    };
+
+                    updateMetric('rsrpLTE', cleanValue(qengLteSegments[11]) || this.rsrpLTE);
+                    updateMetric('rsrqLTE', cleanValue(qengLteSegments[12]) || this.rsrqLTE);
+                    updateMetric('rssiLTE', cleanValue(qengLteSegments[13]) || this.rssiLTE);
+                    updateMetric('sinrLTE', cleanValue(qengLteSegments[14]) || this.sinrLTE);
+
+                    updatePercentage('rsrpLTEPercentage', this.calculateRSRPPercentage, this.rsrpLTE);
+                    updatePercentage('rsrqLTEPercentage', this.calculateRSRQPercentage, this.rsrqLTE);
+                    updatePercentage('sinrLTEPercentage', this.calculateSINRPercentage, this.sinrLTE);
+                    updatePercentage('rssiLTEPercentage', this.calculateRSSIPercentage, this.rssiLTE);
+
+                    const lte_signal_percentage = this.calculateSignalPercentage(
+                      this.rsrpLTEPercentage,
+                      this.sinrLTEPercentage
                     );
 
-                    // Calculate the RSRQ NR Percentage
-                    this.rsrqNRPercentage = this.calculateRSRQPercentage(
-                      parseInt(this.rsrqNR)
-                    );
+                    updateMetric('rsrpNR', cleanValue(qengNrSegments[4]) || this.rsrpNR);
+                    updateMetric('sinrNR', cleanValue(qengNrSegments[5]) || this.sinrNR);
+                    updateMetric('rsrqNR', cleanValue(qengNrSegments[6]) || this.rsrqNR);
+                    updateMetric('rssiNR', cleanValue(qengNrSegments[7]) || this.rssiNR);
 
-                    // Calculate the SINR NR Percentage
-                    this.sinrNRPercentage = this.calculateSINRPercentage(
-                      parseInt(this.sinrNR)
-                    );
+                    updatePercentage('rsrpNRPercentage', this.calculateRSRPPercentage, this.rsrpNR);
+                    updatePercentage('rsrqNRPercentage', this.calculateRSRQPercentage, this.rsrqNR);
+                    updatePercentage('sinrNRPercentage', this.calculateSINRPercentage, this.sinrNR);
+                    updatePercentage('rssiNRPercentage', this.calculateRSSIPercentage, this.rssiNR);
 
-                    // Calculate the RSSI NR Percentage
-                    this.rssiNRPercentage = this.calculateRSSIPercentage(
-                      parseInt(this.rssiNR)
-                    );
-
-                    // Calculate the Signal Percentage
                     const nr_signal_percentage = this.calculateSignalPercentage(
                       this.rsrpNRPercentage,
                       this.sinrNRPercentage
                     );
 
-                    // Average the LTE and NR Signal Percentages
                     this.signalPercentage =
-                      (lte_signal_percentage + nr_signal_percentage) / 2;
-
-                    // Calculate the Signal Assessment
-                    this.signalAssessment = this.signalQuality(
-                      this.signalPercentage
-                    );
+                      Math.round((lte_signal_percentage + nr_signal_percentage) / 2);
+                    this.signalAssessment = this.signalQuality(this.signalPercentage);
                   } else {
                     this.signalAssessment = "No Signal";
                   }
