@@ -460,6 +460,7 @@
           showModal: false,
           countdown: 0,
           lastErrorMessage: "",
+          interCommandDelayMs: 200,
           networkModeCell: "-",
           earfcn1: null,
           pci1: null,
@@ -781,10 +782,13 @@
             addProviderBandsListener();
           },
           async getCurrentSettings() {
-            const atcmd =
-              'AT^SWITCH_SLOT?;^BAND_PREF_EXT?;^CA_INFO?';
+            const commandSequence = [
+              'AT^SWITCH_SLOT?',
+              'AT^BAND_PREF_EXT?',
+              'AT^CA_INFO?',
+            ];
 
-            const result = await this.sendATcommand(atcmd);
+            const result = await this.sendATcommand(commandSequence);
 
             if (!result.ok || !result.data) {
               console.warn("Unable to fetch current settings:", this.lastErrorMessage);
@@ -1107,37 +1111,74 @@
               }
             }, 1000);
           },
+          normalizeCommandQueue(input) {
+            const entries = Array.isArray(input) ? input : [input];
+
+            return entries
+              .map((command) =>
+                typeof command === "string"
+                  ? ATCommandService.sanitize(command)
+                  : ""
+              )
+              .filter((command) => command.length > 0);
+          },
+
           async sendATcommand(atcmd) {
-            if (!atcmd || typeof atcmd !== "string") {
+            const commands = this.normalizeCommandQueue(atcmd);
+
+            if (commands.length === 0) {
               const error = new Error("Invalid AT command.");
               this.lastErrorMessage = error.message;
               console.error("AT command validation error:", error);
               return { ok: false, data: "", error };
             }
 
-            try {
-              const result = await ATCommandService.execute(atcmd, {
-                retries: 3,
-                timeout: 15000,
-              });
+            const aggregatedResponses = [];
 
-              if (!result.ok) {
-                const message = result.error
-                  ? result.error.message
-                  : "Unknown error while executing the command.";
-                this.lastErrorMessage = message;
-                console.warn("AT command failed:", message);
-              } else {
-                this.lastErrorMessage = "";
+            for (let index = 0; index < commands.length; index += 1) {
+              const command = commands[index];
+
+              try {
+                const result = await ATCommandService.execute(command, {
+                  retries: 3,
+                  timeout: 15000,
+                });
+
+                if (!result.ok) {
+                  const message = result.error
+                    ? result.error.message
+                    : "Unknown error while executing the command.";
+                  this.lastErrorMessage = `${command}: ${message}`;
+                  console.warn("AT command failed:", this.lastErrorMessage);
+
+                  return {
+                    ok: false,
+                    data: aggregatedResponses.join("\n"),
+                    error: result.error || new Error(message),
+                  };
+                }
+
+                const chunk =
+                  typeof result.data === "string" ? result.data.trim() : "";
+
+                if (chunk) {
+                  aggregatedResponses.push(chunk);
+                }
+
+                const isLastCommand = index === commands.length - 1;
+                if (!isLastCommand) {
+                  await ATCommandService.delay(this.interCommandDelayMs);
+                }
+              } catch (error) {
+                const message = error.message || "Unexpected error during the AT command.";
+                this.lastErrorMessage = `${command}: ${message}`;
+                console.error("AT command execution error:", error);
+                return { ok: false, data: aggregatedResponses.join("\n"), error };
               }
-
-              return result;
-            } catch (error) {
-              const message = error.message || "Unexpected error during the AT command.";
-              this.lastErrorMessage = message;
-              console.error("AT command execution error:", error);
-              return { ok: false, data: "", error };
             }
+
+            this.lastErrorMessage = "";
+            return { ok: true, data: aggregatedResponses.join("\n"), error: null };
           },
         };
       }
