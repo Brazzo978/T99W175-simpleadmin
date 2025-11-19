@@ -154,7 +154,7 @@
         </div>
 
         <div class="row gap-3 mt-4">
-          <div class="col">
+          <div class="col-12 col-lg-7 col-xl-6">
             <div class="card">
               <div class="card-header pb-0">
                 <ul class="nav nav-tabs card-header-tabs">
@@ -298,7 +298,66 @@
             </div>
           </div>
 
-          <div class="col-md-4">
+          <div class="col-12 col-lg-5 col-xl-3">
+            <div class="card h-100">
+              <div class="card-header">Preferred Network</div>
+              <div class="card-body">
+                <p class="text-muted">
+                  Current selection:
+                  <span class="fw-semibold" x-text="formatPreferredNetworkLabel()"></span>
+                </p>
+                <div class="form-check form-switch mb-2">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="prefNetwork3g"
+                    x-model="preferredNetworkSelection.threeG"
+                    data-requires-admin
+                  />
+                  <label class="form-check-label" for="prefNetwork3g">3G</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="prefNetwork4g"
+                    x-model="preferredNetworkSelection.fourG"
+                    data-requires-admin
+                  />
+                  <label class="form-check-label" for="prefNetwork4g">4G / LTE</label>
+                </div>
+                <div class="form-check form-switch mb-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="prefNetwork5g"
+                    x-model="preferredNetworkSelection.fiveG"
+                    data-requires-admin
+                  />
+                  <label class="form-check-label" for="prefNetwork5g">5G</label>
+                </div>
+                <small class="text-body-secondary"
+                  >Leave all options unchecked to enable Auto mode (value 0).</small
+                >
+              </div>
+              <div class="card-footer d-flex justify-content-end">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  @click="savePreferredNetwork()"
+                  :disabled="isSavingPrefNetwork || prefNetworkValue === null"
+                  data-requires-admin
+                >
+                  Save Preferred Network
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-5 col-xl-3">
             <div class="card">
               <div class="card-header">Cell Locking</div>
               <div class="card-body">
@@ -439,67 +498,6 @@
               <div class="card-footer">
                 Cell Locking only works for the primary cell and is not
                 persistent across reboots.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row mt-4">
-          <div class="col-md-6">
-            <div class="card">
-              <div class="card-header">Preferred Network</div>
-              <div class="card-body">
-                <p class="text-muted">
-                  Current selection:
-                  <span class="fw-semibold" x-text="formatPreferredNetworkLabel()"></span>
-                </p>
-                <div class="form-check form-switch mb-2">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    id="prefNetwork3g"
-                    x-model="preferredNetworkSelection.threeG"
-                    data-requires-admin
-                  />
-                  <label class="form-check-label" for="prefNetwork3g">3G</label>
-                </div>
-                <div class="form-check form-switch mb-2">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    id="prefNetwork4g"
-                    x-model="preferredNetworkSelection.fourG"
-                    data-requires-admin
-                  />
-                  <label class="form-check-label" for="prefNetwork4g">4G / LTE</label>
-                </div>
-                <div class="form-check form-switch mb-3">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    id="prefNetwork5g"
-                    x-model="preferredNetworkSelection.fiveG"
-                    data-requires-admin
-                  />
-                  <label class="form-check-label" for="prefNetwork5g">5G</label>
-                </div>
-                <small class="text-body-secondary"
-                  >Leave all options unchecked to enable Auto mode (value 0).</small
-                >
-              </div>
-              <div class="card-footer d-flex justify-content-end">
-                <button
-                  type="button"
-                  class="btn btn-primary"
-                  @click="savePreferredNetwork()"
-                  :disabled="isSavingPrefNetwork || prefNetworkValue === null"
-                  data-requires-admin
-                >
-                  Save Preferred Network
-                </button>
               </div>
             </div>
           </div>
