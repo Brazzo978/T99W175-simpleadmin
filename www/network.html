@@ -154,7 +154,7 @@
         </div>
 
         <div class="row gap-3 mt-4">
-          <div class="col-12 col-lg-7 col-xl-6">
+          <div class="col-12 col-lg-6 col-xl-6">
             <div class="card">
               <div class="card-header pb-0">
                 <ul class="nav nav-tabs card-header-tabs">
@@ -298,7 +298,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-lg-5 col-xl-3">
+          <div class="col-12 col-lg-3 col-xl-3">
             <div class="card h-100">
               <div class="card-header">Preferred Network</div>
               <div class="card-body">
@@ -326,7 +326,7 @@
                     x-model="preferredNetworkSelection.fourG"
                     data-requires-admin
                   />
-                  <label class="form-check-label" for="prefNetwork4g">4G / LTE</label>
+                  <label class="form-check-label" for="prefNetwork4g">4G</label>
                 </div>
                 <div class="form-check form-switch mb-3">
                   <input
@@ -357,7 +357,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-lg-5 col-xl-3">
+          <div class="col-12 col-lg-3 col-xl-3">
             <div class="card">
               <div class="card-header">Cell Locking</div>
               <div class="card-body">
@@ -1028,12 +1028,12 @@
             const labels = {
               0: 'Auto',
               1: '3G Only',
-              2: '4G / LTE Only',
-              3: '3G + 4G / LTE',
+              2: '4G Only',
+              3: '3G + 4G',
               4: '5G Only',
               5: '3G + 5G',
-              6: '4G / LTE + 5G',
-              7: '3G + 4G / LTE + 5G',
+              6: '4G + 5G',
+              7: '3G + 4G + 5G',
             };
 
             return labels[value] || 'Unknown';
