@@ -220,30 +220,6 @@
                       </div>
                     </div>
 
-                    <div class="col">
-                      <div class="mb-4">
-                        <label for="prefNetworkMode" class="form-label"
-                          >Select Preferred Network</label
-                        >
-                        <select
-                          class="form-select"
-                          id="prefNetworkMode"
-                          x-model="prefNetworkMode"
-                          aria-label="prefNetworkMode"
-                          data-requires-admin
-                        >
-                          <option
-                            value=""
-                            selected
-                            x-text="prefNetwork === '-' ? 'Fetching...' : 'Current: ' + prefNetwork"
-                          ></option>
-                          <option value="7">AUTO</option>
-                          <option value="2">LTE Only</option>
-                          <option value="6">NR5G-NSA</option>
-                          <option value="4">NR5G-SA</option>
-                        </select>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -467,6 +443,67 @@
             </div>
           </div>
         </div>
+
+        <div class="row mt-4">
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-header">Preferred Network</div>
+              <div class="card-body">
+                <p class="text-muted">
+                  Current selection:
+                  <span class="fw-semibold" x-text="formatPreferredNetworkLabel()"></span>
+                </p>
+                <div class="form-check form-switch mb-2">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="prefNetwork3g"
+                    x-model="preferredNetworkSelection.threeG"
+                    data-requires-admin
+                  />
+                  <label class="form-check-label" for="prefNetwork3g">3G</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="prefNetwork4g"
+                    x-model="preferredNetworkSelection.fourG"
+                    data-requires-admin
+                  />
+                  <label class="form-check-label" for="prefNetwork4g">4G / LTE</label>
+                </div>
+                <div class="form-check form-switch mb-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="prefNetwork5g"
+                    x-model="preferredNetworkSelection.fiveG"
+                    data-requires-admin
+                  />
+                  <label class="form-check-label" for="prefNetwork5g">5G</label>
+                </div>
+                <small class="text-body-secondary"
+                  >Leave all options unchecked to enable Auto mode (value 0).</small
+                >
+              </div>
+              <div class="card-footer d-flex justify-content-end">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  @click="savePreferredNetwork()"
+                  :disabled="isSavingPrefNetwork || prefNetworkValue === null"
+                  data-requires-admin
+                >
+                  Save Preferred Network
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
         <!-- Loading Modal for Locking Band -->
         <div class="modal-overlay" x-show="showModal">
           <div class="loading-modal">
@@ -547,7 +584,13 @@
           newApnIP: null,
           newApn: null,
           prefNetwork: "-",
-          prefNetworkMode: null,
+          prefNetworkValue: null,
+          preferredNetworkSelection: {
+            threeG: false,
+            fourG: false,
+            fiveG: false,
+          },
+          isSavingPrefNetwork: false,
           cellNum: null,
           lte_bands: "",
           nsa_bands: "",
@@ -962,11 +1005,121 @@
               this.apnIP = settings.apnIP;
               this.cellLockStatus = settings.cellLockStatus;
               this.prefNetwork = settings.prefNetwork;
+              this.prefNetworkValue = settings.prefNetworkValue;
+              this.updatePreferredNetworkSelectionFromValue(
+                settings.prefNetworkValue
+              );
               this.bands = settings.bands;
             } catch (error) {
               this.lastErrorMessage = error.message || 'Error while parsing the current settings.';
               console.error('Error while parsing the current settings:', error);
             }
+          },
+          formatPreferredNetworkLabel() {
+            if (this.prefNetworkValue === null) {
+              return 'Fetching...';
+            }
+
+            return this.prefNetwork || 'Unknown';
+          },
+          describePrefNetworkValue(value) {
+            if (!Number.isInteger(value) || value < 0) {
+              return 'Unknown';
+            }
+
+            const labels = {
+              0: 'Auto',
+              1: '3G Only',
+              2: '4G / LTE Only',
+              3: '3G + 4G / LTE',
+              4: '5G Only',
+              5: '3G + 5G',
+              6: '4G / LTE + 5G',
+              7: '3G + 4G / LTE + 5G',
+            };
+
+            return labels[value] || 'Unknown';
+          },
+          updatePreferredNetworkSelectionFromValue(value) {
+            const numericValue = Number.isInteger(value) ? value : null;
+
+            this.preferredNetworkSelection.threeG = false;
+            this.preferredNetworkSelection.fourG = false;
+            this.preferredNetworkSelection.fiveG = false;
+
+            if (numericValue === null) {
+              return;
+            }
+
+            if (numericValue & 1) {
+              this.preferredNetworkSelection.threeG = true;
+            }
+            if (numericValue & 2) {
+              this.preferredNetworkSelection.fourG = true;
+            }
+            if (numericValue & 4) {
+              this.preferredNetworkSelection.fiveG = true;
+            }
+          },
+          computePreferredNetworkValueFromSelection() {
+            if (!this.preferredNetworkSelection) {
+              return null;
+            }
+
+            let value = 0;
+
+            if (this.preferredNetworkSelection.threeG) {
+              value |= 1;
+            }
+            if (this.preferredNetworkSelection.fourG) {
+              value |= 2;
+            }
+            if (this.preferredNetworkSelection.fiveG) {
+              value |= 4;
+            }
+
+            return value;
+          },
+          async savePreferredNetwork() {
+            if (this.isSavingPrefNetwork) {
+              return;
+            }
+
+            if (this.prefNetworkValue === null) {
+              alert('Preferred network information is still loading.');
+              return;
+            }
+
+            const targetValue = this.computePreferredNetworkValueFromSelection();
+
+            if (targetValue === null) {
+              alert('Unable to determine the preferred network selection.');
+              return;
+            }
+
+            if (targetValue === this.prefNetworkValue) {
+              alert('No changes made');
+              return;
+            }
+
+            this.isSavingPrefNetwork = true;
+
+            const result = await this.sendATcommand(
+              `AT^SLMODE=1,${targetValue}`
+            );
+
+            this.isSavingPrefNetwork = false;
+
+            if (!result.ok) {
+              alert(
+                this.lastErrorMessage ||
+                  'Unable to save the preferred network. Please try again.'
+              );
+              return;
+            }
+
+            this.prefNetworkValue = targetValue;
+            this.prefNetwork = this.describePrefNetworkValue(targetValue);
           },
 
           async lockSelectedBands() {
@@ -1114,7 +1267,6 @@
             this.apnIP = "-";
             this.newApn = null;
             this.newApnIP = null;
-            this.prefNetworkMode = null;
 
             this.countdown = 60;
             const interval = setInterval(() => {
@@ -1283,16 +1435,6 @@
               });
             }
 
-            if (
-              this.prefNetworkMode !== null &&
-              this.prefNetworkMode !== undefined &&
-              this.prefNetworkMode !== ""
-            ) {
-              commandsToRun.push({
-                command: `AT^SLMODE=1,${this.prefNetworkMode}`,
-                errorMessage: "Unable to save the preferred network.",
-              });
-            }
 
             if (commandsToRun.length === 0) {
               alert("No changes made");
@@ -1365,7 +1507,6 @@
                 this.showModal = false;
                 this.newApn = null;
                 this.newApnIP = null;
-                this.prefNetworkMode = null;
                 this.init();
               }
             }, 1000);
