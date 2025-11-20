@@ -43,6 +43,33 @@
     };
   }
 
+  function parseBlocks(text) {
+    const lines = splitLines(text);
+    const blocks = [];
+
+    let current = null;
+    for (const line of lines) {
+      if (line.startsWith("AT")) {
+        if (current) blocks.push(current);
+        current = { command: line, lines: [] };
+        continue;
+      }
+
+      if (!current) {
+        current = { command: null, lines: [] };
+      }
+
+      current.lines.push(line);
+    }
+
+    if (current) blocks.push(current);
+
+    return blocks.map((block) => {
+      const hasError = block.lines.some((line) => /\bERROR\b/i.test(line));
+      return { ...block, status: hasError ? "error" : "ok" };
+    });
+  }
+
   async function execute(atcmd, options = {}) {
     const sanitized = sanitize(atcmd);
 
@@ -91,11 +118,16 @@
             busy = true;
             lastError = new Error("The modem is busy. Try again later.");
           } else {
-            const hasErrorToken = text.includes("ERROR");
+            const blocks = parseBlocks(text);
+            const hasErrors = blocks.some((block) => block.status === "error");
+            const hasSuccess = blocks.some((block) => block.status === "ok");
+            const partialErrors = hasErrors && hasSuccess;
 
-            return createResult(!hasErrorToken, text, hasErrorToken ? new Error("The modem returned ERROR.") : null, {
+            return createResult(hasSuccess || !hasErrors, text, hasErrors && !hasSuccess ? new Error("The modem returned ERROR for all commands.") : null, {
               busy: false,
               attempts: attempt,
+              blocks,
+              partialErrors,
             });
           }
         }
