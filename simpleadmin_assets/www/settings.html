@@ -375,38 +375,114 @@
             console.error("AT command error:", message);
           },
 
-          async sendATCommand() {
-            if (!this.atcmd) {
-              // Use ATI as default command
-              this.atcmd = "ATI";
-              console.log(
-                "AT Command is empty, using ATI as default command: ",
-                this.atcmd
-              );
+          normalizeCommandQueue(input) {
+            const entries = Array.isArray(input) ? input : [input];
+
+            return entries
+              .map((command) =>
+                typeof command === "string"
+                  ? ATCommandService.sanitize(command)
+                  : ""
+              )
+              .filter((command) => command.length > 0);
+          },
+
+          async executeCommandQueue(commands, options = {}) {
+            const queue = this.normalizeCommandQueue(commands);
+
+            if (queue.length === 0) {
+              const error = new Error("Invalid AT command.");
+              this.handleAtError(error.message);
+              return { ok: false, data: "", error };
             }
+
+            const retries = Number.isInteger(options.retries)
+              ? options.retries
+              : 3;
+            const timeout =
+              typeof options.timeout === "number" ? options.timeout : 12000;
+            const interCommandDelayMs =
+              typeof options.interCommandDelayMs === "number"
+                ? options.interCommandDelayMs
+                : 400;
+
+            const aggregatedResponses = [];
+
+            for (let index = 0; index < queue.length; index += 1) {
+              const command = queue[index];
+
+              try {
+                const result = await ATCommandService.execute(command, {
+                  retries,
+                  timeout,
+                });
+
+                if (!result.ok) {
+                  const message = result.error
+                    ? result.error.message
+                    : "Unknown error while executing the command.";
+                  this.handleAtError(`${command}: ${message}`);
+                  return {
+                    ok: false,
+                    data: aggregatedResponses.join("\n"),
+                    error: result.error || new Error(message),
+                  };
+                }
+
+                const chunk =
+                  typeof result.data === "string" ? result.data.trim() : "";
+
+                if (chunk) {
+                  aggregatedResponses.push(chunk);
+                }
+
+                const isLastCommand = index === queue.length - 1;
+                if (!isLastCommand) {
+                  await ATCommandService.delay(interCommandDelayMs);
+                }
+              } catch (error) {
+                const message =
+                  error.message || "Unexpected error during the AT command.";
+                this.handleAtError(`${command}: ${message}`);
+                return {
+                  ok: false,
+                  data: aggregatedResponses.join("\n"),
+                  error,
+                };
+              }
+            }
+
+            this.showError = false;
+            return { ok: true, data: aggregatedResponses.join("\n"), error: null };
+          },
+
+          async sendATCommand() {
+            const fallbackCommand = "ATI";
+            const commands = this.atcmd
+              ? this.normalizeCommandQueue(this.atcmd)
+              : [fallbackCommand];
+
+            if (commands.length === 0) {
+              const error = new Error("Invalid AT command.");
+              this.handleAtError(error.message);
+              return { ok: false, data: "", error };
+            }
+
             this.isLoading = true;
 
             try {
-              const result = await ATCommandService.execute(this.atcmd, {
+              const result = await this.executeCommandQueue(commands, {
                 retries: 3,
                 timeout: 12000,
               });
 
               if (!result.ok) {
-                const message = result.error
-                  ? result.error.message
-                  : "Unknown error while executing the command.";
-                this.handleAtError(message, result.data);
-                return;
+                return result;
               }
 
               this.atCommandResponse = result.data;
-              this.showError = false;
               this.isClean = false;
-            } catch (error) {
-              this.handleAtError(
-                error.message || "Network error while executing the command."
-              );
+              return result;
             } finally {
               this.isLoading = false;
             }
@@ -512,16 +588,16 @@
           usbNetModeChanger() {
             if (this.usbNetMode != "Unspecified") {
               if (this.usbNetMode == "RMNET") {
-                this.atcmd = 'AT+QCFG="usbnet",0;';
+                this.atcmd = 'AT+QCFG="usbnet",0';
                 this.sendATCommand();
               } else if (this.usbNetMode == "ECM") {
-                this.atcmd = 'AT+QCFG="usbnet",1;';
+                this.atcmd = 'AT+QCFG="usbnet",1';
                 this.sendATCommand();
               } else if (this.usbNetMode == "MBIM") {
-                this.atcmd = 'AT+QCFG="usbnet",2;';
+                this.atcmd = 'AT+QCFG="usbnet",2';
                 this.sendATCommand();
               } else if (this.usbNetMode == "RNDIS") {
-                this.atcmd = 'AT+QCFG="usbnet",3;';
+                this.atcmd = 'AT+QCFG="usbnet",3';
                 this.sendATCommand();
               } else {
                 console.log("USB Net Mode Invalid");
@@ -531,15 +607,19 @@
             }
             this.rebootDevice();
           },
-	  
+
           async fetchCurrentSettings() {
-            this.fetchATCommand =
-              'AT+QMAP="MPDN_RULE";+QMAP="DHCPV4DNS";+QCFG="usbnet"';
+            const commandQueue = [
+              'AT+QMAP="MPDN_RULE"',
+              'AT+QMAP="DHCPV4DNS"',
+              'AT+QCFG="usbnet"',
+            ];
 
             try {
-              const result = await ATCommandService.execute(this.fetchATCommand, {
+              const result = await this.executeCommandQueue(commandQueue, {
                 retries: 2,
                 timeout: 12000,
+                interCommandDelayMs: 300,
               });
 
               if (!result.ok || !result.data) {
