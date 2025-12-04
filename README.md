@@ -20,62 +20,31 @@ Check [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md) for file-by-file behavior, request 
 
 Simpleadmin is designed to run directly on the Foxconn T99W175 inside the modem’s web partition.
 Follow these steps to deploy it safely.
-1. Download the project
+1 Download or clone the repository
 
-Download the ZIP archive from GitHub or clone the repository:
+2 Extract the ZIP and locate the www folder
 
-git clone https://github.com/<your-username>/simpleadmin-t99w175
+3 Connect via SSH to the modem (default IP: 192.168.225.1, default user: root)
 
-2. Extract the ZIP
+4 Locate the webserver folder and inside it find the current www directory
 
-Inside the extracted directory you will find the www folder.
+5 Delete or rename the existing www folder
 
-3. Access the modem via SSH
+6 Upload the freshly downloaded www folder from the repository
 
-Default connection parameters:
+7 Give the www folder recursive 777 permissions:
 
-IP: 192.168.225.1  
-User: root
-
-ssh root@192.168.225.1
-
-4. Locate the modem webserver directory
-
-Identify the folder containing the active www directory
-(e.g. /www, /var/www, or depending on firmware, the web partition path).
-
-5. Remove or rename the existing www directory
-mv /www /www_backup
-
-6. Upload the new www directory
-
-From your computer:
-
-scp -r ./www root@192.168.225.1:/
-
-
-Or copy it manually if already inside the modem.
-
-7. Set recursive permissions on the www folder
+```bash
 chmod -R 777 /www
+```
 
-8. Restart the webserver (or reboot the modem)
+8 Either reboot the modem or restart the webserver:
 
-Restart only the webserver:
-
+```bash
 systemctl restart qcmap_httpd.service
+```
 
-
-Or reboot the device:
-
-reboot
-
-9. Access the interface
-
-Open a browser and go to:
-
-http://192.168.225.1
-
+Browse to the GUI and use Simpleadmin
 
 
 ## 💬 Questions, Support & Requests
@@ -83,3 +52,7 @@ http://192.168.225.1
 For any questions, feature requests or support, feel free to reach out on Telegram:
 
 👉 [Telegram Group](https://t.me/ltesperimentazioni)
+
+
+## Troubleshooting
+Ssh password not known : connect the modem via usb and install needed driver if windows doesnt automatically , then connect to adb using adb shell and run passwd , then you can change root password , and you can use that to access ssh.
