@@ -12,7 +12,6 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 ## Quick overview
 - Responsive HTML pages (Bootstrap 5 + Alpine.js) served from the modem web partition.
 - Bash CGI scripts in `www/cgi-bin/` that drive AT commands, Watchcat, TTL override, and utility actions.
-- Front-end settings via `www/config/simpleadmin.conf` plus default XML baselines in `Default config files/`.
-- Shell helpers in `modem_config` for quick CLI-driven setup and recovery.
+- Front-end settings via `www/config/simpleadmin.conf`.
 
 Check [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md) for file-by-file behavior, request flows, and how each page uses the CGI helpers.
