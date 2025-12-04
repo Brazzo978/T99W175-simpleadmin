@@ -3,20 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Simple Admin</title>
+    <title>Simple T99</title>
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/bootstrap.min.css" />
     <link rel="simpleadmin-logo" href="favicon.ico" />
+    <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
   </head>
-  <body>
+  <body data-require-auth="true">
     <main>
       <div class="container my-4" x-data="networkSettings()" x-init="init()">
         <nav class="navbar navbar-expand-lg mt-2">
           <div class="container-fluid">
             <a class="navbar-brand" href="/"
-              ><span class="mb-0 h4">Simple Admin</span></a
+              ><span class="mb-0 h4">Simple T99</span></a
             >
             <button
               class="navbar-toggler"
@@ -26,6 +27,7 @@
               aria-controls="navbarText"
               aria-expanded="false"
               aria-label="Toggle navigation"
+              data-allow-user="true"
             >
               <span class="navbar-toggler-icon"></span>
             </button>
@@ -52,11 +54,22 @@
                   <a class="nav-link" href="/deviceinfo.html">Device Information</a>
                 </li>
               </ul>
-              <span class="navbar-text">
-                <button class="btn btn-link text-reset" id="darkModeToggle">
-                  Dark Mode
+              <div
+                class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end"
+              >
+                <span
+                  class="badge rounded-pill fw-semibold text-uppercase d-none"
+                  id="navUserRole"
+                ></span>
+                <span class="fw-semibold" id="navUserName"></span>
+                <button
+                  class="btn btn-outline-secondary btn-sm"
+                  id="logoutButton"
+                  type="button"
+                >
+                  Logout
                 </button>
-              </span>
+              </div>
             </div>
           </div>
         </nav>
@@ -85,7 +98,12 @@
                   </div>
                 </template>
 
-                <form class="mt-3" x-show="!isLoading" @submit.prevent="saveSettings">
+                <form
+                  class="mt-3"
+                  x-show="!isLoading"
+                  @submit.prevent="saveSettings"
+                  data-requires-admin
+                >
                   <div class="row g-3">
                     <div class="col-md-6">
                       <label class="form-label" for="ipAddress">LAN IP address</label>
@@ -294,6 +312,27 @@
         </div>
       </div>
     </main>
+    <footer class="border-top py-3 mt-4">
+      <div
+        class="container d-flex flex-wrap gap-3 justify-content-between align-items-center"
+      >
+        <a
+          class="btn btn-outline-secondary btn-sm"
+          href="/credentials.html"
+          data-requires-admin="hide"
+        >
+          Credential Management
+        </a>
+        <button
+          class="btn btn-link text-reset"
+          id="darkModeToggle"
+          type="button"
+          data-allow-user="true"
+        >
+          Dark Mode
+        </button>
+      </div>
+    </footer>
 
     <script>
       document.addEventListener("alpine:init", () => {

@@ -1,3 +1,22 @@
+function describePrefNetworkValue(value) {
+  const labels = {
+    0: "Auto",
+    1: "3G Only",
+    2: "4G / LTE Only",
+    3: "3G + 4G / LTE",
+    4: "5G Only",
+    5: "3G + 5G",
+    6: "4G / LTE + 5G",
+    7: "3G + 4G / LTE + 5G",
+  };
+
+  if (!Number.isInteger(value) || value < 0) {
+    return "Unknown";
+  }
+
+  return labels[value] || "Unknown";
+}
+
 function parseCurrentSettings(rawdata) {
   const lines = rawdata.split("\n");
   console.log(lines);
@@ -60,23 +79,21 @@ function parseCurrentSettings(rawdata) {
   }
 
   let prefNetwork = "-";
-  let prefNetworksValue = null;
+  let prefNetworkValue = null;
   const prefNetworkLine = lines.find((line) => line.includes("^SLMODE:"));
   if (prefNetworkLine) {
-    prefNetworksValue = prefNetworkLine
+    const parsedValue = Number.parseInt(
+      prefNetworkLine
       .split(":")[1]
       .split(",")[1]
       .replace(/\"/g, "")
-      .trim();
+      .trim(),
+      10
+    );
 
-    if (prefNetworksValue === "7") {
-      prefNetwork = "AUTO";
-    } else if (prefNetworksValue === "2") {
-      prefNetwork = "LTE Only";
-    } else if (prefNetworksValue === "6") {
-      prefNetwork = "NR5G-NSA";
-    } else if (prefNetworksValue === "4") {
-      prefNetwork = "NR5G-SA";
+    if (!Number.isNaN(parsedValue)) {
+      prefNetworkValue = parsedValue;
+      prefNetwork = describePrefNetworkValue(parsedValue);
     }
   }
 
@@ -109,6 +126,7 @@ function parseCurrentSettings(rawdata) {
     apnIP,
     cellLockStatus,
     prefNetwork,
+    prefNetworkValue,
     bands,
   };
 }

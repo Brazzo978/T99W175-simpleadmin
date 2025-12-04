@@ -1,5 +1,16 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    printf 'Status: 401 Unauthorized\r\n'
+    printf 'Content-type: text/plain\r\n\r\n'
+    printf 'Authentication required\n'
+    exit 0
+fi
+
 # This script will ping 8.8.8.8 and 1.1.1.1 and return the result
 # If both pings are successful, it will return "OK"
 # If either ping fails, it will return "ERROR"
