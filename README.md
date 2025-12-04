@@ -20,15 +20,62 @@ Check [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md) for file-by-file behavior, request 
 
 Simpleadmin is designed to run directly on the Foxconn T99W175 inside the modem’s web partition.
 Follow these steps to deploy it safely.
-1 Download or clone the repository
-2 Extract the zip and locate the www folder 
-3 Connect via ssh to the modem , the default ip is 192.168.225.1 and the default user is root 
-4 locate the WEBSERVER folder and inside find the www folder 
-5 delete or rename the current www folder 
-6 upload the freshly downloaded one from the repo 
-7 give the www folder 777 permission recursivly (chmod -R 777 /www)
-8 either reboot the modem or launch from ssh systemctl restart qcmap_httpd.service
-9 browse to the gui and enjoy
+1. Download the project
+
+Download the ZIP archive from GitHub or clone the repository:
+
+git clone https://github.com/<your-username>/simpleadmin-t99w175
+
+2. Extract the ZIP
+
+Inside the extracted directory you will find the www folder.
+
+3. Access the modem via SSH
+
+Default connection parameters:
+
+IP: 192.168.225.1  
+User: root
+
+ssh root@192.168.225.1
+
+4. Locate the modem webserver directory
+
+Identify the folder containing the active www directory
+(e.g. /www, /var/www, or depending on firmware, the web partition path).
+
+5. Remove or rename the existing www directory
+mv /www /www_backup
+
+6. Upload the new www directory
+
+From your computer:
+
+scp -r ./www root@192.168.225.1:/
+
+
+Or copy it manually if already inside the modem.
+
+7. Set recursive permissions on the www folder
+chmod -R 777 /www
+
+8. Restart the webserver (or reboot the modem)
+
+Restart only the webserver:
+
+systemctl restart qcmap_httpd.service
+
+
+Or reboot the device:
+
+reboot
+
+9. Access the interface
+
+Open a browser and go to:
+
+http://192.168.225.1
+
 
 
 ## 💬 Questions, Support & Requests
