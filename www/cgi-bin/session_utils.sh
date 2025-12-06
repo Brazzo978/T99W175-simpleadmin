@@ -65,11 +65,6 @@ json_escape() {
     echo "$str"
 }
 
-hash_password() {
-    local password="$1"
-    printf '%s' "$password" | sha256sum | awk '{print $1}'
-}
-
 generate_token() {
     if command -v openssl >/dev/null 2>&1; then
         openssl rand -hex 32
@@ -88,9 +83,7 @@ ensure_credentials_file() {
     fi
     if [ ! -f "$CREDENTIALS_FILE" ]; then
         mkdir -p "$(dirname "$CREDENTIALS_FILE")"
-        local default_hash
-        default_hash="$(hash_password "admin")"
-        printf 'admin:admin:%s\n' "$default_hash" > "$CREDENTIALS_FILE"
+        printf 'admin:admin:admin\n' > "$CREDENTIALS_FILE"
     fi
 }
 
@@ -155,13 +148,11 @@ authenticate_user() {
     if [ -z "$line" ]; then
         return 1
     fi
-    IFS=':' read -r stored_username stored_role stored_hash <<< "$line"
+    IFS=':' read -r stored_username stored_role stored_password <<< "$line"
     if [ "$stored_username" != "$username" ]; then
         return 1
     fi
-    local password_hash
-    password_hash="$(hash_password "$password")"
-    if [ "$password_hash" = "$stored_hash" ]; then
+    if [ "$password" = "$stored_password" ]; then
         SESSION_USERNAME="$stored_username"
         SESSION_ROLE="$stored_role"
         return 0
@@ -285,9 +276,7 @@ invalidate_session() {
 
 ensure_admin_exists_locked() {
     if ! grep -q '^admin:' "$CREDENTIALS_FILE"; then
-        local default_hash
-        default_hash="$(hash_password "admin")"
-        printf 'admin:admin:%s\n' "$default_hash" >> "$CREDENTIALS_FILE"
+        printf 'admin:admin:admin\n' >> "$CREDENTIALS_FILE"
     fi
     if ! awk -F ':' '$2 == "admin" { count++ } END { exit(count>0 ? 0 : 1) }' "$CREDENTIALS_FILE"; then
         local first_user
@@ -342,9 +331,7 @@ add_user() {
         if grep -q -E "^${username}:" "$CREDENTIALS_FILE"; then
             return 1
         fi
-        local hash
-        hash="$(hash_password "$password")"
-        printf '%s:%s:%s\n' "$username" "$role" "$hash" >> "$CREDENTIALS_FILE"
+        printf '%s:%s:%s\n' "$username" "$role" "$password" >> "$CREDENTIALS_FILE"
         ensure_admin_exists_locked
     } 200>"$lock"
     return 0
@@ -360,9 +347,7 @@ update_password() {
         if ! grep -q -E "^${username}:" "$CREDENTIALS_FILE"; then
             return 1
         fi
-        local hash
-        hash="$(hash_password "$password")"
-        awk -F ':' -v user="$username" -v hash="$hash" 'BEGIN{OFS=":"} { if ($1==user) {$3=hash}; print }' "$CREDENTIALS_FILE" > "${CREDENTIALS_FILE}.tmp"
+        awk -F ':' -v user="$username" -v password="$password" 'BEGIN{OFS=":"} { if ($1==user) {$3=password}; print }' "$CREDENTIALS_FILE" > "${CREDENTIALS_FILE}.tmp"
         mv "${CREDENTIALS_FILE}.tmp" "$CREDENTIALS_FILE"
     } 200>"$lock"
     return 0
