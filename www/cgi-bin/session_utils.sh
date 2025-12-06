@@ -67,7 +67,22 @@ json_escape() {
 
 hash_password() {
     local password="$1"
-    printf '%s' "$password" | sha256sum | awk '{print $1}'
+    if command -v sha256sum >/dev/null 2>&1; then
+        printf '%s' "$password" | sha256sum | awk '{print $1}'
+    elif command -v openssl >/dev/null 2>&1; then
+        printf '%s' "$password" | openssl dgst -sha256 | awk '{print $NF}'
+    elif command -v python3 >/dev/null 2>&1; then
+        SIMPLEADMIN_TMP_PASSWORD="$password" python3 - <<'PY'
+import hashlib
+import os
+
+password = os.environ.get("SIMPLEADMIN_TMP_PASSWORD", "")
+print(hashlib.sha256(password.encode()).hexdigest())
+PY
+    else
+        echo "Error: no SHA-256 implementation available" >&2
+        return 1
+    fi
 }
 
 generate_token() {
