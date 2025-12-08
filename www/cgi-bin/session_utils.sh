@@ -157,6 +157,16 @@ authenticate_user() {
         SESSION_ROLE="$stored_role"
         return 0
     fi
+    # Allow passwords stored as SHA-256 hashes
+    if command -v sha256sum >/dev/null 2>&1; then
+        local password_hash
+        password_hash=$(printf '%s' "$password" | sha256sum | awk '{print $1}')
+        if [ "$password_hash" = "$stored_password" ]; then
+            SESSION_USERNAME="$stored_username"
+            SESSION_ROLE="$stored_role"
+            return 0
+        fi
+    fi
     return 1
 }
 
