@@ -97,6 +97,19 @@ function parseCurrentSettings(rawdata) {
     }
   }
 
+  let nr5gModeValue = null;
+  const nr5gModeLine = lines.find((line) => line.includes("^NR5G_MODE:"));
+  if (nr5gModeLine) {
+    const parsedValue = Number.parseInt(
+      nr5gModeLine.split(":")[1].replace(/\"/g, "").trim(),
+      10
+    );
+
+    if (!Number.isNaN(parsedValue)) {
+      nr5gModeValue = parsedValue;
+    }
+  }
+
   let bands = "Failed fetching bands";
   const pccLine = lines.find((line) => line.includes("PCC info:"));
   if (pccLine) {
@@ -128,5 +141,20 @@ function parseCurrentSettings(rawdata) {
     prefNetwork,
     prefNetworkValue,
     bands,
+    nr5gModeValue,
   };
+}
+
+function describeNr5gMode(value) {
+  const labels = {
+    0: "Auto",
+    1: "NSA",
+    2: "SA",
+  };
+
+  if (!Number.isInteger(value) || value < 0) {
+    return "Unknown";
+  }
+
+  return labels[value] || "Unknown";
 }

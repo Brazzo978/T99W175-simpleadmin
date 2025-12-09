@@ -493,6 +493,42 @@
                   >
                     Unlock NR5G-SA Cells
                   </button>
+
+                  <div class="mt-4 pt-3 border-top">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                      <h6 class="mb-0">NR5G Mode</h6>
+                      <span class="text-muted" x-text="`Current: ${nr5gMode}`"></span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        class="btn btn-outline-primary"
+                        @click="setNr5gMode('NSA')"
+                        :disabled="isUpdatingNr5gMode"
+                        data-requires-admin
+                      >
+                        Set NSA
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-primary"
+                        @click="setNr5gMode('SA')"
+                        :disabled="isUpdatingNr5gMode"
+                        data-requires-admin
+                      >
+                        Set SA
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger"
+                        @click="resetNr5gMode()"
+                        :disabled="isUpdatingNr5gMode"
+                        data-requires-admin
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="card-footer">
@@ -583,6 +619,8 @@
           newApn: null,
           prefNetwork: "-",
           prefNetworkValue: null,
+          nr5gMode: "Unknown",
+          isUpdatingNr5gMode: false,
           preferredNetworkSelection: {
             threeG: false,
             fourG: false,
@@ -979,7 +1017,7 @@
           },
           async getCurrentSettings() {
             const atcmd =
-              'AT^SWITCH_SLOT?;+CGCONTRDP=1;+CGDCONT?;^BAND_PREF_EXT?;^CA_INFO?;^SLMODE?';
+              'AT^SWITCH_SLOT?;+CGCONTRDP=1;+CGDCONT?;^BAND_PREF_EXT?;^CA_INFO?;^SLMODE?;^NR5G_MODE?';
 
             const result = await this.sendATcommand(atcmd);
 
@@ -1008,6 +1046,9 @@
                 settings.prefNetworkValue
               );
               this.bands = settings.bands;
+              if (typeof describeNr5gMode === "function") {
+                this.nr5gMode = describeNr5gMode(settings.nr5gModeValue);
+              }
             } catch (error) {
               this.lastErrorMessage = error.message || 'Error while parsing the current settings.';
               console.error('Error while parsing the current settings:', error);
@@ -1661,6 +1702,62 @@
                 this.showModal = false;
               }
             }, 1000);
+          },
+          async setNr5gMode(mode) {
+            const modes = {
+              NSA: 1,
+              SA: 2,
+            };
+
+            const value = modes[mode];
+
+            if (!value) {
+              alert("Invalid NR5G mode selected.");
+              return;
+            }
+
+            this.isUpdatingNr5gMode = true;
+
+            try {
+              const result = await this.sendATcommand(`AT^NR5G_MODE=${value}`);
+
+              if (!result.ok) {
+                alert(this.lastErrorMessage || "Unable to set NR5G mode.");
+                return;
+              }
+
+              this.nr5gMode = mode;
+            } finally {
+              this.isUpdatingNr5gMode = false;
+            }
+          },
+          async resetNr5gMode() {
+            this.isUpdatingNr5gMode = true;
+
+            try {
+              const resetResult = await this.sendATcommand('AT^NR5G_MODE=0');
+
+              if (!resetResult.ok) {
+                alert(this.lastErrorMessage || "Unable to reset NR5G mode.");
+                return;
+              }
+
+              const slmodeResult = await this.sendATcommand('AT^SLMODE=1,7');
+
+              if (!slmodeResult.ok) {
+                alert(this.lastErrorMessage || "Unable to reset preferred network.");
+                return;
+              }
+
+              this.nr5gMode = "Auto";
+              this.prefNetwork = describePrefNetworkValue(7);
+              this.prefNetworkValue = 7;
+              if (typeof this.updatePreferredNetworkSelectionFromValue === "function") {
+                this.updatePreferredNetworkSelectionFromValue(7);
+              }
+            } finally {
+              this.isUpdatingNr5gMode = false;
+            }
           },
           async sendATcommand(atcmd) {
             if (!atcmd || typeof atcmd !== "string") {
