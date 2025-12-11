@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="it" data-bs-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple T99 — Gestione eSIM</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="icon" href="favicon.ico" />
+    <script src="js/auth.js" defer></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/alpinejs.min.js" defer></script>
+    <script src="js/esim-config.js" defer></script>
+    <script src="js/esim.js" defer></script>
+  </head>
+  <body data-require-auth="true">
+    <main>
+      <div class="container my-4" x-data="esimManager()" x-init="init()">
+        <nav class="navbar navbar-expand-lg mt-2">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="/"><span class="mb-0 h4">Simple T99</span></a>
+            <button
+              class="navbar-toggler"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#navbarText"
+              aria-controls="navbarText"
+              aria-expanded="false"
+              aria-label="Toggle navigation"
+              data-allow-user="true"
+            >
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarText">
+              <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                  <a class="nav-link" href="/">Home</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/network.html">4G/5G Settings</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/network-settings.html">Network Settings</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/settings.html">AT Terminal</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/sms.html">SMS</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="deviceinfo.html">Device Information</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link active" aria-current="page" href="/esim.html">Gestione eSIM</a>
+                </li>
+              </ul>
+              <div class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end">
+                <span class="badge rounded-pill fw-semibold text-uppercase d-none" id="navUserRole"></span>
+                <span class="fw-semibold" id="navUserName"></span>
+                <button class="btn btn-outline-secondary btn-sm" id="logoutButton" type="button">
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        <div class="row mt-4" x-show="loading === true">
+          <div class="col">
+            <div class="alert alert-info" role="alert">Caricamento configurazione eSIM...</div>
+          </div>
+        </div>
+
+        <div class="row mt-4" x-show="alert.message" x-transition>
+          <div class="col">
+            <div class="alert" :class="`alert-${alert.type}`" role="alert" x-text="alert.message"></div>
+          </div>
+        </div>
+
+        <template x-if="enabled">
+          <div class="row mt-4 g-4" x-show="loading === false">
+            <div class="col-lg-4">
+              <div class="card h-100">
+                <div class="card-header">Stato server eSIM</div>
+                <div class="card-body">
+                  <p class="mb-2">
+                    <span class="fw-semibold">Endpoint:</span>
+                    <code x-text="baseUrl || 'N/D'"></code>
+                  </p>
+                  <p class="mb-2 d-flex align-items-center gap-2">
+                    <span class="fw-semibold">Salute server:</span>
+                    <span class="badge" :class="serverHealthy ? 'text-bg-success' : 'text-bg-danger'" x-text="serverHealthy ? 'Online' : 'Offline'"></span>
+                  </p>
+                  <div class="mt-3">
+                    <p class="fw-semibold mb-1">EID</p>
+                    <p class="mb-0" x-text="eid || 'Non disponibile'"></p>
+                  </div>
+                  <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-outline-primary btn-sm" type="button" @click="refreshAll">Aggiorna tutto</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" @click="loadEid">Aggiorna EID</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-8">
+              <div class="card mb-4">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                  <span>Profili eSIM</span>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" @click="loadProfiles">Aggiorna</button>
+                </div>
+                <div class="card-body">
+                  <div class="table-responsive">
+                    <table class="table align-middle">
+                      <thead>
+                        <tr>
+                          <th>ICCID</th>
+                          <th>Nome</th>
+                          <th>Nickname</th>
+                          <th>SPN</th>
+                          <th>Stato</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-if="profiles.length === 0">
+                          <tr>
+                            <td colspan="6" class="text-center text-body-secondary">Nessun profilo trovato.</td>
+                          </tr>
+                        </template>
+                        <template x-for="profile in profiles" :key="profile.iccid">
+                          <tr>
+                            <td x-text="profile.iccid"></td>
+                            <td x-text="profile.profile_name"></td>
+                            <td x-text="profile.profile_nickname || '-' "></td>
+                            <td x-text="profile.service_provider_name"></td>
+                            <td>
+                              <span class="badge" :class="profile.enabled ? 'text-bg-success' : 'text-bg-secondary'" x-text="profile.enabled ? 'Abilitato' : 'Disabilitato'"></span>
+                              <div class="small text-body-secondary" x-text="profileStateLabel(profile.profile_state)"></div>
+                            </td>
+                            <td>
+                              <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-outline-success" type="button" @click="enableProfile(profile.iccid)">Abilita</button>
+                                <button class="btn btn-outline-secondary" type="button" @click="disableProfile(profile.iccid)">Disabilita</button>
+                                <button class="btn btn-outline-danger" type="button" @click="deleteProfile(profile.iccid)">Elimina</button>
+                              </div>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="card-footer">
+                  <form class="row g-3" @submit.prevent="setNickname">
+                    <div class="col-md-4">
+                      <label class="form-label" for="nicknameIccid">ICCID</label>
+                      <select class="form-select" id="nicknameIccid" x-model="nicknameForm.iccid">
+                        <option value="" selected>Scegli profilo</option>
+                        <template x-for="profile in profiles" :key="`nick-${profile.iccid}`">
+                          <option :value="profile.iccid" x-text="profile.iccid"></option>
+                        </template>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="nicknameValue">Nickname</label>
+                      <input type="text" class="form-control" id="nicknameValue" x-model="nicknameForm.nickname" placeholder="Lascia vuoto per rimuovere" />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                      <button class="btn btn-primary w-100" type="submit">Salva</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card h-100">
+                <div class="card-header">Download nuovo profilo</div>
+                <div class="card-body">
+                  <form class="row g-3" @submit.prevent="downloadProfile">
+                    <div class="col-12">
+                      <label class="form-label" for="smdp">SMDP+</label>
+                      <input type="text" class="form-control" id="smdp" x-model="downloadForm.smdp" placeholder="es. smdp.io" required />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="matchingId">Matching ID</label>
+                      <input type="text" class="form-control" id="matchingId" x-model="downloadForm.matching_id" required />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="confirmationCode">Codice di conferma (opzionale)</label>
+                      <input type="text" class="form-control" id="confirmationCode" x-model="downloadForm.confirmation_code" />
+                    </div>
+                    <div class="col-12">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="autoConfirm" x-model="downloadForm.auto_confirm" />
+                        <label class="form-check-label" for="autoConfirm">Conferma automaticamente il download</label>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <button class="btn btn-primary" type="submit">Scarica profilo</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card h-100">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                  <span>Notifiche</span>
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-outline-secondary" type="button" @click="loadNotifications">Aggiorna</button>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="table-responsive">
+                    <table class="table align-middle">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>ICCID</th>
+                          <th>Operazione</th>
+                          <th>Endpoint</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-if="notifications.length === 0">
+                          <tr>
+                            <td colspan="4" class="text-center text-body-secondary">Nessuna notifica.</td>
+                          </tr>
+                        </template>
+                        <template x-for="notification in notifications" :key="`${notification.iccid}-${notification.sequence_number}`">
+                          <tr>
+                            <td x-text="notification.sequence_number"></td>
+                            <td x-text="notification.iccid"></td>
+                            <td>
+                              <span class="badge text-bg-info" x-text="notification.operation_name"></span>
+                            </td>
+                            <td class="text-break" x-text="notification.address"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="card-footer">
+                  <form class="row g-3" @submit.prevent="processNotifications">
+                    <div class="col-md-6">
+                      <label class="form-label" for="processIccid">ICCID</label>
+                      <input type="text" class="form-control" id="processIccid" x-model="processForm.iccid" required />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Modalità</label>
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" id="processAll" name="processMode" :value="true" x-model="processForm.process_all" />
+                        <label class="form-check-label" for="processAll">Tutte</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" id="processSingle" name="processMode" :value="false" x-model="processForm.process_all" />
+                        <label class="form-check-label" for="processSingle">Singola</label>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="sequenceNumber">Sequence # (opz.)</label>
+                      <input type="number" min="1" class="form-control" id="sequenceNumber" x-model="processForm.sequence_number" :disabled="processForm.process_all" />
+                    </div>
+                    <div class="col-12 d-flex justify-content-end">
+                      <button class="btn btn-primary" type="submit">Processa</button>
+                    </div>
+                  </form>
+                  <hr />
+                  <form class="row g-3" @submit.prevent="removeNotifications">
+                    <div class="col-md-4">
+                      <div class="form-check mt-4">
+                        <input class="form-check-input" type="checkbox" id="removeAll" x-model="removeForm.remove_all" />
+                        <label class="form-check-label" for="removeAll">Rimuovi tutte</label>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="removeIccid">ICCID (opz.)</label>
+                      <input type="text" class="form-control" id="removeIccid" x-model="removeForm.iccid" :disabled="removeForm.remove_all" />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="removeSequence">Sequence # (opz.)</label>
+                      <input type="number" min="1" class="form-control" id="removeSequence" x-model="removeForm.sequence_number" />
+                    </div>
+                    <div class="col-12 d-flex justify-content-end">
+                      <button class="btn btn-outline-danger" type="submit">Rimuovi</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="!enabled && loading === false">
+          <div class="row mt-4">
+            <div class="col">
+              <div class="alert alert-warning" role="alert">
+                La pagina eSIM è disabilitata. Imposta <code>SIMPLEADMIN_ENABLE_ESIM=1</code> in
+                <code>www/config/simpleadmin.conf</code> e riavvia il servizio web per attivarla. Assicurati che
+                l'eseguibile <code>euicc-client</code> sia in modalità server e raggiungibile all'endpoint configurato.
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </main>
+  </body>
+</html>

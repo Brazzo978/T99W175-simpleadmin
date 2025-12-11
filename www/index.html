@@ -15,6 +15,8 @@
     <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
+    <script src="js/esim-config.js" defer></script>
+    <script src="js/index-esim.js" defer></script>
   </head>
   <body data-require-auth="true">
     <main>
@@ -80,6 +82,21 @@
             </div>
           </div>
         </nav>
+
+        <div class="row mt-4">
+          <div class="col-md-6 col-lg-4">
+            <div class="card d-none" id="esimCard">
+              <div class="card-body">
+                <h5 class="card-title">Gestione eSIM</h5>
+                <p class="card-text">
+                  Usa l'interfaccia dedicata per leggere l'EID, gestire i profili e scaricare
+                  nuove eSIM tramite l'eseguibile <code>euicc-client</code> in modalità server.
+                </p>
+                <a class="btn btn-primary" href="/esim.html">Apri la pagina eSIM</a>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div class="row align-items-center mt-5 gap-md-3 gap-2">
           <div class="col align-self-center">

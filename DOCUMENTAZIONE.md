@@ -45,6 +45,13 @@
 ### `www/config/simpleadmin.conf`
 - Purpose: front-end feature toggle.
 - How: the flag `SIMPLEADMIN_ENABLE_LOGIN` sets whether the interface requires credentials (1) or is openly accessible (0).
+- Additional flags:
+  - `SIMPLEADMIN_ENABLE_ESIM` shows/hides the eSIM management page powered by the `euicc-client` REST server.
+  - `SIMPLEADMIN_ESIM_BASE_URL` sets the base URL for the intermediate eSIM server (default `http://localhost:8080/api/v1`).
+
+### `www/esim.html` — eSIM management
+- Purpose: GUI to interact with the intermediate `euicc-client` REST API (EID, profile lifecycle, downloads, notifications).
+- How: enabled only when `SIMPLEADMIN_ENABLE_ESIM=1`; the page uses `js/esim.js` + `js/esim-config.js` to fetch the base URL from `/cgi-bin/esim_config` and make REST calls to the configured server.
 
 ## JavaScript files
 - `www/js/dark-mode.js`: toggles light/dark themes by updating `data-bs-theme`, saves preference in `localStorage`, and defaults to dark when no choice exists.
@@ -73,6 +80,7 @@
 - `set_watchcat`: creates/updates the `watchcat.service` unit with parameters (`status`, `IpDNS`, `cooldown`, `failures`, `action`); when enabled it writes `/usrdata/simpleadmin/script/watchat.sh` to ping targets, log results, and reboot or swap SIM. Supports full removal when disabled.
 - `watchcat_maker`: simplified helper that validates params and delegates to `create_watchcat.sh`/`remove_watchcat.sh`, returning plain-text messages.
 - `send_sms`: accepts number and UCS-2 message, runs `AT+CMGS` through `atcli_smd8`, pipes the body to `microcom` with `CTRL+Z`, and returns the raw modem reply.
+- `esim_config`: reads `SIMPLEADMIN_ENABLE_ESIM` and `SIMPLEADMIN_ESIM_BASE_URL` from `simpleadmin.conf`, enforces authentication, and returns a JSON payload for the front-end feature toggle.
 
 ## Operational notes
 - All pages load `js/dark-mode.js` so theme preference stays consistent through `localStorage`.
