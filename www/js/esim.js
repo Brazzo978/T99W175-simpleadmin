@@ -1,5 +1,11 @@
-document.addEventListener("alpine:init", () => {
-  Alpine.data("esimManager", () => ({
+let esimManagerRegistered = false;
+
+function registerEsimManager(alpineInstance) {
+  if (esimManagerRegistered || !alpineInstance?.data) {
+    return;
+  }
+
+  alpineInstance.data("esimManager", () => ({
     loading: true,
     enabled: false,
     baseUrl: "",
@@ -336,4 +342,14 @@ document.addEventListener("alpine:init", () => {
       }
     },
   }));
-});
+
+  esimManagerRegistered = true;
+}
+
+if (window.Alpine) {
+  registerEsimManager(window.Alpine);
+} else {
+  document.addEventListener("alpine:init", (event) => {
+    registerEsimManager(event.detail);
+  });
+}
