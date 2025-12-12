@@ -81,9 +81,11 @@ ensure_credentials_file() {
     if login_is_disabled; then
         return 0
     fi
-    if [ ! -f "$CREDENTIALS_FILE" ]; then
-        mkdir -p "$(dirname "$CREDENTIALS_FILE")"
+    mkdir -p "$(dirname "$CREDENTIALS_FILE")"
+
+    if [ ! -f "$CREDENTIALS_FILE" ] || [ ! -s "$CREDENTIALS_FILE" ]; then
         printf 'admin:admin:admin\n' > "$CREDENTIALS_FILE"
+        return 0
     fi
 }
 
@@ -157,22 +159,12 @@ authenticate_user() {
         SESSION_ROLE="$stored_role"
         return 0
     fi
-    # Allow passwords stored as SHA-256 hashes
-    if command -v sha256sum >/dev/null 2>&1; then
-        local password_hash
-        password_hash=$(printf '%s' "$password" | sha256sum | awk '{print $1}')
-        if [ "$password_hash" = "$stored_password" ]; then
-            SESSION_USERNAME="$stored_username"
-            SESSION_ROLE="$stored_role"
-            return 0
-        fi
-    fi
     return 1
 }
 
 create_session() {
     local username="$1"
-    local role="$2"
+    local role="${2:-admin}"
     ensure_session_store
     local token
     token="$(generate_token)"
@@ -285,16 +277,8 @@ invalidate_session() {
 }
 
 ensure_admin_exists_locked() {
-    if ! grep -q '^admin:' "$CREDENTIALS_FILE"; then
+    if ! awk -F ':' '$1=="admin" {found=1} END{exit found?0:1}' "$CREDENTIALS_FILE"; then
         printf 'admin:admin:admin\n' >> "$CREDENTIALS_FILE"
-    fi
-    if ! awk -F ':' '$2 == "admin" { count++ } END { exit(count>0 ? 0 : 1) }' "$CREDENTIALS_FILE"; then
-        local first_user
-        first_user=$(head -n 1 "$CREDENTIALS_FILE" | cut -d ':' -f1)
-        if [ -n "$first_user" ]; then
-            awk -F ':' -v user="$first_user" 'BEGIN{OFS=":"} { if ($1==user) {$2="admin"}; print }' "$CREDENTIALS_FILE" > "${CREDENTIALS_FILE}.tmp"
-            mv "${CREDENTIALS_FILE}.tmp" "$CREDENTIALS_FILE"
-        fi
     fi
 }
 
@@ -302,7 +286,7 @@ list_users() {
     ensure_credentials_file
     local first=1
     printf '['
-    while IFS=':' read -r username role _; do
+    while IFS=':' read -r username role password; do
         [ -z "$username" ] && continue
         if [ $first -eq 0 ]; then
             printf ','
@@ -324,7 +308,7 @@ user_exists() {
 
 add_user() {
     local username="$1"
-    local role="$2"
+    local role="${2:-admin}"
     local password="$3"
     if ! validate_username "$username"; then
         echo "Invalid username" >&2
