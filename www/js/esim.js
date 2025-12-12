@@ -3,6 +3,7 @@ document.addEventListener("alpine:init", () => {
     loading: true,
     enabled: false,
     baseUrl: "",
+    fallbackBaseUrl: "",
     eid: null,
     profiles: [],
     notifications: [],
@@ -34,9 +35,17 @@ document.addEventListener("alpine:init", () => {
     async bootstrap() {
       this.loading = true;
       this.clearAlert();
+      console.debug("[eSIM] Avvio bootstrap gestione eSIM...");
       const config = await EsimConfig.loadConfig();
       this.enabled = config.enabled === 1 || config.enabled === "1" || config.enabled === true;
       this.baseUrl = (config.base_url || "").replace(/\/+$/, "");
+      this.fallbackBaseUrl = this.computeFallbackBaseUrl(this.baseUrl);
+
+      console.debug("[eSIM] Configurazione caricata", {
+        enabled: this.enabled,
+        baseUrl: this.baseUrl,
+        fallbackBaseUrl: this.fallbackBaseUrl,
+      });
       if (!this.enabled) {
         this.setAlert(
           "warning",
@@ -63,25 +72,59 @@ document.addEventListener("alpine:init", () => {
         "Content-Type": "application/json",
       };
     },
+    computeFallbackBaseUrl(baseUrl) {
+      try {
+        const url = new URL(baseUrl);
+        if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+          url.hostname = window.location.hostname;
+          console.debug("[eSIM] Utilizzo fallback base URL", url.toString());
+          return url.toString().replace(/\/+$/, "");
+        }
+      } catch (error) {
+        console.debug("[eSIM] Impossibile calcolare fallback base URL", error);
+      }
+      return "";
+    },
     async apiFetch(path, options = {}) {
       if (!this.enabled) {
         throw new Error("ESIM disabled");
       }
 
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        ...options,
-        headers: {
-          ...this.apiHeaders(),
-          ...(options.headers || {}),
-        },
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `Richiesta fallita (${response.status})`);
+      const baseUrlsToTry = [this.baseUrl];
+      if (this.fallbackBaseUrl && this.fallbackBaseUrl !== this.baseUrl) {
+        baseUrlsToTry.push(this.fallbackBaseUrl);
       }
 
-      return response.json();
+      let lastError;
+      for (const baseUrl of baseUrlsToTry) {
+        try {
+          console.debug(`[eSIM] Richiesta API`, { baseUrl, path });
+          const response = await fetch(`${baseUrl}${path}`, {
+            ...options,
+            headers: {
+              ...this.apiHeaders(),
+              ...(options.headers || {}),
+            },
+          });
+
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `Richiesta fallita (${response.status})`);
+          }
+
+          if (baseUrl !== this.baseUrl) {
+            console.debug("[eSIM] Switch verso fallback base URL", baseUrl);
+            this.baseUrl = baseUrl;
+          }
+
+          return response.json();
+        } catch (error) {
+          console.error(`[eSIM] Errore durante la chiamata a ${baseUrl}${path}`, error);
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error("Impossibile completare la richiesta eSIM.");
     },
     async checkHealth() {
       try {
