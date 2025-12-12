@@ -53,6 +53,20 @@
 - Purpose: GUI to interact with the intermediate `euicc-client` REST API (EID, profile lifecycle, downloads, notifications).
 - How: enabled only when `SIMPLEADMIN_ENABLE_ESIM=1`; the page uses `js/esim.js` + `js/esim-config.js` to fetch the base URL from `/cgi-bin/esim_config` and make REST calls to the configured server.
 
+#### Flusso avanzato e mappatura delle operazioni
+- Bootstrapping: `esimManager.bootstrap()` legge la configurazione da `/cgi-bin/esim_config` (include il flag `enabled` e `base_url`). Se l'endpoint punta a `localhost`, `computeFallbackBaseUrl()` prova a riscriverlo con l'`hostname` del browser per permettere l'accesso cross-device alla stessa istanza `euicc-client`.
+- Health check: prima di caricare i dati, `checkHealth()` interroga `GET /health` sull'API e imposta `serverHealthy`; se l'endpoint non risponde mostra un alert bloccante.
+- Rinfresco dati: `refreshAll()` esegue in parallelo `GET /eid`, `GET /profiles` e `GET /notifications` per popolare EID, lista profili e coda notifiche.
+- Gestione profili: i comandi agiscono sempre su `/profile/*` con payload JSON `{ iccid }`:
+  - `POST /profile/enable` e `POST /profile/disable` applicano lo stato operativo e ricaricano la tabella.
+  - `POST /profile/delete` richiede conferma `confirm()` lato client, poi richiama `refreshAll()` per aggiornare tutto.
+  - `POST /profile/nickname` accetta `iccid` e `nickname` (vuoto = rimozione) per annotare alias locali.
+- Download di un nuovo profilo: `POST /download` invia `{ smdp, matching_id, confirmation_code?, auto_confirm }`. Il codice di conferma è opzionale e viene eliminato dal payload quando vuoto. A valle, il form viene ripulito e scatta un `refreshAll()` per mostrare lo stato.
+- Notifiche GSMA: la tabella si alimenta da `GET /notifications` e due azioni dedicate:
+  - `POST /notifications/process` con `{ iccid, process_all, sequence_number? }` per consumare la coda (risposta `processed_count`).
+  - `POST /notifications/remove` accetta filtri opzionali (`remove_all`, `iccid`, `sequence_number`) e restituisce `removed_count` per confermare la pulizia.
+- Gestione errori e fallback: `apiFetch()` tenta prima `baseUrl`, poi l'eventuale fallback; considera non validi i response non-OK, espone il messaggio di errore restituito dal server e aggiorna dinamicamente `baseUrl` se il fallback risponde correttamente.
+
 ## JavaScript files
 - `www/js/dark-mode.js`: toggles light/dark themes by updating `data-bs-theme`, saves preference in `localStorage`, and defaults to dark when no choice exists.
 - `www/js/generate-freq-box.js`: dynamically builds EARFCN/PCI input pairs for manual lock; responds to `NumCells` changes and emits Alpine-compatible markup (`x-show`).
