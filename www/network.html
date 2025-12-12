@@ -1779,23 +1779,55 @@
               return { ok: false, data: "", error };
             }
 
-            try {
-              const result = await ATCommandService.execute(atcmd, {
+            const executeCommand = () =>
+              ATCommandService.execute(atcmd, {
                 retries: 3,
                 timeout: 15000,
               });
 
-              if (!result.ok) {
-                const message = result.error
-                  ? result.error.message
-                  : "Unknown error while executing the command.";
-                this.lastErrorMessage = message;
-                console.warn("AT command failed:", message);
-              } else {
+            const logFailure = (result) => {
+              const message = result.error
+                ? result.error.message
+                : "Unknown error while executing the command.";
+              this.lastErrorMessage = message;
+              console.warn("AT command failed:", message);
+              return message;
+            };
+
+            try {
+              const result = await executeCommand();
+
+              if (result.ok) {
                 this.lastErrorMessage = "";
+                return result;
               }
 
-              return result;
+              const initialMessage = logFailure(result);
+
+              await new Promise((resolve) => setTimeout(resolve, 300));
+
+              const modemCheck = await ATCommandService.execute("ATI", {
+                retries: 1,
+                timeout: 5000,
+              });
+
+              if (!modemCheck.ok) {
+                this.lastErrorMessage =
+                  initialMessage ||
+                  "Unable to verify modem status after failed AT command.";
+                console.warn("Modem check failed after AT error.", modemCheck);
+                return result;
+              }
+
+              const retryResult = await executeCommand();
+
+              if (retryResult.ok) {
+                this.lastErrorMessage = "";
+                return retryResult;
+              }
+
+              logFailure(retryResult);
+              return retryResult;
             } catch (error) {
               const message = error.message || "Unexpected error during the AT command.";
               this.lastErrorMessage = message;
