@@ -9,7 +9,6 @@ function esimManager() {
     notifications: [],
     serverHealthy: null,
     alert: { type: "", message: "" },
-    _bootstrapped: false,
     downloadForm: {
       smdp: "",
       matching_id: "",
@@ -31,10 +30,6 @@ function esimManager() {
       sequence_number: "",
     },
     init() {
-      if (this._bootstrapped) {
-        console.debug("[eSIM] Bootstrap già eseguito, skip.");
-        return;
-      }
       this.bootstrap();
     },
     async bootstrap() {
@@ -158,7 +153,7 @@ function esimManager() {
       try {
         const payload = await this.apiFetch("/eid", { cache: "no-store" });
         const eid = payload?.data?.eid;
-    
+
         if (eid) {
           this.serverHealthy = true;
           this.eid = eid;
@@ -221,6 +216,99 @@ function esimManager() {
         2: "Operational",
       };
       return labels[value] || "Unknown";
+    },
+    parseLpaQrCode(qrText) {
+      // Formato: LPA:1$smdp.server.com$MATCHING_ID[$CONFIRMATION_CODE]
+      const lpaRegex = /^LPA:1\$([^$]+)\$([^$]+)(?:\$([^$]+))?$/;
+      const match = qrText.match(lpaRegex);
+
+      if (!match) {
+        throw new Error("Formato QR code non valido. Formato atteso: LPA:1$server$id[$code]");
+      }
+
+      return {
+        smdp: match[1],
+        matching_id: match[2],
+        confirmation_code: match[3] || ""
+      };
+    },
+    async handleQrUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        this.setAlert("warning", "Per favore carica un'immagine valida.");
+        event.target.value = '';
+        return;
+      }
+
+      // Verifica che jsQR sia caricato
+      if (typeof jsQR === 'undefined') {
+        this.setAlert("danger", "Libreria jsQR non caricata. Ricarica la pagina e riprova.");
+        event.target.value = '';
+        return;
+      }
+
+      try {
+        const imageData = await this.readImageFile(file);
+        const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (!qrCode) {
+          this.setAlert("danger", "Nessun QR code trovato nell'immagine.");
+          event.target.value = '';
+          return;
+        }
+
+        console.debug("[eSIM] QR code decodificato:", qrCode.data);
+
+        const lpaData = this.parseLpaQrCode(qrCode.data);
+
+        // Forza l'aggiornamento dei campi in modo reattivo
+        this.downloadForm = {
+          ...this.downloadForm,
+          smdp: lpaData.smdp,
+          matching_id: lpaData.matching_id,
+          confirmation_code: lpaData.confirmation_code
+        };
+
+        this.setAlert("success", "QR code letto con successo! Campi compilati automaticamente.");
+
+        console.debug("[eSIM] Campi aggiornati:", this.downloadForm);
+
+        // Reset input file
+        event.target.value = '';
+      } catch (error) {
+        console.error("[eSIM] Errore lettura QR code:", error);
+        this.setAlert("danger", `Errore: ${error.message}`);
+        event.target.value = '';
+      }
+    },
+    readImageFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+          const img = new Image();
+
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            resolve(imageData);
+          };
+
+          img.onerror = () => reject(new Error("Impossibile caricare l'immagine"));
+          img.src = e.target.result;
+        };
+
+        reader.onerror = () => reject(new Error("Impossibile leggere il file"));
+        reader.readAsDataURL(file);
+      });
     },
     async enableProfile(iccid) {
       try {
@@ -392,7 +480,6 @@ if (typeof window !== "undefined") {
 const registerEsimManager = () => {
   if (window.Alpine) {
     window.Alpine.data("esimManager", esimManager);
-    console.debug("[eSIM] Alpine.data registrato");
   }
 };
 
