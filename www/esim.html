@@ -3,10 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Simple T99 — Gestione eSIM</title>
+    <title>Simple T99 – Gestione eSIM</title>
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/bootstrap.min.css" />
     <link rel="icon" href="favicon.ico" />
+    <script src="js/jsQR.js"></script>
     <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
@@ -180,6 +181,12 @@
                 <div class="card-header">Download nuovo profilo</div>
                 <div class="card-body">
                   <form class="row g-3" @submit.prevent="downloadProfile">
+                    <div class="col-12">
+                      <label class="form-label" for="qrUpload">Carica QR code (opzionale)</label>
+                      <input type="file" class="form-control" id="qrUpload" accept="image/*" @change="handleQrUpload($event)" />
+                      <div class="form-text">Carica un'immagine del QR code per compilare automaticamente i campi sottostanti</div>
+                    </div>
+                    <div class="col-12"><hr /></div>
                     <div class="col-12">
                       <label class="form-label" for="smdp">SMDP+</label>
                       <input type="text" class="form-control" id="smdp" x-model="downloadForm.smdp" placeholder="es. smdp.io" required />
