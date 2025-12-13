@@ -129,13 +129,7 @@
                           <label class="form-label" for="confirmationCode">Codice di conferma (opzionale)</label>
                           <input type="text" class="form-control" id="confirmationCode" x-model="downloadForm.confirmation_code" />
                         </div>
-                        <div class="col-md-8">
-                          <div class="form-check mt-2">
-                            <input class="form-check-input" type="checkbox" id="autoConfirm" x-model="downloadForm.auto_confirm" />
-                            <label class="form-check-label" for="autoConfirm">Conferma automaticamente il download</label>
-                          </div>
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
+                        <div class="col align-self-end">
                           <button class="btn btn-primary w-100" type="submit" :disabled="downloadLoading">
                             <span x-show="!downloadLoading">Scarica profilo</span>
                             <span x-show="downloadLoading">
