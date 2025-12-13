@@ -136,7 +136,13 @@
                           </div>
                         </div>
                         <div class="col-md-4 d-flex align-items-end">
-                          <button class="btn btn-primary w-100" type="submit">Scarica profilo</button>
+                          <button class="btn btn-primary w-100" type="submit" :disabled="downloadLoading">
+                            <span x-show="!downloadLoading">Scarica profilo</span>
+                            <span x-show="downloadLoading">
+                              <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                              Download...
+                            </span>
+                          </button>
                         </div>
                       </form>
                     </div>
