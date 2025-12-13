@@ -19,16 +19,6 @@ function esimManager() {
       iccid: "",
       nickname: "",
     },
-    processForm: {
-      iccid: "",
-      process_all: true,
-      sequence_number: "",
-    },
-    removeForm: {
-      remove_all: true,
-      iccid: "",
-      sequence_number: "",
-    },
     init() {
       this.bootstrap();
     },
@@ -217,6 +207,15 @@ function esimManager() {
       };
       return labels[value] || "Unknown";
     },
+    getUniqueNotificationIccids() {
+      const iccids = new Set();
+      this.notifications.forEach(notification => {
+       if (notification.iccid) {
+         iccids.add(notification.iccid);
+       }
+     });
+     return Array.from(iccids).sort();
+    },
     parseLpaQrCode(qrText) {
       // Formato: LPA:1$smdp.server.com$MATCHING_ID[$CONFIRMATION_CODE]
       const lpaRegex = /^LPA:1\$([^$]+)\$([^$]+)(?:\$([^$]+))?$/;
@@ -395,81 +394,109 @@ function esimManager() {
         this.setAlert("danger", `Errore durante il download: ${error.message}`);
       }
     },
-    async processNotifications() {
-      if (!this.processForm.iccid) {
-        this.setAlert("warning", "Inserisci l'ICCID per processare le notifiche.");
-        return;
-      }
-      const payload = {
-        iccid: this.processForm.iccid,
-      };
-      const processAll = this.processForm.process_all === true;
-      payload.process_all = processAll;
-
-      if (!processAll) {
-        const sequence = Number.parseInt(this.processForm.sequence_number, 10);
-        if (Number.isNaN(sequence)) {
-          this.setAlert(
-            "warning",
-            "Indica il sequence number per processare una notifica specifica."
-          );
-          return;
-        }
-
-        payload.sequence_number = sequence;
-      }
-      try {
+  async processSingleNotification(iccid, sequenceNumber) {
+    try {
+      const response = await this.apiFetch("/notifications/process", {
+        method: "POST",
+        body: JSON.stringify({
+          iccid: iccid,
+          sequence_number: sequenceNumber,
+          process_all: false
+        }),
+      });
+      const processedCount = response?.processed_count ?? 0;
+      this.setAlert("success", `Notifica #${sequenceNumber} processata.`);
+      await this.loadNotifications();
+    } catch (error) {
+      console.error(error);
+      this.setAlert("danger", `Errore durante l'elaborazione: ${error.message}`);
+    }
+  },
+  async removeSingleNotification(iccid, sequenceNumber) {
+    try {
+      const response = await this.apiFetch("/notifications/remove", {
+        method: "POST",
+        body: JSON.stringify({
+          iccid: iccid,
+          sequence_number: sequenceNumber
+        }),
+      });
+      this.setAlert("success", `Notifica #${sequenceNumber} rimossa.`);
+      await this.loadNotifications();
+    } catch (error) {
+      console.error(error);
+      this.setAlert("danger", `Errore durante la rimozione: ${error.message}`);
+    }
+  },
+  async processAndRemoveNotification(iccid, sequenceNumber) {
+    try {
+      await this.apiFetch("/notifications/process", {
+        method: "POST",
+        body: JSON.stringify({
+          iccid: iccid,
+          sequence_number: sequenceNumber,
+          process_all: false
+        }),
+      });
+      await this.apiFetch("/notifications/remove", {
+        method: "POST",
+        body: JSON.stringify({
+          iccid: iccid,
+          sequence_number: sequenceNumber
+        }),
+      });
+      this.setAlert("success", `Notifica #${sequenceNumber} processata e rimossa.`);
+      await this.loadNotifications();
+    } catch (error) {
+      console.error(error);
+      this.setAlert("danger", `Errore: ${error.message}`);
+    }
+  },
+  async processAllNotifications() {
+    if (!confirm('Confermi di voler processare tutte le notifiche?')) {
+      return;
+    }
+    try {
+      const iccids = this.getUniqueNotificationIccids();
+      let totalProcessed = 0;
+  
+      for (const iccid of iccids) {
         const response = await this.apiFetch("/notifications/process", {
           method: "POST",
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            iccid: iccid,
+            process_all: true
+          }),
         });
-        const processedCount = response?.processed_count ?? 0;
-        this.setAlert("success", `Notifiche elaborate: ${processedCount}.`);
-        await this.loadNotifications();
-      } catch (error) {
-        console.error(error);
-        this.setAlert("danger", `Errore durante l'elaborazione: ${error.message}`);
+        totalProcessed += response?.processed_count ?? 0;
       }
-    },
-    async removeNotifications() {
-      const payload = {};
-      const removeAll = this.removeForm.remove_all === true;
-
-      if (removeAll) {
-        payload.remove_all = true;
-      } else {
-        const hasIccid = Boolean(this.removeForm.iccid);
-        const sequence = Number.parseInt(this.removeForm.sequence_number, 10);
-        const hasSequence = !Number.isNaN(sequence);
-
-        if (!hasIccid && !hasSequence) {
-          this.setAlert(
-            "warning",
-            "Specifica un ICCID o un sequence number per rimuovere le notifiche."
-          );
-          return;
-        }
-
-        if (hasIccid) {
-          payload.iccid = this.removeForm.iccid;
-        }
-        if (hasSequence) {
-          payload.sequence_number = sequence;
-        }
-      }
-      try {
-        const response = await this.apiFetch("/notifications/remove", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-        const removedCount = response?.removed_count ?? 0;
-        this.setAlert("success", `Notifiche rimosse: ${removedCount}.`);
-        await this.loadNotifications();
-      } catch (error) {
-        console.error(error);
-        this.setAlert("danger", `Errore durante la rimozione: ${error.message}`);
-      }
-    },
+      this.setAlert("success", `Tutte le notifiche processate: ${totalProcessed}.`);
+      await this.loadNotifications();
+    } catch (error) {
+      console.error(error);
+      this.setAlert("danger", `Errore durante l'elaborazione: ${error.message}`);
+    }
+  },
+  async removeAllNotifications() {
+    if (!confirm('Confermi di voler rimuovere TUTTE le notifiche?')) {
+      return;
+    }
+  
+    try {
+      const response = await this.apiFetch("/notifications/remove", {
+        method: "POST",
+        body: JSON.stringify({
+          remove_all: true
+        }),
+      });
+      const removedCount = response?.removed_count ?? 0;
+      this.setAlert("success", `Tutte le notifiche rimosse: ${removedCount}.`);
+      await this.loadNotifications();
+    } catch (error) {
+      console.error(error);
+      this.setAlert("danger", `Errore durante la rimozione: ${error.message}`);
+    }
+  },
   };
 }
 
