@@ -216,6 +216,21 @@ function esimManager() {
      });
      return Array.from(iccids).sort();
     },
+    notificationOperationBadge(operationName) {
+      const op = (operationName || '').toLowerCase();
+    
+      if (op.includes('enable')) {
+        return 'text-bg-success'; 
+      } else if (op.includes('disable')) {
+        return 'text-bg-danger'; 
+      } else if (op.includes('delete')) {
+        return 'text-bg-warning'; 
+      } else if (op.includes('install') || op.includes('download')) {
+        return 'text-bg-primary'; 
+      } else {
+        return 'text-bg-secondary'; 
+      }
+    },
     parseLpaQrCode(qrText) {
       // Formato: LPA:1$smdp.server.com$MATCHING_ID[$CONFIRMATION_CODE]
       const lpaRegex = /^LPA:1\$([^$]+)\$([^$]+)(?:\$([^$]+))?$/;
