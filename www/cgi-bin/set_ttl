@@ -44,7 +44,7 @@ fi
 setTTL=$(printf '%b\n' "${ttlvalue//%/\\x}")
 if [ -n "${setTTL}" ]; then
     log_debug "Stopping service to remove rules"
-    /usrdata/simplefirewall/ttl-override stop
+    /WEBSERVER/www/scripts/ttl/ttl-override stop
 
     # Convert ttlvalue to integer
     if [ "${ttlvalue}" ]; then
@@ -55,20 +55,24 @@ if [ -n "${setTTL}" ]; then
     # Call the sh script with the appropriate parameters
     if [ "${ttlvalue_int}" != 0 ]; then
         log_debug "Enabling TTL with value: ${setTTL}"
-        /usrdata/simpleadmin/script/ttl_script.sh enable "${setTTL}"
-        commandRan="/usrdata/simpleadmin/script/ttl_script.sh enable ${setTTL}"
+        echo "${setTTL}" > /WEBSERVER/www/scripts/ttl/ttlvalue
+        #/usrdata/simpleadmin/script/ttl_script.sh enable "${setTTL}"
+        #commandRan="/usrdata/simpleadmin/script/ttl_script.sh enable ${setTTL}"
+        commandRan="echo "${setTTL}" > /WEBSERVER/www/scripts/ttl/ttlvalue"
         ttlenabled=true
         ttlvalue=$ttlvalue_int
     elif [ "${ttlvalue_int}" = 0 ]; then
         log_debug "Disabling TTL"
-        /usrdata/simpleadmin/script/ttl_script.sh disable 0
-        commandRan="/usrdata/simpleadmin/script/ttl_script.sh disable 0"
+        echo 0 > /WEBSERVER/www/scripts/ttl/ttlvalue
+        #/usrdata/simpleadmin/script/ttl_script.sh disable 0
+        #commandRan="/usrdata/simpleadmin/script/ttl_script.sh disable 0"
+        commandRan="echo 0 > /WEBSERVER/www/scripts/ttl/ttlvalue"
         ttlenabled=false
         ttlvalue=0
     fi
 
     log_debug "Starting service to apply rules"
-    /usrdata/simplefirewall/ttl-override start
+    /WEBSERVER/www/scripts/ttl/ttl-override start
 fi
 
 echo "Content-type: text/text"
