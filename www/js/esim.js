@@ -16,23 +16,24 @@ function esimManager() {
       confirmation_code: "",
       auto_confirm: true,
     },
-    nicknameForm: {
+    nicknameModal: {
       iccid: "",
       nickname: "",
+      currentNickname: "",
     },
     init() {
       this.bootstrap();
     },
     async bootstrap() {
       if (this._bootstrapped) {
-        console.debug("[eSIM] Bootstrap già eseguito, skip.");
+        console.debug("[eSIM] Bootstrap already executed, skipping.");
         return;
       }
       this._bootstrapped = true;
 
       this.loading = true;
       this.clearAlert();
-      console.debug("[eSIM] Avvio bootstrap gestione eSIM...");
+      console.debug("[eSIM] Starting eSIM management bootstrap...");
 
       const config = await EsimConfig.loadConfig();
       this.enabled = config.enabled === 1 || config.enabled === "1" || config.enabled === true;
@@ -43,7 +44,7 @@ function esimManager() {
       try {
         const url = new URL(configBaseUrl);
         if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-          console.debug("[eSIM] Rilevato localhost, utilizzo direttamente il fallback");
+          console.debug("[eSIM] Localhost detected, using fallback directly");
           this.baseUrl = this.fallbackBaseUrl;
         } else {
           this.baseUrl = configBaseUrl;
@@ -52,7 +53,7 @@ function esimManager() {
         this.baseUrl = configBaseUrl;
       }
 
-      console.debug("[eSIM] Configurazione caricata", {
+      console.debug("[eSIM] Configuration loaded", {
         enabled: this.enabled,
         baseUrl: this.baseUrl,
         fallbackBaseUrl: this.fallbackBaseUrl,
@@ -61,7 +62,7 @@ function esimManager() {
       if (!this.enabled) {
         this.setAlert(
           "warning",
-          "La gestione eSIM è disabilitata. Abilitala in config/simpleadmin.conf per procedere."
+          "eSIM management is disabled. Enable it in config/simpleadmin.conf to proceed."
         );
         this.loading = false;
         return;
@@ -75,7 +76,7 @@ function esimManager() {
       this.alert.type = type;
       this.alert.message = message;
       
-      // Auto-dismiss dopo 5s solo per success, info, warning (non per danger/error)
+      // Auto-dismiss after 5s only for success, info, warning (not for danger/error)
       if (autoDismiss && type !== 'danger') {
         if (this._alertTimeout) {
           clearTimeout(this._alertTimeout);
@@ -103,17 +104,17 @@ function esimManager() {
         const url = new URL(baseUrl);
         if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
           url.hostname = window.location.hostname;
-          console.debug("[eSIM] Utilizzo fallback base URL", url.toString());
+          console.debug("[eSIM] Using fallback base URL", url.toString());
           return url.toString().replace(/\/+$/, "");
         }
       } catch (error) {
-        console.debug("[eSIM] Impossibile calcolare fallback base URL", error);
+        console.debug("[eSIM] Unable to compute fallback base URL", error);
       }
       return "";
     },
     async apiFetch(path, options = {}) {
       if (!this.enabled) {
-        throw new Error("ESIM disabled");
+        throw new Error("eSIM disabled");
       }
 
       const baseUrlsToTry = [this.baseUrl];
@@ -124,7 +125,7 @@ function esimManager() {
       let lastError;
       for (const baseUrl of baseUrlsToTry) {
         try {
-          console.debug(`[eSIM] Richiesta API`, { baseUrl, path });
+          console.debug(`[eSIM] API request`, { baseUrl, path });
           const response = await fetch(`${baseUrl}${path}`, {
             ...options,
             headers: {
@@ -135,22 +136,22 @@ function esimManager() {
 
           if (!response.ok) {
             const text = await response.text();
-            throw new Error(text || `Richiesta fallita (${response.status})`);
+            throw new Error(text || `Request failed (${response.status})`);
           }
 
           if (baseUrl !== this.baseUrl) {
-            console.debug("[eSIM] Switch verso fallback base URL", baseUrl);
+            console.debug("[eSIM] Switching to fallback base URL", baseUrl);
             this.baseUrl = baseUrl;
           }
 
           return response.json();
         } catch (error) {
-          console.error(`[eSIM] Errore durante la chiamata a ${baseUrl}${path}`, error);
+          console.error(`[eSIM] Error during request to ${baseUrl}${path}`, error);
           lastError = error;
         }
       }
 
-      throw lastError || new Error("Impossibile completare la richiesta eSIM.");
+      throw lastError || new Error("Unable to complete eSIM request.");
     },
     async checkHealth() {
       try {
@@ -165,7 +166,7 @@ function esimManager() {
           this.serverHealthy = false;
           this.setAlert(
             "warning",
-            "Server online ma eSIM non disponibile. Verifica il modulo eSIM.",
+            "Server online but eSIM not available. Check the eSIM module.",
             false
           );
           console.debug("[eSIM] Server online - eSIM ERROR");
@@ -175,7 +176,7 @@ function esimManager() {
         this.serverHealthy = false;
         this.setAlert(
           "danger",
-          "Server offline. Verifica che euicc-client sia in esecuzione.",
+          "Server offline. Verify that euicc-client is running.",
           false
         );
         console.debug("[eSIM] Server OFFLINE");
@@ -188,7 +189,7 @@ function esimManager() {
         await this.loadNotifications();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", "Errore durante l'aggiornamento dei dati eSIM.", false);
+        this.setAlert("danger", "Error while refreshing eSIM data.", false);
       }
     },
     sleep(ms) {
@@ -251,7 +252,7 @@ function esimManager() {
       const match = qrText.match(lpaRegex);
 
       if (!match) {
-        throw new Error("Formato QR code non valido. Formato atteso: LPA:1$server$id[$code]");
+        throw new Error("Invalid QR code format. Expected: LPA:1$server$id[$code]");
       }
 
       return {
@@ -265,13 +266,13 @@ function esimManager() {
       if (!file) return;
 
       if (!file.type.startsWith('image/')) {
-        this.setAlert("warning", "Per favore carica un'immagine valida.");
+        this.setAlert("warning", "Please upload a valid image file.");
         event.target.value = '';
         return;
       }
 
       if (typeof jsQR === 'undefined') {
-        this.setAlert("danger", "Libreria jsQR non caricata. Ricarica la pagina e riprova.", false);
+        this.setAlert("danger", "jsQR library not loaded. Reload the page and try again.", false);
         event.target.value = '';
         return;
       }
@@ -281,12 +282,12 @@ function esimManager() {
         const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
 
         if (!qrCode) {
-          this.setAlert("danger", "Nessun QR code trovato nell'immagine.", false);
+          this.setAlert("danger", "No QR code found in the image.", false);
           event.target.value = '';
           return;
         }
 
-        console.debug("[eSIM] QR code decodificato:", qrCode.data);
+        console.debug("[eSIM] Decoded QR code:", qrCode.data);
 
         const lpaData = this.parseLpaQrCode(qrCode.data);
 
@@ -297,14 +298,14 @@ function esimManager() {
           confirmation_code: lpaData.confirmation_code
         };
 
-        this.setAlert("success", "QR code letto con successo! Campi compilati automaticamente.");
+        this.setAlert("success", "QR code read successfully! Fields auto-filled.");
 
-        console.debug("[eSIM] Campi aggiornati:", this.downloadForm);
+        console.debug("[eSIM] Updated fields:", this.downloadForm);
 
         event.target.value = '';
       } catch (error) {
-        console.error("[eSIM] Errore lettura QR code:", error);
-        this.setAlert("danger", `Errore: ${error.message}`, false);
+        console.error("[eSIM] QR code read error:", error);
+        this.setAlert("danger", `Error: ${error.message}`, false);
         event.target.value = '';
       }
     },
@@ -327,11 +328,11 @@ function esimManager() {
             resolve(imageData);
           };
 
-          img.onerror = () => reject(new Error("Impossibile caricare l'immagine"));
+          img.onerror = () => reject(new Error("Unable to load image"));
           img.src = e.target.result;
         };
 
-        reader.onerror = () => reject(new Error("Impossibile leggere il file"));
+        reader.onerror = () => reject(new Error("Unable to read file"));
         reader.readAsDataURL(file);
       });
     },
@@ -341,30 +342,34 @@ function esimManager() {
           method: "POST",
           body: JSON.stringify({ iccid }),
         });
-        this.setAlert("success", `Profilo ${iccid} abilitato con successo.`);
+        this.setAlert("success", `Profile ${iccid} enabled successfully.`);
+        await this.sleep(3000);
         await this.loadProfiles();
+        await this.sleep(500);
         await this.loadNotifications();        
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore durante l'abilitazione del profilo: ${error.message}`, false);
+        this.setAlert("danger", `Error enabling profile: ${error.message}`, false);
       }
-    },
+    },    
     async disableProfile(iccid) {
       try {
         await this.apiFetch("/profile/disable", {
           method: "POST",
           body: JSON.stringify({ iccid }),
         });
-        this.setAlert("success", `Profilo ${iccid} disabilitato con successo.`);
+        this.setAlert("success", `Profile ${iccid} disabled successfully.`);
+        await this.sleep(500);
         await this.loadProfiles();
+        await this.sleep(500);
         await this.loadNotifications();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore durante la disabilitazione del profilo: ${error.message}`, false);
+        this.setAlert("danger", `Error disabling profile: ${error.message}`, false);
       }
     },
     async deleteProfile(iccid) {
-      if (!confirm(`Confermi l'eliminazione del profilo ${iccid}?`)) {
+      if (!confirm(`Confirm deletion of profile ${iccid}?`)) {
         return;
       }
       try {
@@ -372,16 +377,16 @@ function esimManager() {
           method: "POST",
           body: JSON.stringify({ iccid }),
         });
-        this.setAlert("success", `Profilo ${iccid} eliminato.`);
+        this.setAlert("success", `Profile ${iccid} deleted.`);
         await this.refreshAll();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore durante l'eliminazione: ${error.message}`, false);
+        this.setAlert("danger", `Error during deletion: ${error.message}`, false);
       }
     },
     async setNickname() {
       if (!this.nicknameForm.iccid) {
-        this.setAlert("warning", "Seleziona un ICCID per impostare il nickname.");
+        this.setAlert("warning", "Select an ICCID to set the nickname.");
         return;
       }
       try {
@@ -392,17 +397,61 @@ function esimManager() {
             nickname: this.nicknameForm.nickname || "",
           }),
         });
-        this.setAlert("success", "Nickname aggiornato.");
+        this.setAlert("success", "Nickname updated.");
         this.nicknameForm.nickname = "";
         await this.loadProfiles();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore durante il salvataggio del nickname: ${error.message}`, false);
+        this.setAlert("danger", `Error saving nickname: ${error.message}`, false);
       }
     },
+
+    openNicknameModal(profile) {
+      this.nicknameModal.iccid = profile.iccid;
+      this.nicknameModal.nickname = profile.profile_nickname || "";
+      this.nicknameModal.currentNickname = profile.profile_nickname || "";
+      
+      const modalEl = document.getElementById('nicknameModal');
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+    },
+
+    async saveNicknameFromModal() {
+      if (!this.nicknameModal.iccid) {
+        this.setAlert("warning", "Invalid ICCID ");
+        return;
+      }
+      
+      try {
+        await this.apiFetch("/profile/nickname", {
+          method: "POST",
+          body: JSON.stringify({
+            iccid: this.nicknameModal.iccid,
+            nickname: this.nicknameModal.nickname || "",
+          }),
+        });
+        
+        this.setAlert("success", "Nickname successful updated");
+        
+        const modalEl = document.getElementById('nicknameModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        
+        await this.loadProfiles();
+        
+        // Reset del form
+        this.nicknameModal.iccid = "";
+        this.nicknameModal.nickname = "";
+        this.nicknameModal.currentNickname = "";
+      } catch (error) {
+        console.error(error);
+        this.setAlert("danger", `Error saving nickname: ${error.message}`, false);
+      }
+    },
+    
     async downloadProfile() {
       if (!this.downloadForm.smdp || !this.downloadForm.matching_id) {
-        this.setAlert("warning", "Compila SMDP e Matching ID per scaricare il profilo.");
+        this.setAlert("warning", "Fill in SMDP and Matching ID to download the profile.");
         return;
       }
       
@@ -415,28 +464,27 @@ function esimManager() {
       this.clearAlert();
       
       try {
-        this.setAlert("info", "Download profilo in corso...", false);
+        this.setAlert("info", "Profile download in progress...", false);
         
         await this.apiFetch("/download", {
           method: "POST",
           body: JSON.stringify(body),
         });
         
-        this.setAlert("success", "Download profilo completato!");
+        this.setAlert("success", "Profile download completed!");
         this.downloadForm.confirmation_code = "";
         
-        // Refresh completo dopo il download
         await this.refreshAll();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore durante il download: ${error.message}`, false);
+        this.setAlert("danger", `Error during download: ${error.message}`, false);
       } finally {
         this.downloadLoading = false;
       }
     },
     async processSingleNotification(iccid, sequenceNumber) {
       try {
-        const response = await this.apiFetch("/notifications/process", {
+        await this.apiFetch("/notifications/process", {
           method: "POST",
           body: JSON.stringify({
             iccid: iccid,
@@ -444,11 +492,11 @@ function esimManager() {
             process_all: false
           }),
         });
-        this.setAlert("success", `Notifica #${sequenceNumber} processata.`);
+        this.setAlert("success", `Notification #${sequenceNumber} processed.`);
         await this.loadNotifications();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore durante l'elaborazione: ${error.message}`, false);
+        this.setAlert("danger", `Error during processing: ${error.message}`, false);
       }
     },
     async removeSingleNotification(iccid, sequenceNumber) {
@@ -460,11 +508,11 @@ function esimManager() {
             sequence_number: sequenceNumber
           }),
         });
-        this.setAlert("success", `Notifica #${sequenceNumber} rimossa.`);
+        this.setAlert("success", `Notification #${sequenceNumber} removed.`);
         await this.loadNotifications();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore durante la rimozione: ${error.message}`, false);
+        this.setAlert("danger", `Error during removal: ${error.message}`, false);
       }
     },
     async processAndRemoveNotification(iccid, sequenceNumber) {
@@ -484,15 +532,15 @@ function esimManager() {
             sequence_number: sequenceNumber
           }),
         });
-        this.setAlert("success", `Notifica #${sequenceNumber} processata e rimossa.`);
+        this.setAlert("success", `Notification #${sequenceNumber} processed and removed.`);
         await this.loadNotifications();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore: ${error.message}`, false);
+        this.setAlert("danger", `Error: ${error.message}`, false);
       }
     },
     async processAllNotifications() {
-      if (!confirm('Confermi di voler processare tutte le notifiche?')) {
+      if (!confirm('Confirm processing of ALL notifications?')) {
         return;
       }
       try {
@@ -509,15 +557,15 @@ function esimManager() {
           });
           totalProcessed += response?.processed_count ?? 0;
         }
-        this.setAlert("success", `Tutte le notifiche processate: ${totalProcessed}.`);
+        this.setAlert("success", `All notifications processed: ${totalProcessed}.`);
         await this.loadNotifications();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore durante l'elaborazione: ${error.message}`, false);
+        this.setAlert("danger", `Error during processing: ${error.message}`, false);
       }
     },
     async removeAllNotifications() {
-      if (!confirm('Confermi di voler rimuovere TUTTE le notifiche?')) {
+      if (!confirm('Confirm removal of ALL notifications?')) {
         return;
       }
     
@@ -529,11 +577,11 @@ function esimManager() {
           }),
         });
         const removedCount = response?.removed_count ?? 0;
-        this.setAlert("success", `Tutte le notifiche rimosse: ${removedCount}.`);
+        this.setAlert("success", `All notifications removed: ${removedCount}.`);
         await this.loadNotifications();
       } catch (error) {
         console.error(error);
-        this.setAlert("danger", `Errore durante la rimozione: ${error.message}`, false);
+        this.setAlert("danger", `Error during removal: ${error.message}`, false);
       }
     },
   };

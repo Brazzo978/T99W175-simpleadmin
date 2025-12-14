@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const esimCard = document.getElementById("esimCard");
+  const esimCard = document.getElementById("esimNavItem");
   if (!esimCard || typeof EsimConfig === "undefined") {
     return;
   }
@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const enabled =
       config && (config.enabled === 1 || config.enabled === "1" || config.enabled === true);
     if (enabled) {
-      esimCard.classList.remove("d-none");
+      esimCard.style.display = 'block';
     }
   });
 });

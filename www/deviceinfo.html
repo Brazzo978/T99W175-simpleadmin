@@ -12,6 +12,8 @@
     <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
+    <script src="js/esim-config.js" defer></script>
+    <script src="js/index-esim.js" defer></script>    
   </head>
   <body data-require-auth="true">
     <main>
@@ -51,13 +53,11 @@
                   <a class="nav-link" href="/sms.html">SMS</a>
                 </li>
                 <li class="nav-item">
-                  <a
-                    class="nav-link active"
-                    href="/deviceinfo.html"
-                    aria-current="page"
-                    >Device Information</a
-                  >
+                  <a class="nav-link" href="deviceinfo.html">Device Information</a>
                 </li>
+                <li class="nav-item" id="esimNavItem" style="display: none;">
+                  <a class="nav-link" href="/esim.html">eSIM</a>
+                </li>                   
               </ul>
               <div
                 class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end"
