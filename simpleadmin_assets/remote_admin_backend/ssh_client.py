@@ -1,7 +1,12 @@
 """Utilities to execute commands on the remote host via SSH."""
 from __future__ import annotations
 
+import os
 import shlex
+import sys
+import threading
+from datetime import datetime
+from pathlib import Path
 from typing import Iterable, List, Tuple, Union
 
 try:
@@ -10,6 +15,9 @@ except ImportError:  # pragma: no cover - dependency missing at runtime
     paramiko = None  # type: ignore
 
 from .config import load_config
+
+
+_LOG_LOCK = threading.RLock()
 
 
 class RemoteCommandError(Exception):
@@ -45,6 +53,66 @@ def _serialize_command(command: Union[str, Iterable[str]]) -> str:
     for token in command:
         parts.append(shlex.quote(str(token)))
     return " ".join(parts)
+
+
+def _is_debug_enabled(config: dict) -> bool:
+    """Return True when debug logging should be recorded."""
+
+    return bool(config.get("debug")) or bool(os.environ.get("REMOTE_ADMIN_DEBUG"))
+
+
+def _debug_log_path() -> Path:
+    """Return the path to the AT debug log beside the Python executable."""
+
+    try:
+        executable = Path(sys.argv[0]).resolve()
+    except Exception:
+        executable = Path(__file__).resolve()
+    return executable.parent / "at_debug.log"
+
+
+def _log_at_interaction(
+    log_path: Path,
+    *,
+    command: str,
+    status: str,
+    response: List[str],
+    stderr: str,
+    exit_code: int,
+    position: int,
+    total: int,
+) -> None:
+    """Append a formatted AT interaction to the debug log."""
+
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    response_lines = response or []
+    stderr_clean = stderr.strip()
+
+    lines = [
+        f"[{timestamp}] Command {position}/{total}: {command}",
+        f"Status: {status or 'N/A'} | Exit code: {exit_code}",
+    ]
+
+    if response_lines:
+        lines.append("Response:")
+        lines.extend(f"  {line}" for line in response_lines)
+    else:
+        lines.append("Response: <empty>")
+
+    if stderr_clean:
+        lines.append("Stderr:")
+        lines.extend(f"  {line}" for line in stderr_clean.splitlines())
+
+    lines.append("")
+
+    with _LOG_LOCK:
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_path.open("a", encoding="utf-8") as fp:
+                fp.write("\n".join(lines) + "\n")
+        except Exception:
+            # Logging must never interfere with command execution.
+            return
 
 
 def execute_remote(command: Union[str, Iterable[str]], *, timeout: int = 30) -> Tuple[str, str, int]:
@@ -84,29 +152,47 @@ def execute_remote(command: Union[str, Iterable[str]], *, timeout: int = 30) -> 
 
 
 def _split_at_commands(command: str) -> List[str]:
-    """Split a potentially chained AT command string into individual commands."""
+    """Split user-provided AT command chains into discrete commands.
+
+    Mikrotik routers accept only a single AT command per invocation of
+    ``/interface/lte/at-chat``. Users, however, may chain commands with
+    semicolons or newlines. This parser keeps quotes intact and honours
+    backslash escapes so that payloads containing separators are not split
+    incorrectly.
+    """
+
+    if not command:
+        return []
 
     parts: List[str] = []
-    if not command:
-        return parts
-
     current: List[str] = []
     in_quotes = False
-    previous = ""
+    escaped = False
 
     for char in command:
-        if char == '"' and previous != "\\":
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+
+        if char == "\\":
+            current.append(char)
+            escaped = True
+            continue
+
+        if char == '"':
             in_quotes = not in_quotes
+            current.append(char)
+            continue
 
         if not in_quotes and char in {";", "\n", "\r"}:
             segment = "".join(current).strip()
             if segment:
                 parts.append(segment)
             current = []
-        else:
-            current.append(char)
+            continue
 
-        previous = char
+        current.append(char)
 
     tail = "".join(current).strip()
     if tail:
@@ -116,54 +202,84 @@ def _split_at_commands(command: str) -> List[str]:
 
 
 def _ensure_at_prefix(command: str) -> str:
-    """Ensure that chained AT commands keep the required "AT" prefix."""
+    """Normalise a single AT command to always include the ``AT`` prefix."""
 
-    stripped = command.lstrip()
+    stripped = command.strip()
     if not stripped:
-        return command
+        return ""
 
-    uppercase = stripped.upper()
-    if uppercase.startswith("AT"):
+    if stripped.upper().startswith("AT"):
         return stripped
 
-    # Commands chained after the first one may omit the leading AT.
     if stripped[0] in {"+", "^", "%", "&"}:
         return f"AT{stripped}"
 
     return f"AT {stripped}" if not stripped.startswith("AT ") else stripped
 
 
-def _response_is_successful(stdout: str, stderr: str, exit_code: int) -> bool:
-    """Determine whether an AT command executed successfully."""
+def _escape_ros_value(value: str) -> str:
+    """Escape a value for safe injection into RouterOS CLI arguments."""
+
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _parse_at_response(stdout: str) -> Tuple[str, List[str]]:
+    """Extract status and modem output from RouterOS ``at-chat`` output."""
+
+    status = ""
+    response_lines: List[str] = []
+    collecting_response = False
+
+    for raw_line in stdout.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        lowered = line.lower()
+        if lowered.startswith("status:"):
+            status = line.split(":", 1)[1].strip()
+            collecting_response = False
+            continue
+
+        if lowered.startswith("response:"):
+            collecting_response = True
+            remainder = line.split(":", 1)[1].strip()
+            if remainder:
+                response_lines.append(remainder)
+            continue
+
+        if collecting_response:
+            response_lines.append(line)
+            continue
+
+        response_lines.append(line)
+
+    return status, response_lines
+
+
+def _response_is_successful(status: str, response: List[str], stderr: str, exit_code: int) -> bool:
+    """Determine whether RouterOS reported a successful AT invocation."""
 
     if exit_code != 0:
         return False
 
-    stdout_lines = [line.strip() for line in stdout.splitlines() if line.strip()]
-    stderr_lines = [line.strip() for line in stderr.splitlines() if line.strip()]
-
-    if not stdout_lines and stderr_lines:
+    if stderr.strip():
         return False
 
-    for line in stdout_lines + stderr_lines:
-        if "ERROR" in line.upper():
+    status_normalized = status.lower()
+    if status_normalized.startswith("ok"):
+        return True
+    if status_normalized.startswith("error"):
+        return False
+
+    for line in response:
+        upper = line.upper()
+        if upper == "OK":
+            return True
+        if "ERROR" in upper:
             return False
 
-    if not stdout_lines:
-        return True
-
-    last_line = stdout_lines[-1].upper()
-    if last_line == "OK":
-        return True
-
-    for line in stdout_lines:
-        lowered = line.lower()
-        if lowered.startswith("status:") and "ok" in lowered:
-            return True
-        if lowered.endswith(": ok"):
-            return True
-
-    return False
+    return bool(response)
 
 
 def run_at_command(at_command: str, *, timeout: int = 30) -> Tuple[str, str, int]:
@@ -175,34 +291,55 @@ def run_at_command(at_command: str, *, timeout: int = 30) -> Tuple[str, str, int
             "Missing LTE interface name in the remote configuration."
         )
 
-    escaped_interface = interface.replace('"', '\\"')
+    escaped_interface = _escape_ros_value(interface)
 
-    commands = _split_at_commands(at_command)
-    if not commands:
-        commands = [at_command.strip()]
+    commands = _split_at_commands(at_command) or [at_command.strip()]
+    normalized_commands = [
+        normalized
+        for normalized in (_ensure_at_prefix(command) for command in commands)
+        if normalized
+    ]
+
+    debug_enabled = _is_debug_enabled(cfg)
+    log_path = _debug_log_path() if debug_enabled else None
 
     stdout_parts: List[str] = []
     stderr_parts: List[str] = []
     exit_code = 0
 
-    for index, command in enumerate(commands):
-        normalized = _ensure_at_prefix(command)
-        escaped_command = normalized.replace('"', '\\"')
-        ros_command = (
-            f'interface/lte/at-chat "{escaped_interface}" input="{escaped_command}"'
-        )
+    total_commands = len(normalized_commands)
+
+    for index, normalized in enumerate(normalized_commands, start=1):
+        
+        ros_command = [
+            "interface/lte/at-chat",
+            f'interface="{escaped_interface}"',
+            f'input="{_escape_ros_value(normalized)}"',
+        ]
 
         stdout, stderr, exit_code = execute_remote(ros_command, timeout=timeout)
 
-        stdout = stdout.strip()
-        stderr = stderr.strip()
+        status, response = _parse_at_response(stdout)
+        joined_response = "\n".join(response).strip()
 
-        if stdout:
-            stdout_parts.append(stdout)
-        if stderr:
-            stderr_parts.append(stderr)
+        if debug_enabled and log_path:
+            _log_at_interaction(
+                log_path,
+                command=normalized,
+                status=status,
+                response=response,
+                stderr=stderr,
+                exit_code=exit_code,
+                position=index,
+                total=total_commands or 1,
+            )
 
-        if not _response_is_successful(stdout, stderr, exit_code):
+        if joined_response:
+            stdout_parts.append(joined_response)
+        if stderr.strip():
+            stderr_parts.append(stderr.strip())
+
+        if not _response_is_successful(status, response, stderr, exit_code):
             stderr_parts.append(
                 f'Aborting remaining commands after failure of "{normalized}".'
             )
