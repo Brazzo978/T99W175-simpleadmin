@@ -449,6 +449,12 @@ def run_server(host: str, port: int, quiet: bool = False, debug: bool = False) -
         www_root = asset_root / "www"
         backend_root = asset_root
 
+        existing_pythonpath = os.environ.get("PYTHONPATH", "")
+        updated_paths = [str(backend_root)]
+        if existing_pythonpath:
+            updated_paths.append(existing_pythonpath)
+        os.environ["PYTHONPATH"] = os.pathsep.join(updated_paths)
+
         sys.path.insert(0, str(backend_root))
         _patch_at_command_handling()
         if debug:
