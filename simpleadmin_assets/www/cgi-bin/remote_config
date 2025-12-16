@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import sys
+from http import HTTPStatus
+from typing import Any, Dict
+
+from remote_admin_backend import ssh_client
+
+
+def _read_body() -> Dict[str, Any]:
+    try:
+        length = int(os.environ.get("CONTENT_LENGTH", "0"))
+    except ValueError:
+        length = 0
+    raw_body = sys.stdin.read(length) if length > 0 else ""
+    if not raw_body:
+        return {}
+    try:
+        return json.loads(raw_body)
+    except json.JSONDecodeError:
+        return {}
+
+
+def _respond(status: HTTPStatus, payload: Dict[str, Any]) -> None:
+    print(f"Status: {status.value} {status.phrase}")
+    print("Content-Type: application/json")
+    print()
+    print(json.dumps(payload))
+
+
+def handle_get() -> None:
+    config = ssh_client.load_config()
+    if config.get("password"):
+        config["password"] = "***"
+    _respond(HTTPStatus.OK, {"success": True, "config": config})
+
+
+def handle_post() -> None:
+    data = _read_body()
+    if not data:
+        _respond(
+            HTTPStatus.BAD_REQUEST,
+            {"success": False, "message": "Empty configuration payload."},
+        )
+        return
+
+    updated = ssh_client.save_config(data)
+    required = ["host", "username", "password", "interface"]
+    missing = [field for field in required if not str(updated.get(field) or "").strip()]
+    if missing:
+        _respond(
+            HTTPStatus.BAD_REQUEST,
+            {
+                "success": False,
+                "message": f"Missing required fields: {', '.join(missing)}.",
+            },
+        )
+        return
+
+    _respond(HTTPStatus.OK, {"success": True, "message": "Configuration saved.", "config": updated})
+
+
+def main() -> None:
+    method = os.environ.get("REQUEST_METHOD", "GET").upper()
+    if method == "GET":
+        handle_get()
+    elif method == "POST":
+        handle_post()
+    else:
+        _respond(
+            HTTPStatus.METHOD_NOT_ALLOWED,
+            {"success": False, "message": "Method not allowed."},
+        )
+
+
+if __name__ == "__main__":
+    main()
