@@ -13,6 +13,7 @@ _DEFAULT_CONFIG = {
     "username": "",
     "password": "",
     "interface": "",
+    "debug": False,
 }
 
 _LOCK = threading.RLock()
