@@ -42,13 +42,26 @@
     }
   }
 
+  async function readJson(response) {
+    try {
+      const text = await response.text();
+      if (!text) {
+        return null;
+      }
+      return JSON.parse(text);
+    } catch (error) {
+      console.warn("Invalid JSON response", error);
+      return null;
+    }
+  }
+
   async function loadConfig() {
     try {
       const response = await fetch("/cgi-bin/remote_config");
+      const data = await readJson(response);
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error((data && data.message) || `HTTP ${response.status}`);
       }
-      const data = await response.json();
       if (!data || !data.config) {
         return;
       }
@@ -97,7 +110,7 @@
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const data = (await readJson(response)) || {};
       if (!response.ok || !data.success) {
         throw new Error(data.message || `HTTP ${response.status}`);
       }
@@ -114,7 +127,7 @@
     setStatus("Testing remote connection...", "info");
     try {
       const response = await fetch("/cgi-bin/remote_status");
-      const data = await response.json();
+      const data = (await readJson(response)) || {};
       if (!response.ok || !data.success) {
         throw new Error(data.message || `HTTP ${response.status}`);
       }
