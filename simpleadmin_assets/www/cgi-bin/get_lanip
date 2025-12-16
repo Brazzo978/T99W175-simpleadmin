@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+from http import HTTPStatus
+
+from remote_admin_backend import ssh_client
+
+
+def main() -> None:
+    config = ssh_client.load_config()
+    lan_ip = config.get("host", "")
+
+    print(f"Status: {HTTPStatus.OK.value} {HTTPStatus.OK.phrase}")
+    print("Content-Type: application/json")
+    print()
+    print(json.dumps({"lanip": lan_ip}))
+
+
+if __name__ == "__main__":
+    main()

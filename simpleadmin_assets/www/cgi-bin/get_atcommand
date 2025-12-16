@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+import sys
+import urllib.parse
+
+from remote_admin_backend import ssh_client
+
+
+def main() -> None:
+    query = urllib.parse.parse_qs(os.environ.get("QUERY_STRING", ""))
+    command = "".join(query.get("atcmd", [])).strip()
+
+    if not command:
+        print("Status: 400 Bad Request")
+        print("Content-Type: text/plain")
+        print()
+        print("Missing atcmd parameter.")
+        return
+
+    try:
+        stdout, stderr, exit_code = ssh_client.run_at_command(command, timeout=30)
+    except ssh_client.RemoteConnectionError as exc:
+        print("Status: 502 Bad Gateway")
+        print("Content-Type: text/plain")
+        print()
+        print(str(exc))
+        return
+
+    print("Content-Type: text/plain")
+    print()
+    if exit_code != 0 and not stdout:
+        print(stderr or "Unknown AT error")
+    elif stderr.strip():
+        print(f"{stdout}\n{stderr}".strip())
+    else:
+        sys.stdout.write(stdout)
+
+
+if __name__ == "__main__":
+    main()

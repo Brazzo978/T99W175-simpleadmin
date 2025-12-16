@@ -6,6 +6,7 @@ import argparse
 import base64
 import io
 import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -19,7 +20,7 @@ from typing import Iterator, List, Optional, Tuple
 SERVER_DESCRIPTION = "Simple Admin remote launcher"
 
 ASSET_ARCHIVE_B64 = (
-   
+
 )
 
 
@@ -28,9 +29,27 @@ def _prepare_assets() -> Iterator[Path]:
     """Extract embedded assets to a temporary directory."""
     with tempfile.TemporaryDirectory(prefix="simpleadmin-") as tmpdir:
         root = Path(tmpdir)
-        data = base64.b64decode(ASSET_ARCHIVE_B64)
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            archive.extractall(root)
+        archive_data = "".join(ASSET_ARCHIVE_B64).strip()
+
+        extracted = False
+        if archive_data:
+            try:
+                data = base64.b64decode(archive_data)
+                with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                    archive.extractall(root)
+                extracted = True
+            except Exception:
+                print(
+                    "Failed to unpack embedded assets, falling back to local files...",
+                    file=sys.stderr,
+                    flush=True,
+                )
+
+        if not extracted:
+            local_assets = Path(__file__).resolve().parent / "simpleadmin_assets"
+            if not local_assets.is_dir():
+                raise RuntimeError("Embedded assets missing and local assets not found.")
+            shutil.copytree(local_assets, root, dirs_exist_ok=True)
 
         cgi_root = root / "www" / "cgi-bin"
         if cgi_root.is_dir():
