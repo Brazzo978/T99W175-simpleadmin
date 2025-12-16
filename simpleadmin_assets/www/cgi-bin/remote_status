@@ -24,15 +24,28 @@ def main() -> None:
         )
         return
 
-    if exit_code != 0 or stderr.strip():
-        message = stderr.strip() or f"ATI failed with exit code {exit_code}."
+    stderr_clean = stderr.strip()
+    stdout_clean = stdout.strip()
+
+    if stderr_clean:
         _respond(
             HTTPStatus.BAD_GATEWAY,
-            {"success": False, "message": message, "output": stdout.strip()},
+            {"success": False, "message": stderr_clean, "output": stdout_clean},
         )
         return
 
-    cleaned = stdout.strip() or "Modem responded."
+    if exit_code != 0 and "OK" not in stdout_clean.upper():
+        _respond(
+            HTTPStatus.BAD_GATEWAY,
+            {
+                "success": False,
+                "message": f"ATI failed with exit code {exit_code}.",
+                "output": stdout_clean,
+            },
+        )
+        return
+
+    cleaned = stdout_clean or "Modem responded."
     _respond(
         HTTPStatus.OK,
         {"success": True, "message": "Connection OK", "output": cleaned},
