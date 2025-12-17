@@ -1,0 +1,122 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+SCHEDULE_FILE="/persist/reboot.txt"
+
+json_escape() {
+    python3 - <<'PY' "$1"
+import json, sys
+print(json.dumps(sys.argv[1]))
+PY
+}
+
+send_json() {
+    local status="$1"
+    local payload="$2"
+    printf 'Status: %s\r\n' "$status"
+    printf 'Content-type: application/json\r\n\r\n'
+    printf '%s\n' "$payload"
+    exit 0
+}
+
+url_decode() {
+    local data="${1//+/ }"
+    printf '%b' "${data//%/\\x}"
+}
+
+parse_params() {
+    local qs="$1"
+    IFS='&' read -ra pairs <<< "$qs"
+    for pair in "${pairs[@]}"; do
+        [ -z "$pair" ] && continue
+        key="${pair%%=*}"
+        val="${pair#*=}"
+        val=$(url_decode "$val")
+        case "$key" in
+            schedule) schedule="$val" ;;
+            action) action="$val" ;;
+        esac
+    done
+}
+
+ensure_auth() {
+    if ! session_load; then
+        send_json "401 Unauthorized" '{"success":false,"message":"Authentication required"}'
+    fi
+
+    if ! session_require_role "admin"; then
+        send_json "403 Forbidden" '{"success":false,"message":"Admin privileges required"}'
+    fi
+}
+
+read_schedule_file() {
+    if [ -f "$SCHEDULE_FILE" ]; then
+        schedule=$(grep -v '^\s*$' "$SCHEDULE_FILE" | head -n1)
+    else
+        schedule=""
+    fi
+}
+
+save_schedule() {
+    local schedule_line="$1"
+    mkdir -p "$(dirname "$SCHEDULE_FILE")"
+    printf '%s\n' "$schedule_line" > "$SCHEDULE_FILE"
+}
+
+validate_schedule() {
+    local line="$1"
+    local field_count
+    field_count=$(echo "$line" | awk '{print NF}')
+
+    if [ "$field_count" -lt 6 ]; then
+        send_json "400 Bad Request" '{"success":false,"message":"Invalid cron format. Expect at least 6 fields."}'
+    fi
+}
+
+handle_get() {
+    read_schedule_file
+    local schedule_json
+    schedule_json=$(json_escape "$schedule")
+    send_json "200 OK" "{\"success\":true,\"schedule\":${schedule_json}}"
+}
+
+handle_post() {
+    if [ -n "${CONTENT_LENGTH:-}" ]; then
+        read -r -n "$CONTENT_LENGTH" POST_DATA
+    else
+        read -r POST_DATA
+    fi
+    parse_params "$POST_DATA"
+
+    if [ "$action" = "delete" ] || [ -z "${schedule// }" ]; then
+        rm -f "$SCHEDULE_FILE"
+        send_json "200 OK" '{"success":true,"schedule":""}'
+    fi
+
+    validate_schedule "$schedule"
+    save_schedule "$schedule"
+    local schedule_json
+    schedule_json=$(json_escape "$schedule")
+    send_json "200 OK" "{\"success\":true,\"schedule\":${schedule_json}}"
+}
+
+ensure_auth
+
+case "$REQUEST_METHOD" in
+    GET)
+        handle_get
+        ;;
+    POST)
+        handle_post
+        ;;
+    DELETE)
+        action="delete"
+        handle_post
+        ;;
+    *)
+        send_json "405 Method Not Allowed" '{"success":false,"message":"Unsupported method"}'
+        ;;
+esac

@@ -358,7 +358,168 @@
                     <div class="alert alert-info mt-3" role="alert">
                       <strong>Custom TTL active:</strong> Packets will be sent with TTL value of <span x-text="form.ttlValue"></span>.
                     </div>
-                  </template>                 
+                  </template>
+
+                  <hr class="my-4" />
+
+                  <div class="mb-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <h5 class="mb-0">Riavvio automatico</h5>
+                      <span class="badge text-bg-light">Salvato in reboot.txt (cron)</span>
+                    </div>
+                    <p class="text-body-secondary mb-3">
+                      Imposta un riavvio pianificato: l'impostazione viene salvata in formato compatibile con cron e potrai modificarla o cancellarla in seguito.
+                    </p>
+
+                    <div class="btn-group mb-3" role="group" aria-label="Auto reboot options">
+                      <button
+                        type="button"
+                        class="btn"
+                        :class="rebootForm.mode === 'interval' ? 'btn-primary' : 'btn-outline-primary'"
+                        @click="rebootForm.mode = 'interval'"
+                        :disabled="rebootSaving"
+                      >
+                        Ogni X ore
+                      </button>
+                      <button
+                        type="button"
+                        class="btn"
+                        :class="rebootForm.mode === 'schedule' ? 'btn-primary' : 'btn-outline-primary'"
+                        @click="rebootForm.mode = 'schedule'"
+                        :disabled="rebootSaving"
+                      >
+                        Programmazione
+                      </button>
+                    </div>
+
+                    <div class="row g-3" x-show="rebootForm.mode === 'interval'">
+                      <div class="col-md-4 col-lg-3">
+                        <label class="form-label" for="rebootIntervalHours">Ogni quante ore?</label>
+                        <div class="input-group">
+                          <input
+                            id="rebootIntervalHours"
+                            class="form-control"
+                            type="number"
+                            min="1"
+                            max="720"
+                            :disabled="rebootSaving"
+                            x-model.number="rebootForm.intervalHours"
+                          />
+                          <span class="input-group-text">ore</span>
+                        </div>
+                        <div class="form-text">Esegue un riavvio ogni N ore (es. 12 =&gt; <code>0 */12 * * * reboot</code>).</div>
+                      </div>
+                    </div>
+
+                    <div class="row g-3" x-show="rebootForm.mode === 'schedule'">
+                      <div class="col-md-4 col-lg-3">
+                        <label class="form-label" for="rebootFrequency">Frequenza</label>
+                        <select
+                          id="rebootFrequency"
+                          class="form-select"
+                          :disabled="rebootSaving"
+                          x-model="rebootForm.frequency"
+                        >
+                          <option value="daily">Ogni giorno</option>
+                          <option value="weekly">Ogni settimana</option>
+                          <option value="monthly">Ogni mese</option>
+                        </select>
+                      </div>
+
+                      <div class="col-md-4 col-lg-3" x-show="rebootForm.frequency === 'weekly'">
+                        <label class="form-label" for="rebootDayOfWeek">Giorno</label>
+                        <select
+                          id="rebootDayOfWeek"
+                          class="form-select"
+                          :disabled="rebootSaving"
+                          x-model="rebootForm.dayOfWeek"
+                        >
+                          <option value="1">Lunedì</option>
+                          <option value="2">Martedì</option>
+                          <option value="3">Mercoledì</option>
+                          <option value="4">Giovedì</option>
+                          <option value="5">Venerdì</option>
+                          <option value="6">Sabato</option>
+                          <option value="0">Domenica</option>
+                        </select>
+                      </div>
+
+                      <div class="col-md-4 col-lg-3" x-show="rebootForm.frequency === 'monthly'">
+                        <label class="form-label" for="rebootDayOfMonth">Giorno del mese</label>
+                        <input
+                          id="rebootDayOfMonth"
+                          class="form-control"
+                          type="number"
+                          min="1"
+                          max="31"
+                          :disabled="rebootSaving"
+                          x-model.number="rebootForm.dayOfMonth"
+                        />
+                        <div class="form-text">Esempio: 1 = ogni primo del mese.</div>
+                      </div>
+
+                      <div class="col-md-4 col-lg-3">
+                        <label class="form-label" for="rebootTime">Orario</label>
+                        <input
+                          id="rebootTime"
+                          class="form-control"
+                          type="time"
+                          step="60"
+                          :disabled="rebootSaving"
+                          x-model="rebootForm.time"
+                        />
+                        <div class="form-text">Esempi: 00:00 (mezzanotte), 16:00 (ogni giorno alle 16).</div>
+                      </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                      <button
+                        type="button"
+                        class="btn btn-primary"
+                        :disabled="rebootSaving"
+                        @click="saveRebootSchedule()"
+                      >
+                        Salva pianificazione
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        :disabled="rebootSaving"
+                        @click="loadRebootSchedule()"
+                      >
+                        Annulla modifiche
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger"
+                        :disabled="rebootSaving || !rebootSchedule"
+                        @click="clearRebootSchedule()"
+                      >
+                        Rimuovi pianificazione
+                      </button>
+                    </div>
+
+                    <template x-if="rebootSuccessMessage">
+                      <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                        <span x-text="rebootSuccessMessage"></span>
+                        <button type="button" class="btn-close" @click="rebootSuccessMessage = ''"></button>
+                      </div>
+                    </template>
+
+                    <template x-if="rebootErrorMessage">
+                      <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                        <span x-text="rebootErrorMessage"></span>
+                        <button type="button" class="btn-close" @click="rebootErrorMessage = ''"></button>
+                      </div>
+                    </template>
+
+                    <template x-if="rebootSchedule">
+                      <div class="alert alert-info mt-3" role="alert">
+                        <strong>Pianificazione corrente:</strong>
+                        <code x-text="rebootSchedule"></code>
+                      </div>
+                    </template>
+                  </div>
 
                   <template x-if="validationErrors.length">
                     <div class="alert alert-warning mt-4" role="alert">
