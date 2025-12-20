@@ -328,7 +328,6 @@ ensure_guest_exists_locked() {
 
 ensure_defaults_locked() {
     ensure_admin_exists_locked
-    ensure_guest_exists_locked
 }
 
 list_users() {
@@ -386,9 +385,6 @@ update_password() {
     local username="$1"
     local password="$2"
     ensure_credentials_file
-    if [ "$username" = "guest" ]; then
-        return 3
-    fi
     local lock="${CREDENTIALS_FILE}.lock"
     {
         flock -x 200
@@ -406,9 +402,6 @@ update_role() {
     local username="$1"
     local role="$2"
     ensure_credentials_file
-    if [ "$username" = "guest" ]; then
-        return 3
-    fi
     if ! validate_role "$role"; then
         return 2
     fi
@@ -428,8 +421,8 @@ update_role() {
 delete_user() {
     local username="$1"
     ensure_credentials_file
-    if [ "$username" = "guest" ]; then
-        return 3
+    if [ "$username" = "admin" ]; then
+        return 4
     fi
     local lock="${CREDENTIALS_FILE}.lock"
     {
