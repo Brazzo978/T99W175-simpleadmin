@@ -215,7 +215,7 @@ this.phoneNumber = phoneNumber || "Unknown";
 this.wwanIpv4 = wwanIpv4 || "-";
 this.wwanIpv6 = wwanIpv6 || "-";
 // Define the GUI version here
-this.simpleAdminVersion = "T99-RC01";
+this.simpleAdminVersion = "T99-RC03-Final";
 this.showError = false;
 } catch (error) {
 console.error("Parsing error:", error);
