@@ -18,7 +18,10 @@ function describePrefNetworkValue(value) {
 }
 
 function parseCurrentSettings(rawdata) {
-  const lines = rawdata.split("\n");
+  const lines = rawdata
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
   console.log(lines);
 
   let sim = "-";
@@ -62,21 +65,149 @@ function parseCurrentSettings(rawdata) {
     }
   }
 
-  let cellLock4GStatus = "0";
-  const cellLock4GLine = lines.find((line) =>
-    line.includes("LTE,Enable Bands :")
-  );
-  if (cellLock4GLine) {
-    cellLock4GStatus = cellLock4GLine.split(":")[1].replace(/\"/g, "");
-  }
+  const extractPayload = (line) => {
+    if (!line || !line.includes(":")) {
+      return "";
+    }
 
-  let cellLock5GStatus = "0";
-  const cellLock5GLine = lines.find((line) =>
-    line.includes("NR5G_SA,Enable Bands :")
+    return line.split(":").slice(1).join(":").trim();
+  };
+
+  const parseLteLocks = (line) => {
+    const payload = extractPayload(line);
+
+    if (!payload || /have not set cell lock before/i.test(payload)) {
+      return [];
+    }
+
+    const matches = [...payload.matchAll(/\((\d+),(\d+)\)/g)];
+    const parsedPairs = matches
+      .map((match) => ({
+        pci: Number.parseInt(match[1], 10),
+        earfcn: Number.parseInt(match[2], 10),
+      }))
+      .filter(
+        (pair) =>
+          Number.isInteger(pair.pci) && Number.isInteger(pair.earfcn)
+      );
+
+    if (parsedPairs.length > 0) {
+      return parsedPairs;
+    }
+
+    const numbers = payload
+      .split(",")
+      .map((value) => Number.parseInt(value.trim(), 10))
+      .filter((value) => Number.isInteger(value));
+
+    const pairs = [];
+
+    for (let i = 0; i + 1 < numbers.length; i += 2) {
+      pairs.push({ pci: numbers[i], earfcn: numbers[i + 1] });
+    }
+
+    return pairs;
+  };
+
+  const parseNrLocks = (line) => {
+    const payload = extractPayload(line);
+
+    if (!payload || /have not set cell lock before/i.test(payload)) {
+      return [];
+    }
+
+    const matches = [...payload.matchAll(/\((\d+),(\d+),(\d+),(\d+)\)/g)];
+    const parsedLocks = matches
+      .map((match) => ({
+        band: Number.parseInt(match[1], 10),
+        scs: Number.parseInt(match[2], 10),
+        arfcn: Number.parseInt(match[3], 10),
+        pci: Number.parseInt(match[4], 10),
+      }))
+      .filter(
+        (lock) =>
+          Number.isInteger(lock.band) &&
+          Number.isInteger(lock.scs) &&
+          Number.isInteger(lock.arfcn) &&
+          Number.isInteger(lock.pci)
+      );
+
+    if (parsedLocks.length > 0) {
+      return parsedLocks;
+    }
+
+    const numbers = payload
+      .split(",")
+      .map((value) => Number.parseInt(value.trim(), 10))
+      .filter((value) => Number.isInteger(value));
+
+    const locks = [];
+
+    for (let i = 0; i + 3 < numbers.length; i += 4) {
+      locks.push({
+        band: numbers[i],
+        scs: numbers[i + 1],
+        arfcn: numbers[i + 2],
+        pci: numbers[i + 3],
+      });
+    }
+
+    return locks;
+  };
+
+  const describeScs = (value) => {
+    const labels = {
+      0: "15kHz",
+      1: "30kHz",
+      2: "60kHz",
+      3: "120kHz",
+      4: "240kHz",
+    };
+
+    return labels[value] || `SCS ${value}`;
+  };
+
+  const lteLocks = parseLteLocks(
+    lines.find((line) => /LTE_LOCK:/i.test(line)) || ""
   );
-  if (cellLock5GLine) {
-    cellLock5GStatus = cellLock5GLine.split(":")[1].replace(/\"/g, "");
-  }
+
+  const nrLocks = parseNrLocks(
+    lines.find((line) => /NR5G_LOCK:/i.test(line)) || ""
+  );
+
+  const describeLteLock = (locks) => {
+    if (!Array.isArray(locks) || locks.length === 0) {
+      return null;
+    }
+
+    const formatted = locks
+      .map((pair) => `PCI ${pair.pci} / EARFCN ${pair.earfcn}`)
+      .join(" · ");
+
+    return `LTE (${locks.length}): ${formatted}`;
+  };
+
+  const describeNrLock = (locks) => {
+    if (!Array.isArray(locks) || locks.length === 0) {
+      return null;
+    }
+
+    const formatted = locks
+      .map(
+        (lock) =>
+          `Band ${lock.band} (${describeScs(lock.scs)}) / PCI ${lock.pci} / NR-ARFCN ${lock.arfcn}`
+      )
+      .join(" · ");
+
+    return `NR5G-SA (${locks.length}): ${formatted}`;
+  };
+
+  const statusParts = [describeLteLock(lteLocks), describeNrLock(nrLocks)].filter(
+    Boolean
+  );
+
+  const cellLockStatus =
+    statusParts.length > 0 ? statusParts.join(" | ") : "Not Locked";
 
   let prefNetwork = "-";
   let prefNetworkValue = null;
@@ -122,15 +253,6 @@ function parseCurrentSettings(rawdata) {
       .join(", ");
 
     bands = sccBands ? `${pccBands}, ${sccBands}` : pccBands;
-  }
-
-  let cellLockStatus = "Not Locked";
-  if (cellLock4GStatus == 1 && cellLock5GStatus == 1) {
-    cellLockStatus = "Locked to 4G and 5G";
-  } else if (cellLock4GStatus == 1) {
-    cellLockStatus = "Locked to 4G";
-  } else if (cellLock5GStatus == 1) {
-    cellLockStatus = "Locked to 5G";
   }
 
   return {

@@ -432,7 +432,7 @@ function cellLocking() {
     },
     async getCurrentSettings() {
       const atcmd =
-        'AT^SWITCH_SLOT?;+CGCONTRDP=1;+CGDCONT?;^BAND_PREF_EXT?;^CA_INFO?;^SLMODE?';
+        'AT^SWITCH_SLOT?;+CGCONTRDP=1;+CGDCONT?;^BAND_PREF_EXT?;^CA_INFO?;^SLMODE?;^LTE_LOCK?;^NR5G_LOCK?';
 
       const result = await this.sendATcommand(atcmd);
 
