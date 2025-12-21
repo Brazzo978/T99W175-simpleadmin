@@ -93,53 +93,65 @@
                 <div class="card-text">
                   <div class="table-responsive">
                    <table class="table">
-  <tbody>
-    <tr>
-      <th scope="row">Manufacturer</th>
-      <td x-text="manufacturer"></td>
-    </tr>
-    <tr>
-      <th scope="row">Model Name</th>
-      <td x-text="modelName"></td>
-    </tr>
-    <tr>
-      <th scope="row">Firmware version</th>
-      <td class="col-md-2" x-text="firmwareVersion"></td>
-    </tr>
-    <tr>
-      <th scope="row">Phone Number</th>
-      <td class="col-md-2" x-text="phoneNumber"></td>
-    </tr>
-    <tr>
-      <th scope="row">IMSI</th>
-      <td class="col-md-2" x-text="imsi"></td>
-    </tr>
-    <tr>
-      <th scope="row">ICCID</th>
-      <td class="col-md-2" x-text="iccid"></td>
-    </tr>
-    <tr>
-  <th scope="row">IMEI</th>
-  <td class="col-md-2" x-text="imei"></td>
-   </tr>
-    <tr>
-      <th scope="row">LAN IP</th>
-      <td class="col-md-2" x-text="lanIp"></td>
-    </tr>
-    <tr>
-      <th scope="row">WWAN IPv<sup>4</sup></th>
-      <td class="col-md-2" x-text="wwanIpv4"></td>
-    </tr>
-    <tr>
-      <th scope="row">WWAN IPv<sup>6</sup></th>
-      <td class="col-md-2" x-text="wwanIpv6"></td>
-    </tr>
-    <tr>
-      <th scope="row">Simple T99 Version</th>
-      <td class="col-md-2" x-text="simpleAdminVersion"></td>
-    </tr>
-  </tbody>
-</table>
+                    <tbody>
+                      <tr>
+                        <th scope="row">Manufacturer</th>
+                        <td x-text="manufacturer"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Model Name</th>
+                        <td x-text="modelName"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Firmware version</th>
+                        <td class="col-md-2" x-text="firmwareVersion"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Phone Number</th>
+                        <td class="col-md-2" x-text="phoneNumber"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">IMSI</th>
+                        <td class="col-md-2" x-text="imsi"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">ICCID</th>
+                        <td class="col-md-2" x-text="iccid"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">IMEI</th>
+                        <td class="col-md-2">
+                          <span x-text="imei"></span>
+                          <button 
+                            type="button" 
+                            class="btn btn-sm btn-link p-0 ms-2" 
+                            @click="openImeiModal()"
+                            title="Edit IMEI"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="grey" class="bi bi-pencil" viewBox="0 0 16 16">
+                              <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">LAN IP</th>
+                        <td class="col-md-2" x-text="lanIp"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">WWAN IPv<sup>4</sup></th>
+                        <td class="col-md-2" x-text="wwanIpv4"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">WWAN IPv<sup>6</sup></th>
+                        <td class="col-md-2" x-text="wwanIpv6"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Simple T99 Version</th>
+                        <td class="col-md-2" x-text="simpleAdminVersion"></td>
+                      </tr>
+                    </tbody>
+                  </table>
 
                   </div>
                 </div>
@@ -158,8 +170,84 @@
           </div>
         </div>
 
-        <!-- Loading Modal for Reboot -->
-        <div class="modal-overlay" x-show="showModal">
+        <!-- IMEI Edit Modal - Legal Warning -->
+        <div class="modal-overlay" x-show="showImeiWarningModal">
+          <div class="loading-modal" style="max-width: 500px;">
+            <div class="loading-text" style="display: flex; flex-direction: column">
+              <h4 class="text-warning">⚠️ Legal Warning</h4>
+              <p style="margin-top: 1rem; text-align: left;">
+                Changing the IMEI is <strong>only permitted in countries where it is legal</strong>. 
+                In many jurisdictions, modifying the IMEI is <strong>illegal</strong> and may result in criminal penalties.
+              </p>
+              <p style="text-align: left;">
+                By proceeding, you confirm that you are authorized to modify this device's IMEI 
+                and that doing so is legal in your jurisdiction.
+              </p>
+            </div>
+            <div class="d-grid gap-2 d-md-block mt-3">
+              <button
+                class="btn btn-primary"
+                type="button"
+                @click="acceptImeiWarning()"
+              >
+                I Understand - Continue
+              </button>
+              <button
+                class="btn btn-secondary"
+                type="button"
+                @click="closeImeiWarningModal()"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- IMEI Edit Modal - Input -->
+        <div class="modal-overlay" x-show="showImeiInputModal">
+          <div class="loading-modal" style="max-width: 450px;">
+            <div class="loading-text" style="display: flex; flex-direction: column">
+              <h4>Edit IMEI</h4>
+              <p style="margin-top: 0.5rem; text-align: left;">
+                Current IMEI: <strong x-text="imei"></strong>
+              </p>
+              <div class="mb-3 text-start">
+                <label for="newImeiInput" class="form-label">New IMEI (15 digits)</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  id="newImeiInput"
+                  x-model="newImei"
+                  maxlength="15"
+                  pattern="[0-9]{15}"
+                  placeholder="Enter 15 digit IMEI"
+                  @input="validateImeiInput()"
+                />
+                <div class="form-text" x-show="imeiValidationError" x-text="imeiValidationError" style="color: #dc3545;"></div>
+              </div>
+            </div>
+            <div class="d-grid gap-2 d-md-block">
+              <button
+                class="btn btn-danger"
+                type="button"
+                @click="confirmImeiChange()"
+                :disabled="!isImeiValid"
+              >
+                Change IMEI
+              </button>
+              <button
+                class="btn btn-danger"
+                type="button"
+                @click="closeImeiInputModal()"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reboot Modal Confirmation -->
+        <div class="modal-overlay" x-show="showRebootModal">
           <div class="loading-modal">
             <div
               class="loading-text"
@@ -172,14 +260,14 @@
               <button
                 class="btn btn-primary"
                 type="button"
-                @click="updateIMEI()"
+                @click="executeReboot()"
               >
                 Reboot
               </button>
               <button
                 class="btn btn-danger"
                 type="button"
-                @click="closeModal()"
+                @click="closeRebootModal()"
               >
                 Cancel
               </button>
