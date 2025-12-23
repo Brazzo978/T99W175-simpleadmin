@@ -10,6 +10,17 @@ function populateCheckboxes(
   var checkboxesForm = document.getElementById("checkboxForm");
   var networkModeElement = document.getElementById("networkModeBand");
 
+  const dropdown = document.getElementById("networkModeBand");
+  const mode = dropdown ? dropdown.value : "LTE";
+  if (!checkboxForm) return;
+
+  checkboxForm.classList.remove("lte-layout", "nr-layout");
+  if (mode === "LTE") {
+    checkboxForm.classList.add("lte-layout");
+  } else {
+    checkboxForm.classList.add("nr-layout");
+  }
+
   if (!checkboxesForm || !networkModeElement) {
     console.warn(
       "Unable to populate the checkboxes: required elements are missing."

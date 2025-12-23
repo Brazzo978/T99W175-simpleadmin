@@ -7,6 +7,7 @@
     <!-- Import all the bootstrap css files from css folder -->
     <link rel="stylesheet" href="css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/styles.css" />     
+    <link rel="stylesheet" href="css/custom-styles.css" />
 
     <!-- Logo -->
     <link rel="simpleadmin-logo" href="favicon.ico" />
@@ -29,9 +30,8 @@
       <div class="container my-4" x-data="cellLocking()" x-init="init()">
         <nav class="navbar navbar-expand-lg mt-2">
           <div class="container-fluid">
-            <a class="navbar-brand" href="/"
-              ><span class="mb-0 h4">Simple T99</span></a
-            >
+            <a class="navbar-brand" href="/">
+            <span class="mb-0 h4">Simple T99</span></a>
             <button
               class="navbar-toggler"
               type="button"
@@ -40,35 +40,31 @@
               aria-controls="navbarText"
               aria-expanded="false"
               aria-label="Toggle navigation"
-              data-allow-user="true"
-            >
+              data-allow-user="true">
               <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarText">
               <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
                 <li class="nav-item"><a class="nav-link active" href="/radio-settings.html">Radio Settings</a></li>
-                <li class="nav-item"><a class="nav-link" href="/network-settings.html">Network Settings</a></li>
+                <li class="nav-item"><a class="nav-link" href="/settings.html">System Settings</a></li>
                 <li class="nav-item"><a class="nav-link" href="/advanced.html">Advanced</a></li>
                 <li class="nav-item"><a class="nav-link" href="/sms.html">SMS</a></li>
                 <li class="nav-item"><a class="nav-link" href="deviceinfo.html">Device Information</a></li>
                 <li class="nav-item" id="esimNavItem" style="display: none;"><a class="nav-link" href="/esim.html">eSIM</a></li>                
               </ul>
-              <div
-                class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end"
-              >
-                <span
-                  class="badge rounded-pill fw-semibold text-uppercase d-none"
-                  id="navUserRole"
-                ></span>
+              <div class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end" >
+                <span class="badge rounded-pill fw-semibold text-uppercase d-none" id="navUserRole" ></span>
                 <span class="fw-semibold" id="navUserName"></span>
                 <button
-                  class="btn btn-outline-secondary btn-sm"
-                  id="logoutButton"
+                  id="darkModeToggle"
+                  class="btn btn-outline-secondary btn-sm d-flex align-items-center justify-content-center"
                   type="button"
-                >
-                  Logout
-                </button>
+                  data-allow-user="true"
+                  aria-label="Toggle dark mode">
+                  <span id="darkModeIcon">🌙</span>
+                </button>                              
+                <button class="btn btn-outline-secondary btn-sm" id="logoutButton" type="button">Logout</button>
               </div>
             </div>
           </div>
@@ -318,7 +314,7 @@
                   >Leave all options unchecked to enable Auto mode (value 0).</small
                 >
               </div>
-              <div class="card-footer d-flex justify-content-end">
+              <div class="card-footer d-flex justify-content-center">
                 <button
                   type="button"
                   class="btn btn-primary"
@@ -470,14 +466,14 @@
                   </button>
 
                   <div class="mt-4 pt-3 border-top">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
                       <h6 class="mb-0">NR5G Mode</h6>
                       <span class="text-muted" x-text="`Current: ${nr5gMode}`"></span>
                     </div>
-                    <div class="d-flex flex-wrap gap-2">
+                    <div class="d-flex flex-wrap justify-content-between gap-2">
                       <button
                         type="button"
-                        class="btn btn-outline-primary"
+                        class="btn btn-primary"
                         @click="setNr5gMode('NSA')"
                         :disabled="isUpdatingNr5gMode"
                         data-requires-admin
@@ -486,7 +482,7 @@
                       </button>
                       <button
                         type="button"
-                        class="btn btn-outline-primary"
+                        class="btn btn-primary"
                         @click="setNr5gMode('SA')"
                         :disabled="isUpdatingNr5gMode"
                         data-requires-admin
@@ -495,7 +491,7 @@
                       </button>
                       <button
                         type="button"
-                        class="btn btn-outline-danger"
+                        class="btn btn-danger"
                         @click="resetNr5gMode()"
                         :disabled="isUpdatingNr5gMode"
                         data-requires-admin
@@ -531,11 +527,5 @@
         </div>
       </div>
     </main>
-    <footer class="border-top py-3 mt-4">
-      <div class="container d-flex flex-wrap gap-3 justify-content-between align-items-center">
-        <a class="btn btn-outline-secondary btn-sm" href="/credentials.html" data-requires-admin="hide">Credential Management</a>
-        <button class="btn btn-link text-reset" id="darkModeToggle" type="button" data-allow-user="true">Dark Mode</button>
-      </div>
-    </footer>
   </body>
 </html>

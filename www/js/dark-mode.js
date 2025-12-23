@@ -2,32 +2,29 @@
 const darkModeToggle = document.getElementById('darkModeToggle');
 
 if (darkModeToggle) {
-  const toggleDarkMode = () => {
-    const html = document.querySelector('html');
-    const currentTheme = html.getAttribute('data-bs-theme');
+  const html = document.documentElement;
+  const iconSpan = document.getElementById('darkModeIcon');
 
-    if (currentTheme === 'dark') {
-      html.removeAttribute('data-bs-theme');
-      darkModeToggle.textContent = 'Dark Mode';
-      localStorage.setItem('theme', 'light');
-    } else {
+  const applyTheme = (theme) => {
+    if (theme === 'dark') {
       html.setAttribute('data-bs-theme', 'dark');
-      darkModeToggle.textContent = 'Light Mode';
-      localStorage.setItem('theme', 'dark');
+      if (iconSpan) iconSpan.textContent = '🌙';   // dark = luna
+    } else {
+      html.removeAttribute('data-bs-theme');       // light = default
+      if (iconSpan) iconSpan.textContent = '☀️';   // light = sole
     }
+    localStorage.setItem('theme', theme);
   };
 
-  const storedTheme = localStorage.getItem('theme');
-  const html = document.querySelector('html');
+  const toggleDarkMode = () => {
+    const currentTheme = html.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+  };
 
-  if (storedTheme) {
-    html.setAttribute('data-bs-theme', storedTheme);
-    darkModeToggle.textContent = storedTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
-  } else {
-    html.setAttribute('data-bs-theme', 'dark');
-    darkModeToggle.textContent = 'Light Mode';
-    localStorage.setItem('theme', 'dark');
-  }
+  // init da localStorage (default: dark)
+  const storedTheme = localStorage.getItem('theme') || 'dark';
+  applyTheme(storedTheme);
 
   darkModeToggle.addEventListener('click', toggleDarkMode);
 }
