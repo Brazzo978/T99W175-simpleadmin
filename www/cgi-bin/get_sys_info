@@ -27,14 +27,18 @@ fi
 # "up 18:16," (hours:minutes)
 # "up 4 days, 20:25," (days + hours:minutes)
 # "up 2 min," (only minutes)
-# "up 2 min,  load average..." (only minutes)
+# "up 1 day," (only days - no time shown)
 
-if [[ $uptime_output =~ up\ ([0-9]+):([0-9]+),? ]]; then
-    # Format: hours:minutes
+# First try to match "days, HH:MM" pattern
+if [[ $uptime_output =~ days,\ ([0-9]+):([0-9]+) ]]; then
     hours=$((10#${BASH_REMATCH[1]}))
     minutes=$((10#${BASH_REMATCH[2]}))
+# Then try "up HH:MM" pattern (no days) - match after "up "
+elif [[ $uptime_output =~ up\ ([0-9]+):([0-9]+) ]]; then
+    hours=$((10#${BASH_REMATCH[1]}))
+    minutes=$((10#${BASH_REMATCH[2]}))
+# Then try "up X min" pattern
 elif [[ $uptime_output =~ up\ ([0-9]+)\ min ]]; then
-    # Format: only minutes
     minutes=$((10#${BASH_REMATCH[1]}))
 fi
 
