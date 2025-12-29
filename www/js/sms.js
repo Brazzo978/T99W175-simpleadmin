@@ -82,7 +82,6 @@ return {
     this.senders = [];
     this.messages = [];
     let match;
-    let lastIndex = null;
     while ((match = cmglRegex.exec(data)) !== null) {
       const index = parseInt(match[1]);
       const senderHex = match[2];
@@ -111,17 +110,10 @@ return {
       const messageRaw = data.substring(startIndex, endIndex).trim();
       const messageHex = this.extractHexPayload(messageRaw);
       const message = messageHex ? this.decodeHexToText(messageHex) : messageRaw;
-      if (lastIndex !== null && this.messages[lastIndex].sender === sender && (date - this.messages[lastIndex].date) / 1000 <= 1) {
-        this.messages[lastIndex].text += " " + message;
-        this.messages[lastIndex].indices.push(index);
-        this.dates[lastIndex] = this.formatDate(date);
-      } else {
-        this.messageIndices.push([index]);
-        this.senders.push(sender);
-        this.dates.push(this.formatDate(date));
-        this.messages.push({ text: message, sender: sender, date: date, indices: [index] });
-        lastIndex = this.messages.length - 1;
-      }
+      this.messageIndices.push([index]);
+      this.senders.push(sender);
+      this.dates.push(this.formatDate(date));
+      this.messages.push({ text: message, sender: sender, date: date, indices: [index] });
     }
     while ((match = cscaRegex.exec(data)) !== null) {
       const serviceCenterHex = match[1];
