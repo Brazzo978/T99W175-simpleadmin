@@ -213,7 +213,7 @@ return {
       }
       // SIM is ready, execute full command set
       this.atcmd =
-        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;';
+        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;+COPS?;';
 
       const result = await ATCommandService.execute(this.atcmd, {
         retries: 3,
@@ -661,29 +661,39 @@ return {
             this.activeSim = "No SIM";
           }
           // --- Network Provider & MCCMNC ---
+          // Helper function to remove consecutive duplicate words
+          const removeConsecutiveDuplicates = (str) => {
+            return str.replace(/(.+)(\s+\1)+/gi, '$1').trim();
+          };
+
+          // Try to get operator name from +COPS? first
+          const copsLine = lines.find((line) => line.includes("+COPS:"));
+          if (copsLine) {
+            // Format: +COPS: mode,format,"operator_name",act
+            const copsMatch = copsLine.match(/\+COPS:\s*\d+,\d+,"([^"]*)"/);
+            if (copsMatch && copsMatch[1]) {
+              let operatorName = copsMatch[1].trim();
+              // Remove consecutive duplicates like "BetterRoaming BetterRoaming"
+              operatorName = removeConsecutiveDuplicates(operatorName);
+              this.networkProvider = operatorName || "Unknown";
+            } else {
+              this.networkProvider = "Unknown";
+            }
+          } else {
+            this.networkProvider = "Unknown";
+          }
+
+          // Still extract MCCMNC code from debug output for reference
           const mccLine = lines.find((line) => line.includes("mcc:"));
           if (mccLine) {
             const mccMatch = mccLine.match(/mcc:\s*(\d+)/i);
             const mncMatch = mccLine.match(/mnc:\s*(\d+)/i);
-            const mccmncCode =
+            this.mccmnc =
               mccMatch && mncMatch
                 ? `${mccMatch[1]}${mncMatch[1].padStart(2, "0")}`
-                : mccLine.replace(/\D/g, "");
-
-            const networkProviderMap = {
-              ...italianNetworkProviders,
-              "46000": "China Mobile",
-              "46001": "China Unicom",
-              "46011": "China Telecom",
-            };
-
-            this.mccmnc = mccmncCode || "Unknown";
-            this.networkProvider =
-              networkProviderMap[mccmncCode] ||
-              (mccmncCode ? mccmncCode : "Unknown");
+                : mccLine.replace(/\D/g, "") || "Unknown";
           } else {
             this.mccmnc = "Unknown";
-            this.networkProvider = "Unknown";
           }
           // --- APN ---
           // find this example value from lines "+CGCONTRDP: 1,0,\"internet.dito.ph\",\"100.65.141.236\",\"36.5.141.64.76.204.39.68.23.210.251.16.49.239.42.149\", \"254.128.0.0.0.0.0.0.0.0.0.0.0.0.0.1\",\"131.226.72.19\",\"131.226.73.19\"\r"
