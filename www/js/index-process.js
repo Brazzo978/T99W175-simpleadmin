@@ -88,6 +88,15 @@ const defaultDataState = {
   uploadStat: "0",
   detailedSignals: [],
   intervalId: null,
+  phoneNumber: "Unknown",
+  imsi: "Unknown",
+  iccid: "Unknown",
+  paTemperature: "Unknown",
+  skinTemperature: "Unknown",
+  connectionDetails: {
+    ping: null,
+    dns: null
+  },
 };
 
 return {
@@ -213,7 +222,7 @@ return {
       }
       // SIM is ready, execute full command set
       this.atcmd =
-        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;+COPS?;';
+        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;+COPS?;+CIMI;+ICCID;+CNUM;';
 
       const result = await ATCommandService.execute(this.atcmd, {
         retries: 3,
@@ -635,6 +644,26 @@ return {
               .find((line) => line.includes('TSENS:'))
               .split(",")[1]
               .replace(/"/g, "");
+          }
+
+          // --- PA Temperature ---
+          try {
+            const paLine = lines.find((line) => line.trim().startsWith('PA:'));
+            if (paLine) {
+              this.paTemperature = paLine.split(':')[1].trim() || 'Unknown';
+            }
+          } catch (error) {
+            this.paTemperature = 'Unknown';
+          }
+
+          // --- Skin Temperature ---
+          try {
+            const skinLine = lines.find((line) => line.trim().startsWith('Skin Sensor:'));
+            if (skinLine) {
+              this.skinTemperature = skinLine.split(':')[1].trim() || 'Unknown';
+            }
+          } catch (error) {
+            this.skinTemperature = 'Unknown';
           }
           // --- SIM Status ---
           const sim_status = lines
@@ -1269,6 +1298,35 @@ return {
           } else {
             this.signalAssessment = "No Signal";
           }
+
+          // Parse SIM info: IMSI, ICCID, Phone Number
+          for (const line of lines) {
+            const trimmed = line.trim();
+
+            // Parse IMSI (15 digits)
+            if (/^\d{15}$/.test(trimmed)) {
+              this.imsi = trimmed;
+            }
+
+            // Parse ICCID
+            if (trimmed.startsWith('ICCID:')) {
+              this.iccid = trimmed.replace('ICCID:', '').trim();
+            } else if (trimmed.startsWith('+ICCID:')) {
+              const parts = trimmed.split(':');
+              if (parts[1]) {
+                this.iccid = parts[1].replace(/"/g, '').trim();
+              }
+            }
+
+            // Parse phone number
+            if (trimmed.includes('+CNUM:')) {
+              const match = trimmed.match(/,"?(\+?\d+)"?/);
+              if (match && match[1]) {
+                this.phoneNumber = match[1];
+              }
+            }
+          }
+
         this.lastUpdate = new Date().toLocaleString();
       } catch (parseError) {
         console.error("Error while parsing the AT response", parseError);
@@ -1291,17 +1349,34 @@ return {
   },
 
   requestPing() {
-    return fetch("/cgi-bin/get_ping")
+    // Create timeout controller (10 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    return fetch("/cgi-bin/get_ping", { signal: controller.signal })
       .then((response) => {
+        clearTimeout(timeoutId);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
       })
       .then((data) => {
+        // Save detailed connection data for the modal
+        if (data.ping && data.dns) {
+          this.connectionDetails = {
+            ping: data.ping,
+            dns: data.dns
+          };
+        }
         return data;
       })
       .catch((error) => {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          console.error("Ping request timeout");
+          throw new Error('Request timeout');
+        }
         console.error("Error:", error);
         throw error;
       });
@@ -1462,6 +1537,41 @@ return {
     }
   },
 
+  // Get temperature icon container class based on temperature value
+  getTempIconClass() {
+    const tempValue = parseInt(this.temperature) || 0;
+    if (tempValue >= 0 && tempValue <= 40) {
+      return 'icon-container icon-temp temp-good';
+    } else if (tempValue >= 41 && tempValue <= 50) {
+      return 'icon-container icon-temp temp-warning';
+    } else {
+      return 'icon-container icon-temp temp-danger';
+    }
+  },
+
+  // Get signal icon container class based on signal percentage
+  getSignalIconClass() {
+    const signalValue = parseInt(this.signalPercentage) || 0;
+    if (signalValue <= 45) {
+      return 'icon-container icon-signal signal-poor';
+    } else if (signalValue >= 46 && signalValue <= 50) {
+      return 'icon-container icon-signal signal-fair';
+    } else {
+      return 'icon-container icon-signal signal-good';
+    }
+  },
+
+  // Get cloud icon class based on connection status
+  getConnectionIconClass() {
+    if (this.internetConnectionStatus === 'Connected') {
+      return 'icon-container icon-cloud connection-connected';
+    } else if (this.internetConnectionStatus === 'Partial') {
+      return 'icon-container icon-cloud connection-warning';
+    } else {
+      return 'icon-container icon-cloud connection-disconnected';
+    }
+  },
+
  fetchSysInfo() {
   fetch("/cgi-bin/get_sys_info")
     .then((response) => {
@@ -1570,8 +1680,10 @@ return {
 
     this.requestPing()
       .then((data) => {
-        if (data.connected === true || data.status === 'ok') {
+        if (data.status === 'ok') {
           this.internetConnectionStatus = "Connected";
+        } else if (data.status === 'warning') {
+          this.internetConnectionStatus = "Partial";
         } else {
           this.internetConnectionStatus = "Disconnected";
         }
@@ -1591,8 +1703,10 @@ return {
 
       this.requestPing()
         .then((data) => {
-          if (data.connected === true || data.status === 'ok') {
+          if (data.status === 'ok') {
             this.internetConnectionStatus = "Connected";
+          } else if (data.status === 'warning') {
+            this.internetConnectionStatus = "Partial";
           } else {
             this.internetConnectionStatus = "Disconnected";
           }

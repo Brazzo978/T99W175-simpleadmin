@@ -38,7 +38,8 @@
               class="btn btn-blink d-lg-none"
               type="button"
               aria-label="Toggle dark mode">
-              <span class="darkModeIcon">🌙</span>
+              <svg class="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              <svg class="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </button>
             <!-- Hamburger -->
             <button
@@ -51,39 +52,102 @@
               aria-label="Toggle navigation">
               <span class="navbar-toggler-icon"></span>
             </button>
-            <!-- Logout MOBILE -->
-            <button
-              class="btn btn-outline-secondary btn-sm d-lg-none"
-              id="logoutButtonMobile"
-              type="button"
-              aria-label="Logout">
-              Logout
-            </button>                    
           </div>
           <!-- COLLAPSABLE MENU -->
-          <div class="collapse navbar-collapse" id="navbarText">
+          <div class="collapse navbar-collapse order-lg-2" id="navbarText">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-              <li class="nav-item"><a class="nav-link active" href="/">Home</a></li>
-              <li class="nav-item" data-role-access="admin"><a class="nav-link" href="/radio-settings.html">Radio Settings</a></li>
-              <li class="nav-item" data-role-access="admin"><a class="nav-link" href="/settings.html">System Settings</a></li>
-              <li class="nav-item" data-role-access="admin"><a class="nav-link" href="/advanced.html">Advanced</a></li>
-              <li class="nav-item"><a class="nav-link" href="/sms.html">SMS</a></li>
-              <li class="nav-item"><a class="nav-link" href="/deviceinfo.html">Device Information</a></li>
-              <li class="nav-item" id="esimNavItem" style="display: none;" data-role-access="admin"><a class="nav-link" href="/esim.html">eSIM</a></li>                    
+              <li class="nav-item">
+                <a class="nav-link active" href="/">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  Home
+                </a>
+              </li>
+              <li class="nav-item dropdown" data-role-access="admin">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6"/>
+                    <path d="m1 12h6m6 0h6"/>
+                  </svg>
+                  Configuration
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="/radio-settings.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+                    Radio Settings
+                  </a></li>
+                  <li><a class="dropdown-item" href="/settings.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    System Settings
+                  </a></li>
+                  <li><a class="dropdown-item" href="/advanced.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    Advanced
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="/credentials.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Users
+                  </a></li>
+                  <li><a class="dropdown-item" href="/esim.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                    eSIM
+                  </a></li>
+                </ul>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/sms.html">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  SMS
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/deviceinfo.html">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                  </svg>
+                  Device Info
+                </a>
+              </li>
+              <li class="nav-item d-lg-none">
+                <a href="#" class="nav-link logout-link" id="logoutButton">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  Logout
+                </a>
+              </li>
             </ul>
             <!-- DESKTOP RIGHT SIDE -->
             <div class="navbar-text d-none d-lg-flex align-items-center gap-3">
-              <span class="badge rounded-pill bg-danger fw-semibold text-uppercase" id="navUserRole"></span>
-              <span class="fw-semibold" id="navUserName"></span>
-              <button class="btn btn-outline-secondary" id="logoutButton">Logout</button>
+              <div class="navbar-user-section">
+                <div class="navbar-user-avatar" id="userAvatar">A</div>
+                <span class="navbar-user-name" id="navUserName"></span>
+              </div>
               <!-- Dark mode DESKTOP -->
               <button
                 id="darkModeToggleDesktop"
                 class="btn btn-blink btn-sm"
                 type="button"
                 aria-label="Toggle dark mode">
-                <span class="darkModeIcon">🌙</span>
+                <svg class="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg class="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
               </button>
+              <!-- Logout DESKTOP -->
+              <a href="#" class="logout-link" id="logoutButtonDesktop">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              </a>
             </div>
           </div>
         </div>
@@ -92,9 +156,9 @@
         <div class="row mt-5 g-3">
           <!-- Temperature Card -->
           <div class="col-6 col-lg-3">
-            <div class="card">
+            <div class="card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#temperatureModal">
               <div class="card-body d-flex flex-column align-items-center justify-content-center">
-                <div class="icon-container icon-temp">
+                <div :class="getTempIconClass()">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="45" height="45">
                     <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>
                   </svg>
@@ -107,7 +171,7 @@
 
           <!-- SIM Status Card -->
           <div class="col-6 col-lg-3">
-            <div class="card">
+            <div class="card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#simInfoModal">
               <div class="card-body d-flex flex-column align-items-center justify-content-center">
                 <div class="icon-container icon-sim">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 25" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="45" height="45">
@@ -123,9 +187,9 @@
 
           <!-- Signal Percentage Card -->
           <div class="col-6 col-lg-3">
-            <div class="card">
+            <div class="card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#advancedSignalModal">
               <div class="card-body d-flex flex-column align-items-center justify-content-center">
-                <div class="icon-container icon-signal">
+                <div :class="getSignalIconClass()">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="45" height="45">
                     <path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16"/>
                   </svg>
@@ -138,9 +202,9 @@
 
           <!-- Internet Connection Card -->
           <div class="col-6 col-lg-3">
-            <div class="card">
+            <div class="card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#connectionModal">
               <div class="card-body d-flex flex-column align-items-center justify-content-center">
-                <div class="icon-container icon-cloud">
+                <div :class="getConnectionIconClass()">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="45" height="45">
                     <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
                   </svg>
@@ -205,7 +269,7 @@
                             }
                           }"
                         >
-                          <div class="progress w-100" role="progressbar" aria-label="CPU usage" aria-valuemin="0" aria-valuemax="100" style="height: 18px">
+                          <div class="progress w-100" role="progressbar" aria-label="CPU usage" aria-valuemin="0" aria-valuemax="100" style="height: 24px">
                             <div
                               :class="getCpuProgressBarClass()"
                               :style="'width: ' + cpuUsage + '%'"
@@ -232,7 +296,7 @@
                             }
                           }"
                         >
-                          <div class="progress w-100" role="progressbar" aria-label="Memory usage" aria-valuemin="0" aria-valuemax="100" style="height: 18px">
+                          <div class="progress w-100" role="progressbar" aria-label="Memory usage" aria-valuemin="0" aria-valuemax="100" style="height: 24px">
                             <div
                               :class="getMemProgressBarClass()"
                               :style="'width: ' + memPercent + '%'"
@@ -249,8 +313,8 @@
                           <template x-if="systemDuplex !== 'Unknown' && systemDuplex !== ''">
                             <span class="ms-2">
                               <span class="badge" :class="{
-                                'bg-success': systemDuplex === 'Full',
-                                'bg-warning': systemDuplex === 'Half'
+                                'badge-success-modern': systemDuplex === 'Full',
+                                'badge-warning-modern': systemDuplex === 'Half'
                               }" x-text="systemDuplex + ' Duplex'"></span>
                             </span>
                           </template>
@@ -368,7 +432,7 @@
                             :aria-valuenow="rsrqLTEPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
@@ -415,7 +479,7 @@
                             :aria-valuenow="rsrpLTEPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
@@ -461,7 +525,7 @@
                             :aria-valuenow="rssiLTEPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
@@ -508,7 +572,7 @@
                             :aria-valuenow="sinrLTEPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
@@ -552,7 +616,7 @@
                             :aria-valuenow="rsrqNRPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
@@ -599,7 +663,7 @@
                             :aria-valuenow="rsrpNRPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
@@ -645,7 +709,7 @@
                             :aria-valuenow="rssiNRPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
@@ -692,7 +756,7 @@
                             :aria-valuenow="sinrNRPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
@@ -720,7 +784,7 @@
           </div>
         </div>
 
-        <div class="row mt-4">
+        <div class="row mt-4" style="display: none;">
           <div class="col-12">
             <div class="card">
               <div
@@ -784,7 +848,7 @@
                             <template x-if="metric.percentage > 0">
                               <div
                                 class="progress"
-                                style="height: 18px"
+                                style="height: 24px"
                                 role="progressbar"
                                 aria-valuemin="0"
                                 aria-valuemax="100"
@@ -820,7 +884,7 @@
                               <template x-if="antenna.percentage > 0">
                                 <div
                                   class="progress"
-                                  style="height: 12px"
+                                  style="height: 20px"
                                   role="progressbar"
                                   aria-valuemin="0"
                                   aria-valuemax="100"
@@ -843,6 +907,307 @@
                     </div>
                   </template>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Temperature Modal -->
+        <div class="modal fade" id="temperatureModal" tabindex="-1" aria-labelledby="temperatureModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="temperatureModalLabel">Temperature Sensors</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="card-text table-responsive-sm">
+                  <table class="table">
+                    <tbody>
+                      <tr>
+                        <th scope="row">Main Sensor (TSENS)</th>
+                        <td x-text="temperature"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">PA Temperature</th>
+                        <td x-text="paTemperature"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Skin Temperature</th>
+                        <td x-text="skinTemperature"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SIM Info Modal -->
+        <div class="modal fade" id="simInfoModal" tabindex="-1" aria-labelledby="simInfoModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="simInfoModalLabel">SIM Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="card-text table-responsive-sm">
+                  <table class="table">
+                    <tbody>
+                      <tr>
+                        <th scope="row">Phone Number</th>
+                        <td x-text="phoneNumber"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">IMSI</th>
+                        <td x-text="imsi"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">ICCID</th>
+                        <td x-text="iccid"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Signal Modal -->
+        <div class="modal fade" id="advancedSignalModal" tabindex="-1" aria-labelledby="advancedSignalModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="advancedSignalModalLabel">Advanced Signal Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <template x-if="detailedSignals.length === 0">
+                  <p class="mb-0 text-muted">
+                    No advanced details available.
+                  </p>
+                </template>
+
+                <template x-for="(entry, index) in detailedSignals" :key="entry.id ?? index">
+                  <div
+                    class="mb-4 pb-3 border-bottom"
+                    :class="{ 'border-0 pb-0 mb-0': index === detailedSignals.length - 1 }"
+                  >
+                    <div
+                      class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-2"
+                    >
+                      <div>
+                        <h5 class="mb-1" x-text="entry.title"></h5>
+                        <p class="mb-0 text-muted">
+                          <span x-text="'Technology: ' + entry.technology"></span>
+                          <span class="ms-3" x-text="'Band: ' + entry.bandDisplay"></span>
+                        </p>
+                      </div>
+                      <div class="text-md-end text-muted small">
+                        <div x-text="'PCI: ' + entry.pciDisplay"></div>
+                        <div x-text="'Channel: ' + entry.channelDisplay"></div>
+                      </div>
+                    </div>
+
+                    <div class="row small text-muted mt-2">
+                      <div class="col-md-6">
+                        <p class="mb-1" x-text="'Bandwidth: ' + entry.bandwidthDisplay"></p>
+                      </div>
+                      <div class="col-md-6 text-md-end" x-show="entry.rxDiversityDisplay">
+                        <p class="mb-1" x-text="'RX Diversity: ' + entry.rxDiversityDisplay"></p>
+                      </div>
+                    </div>
+
+                    <div class="mt-3">
+                      <template x-for="metric in entry.metrics" :key="metric.key">
+                        <div class="mb-3">
+                          <div class="d-flex justify-content-between">
+                            <span class="fw-semibold" x-text="metric.label"></span>
+                            <span x-text="metric.display"></span>
+                          </div>
+                          <template x-if="metric.percentage > 0">
+                            <div
+                              class="progress"
+                              style="height: 24px"
+                              role="progressbar"
+                              aria-valuemin="0"
+                              aria-valuemax="100"
+                              :aria-valuenow="metric.percentage"
+                            >
+                              <div
+                                class="progress-bar"
+                                :class="getProgressBarClass(metric.percentage)"
+                                :style="'width: ' + metric.percentage + '%'"
+                              >
+                                <span
+                                  x-text="metric.display + ' / ' + metric.percentage + '%'"
+                                ></span>
+                              </div>
+                            </div>
+                          </template>
+                          <template x-if="metric.percentage === 0">
+                            <span class="fst-italic text-muted">Value not available</span>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+
+                    <template x-if="entry.antennas && entry.antennas.length">
+                      <div class="mt-3">
+                        <h6 class="fw-semibold">RSRP per Antenna</h6>
+                        <template x-for="antenna in entry.antennas" :key="antenna.label">
+                          <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                              <span x-text="antenna.label"></span>
+                              <span x-text="antenna.display"></span>
+                            </div>
+                            <template x-if="antenna.percentage > 0">
+                              <div
+                                class="progress"
+                                style="height: 20px"
+                                role="progressbar"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                :aria-valuenow="antenna.percentage"
+                              >
+                                <div
+                                  class="progress-bar"
+                                  :class="getProgressBarClass(antenna.percentage)"
+                                  :style="'width: ' + antenna.percentage + '%'"
+                                ></div>
+                              </div>
+                            </template>
+                            <template x-if="antenna.percentage === 0">
+                              <span class="fst-italic text-muted">Value not available</span>
+                            </template>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connection Details Modal -->
+        <div class="modal fade" id="connectionModal" tabindex="-1" aria-labelledby="connectionModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="connectionModalLabel">Connection Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="card-text">
+                  <!-- Ping Status -->
+                  <h6 class="fw-semibold mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="22" y1="12" x2="18" y2="12"/>
+                      <line x1="6" y1="12" x2="2" y2="12"/>
+                      <line x1="12" y1="6" x2="12" y2="2"/>
+                      <line x1="12" y1="22" x2="12" y2="18"/>
+                    </svg>
+                    Ping Test
+                  </h6>
+                  <div class="mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                      <span class="text-muted">Status:</span>
+                      <span>
+                        <span class="badge" :class="{
+                          'badge-success-modern': connectionDetails.ping && connectionDetails.ping.passed === connectionDetails.ping.total,
+                          'badge-warning-modern': connectionDetails.ping && connectionDetails.ping.passed > 0 && connectionDetails.ping.passed < connectionDetails.ping.total,
+                          'bg-danger': connectionDetails.ping && connectionDetails.ping.passed === 0
+                        }" x-text="connectionDetails.ping ? connectionDetails.ping.passed + '/' + connectionDetails.ping.total + ' Passed' : 'Loading...'"></span>
+                      </span>
+                    </div>
+                    <template x-if="connectionDetails.ping && connectionDetails.ping.results">
+                      <div class="table-responsive">
+                        <table class="table table-sm">
+                          <thead>
+                            <tr>
+                              <th>Host</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <template x-for="result in connectionDetails.ping.results" :key="result.host">
+                              <tr>
+                                <td x-text="result.host"></td>
+                                <td>
+                                  <span class="badge" :class="result.status === 'ok' ? 'badge-success-modern' : 'bg-danger'" x-text="result.status === 'ok' ? '✓ OK' : '✗ Failed'"></span>
+                                </td>
+                              </tr>
+                            </template>
+                          </tbody>
+                        </table>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- DNS Status -->
+                  <h6 class="fw-semibold mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+                      <path d="M2 12h20"/>
+                    </svg>
+                    DNS Resolution
+                  </h6>
+                  <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                      <span class="text-muted">Status:</span>
+                      <span>
+                        <span class="badge" :class="{
+                          'badge-success-modern': connectionDetails.dns && connectionDetails.dns.passed === connectionDetails.dns.total,
+                          'badge-warning-modern': connectionDetails.dns && connectionDetails.dns.passed > 0 && connectionDetails.dns.passed < connectionDetails.dns.total,
+                          'bg-danger': connectionDetails.dns && connectionDetails.dns.passed === 0
+                        }" x-text="connectionDetails.dns ? connectionDetails.dns.passed + '/' + connectionDetails.dns.total + ' Passed' : 'Loading...'"></span>
+                      </span>
+                    </div>
+                    <template x-if="connectionDetails.dns && connectionDetails.dns.results">
+                      <div class="table-responsive">
+                        <table class="table table-sm">
+                          <thead>
+                            <tr>
+                              <th>Server</th>
+                              <th>Domain</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <template x-for="result in connectionDetails.dns.results" :key="result.server">
+                              <tr>
+                                <td x-text="result.server"></td>
+                                <td x-text="result.domain"></td>
+                                <td>
+                                  <span class="badge" :class="result.status === 'ok' ? 'badge-success-modern' : 'bg-danger'" x-text="result.status === 'ok' ? '✓ OK' : '✗ Failed'"></span>
+                                </td>
+                              </tr>
+                            </template>
+                          </tbody>
+                        </table>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
               </div>
             </div>
           </div>

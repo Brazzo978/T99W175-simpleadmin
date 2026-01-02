@@ -10,9 +10,86 @@ if ! session_load; then
     exit 0
 fi
 
-# Run ping against each target address
-if ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
-    send_json_response 200 '{"status":"ok","connected":true}'
-else
-    send_json_response 200 '{"status":"error","connected":false}'
+# Load configuration from simpleadmin.conf
+CONFIG_FILE="$SCRIPT_DIR/../config/simpleadmin.conf"
+if [ -f "$CONFIG_FILE" ]; then
+    . "$CONFIG_FILE"
 fi
+
+# Use configured values or defaults
+PING_TARGETS="${SIMPLEADMIN_PING_TARGETS:-8.8.8.8,1.1.1.1}"
+DNS_TESTS="${SIMPLEADMIN_DNS_TESTS:-8.8.8.8:www.google.com,1.1.1.1:www.google.com}"
+
+# Test ping connectivity
+ping_results=()
+ping_count=0
+
+IFS=',' read -ra TARGETS <<< "$PING_TARGETS"
+for target in "${TARGETS[@]}"; do
+    target=$(echo "$target" | xargs) # trim whitespace
+    if ping -c 1 -W 1 "$target" >/dev/null 2>&1; then
+        ping_results+=("{\"host\":\"$target\",\"status\":\"ok\"}")
+        ping_count=$((ping_count + 1))
+    else
+        ping_results+=("{\"host\":\"$target\",\"status\":\"failed\"}")
+    fi
+done
+
+# Test DNS resolution
+dns_results=()
+dns_count=0
+
+IFS=',' read -ra DNS_ARRAY <<< "$DNS_TESTS"
+for dns_test in "${DNS_ARRAY[@]}"; do
+    dns_test=$(echo "$dns_test" | xargs) # trim whitespace
+    server="${dns_test%%:*}"
+    domain="${dns_test#*:}"
+
+    # Test with 2 second timeout using dig's built-in timeout parameter
+    if dig @"$server" +timeout=2 +short "$domain" >/dev/null 2>&1; then
+        dns_results+=("{\"server\":\"$server\",\"domain\":\"$domain\",\"status\":\"ok\"}")
+        dns_count=$((dns_count + 1))
+    else
+        dns_results+=("{\"server\":\"$server\",\"domain\":\"$domain\",\"status\":\"failed\"}")
+    fi
+done
+
+# Build JSON arrays
+ping_json=$(IFS=,; echo "${ping_results[*]}")
+dns_json=$(IFS=,; echo "${dns_results[*]}")
+
+# Calculate totals
+total_targets=${#TARGETS[@]}
+total_dns=${#DNS_ARRAY[@]}
+total_tests=$((ping_count + dns_count))
+max_tests=$((total_targets + total_dns))
+
+# Determine connectivity status
+if [ "$total_tests" -eq "$max_tests" ]; then
+    # All connectivity checks passed
+    status="ok"
+elif [ "$total_tests" -gt 0 ]; then
+    # Partial connectivity - some tests passed
+    status="warning"
+else
+    # No connectivity at all
+    status="error"
+fi
+
+# Build response JSON
+response="{
+  \"status\": \"$status\",
+  \"connected\": $([ "$status" != "error" ] && echo "true" || echo "false"),
+  \"ping\": {
+    \"total\": $total_targets,
+    \"passed\": $ping_count,
+    \"results\": [$ping_json]
+  },
+  \"dns\": {
+    \"total\": $total_dns,
+    \"passed\": $dns_count,
+    \"results\": [$dns_json]
+  }
+}"
+
+send_json_response 200 "$response"

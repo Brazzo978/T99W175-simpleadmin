@@ -30,6 +30,13 @@ function registerNetworkSettings() {
       dayOfMonth: 1,
       time: "00:00",
     },
+    connectionConfigSaving: false,
+    connectionConfigSuccessMessage: "",
+    connectionConfigErrorMessage: "",
+    connectionConfigForm: {
+      pingTargets: "",
+      dnsTests: "",
+    },
     currentTtlSettings: {
       enabled: false,
       value: 0,
@@ -60,6 +67,7 @@ function registerNetworkSettings() {
       await this.fetchConfiguration();
       await this.fetchTtlSettings();
       await this.loadRebootSchedule();
+      await this.fetchConnectionConfig();
     },
     resetMessages() {
       this.successMessage = "";
@@ -732,6 +740,58 @@ function registerNetworkSettings() {
           error && error.message
             ? `Configuration saved but the modem restart failed: ${error.message}`
             : "Configuration saved but the modem restart failed.";
+      }
+    },
+    async fetchConnectionConfig() {
+      try {
+        const response = await fetch("/cgi-bin/get_connection_config");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        this.connectionConfigForm.pingTargets = data.pingTargets || "";
+        this.connectionConfigForm.dnsTests = data.dnsTests || "";
+      } catch (error) {
+        console.error("Error loading connection config:", error);
+        // Set defaults on error
+        this.connectionConfigForm.pingTargets = "8.8.8.8,1.1.1.1";
+        this.connectionConfigForm.dnsTests = "8.8.8.8:www.google.com,1.1.1.1:www.google.com";
+      }
+    },
+    async saveConnectionConfig() {
+      this.connectionConfigSaving = true;
+      this.connectionConfigSuccessMessage = "";
+      this.connectionConfigErrorMessage = "";
+
+      try {
+        const response = await fetch("/cgi-bin/set_connection_config", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            pingTargets: this.connectionConfigForm.pingTargets,
+            dnsTests: this.connectionConfigForm.dnsTests,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.status === "success") {
+          this.connectionConfigSuccessMessage = "Connection monitoring configuration saved successfully!";
+        } else {
+          this.connectionConfigErrorMessage = result.message || "Failed to save configuration";
+        }
+      } catch (error) {
+        console.error("Error saving connection config:", error);
+        this.connectionConfigErrorMessage =
+          error && error.message ? error.message : "Failed to save configuration";
+      } finally {
+        this.connectionConfigSaving = false;
       }
     },
   }));

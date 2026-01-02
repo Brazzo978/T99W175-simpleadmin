@@ -10,37 +10,20 @@ if ! session_load; then
     exit 0
 fi
 
-# Execute the uptime command and parse the result
+# Execute the uptime command for raw display
 uptime_output=$(uptime)
 
-# Parse uptime components
-days=0
-hours=0
-minutes=0
+# Calculate uptime from /proc/uptime (much more reliable than parsing)
+# /proc/uptime contains seconds.idle since boot
+read uptime_seconds uptime_idle < /proc/uptime
 
-# Extract days (e.g., "3 days", "1 day")
-if [[ $uptime_output =~ ([0-9]+)\ day ]]; then
-    days=${BASH_REMATCH[1]}
-fi
+# Convert to integer (truncate decimal)
+uptime_seconds=${uptime_seconds%.*}
 
-# Extract time from uptime - multiple formats:
-# "up 18:16," (hours:minutes)
-# "up 4 days, 20:25," (days + hours:minutes)
-# "up 2 min," (only minutes)
-# "up 1 day," (only days - no time shown)
-
-# First try to match "days, HH:MM" pattern
-if [[ $uptime_output =~ days,\ ([0-9]+):([0-9]+) ]]; then
-    hours=$((10#${BASH_REMATCH[1]}))
-    minutes=$((10#${BASH_REMATCH[2]}))
-# Then try "up HH:MM" pattern (no days) - match after "up "
-elif [[ $uptime_output =~ up\ ([0-9]+):([0-9]+) ]]; then
-    hours=$((10#${BASH_REMATCH[1]}))
-    minutes=$((10#${BASH_REMATCH[2]}))
-# Then try "up X min" pattern
-elif [[ $uptime_output =~ up\ ([0-9]+)\ min ]]; then
-    minutes=$((10#${BASH_REMATCH[1]}))
-fi
+# Convert seconds to days, hours, minutes
+days=$((uptime_seconds / 86400))
+hours=$(((uptime_seconds % 86400) / 3600))
+minutes=$(((uptime_seconds % 3600) / 60))
 
 # Get CPU usage from /proc/stat (delta method - most accurate)
 # We need two samples 1 second apart, so we save state in a temp file

@@ -96,9 +96,20 @@
   function updateNav(session) {
     const nameEl = document.getElementById("navUserName");
     const roleEl = document.getElementById("navUserRole");
+    const avatarEl = document.getElementById("userAvatar");
 
     if (nameEl) {
       nameEl.textContent = session ? session.username : "";
+    }
+
+    if (avatarEl) {
+      if (session) {
+        // Use "A" for admin, "U" for user, or first letter of username as fallback
+        const initial = session.role === "admin" ? "A" : "U";
+        avatarEl.textContent = initial;
+      } else {
+        avatarEl.textContent = "";
+      }
     }
 
     if (roleEl) {
@@ -271,23 +282,28 @@
   function handleLogoutButton() {
     const logoutButton = document.getElementById("logoutButton");
     const logoutButtonMobile = document.getElementById("logoutButtonMobile");
-    if (!logoutButtonMobile && logoutButton) {
-      return;
-    }
+    const logoutButtonDesktop = document.getElementById("logoutButtonDesktop");
 
-    const handleLogout = () => {
+    const handleLogout = (event) => {
       event.preventDefault();
       logout();
     };
 
-    logoutButtonMobile.addEventListener('click', handleLogout);
-    logoutButton.addEventListener('click', handleLogout);
+    if (logoutButton) {
+      logoutButton.addEventListener('click', handleLogout);
+    }
+    if (logoutButtonMobile) {
+      logoutButtonMobile.addEventListener('click', handleLogout);
+    }
+    if (logoutButtonDesktop) {
+      logoutButtonDesktop.addEventListener('click', handleLogout);
+    }
   }
 
   // Re-initialize event listeners (called after SPA navigation)
   function reinitEventListeners() {
     // Remove existing listeners by cloning and replacing
-    ['logoutButton', 'logoutButtonMobile'].forEach(id => {
+    ['logoutButton', 'logoutButtonMobile', 'logoutButtonDesktop'].forEach(id => {
       const btn = document.getElementById(id);
       if (btn) {
         const newBtn = btn.cloneNode(true);
