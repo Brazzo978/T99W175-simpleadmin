@@ -82,17 +82,6 @@ function registerNetworkSettings() {
       dayOfMonth: 1,
       time: "00:00",
     },
-    // Connection config save in progress
-    connectionConfigSaving: false,
-    // Connection config success message
-    connectionConfigSuccessMessage: "",
-    // Connection config error message
-    connectionConfigErrorMessage: "",
-    // Connection monitoring configuration form
-    connectionConfigForm: {
-      pingTargets: "",
-      dnsTests: "",
-    },
     // Current TTL settings from server
     currentTtlSettings: {
       enabled: false,
@@ -160,7 +149,6 @@ function registerNetworkSettings() {
       await this.fetchConfiguration();
       await this.fetchTtlSettings();
       await this.loadRebootSchedule();
-      await this.fetchConnectionConfig();
       await this.fetchArpEntries();
 
       // Watch for changes to form fields that require restart
@@ -246,6 +234,49 @@ function registerNetworkSettings() {
       const networkPrefix = `${octets[0]}.${octets[1]}.${octets[2]}`;
       this.form.dhcpStart = `${networkPrefix}.20`;
       this.form.dhcpEnd = `${networkPrefix}.60`;
+    },
+    handleMaskChange() {
+      if (this.dhcpRangeEdited) {
+        return;
+      }
+
+      if (!this.isValidIp(this.form.ipAddress)) {
+        return;
+      }
+
+      if (!this.isValidNetmask(this.form.subnetMask)) {
+        return;
+      }
+
+      // Calculate network address and broadcast based on IP and subnet mask
+      const ipOctets = this.form.ipAddress.split(".").map(Number);
+      const maskOctets = this.form.subnetMask.split(".").map(Number);
+
+      // Calculate network address
+      const networkOctets = ipOctets.map((ip, i) => ip & maskOctets[i]);
+
+      // Calculate wildcard (inverse of mask)
+      const wildcardOctets = maskOctets.map(m => 255 - m);
+
+      // Calculate broadcast address
+      const broadcastOctets = networkOctets.map((net, i) => net | wildcardOctets[i]);
+
+      // Calculate max hosts
+      const maxHosts = broadcastOctets[3] - networkOctets[3] - 1;
+
+      // Network prefix
+      const networkPrefix = `${networkOctets[0]}.${networkOctets[1]}.${networkOctets[2]}`;
+
+      // Calculate safe DHCP range (use middle portion of available range)
+      // Skip first few IPs (usually gateway) and last IPs (broadcast)
+      const startOffset = Math.min(10, Math.floor(maxHosts / 4));
+      const endOffset = Math.min(60, Math.floor(maxHosts / 2));
+
+      const dhcpStart = networkOctets[3] + startOffset;
+      const dhcpEnd = Math.min(networkOctets[3] + endOffset, broadcastOctets[3] - 1);
+
+      this.form.dhcpStart = `${networkPrefix}.${dhcpStart}`;
+      this.form.dhcpEnd = `${networkPrefix}.${dhcpEnd}`;
     },
     validateIpField(field, value) {
       this.ipErrors[field] = value !== "" && !this.isValidIp(value);
@@ -939,58 +970,6 @@ function registerNetworkSettings() {
           window.location.reload();
         }
       }, 1000);
-    },
-    async fetchConnectionConfig() {
-      try {
-        const response = await fetch("/cgi-bin/get_connection_config");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        this.connectionConfigForm.pingTargets = data.pingTargets || "";
-        this.connectionConfigForm.dnsTests = data.dnsTests || "";
-      } catch (error) {
-        console.error("Error loading connection config:", error);
-        // Set defaults on error
-        this.connectionConfigForm.pingTargets = "8.8.8.8,1.1.1.1";
-        this.connectionConfigForm.dnsTests = "8.8.8.8:www.google.com,1.1.1.1:www.google.com";
-      }
-    },
-    async saveConnectionConfig() {
-      this.connectionConfigSaving = true;
-      this.connectionConfigSuccessMessage = "";
-      this.connectionConfigErrorMessage = "";
-
-      try {
-        const response = await fetch("/cgi-bin/set_connection_config", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            pingTargets: this.connectionConfigForm.pingTargets,
-            dnsTests: this.connectionConfigForm.dnsTests,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        if (result.status === "success") {
-          this.connectionConfigSuccessMessage = "Connection monitoring configuration saved successfully!";
-        } else {
-          this.connectionConfigErrorMessage = result.message || "Failed to save configuration";
-        }
-      } catch (error) {
-        console.error("Error saving connection config:", error);
-        this.connectionConfigErrorMessage =
-          error && error.message ? error.message : "Failed to save configuration";
-      } finally {
-        this.connectionConfigSaving = false;
-      }
     },
     async fetchArpEntries() {
       try {

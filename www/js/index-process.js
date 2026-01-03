@@ -354,10 +354,17 @@ function processAllInfos() {
                 const numeric = parseFloat(trimmed);
                 return {
                   label: `${prefix} ${index + 1}`,
+                  logicalIndex: index, // 0-based logical antenna index
                   value: Number.isNaN(numeric) ? null : numeric,
                 };
               });
             };
+
+            // Mapping from logical antenna index to physical antenna index
+            // Logical: 0, 1, 2, 3 (displayed as "Antenna 1", "Antenna 2", "Antenna 3", "Antenna 4")
+            // Physical: 0, 1, 2, 3 (ANT0, ANT1, ANT2, ANT3)
+            const LTE_LOGICAL_TO_PHYSICAL = [0, 3, 2, 1]; // Logical 0->ANT0, Logical 1->ANT3, Logical 2->ANT2, Logical 3->ANT1
+            const NR_LOGICAL_TO_PHYSICAL = [2, 0, 1, 3];  // Different mapping for 5G
 
             const finalizeEntry = () => {
               if (!currentEntry) {
@@ -454,14 +461,27 @@ function processAllInfos() {
                 this.calculateSINRPercentage
               );
 
+              // Process antennas for display
               detail.antennas = (currentEntry.antennas || []).map((antenna, index) => {
                 const normalized = roundValue(antenna.value);
                 const label = antenna.label || `Antenna ${index + 1}`;
+
+                // Map logical antenna to physical antenna
+                let physicalAntenna;
+                if (antenna.logicalIndex !== undefined && antenna.logicalIndex >= 0 && antenna.logicalIndex <= 3) {
+                  const mapping = currentEntry.technology === 'LTE'
+                    ? LTE_LOGICAL_TO_PHYSICAL
+                    : NR_LOGICAL_TO_PHYSICAL;
+                  physicalAntenna = mapping[antenna.logicalIndex];
+                }
+
                 if (normalized === null) {
                   return {
                     label,
                     display: "N/A",
                     percentage: 0,
+                    logicalIndex: antenna.logicalIndex,
+                    physicalAntenna,
                   };
                 }
 
@@ -469,6 +489,8 @@ function processAllInfos() {
                   label,
                   display: `${normalized} dBm`,
                   percentage: this.calculateRSRPPercentage(normalized),
+                  logicalIndex: antenna.logicalIndex,
+                  physicalAntenna,
                 };
               });
 

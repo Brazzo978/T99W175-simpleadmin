@@ -104,6 +104,10 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                     Advanced
                   </a></li>
+                  <li><a class="dropdown-item" href="/monitor.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    Monitoring
+                  </a></li>
                   <li><hr class="dropdown-divider"></li>
                   <li><a class="dropdown-item" href="/credentials.html">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -239,6 +243,7 @@
                             class="form-select"
                             :disabled="isSaving"
                             x-model="form.subnetMask"
+                            @change="handleMaskChange"
                           >
                             <template x-for="option in maskOptions" :key="option.value">
                               <option :value="option.value" x-text="option.label"></option>
@@ -737,79 +742,6 @@
                     </div>
                   </div>
                   
-                </div>
-              </div>
-
-              <!-- Connection Monitoring Configuration -->
-              <div class="card mt-4">
-                <div class="card-header">Connection Monitoring</div>
-                <div class="card-body">
-
-                  <template x-if="connectionConfigSuccessMessage">
-                    <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
-                      <span x-text="connectionConfigSuccessMessage"></span>
-                      <button type="button" class="btn-close" @click="connectionConfigSuccessMessage = ''"></button>
-                    </div>
-                  </template>
-
-                  <template x-if="connectionConfigErrorMessage">
-                    <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
-                      <span x-text="connectionConfigErrorMessage"></span>
-                      <button type="button" class="btn-close" @click="connectionConfigErrorMessage = ''"></button>
-                    </div>
-                  </template>
-
-                  <p class="text-body-secondary mb-3">
-                    Configure ping targets and DNS resolution tests for connection monitoring (Home Icon).
-                  </p>
-
-                  <div class="mb-4">
-                    <label class="form-label" for="pingTargets">Ping Targets</label>
-                    <input
-                      id="pingTargets"
-                      class="form-control"
-                      type="text"
-                      autocomplete="off"
-                      placeholder="8.8.8.8,1.1.1.1"
-                      x-model="connectionConfigForm.pingTargets"
-                      :disabled="connectionConfigSaving"
-                    />
-                    <div class="form-text">
-                      Enter multiple hosts separated by commas. These hosts will be pinged to test connectivity.
-                    </div>
-                  </div>
-
-                  <div class="mb-4">
-                    <label class="form-label" for="dnsTests">DNS Resolution Tests</label>
-                    <input
-                      id="dnsTests"
-                      class="form-control"
-                      type="text"
-                      autocomplete="off"
-                      placeholder="8.8.8.8:www.google.com,1.1.1.1:www.google.com"
-                      x-model="connectionConfigForm.dnsTests"
-                      :disabled="connectionConfigSaving"
-                    />
-                    <div class="form-text">
-                      Enter DNS server and domain pairs in the format <code>server:domain</code>, separated by commas. Example: <code>8.8.8.8:www.google.com,1.1.1.1:www.google.com</code>
-                    </div>
-                  </div>
-
-                  <div class="d-flex justify-content-end">
-                    <button
-                      type="button"
-                      class="btn btn-primary"
-                      :disabled="connectionConfigSaving"
-                      @click="saveConnectionConfig()"
-                    >
-                      <span x-show="!connectionConfigSaving">Apply</span>
-                      <span x-show="connectionConfigSaving">
-                        <span class="spinner-border spinner-border-sm" role="status"></span>
-                        Saving...
-                      </span>
-                    </button>
-                  </div>
-
                 </div>
               </div>
 
