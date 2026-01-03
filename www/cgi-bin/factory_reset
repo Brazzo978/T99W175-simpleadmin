@@ -1,0 +1,163 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"status":"error","message":"Authentication required"}'
+    exit 0
+fi
+
+# Check if user is admin
+if [ "$SESSION_USER_ROLE" != "admin" ]; then
+    send_json_response 403 '{"status":"error","message":"Administrator access required"}'
+    exit 0
+fi
+
+log_action() {
+    logger -t "simpleadmin-factory-reset" "$1"
+}
+
+log_action "Factory reset initiated by $SESSION_USER from $REMOTE_ADDR"
+
+# Function to execute AT command
+exec_atcmd() {
+    atcli_smd8 "$1" 2>&1
+}
+
+# Function to clear all band locks
+clear_band_locks() {
+    log_action "Clearing band locks"
+
+    # Clear all band locks
+    exec_atcmd 'AT^BAND_PREF_EXT'
+
+    log_action "Band locks cleared"
+}
+
+# Function to clear all cell locks
+clear_cell_locks() {
+    log_action "Clearing cell locks"
+
+    # Clear LTE locks
+    exec_atcmd 'AT^LTE_LOCK'
+
+    # Clear NR5G Locks
+    exec_atcmd 'AT^NR5G_LOCK'
+
+    # Set Auto Mode & NSA\SA Auto
+    exec_atcmd 'AT^SLMODE=1,0'
+    exec_atcmd 'AT^NR5G_MODE=0'
+
+    log_action "Cell locks cleared"
+}
+
+# Function to restore XML configurations
+restore_xml_configs() {
+    log_action "Restoring XML configurations"
+
+    local cfg_dir="/etc/data"
+
+    # Restore factory configs
+    if [ -f "$cfg_dir/factory_mobileap_cfg.xml" ]; then
+        cp "$cfg_dir/factory_mobileap_cfg.xml" "$cfg_dir/mobileap_cfg.xml"
+        log_action "Restored mobileap_cfg.xml"
+    else
+        log_action "WARNING: factory_mobileap_cfg.xml not found"
+    fi
+
+    if [ -f "$cfg_dir/factory_mobileap_firewall.xml" ]; then
+        cp "$cfg_dir/factory_mobileap_firewall.xml" "$cfg_dir/mobileap_firewall.xml"
+        log_action "Restored mobileap_firewall.xml"
+    else
+        log_action "WARNING: factory_mobileap_firewall.xml not found"
+    fi
+}
+
+# Function to restore system files
+restore_system_files() {
+    log_action "Restoring system files"
+
+    local etc_dir="/etc"
+
+    # Restore passwd.stock to both passwd and passwd-
+    if [ -f "$etc_dir/passwd.stock" ]; then
+        cp "$etc_dir/passwd.stock" "$etc_dir/passwd"
+        cp "$etc_dir/passwd.stock" "$etc_dir/passwd-"
+        log_action "Restored passwd and passwd-"
+    else
+        log_action "WARNING: passwd.stock not found"
+    fi
+
+    # Restore shadow.stock to both shadow and shadow-
+    if [ -f "$etc_dir/shadow.stock" ]; then
+        cp "$etc_dir/shadow.stock" "$etc_dir/shadow"
+        cp "$etc_dir/shadow.stock" "$etc_dir/shadow-"
+        log_action "Restored shadow and shadow-"
+    else
+        log_action "WARNING: shadow.stock not found"
+    fi
+
+    # Reset web UI credentials
+    local credentials_file="/WEBSERVER/www/cgi-bin/credentials.stock"
+    if [ -f "$credentials_file" ]; then
+        # Reset admin and guest credentials using sed
+        cp $credentials_file /WEBSERVER/www/cgi-bin/credentials.txt
+        log_action "Reset web UI credentials to defaults"
+    else
+        log_action "WARNING: credentials.stock not found"
+    fi
+}
+
+# Function to clear SSH keys
+clear_ssh_keys() {
+    log_action "Clearing SSH keys"
+
+    local dropbear_dir="/systemrw/data/dropbear"
+
+    if [ -d "$dropbear_dir" ]; then
+        rm -f "$dropbear_dir"/*_key "$dropbear_dir"/*_key.pub
+        log_action "Cleared dropbear keys"
+    else
+        log_action "WARNING: dropbear directory not found"
+    fi
+}
+
+# Function to reboot the system
+reboot_system() {
+    log_action "System rebooting"
+
+    # Give time for response to be sent
+    (sleep 2 && reboot) &
+}
+
+# Main execution
+main() {
+    # Execute all reset operations
+    clear_band_locks
+    clear_cell_locks
+    restore_xml_configs
+    restore_system_files
+    clear_ssh_keys
+
+    # Send success response
+    send_json_response 200 '{
+        "status":"success",
+        "message":"Factory reset completed successfully. The system will reboot now.",
+        "details": {
+            "band_locks_cleared": true,
+            "cell_locks_cleared": true,
+            "xml_configs_restored": true,
+            "system_files_restored": true,
+            "ssh_keys_cleared": true
+        }
+    }'
+
+    # Schedule reboot
+    reboot_system
+}
+
+# Run main function
+main

@@ -64,6 +64,10 @@ return {
     currentUsbNetMode: "Unknown",
     // DNS proxy status (deprecated/unused)
     DNSProxyStatus: true,
+    // Factory reset confirmation modal visibility
+    showFactoryResetModal: false,
+    // Factory reset in progress state
+    isFactoryResetting: false,
 
     /**
      * Closes the reboot confirmation modal.
@@ -295,6 +299,60 @@ return {
         console.error("Error updating TTL: ", error);
         this.isLoading = false; // Ensure loading state is properly handled in case of error
         });
+    },
+
+    /**
+     * Shows the factory reset confirmation modal.
+     *
+     * Sets showFactoryResetModal flag to display the warning dialog.
+     */
+    showFactoryResetModal() {
+      this.showFactoryResetModal = true;
+    },
+
+    /**
+     * Closes the factory reset confirmation modal.
+     *
+     * Resets modal visibility flag to hide the dialog.
+     */
+    closeFactoryResetModal() {
+      this.showFactoryResetModal = false;
+    },
+
+    /**
+     * Performs the factory reset operation.
+     *
+     * Sends request to factory_reset CGI endpoint to reset device to factory defaults.
+     * Shows progress modal and handles success/error responses.
+     * The device will automatically reboot after successful reset.
+     */
+    performFactoryReset() {
+      this.showFactoryResetModal = false;
+      this.isFactoryResetting = true;
+
+      fetch('/cgi-bin/factory_reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          console.log('Factory reset initiated:', data.message);
+          // The device will reboot automatically
+          // The progress modal will stay visible until reboot happens
+        } else {
+          console.error('Factory reset failed:', data.message);
+          this.isFactoryResetting = false;
+          alert('Factory reset failed: ' + data.message);
+        }
+      })
+      .catch(error => {
+        console.error('Error performing factory reset:', error);
+        this.isFactoryResetting = false;
+        alert('Error performing factory reset: ' + error.message);
+      });
     },
 
     /**

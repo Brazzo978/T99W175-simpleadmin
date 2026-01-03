@@ -384,6 +384,15 @@
                       <div class="row g-3 mt-1">
                         <div class="col-md-12">
                           <label class="form-label" for="bridgeMac">Bridge client MAC address</label>
+
+                          <!-- Show currently configured MAC (if any) -->
+                          <template x-if="originalData && originalData.bridgeMac && originalData.bridgeEnabled">
+                            <div class="mb-2">
+                              <span class="small text-muted">Currently configured: </span>
+                              <code class="text-danger" x-text="originalData.bridgeMac.toUpperCase()"></code>
+                            </div>
+                          </template>
+
                           <div class="input-group">
                             <select
                               id="bridgeMac"
@@ -839,6 +848,55 @@
         </div>
       </div>
 
+      <!-- Bridge Mode Enable Confirmation Modal -->
+      <div class="modal fade" id="bridgeEnableModal" tabindex="-1" aria-labelledby="bridgeEnableModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="bridgeEnableModalLabel">Enable Bridge Mode</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p>You are about to enable bridge mode (IP passthrough).</p>
+              <p class="text-info"><strong>Important notes:</strong></p>
+              <ul class="mb-0">
+                <li>The public IP will be routed directly to the selected client device</li>
+                <li>The router interface will remain on the LAN subnet and may be harder to access</li>
+                <li>DHCP will be automatically enabled if not already active</li>
+                <li>Make sure to select the correct device from the MAC address list</li>
+              </ul>
+              <p class="mt-3 small text-muted">You can select a device after confirming.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @click="cancelBridgeEnable()">Cancel</button>
+              <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="confirmBridgeEnable()">Enable Bridge Mode</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bridge Mode Disable Confirmation Modal -->
+      <div class="modal fade" id="bridgeDisableModal" tabindex="-1" aria-labelledby="bridgeDisableModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="bridgeDisableModalLabel">Disable Bridge Mode</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p>You are about to disable bridge mode (IP passthrough).</p>
+              <p class="text-warning"><strong>This will remove the MAC address association:</strong></p>
+              <p class="mb-0"><code x-text="form.bridgeMac || ''"></code></p>
+              <p class="mt-3 small text-muted">The device will revert to standard NAT routing mode.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @click="cancelBridgeDisable()">Cancel</button>
+              <button type="button" class="btn btn-danger" data-bs-dismiss="modal" @click="confirmBridgeDisable()">Disable Bridge Mode</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
             </form>
           </div>
         </div>
@@ -876,6 +934,9 @@
         </div>
       </div>
     </footer>
+
+
+
     </main>
   </body>
 </html>

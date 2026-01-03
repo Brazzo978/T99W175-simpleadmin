@@ -53,6 +53,9 @@ function registerNetworkSettings() {
     dhcpRangeEdited: false,
     // Original configuration data for comparison
     originalData: null,
+    // Bridge mode confirmation modals
+    showBridgeEnableModal: false,
+    showBridgeDisableModal: false,
     // TTL save in progress flag
     ttlSaving: false,
     // TTL save success message
@@ -292,10 +295,170 @@ function registerNetworkSettings() {
       }
     },
     clearBridgeError() {
-      if (!this.form.bridgeEnabled) {
+      // When toggling bridge mode, show appropriate confirmation modal
+
+      // Case 1: Disabling bridge mode with a MAC set
+      if (!this.form.bridgeEnabled && this.form.bridgeMac) {
+        // Revert for now - wait for user confirmation
+        this.form.bridgeEnabled = true;
+
+        // Show disable confirmation modal
+        this.$nextTick(() => {
+          const modalElement = document.getElementById('bridgeDisableModal');
+          if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+          }
+        });
+      }
+      // Case 2: No MAC set while disabling - clear it
+      else if (!this.form.bridgeEnabled) {
         this.form.bridgeMac = "";
       }
+      // Case 3: Enabling bridge mode - show enable confirmation
+      else if (this.form.bridgeEnabled && !this.showBridgeDisableModal) {
+        // Don't show modal if we're coming back from disabling
+        this.form.bridgeEnabled = false; // Revert for now
+
+        this.$nextTick(() => {
+          const modalElement = document.getElementById('bridgeEnableModal');
+          if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+          }
+        });
+      }
     },
+
+    confirmBridgeEnable() {
+      // User confirmed - enable bridge mode
+      this.form.bridgeEnabled = true;
+
+      // Ensure DHCP is enabled
+      if (!this.form.dhcpEnabled) {
+        this.form.dhcpEnabled = true;
+      }
+
+      // Hide the modal
+      const modalElement = document.getElementById('bridgeEnableModal');
+      if (modalElement) {
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+          modal.hide();
+        }
+      }
+    },
+
+    cancelBridgeEnable() {
+      // User cancelled - modal will be hidden by data-bs-dismiss
+      // Keep bridge mode disabled (already reverted)
+    },
+
+    async confirmBridgeDisable() {
+      // User confirmed - disable bridge mode and clear MAC
+      this.form.bridgeEnabled = false;
+      this.form.bridgeMac = "";
+
+      // Save immediately without restart
+      await this.saveBridgeDisable();
+    },
+
+    async saveBridgeDisable() {
+      this.isSaving = true;
+      this.successMessage = "";
+      this.restartMessage = "";
+      this.validationErrors = [];
+
+      const params = new URLSearchParams();
+      params.set("action", "update");
+      params.set("ip_address", this.form.ipAddress.trim());
+      params.set("subnet_mask", this.form.subnetMask.trim());
+      params.set("dhcp_enabled", this.form.dhcpEnabled ? "1" : "0");
+      if (this.form.dhcpEnabled) {
+        params.set("dhcp_start", this.form.dhcpStart.trim());
+        params.set("dhcp_end", this.form.dhcpEnd.trim());
+        params.set("dhcp_lease", this.form.dhcpLease.trim());
+      }
+      params.set("dmz_enabled", this.form.dmzEnabled ? "1" : "0");
+      const dmzIpValue = this.form.dmzEnabled ? this.form.dmzIp.trim() : "0.0.0.0";
+      params.set("dmz_ip", dmzIpValue);
+      params.set("ipv6_enabled", this.form.ipv6Enabled ? "1" : "0");
+      params.set("bridge_enabled", "0"); // Disabled
+      params.set("bridge_mac", "0"); // Cleared
+      params.set("auto_connect", this.form.autoConnect ? "1" : "0");
+      params.set("roaming_enabled", this.form.roamingEnabled ? "1" : "0");
+
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+
+      try {
+        const response = await fetch("/cgi-bin/network_settings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: params.toString(),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        if (!payload.success) {
+          const details = Array.isArray(payload.errors) && payload.errors.length
+            ? `: ${payload.errors.join(" ")}`
+            : "";
+          throw new Error(payload.message + details);
+        }
+
+        // Update original data to reflect the saved state
+        this.originalData = {
+          ...this.form,
+          bridgeEnabled: false,
+          bridgeMac: ""
+        };
+
+        this.successMessage = "Bridge mode disabled successfully.";
+
+        // Auto-hide success message after 5 seconds
+        setTimeout(() => {
+          this.successMessage = "";
+        }, 5000);
+
+        // Hide the modal
+        const modalElement = document.getElementById('bridgeDisableModal');
+        if (modalElement) {
+          const modal = bootstrap.Modal.getInstance(modalElement);
+          if (modal) {
+            modal.hide();
+          }
+        }
+
+      } catch (error) {
+        console.error("Unable to disable bridge mode", error);
+        if (error && error.name === "AbortError") {
+          this.validationErrors.push(
+            "Disabling bridge mode timed out. Please verify the connection and try again."
+          );
+        } else {
+          this.validationErrors.push(
+            error && error.message ? error.message : "Unable to disable bridge mode."
+          );
+        }
+      } finally {
+        window.clearTimeout(timeoutId);
+        this.isSaving = false;
+      }
+    },
+
+    cancelBridgeDisable() {
+      // User cancelled - keep bridge mode enabled (already reverted)
+      // Modal will be hidden by data-bs-dismiss
+    },
+
     async applyTTL() {
       this.ttlSaving = true
       this.ttlSuccessMessage = ""
@@ -809,24 +972,6 @@ function registerNetworkSettings() {
 
       if (!this.validateForm()) {
         return;
-      }
-
-      if (
-        this.form.bridgeEnabled &&
-        this.originalData &&
-        !this.originalData.bridgeEnabled
-      ) {
-        const confirmed = window.confirm(
-          "Enabling bridge mode will route the public IP directly to the selected client. This may make it harder to access the router interface because it will remain on the LAN subnet. Continue?"
-        );
-        if (!confirmed) {
-          return;
-        }
-
-        // Ensure DHCP is enabled when bridge mode is activated
-        if (!this.form.dhcpEnabled) {
-          this.form.dhcpEnabled = true;
-        }
       }
 
       const params = new URLSearchParams();

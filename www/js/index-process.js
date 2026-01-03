@@ -364,7 +364,20 @@ function processAllInfos() {
             // Logical: 0, 1, 2, 3 (displayed as "Antenna 1", "Antenna 2", "Antenna 3", "Antenna 4")
             // Physical: 0, 1, 2, 3 (ANT0, ANT1, ANT2, ANT3)
             const LTE_LOGICAL_TO_PHYSICAL = [0, 3, 2, 1]; // Logical 0->ANT0, Logical 1->ANT3, Logical 2->ANT2, Logical 3->ANT1
-            const NR_LOGICAL_TO_PHYSICAL = [2, 1, 0, 3];  // Logical 0->ANT2, Logical 1->ANT1, Logical 2->ANT0, Logical 3->ANT3
+            const NR_FDD_LOGICAL_TO_PHYSICAL = [2, 3, 0, 1]; // For N1, N3, N7 (5G FDD): MAIN, Aux1, Aux2, Aux3
+            const NR_TDD_LOGICAL_TO_PHYSICAL = [2, 1, 0, 3]; // For N41, N77, N78, N79 (5G TDD)
+
+            // Helper function to check if NR band is FDD
+            const isNrFddBand = (band) => {
+              if (!band) return false;
+              const bandNum = parseInt(band.replace(/\D/g, '')); // Extract number from band string
+              return [1, 3, 7, 28].includes(bandNum);
+            };
+
+            // Get the correct NR mapping based on band
+            const getNrMapping = (band) => {
+              return isNrFddBand(band) ? NR_FDD_LOGICAL_TO_PHYSICAL : NR_TDD_LOGICAL_TO_PHYSICAL;
+            };
 
             const finalizeEntry = () => {
               if (!currentEntry) {
@@ -471,7 +484,7 @@ function processAllInfos() {
                 if (antenna.logicalIndex !== undefined && antenna.logicalIndex >= 0 && antenna.logicalIndex <= 3) {
                   const mapping = currentEntry.technology === 'LTE'
                     ? LTE_LOGICAL_TO_PHYSICAL
-                    : NR_LOGICAL_TO_PHYSICAL;
+                    : getNrMapping(currentEntry.band);
                   physicalAntenna = mapping[antenna.logicalIndex];
                 }
 
