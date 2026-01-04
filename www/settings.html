@@ -827,23 +827,18 @@
 
       <!-- Reboot Progress Modal -->
       <div class="modal-overlay" x-cloak x-show="showRebootModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
-        <div class="modern-loading-modal" @click.stop>
-          <div class="modern-loader-container">
-            <div class="modern-loader">
-              <svg class="modern-loader-svg" viewBox="0 0 50 50">
-                <circle class="modern-loader-circle" cx="25" cy="25" r="20"></circle>
-              </svg>
-            </div>
-            <div class="modern-loading-content">
-              <h4 class="modern-loading-title">Restarting Modem</h4>
-              <p class="modern-loading-text">
-                Please wait while the modem restarts...
-              </p>
-              <div class="modern-countdown">
-                <span class="modern-countdown-number" x-text="rebootCountdown"></span>
-                <span class="modern-countdown-label">seconds remaining</span>
-              </div>
-            </div>
+        <div class="loading-modal">
+          <div class="loader"></div>
+          <div
+            class="loading-text"
+            style="display: flex; flex-direction: column"
+          >
+            <h3>Rebooting...</h3>
+            <p style="margin-top: 0.5rem">
+              Please wait for
+              <span x-text="rebootCountdown" style="font-weight: 500"></span>
+              seconds.
+            </p>
           </div>
         </div>
       </div>
