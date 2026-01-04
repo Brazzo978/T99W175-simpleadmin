@@ -249,7 +249,6 @@ function fetchDeviceInfo() {
         this.phoneNumber = phoneNumber || "Unknown";
         this.wwanIpv4 = wwanIpv4 || "-";
         this.wwanIpv6 = wwanIpv6 || "-";
-        this.simpleAdminVersion = "T99-RC05-Final";
         this.showError = false;
       } catch (error) {
         console.error("Parsing error:", error);

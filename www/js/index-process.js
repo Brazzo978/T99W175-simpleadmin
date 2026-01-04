@@ -363,20 +363,45 @@ function processAllInfos() {
             // Mapping from logical antenna index to physical antenna index
             // Logical: 0, 1, 2, 3 (displayed as "Antenna 1", "Antenna 2", "Antenna 3", "Antenna 4")
             // Physical: 0, 1, 2, 3 (ANT0, ANT1, ANT2, ANT3)
-            const LTE_LOGICAL_TO_PHYSICAL = [0, 3, 2, 1]; // Logical 0->ANT0, Logical 1->ANT3, Logical 2->ANT2, Logical 3->ANT1
-            const NR_FDD_LOGICAL_TO_PHYSICAL = [2, 3, 0, 1]; // For N1, N3, N7 (5G FDD): MAIN, Aux1, Aux2, Aux3
-            const NR_TDD_LOGICAL_TO_PHYSICAL = [2, 1, 0, 3]; // For N41, N77, N78, N79 (5G TDD)
 
-            // Helper function to check if NR band is FDD
-            const isNrFddBand = (band) => {
-              if (!band) return false;
-              const bandNum = parseInt(band.replace(/\D/g, '')); // Extract number from band string
-              return [1, 3, 7, 28].includes(bandNum);
-            };
+            // LTE mapping: Logical 0->ANT0, Logical 1->ANT3, Logical 2->ANT2, Logical 3->ANT1
+            const LTE_LOGICAL_TO_PHYSICAL = [0, 3, 2, 1];
 
-            // Get the correct NR mapping based on band
+            // Case 1: 5G FDD 2x2 MIMO (N5, N8, N12, N20, N28, N71) - Only 2 antennas used
+            // Mapping: [0, 3] means MAIN->ANT0, AUX1->ANT3, others (ANT1, ANT2) added as "Not Used"
+            const NR_FDD_2X2_LOGICAL_TO_PHYSICAL = [0, 3];
+
+            // Case 2: 5G FDD 4x4 MIMO (N1, N2, N3, N7, N25, N66) - All 4 antennas
+            // Mapping: [2, 3, 0, 1] means MAIN->ANT2, AUX1->ANT3, AUX2->ANT0, AUX3->ANT1
+            const NR_FDD_4X4_LOGICAL_TO_PHYSICAL = [2, 3, 0, 1];
+
+            // Case 3: 5G TDD 4x4 MIMO (N38, N40, N41, N77, N78, N79)
+            // Mapping: [2, 1, 0, 3] means MAIN->ANT2, AUX1->ANT1, AUX2->ANT0, AUX3->ANT3
+            const NR_TDD_LOGICAL_TO_PHYSICAL = [2, 1, 0, 3];
+
+            // Helper function to determine NR antenna mapping based on band
             const getNrMapping = (band) => {
-              return isNrFddBand(band) ? NR_FDD_LOGICAL_TO_PHYSICAL : NR_TDD_LOGICAL_TO_PHYSICAL;
+              if (!band) return NR_FDD_4X4_LOGICAL_TO_PHYSICAL;
+
+              const bandNum = parseInt(band.replace(/\D/g, '')); // Extract number from band string
+
+              // Case 1: 5G FDD 2x2 MIMO bands
+              if ([5, 8, 12, 20, 28, 71].includes(bandNum)) {
+                return NR_FDD_2X2_LOGICAL_TO_PHYSICAL;
+              }
+
+              // Case 2: 5G FDD 4x4 MIMO bands
+              if ([1, 2, 3, 7, 25, 66].includes(bandNum)) {
+                return NR_FDD_4X4_LOGICAL_TO_PHYSICAL;
+              }
+
+              // Case 3: 5G TDD 4x4 MIMO bands
+              if ([38, 40, 41, 77, 78, 79].includes(bandNum)) {
+                return NR_TDD_LOGICAL_TO_PHYSICAL;
+              }
+
+              // Default: Assume 4x4 FDD for unknown bands
+              return NR_FDD_4X4_LOGICAL_TO_PHYSICAL;
             };
 
             const finalizeEntry = () => {
@@ -475,7 +500,7 @@ function processAllInfos() {
               );
 
               // Process antennas for display
-              detail.antennas = (currentEntry.antennas || []).map((antenna, index) => {
+              let processedAntennas = (currentEntry.antennas || []).map((antenna, index) => {
                 const normalized = roundValue(antenna.value);
                 const label = antenna.label || `Antenna ${index + 1}`;
 
@@ -505,7 +530,30 @@ function processAllInfos() {
                   logicalIndex: antenna.logicalIndex,
                   physicalAntenna,
                 };
-              }).sort((a, b) => {
+              });
+
+              // Add missing physical antennas as "Not Used" for 2x2 MIMO bands
+              if (currentEntry.technology === 'NR') {
+                const usedPhysicalAntennas = processedAntennas
+                  .map(a => a.physicalAntenna)
+                  .filter(p => p !== undefined && p !== null);
+
+                const allPhysicalAntennas = [0, 1, 2, 3]; // ANT0, ANT1, ANT2, ANT3
+                const missingAntennas = allPhysicalAntennas.filter(p => !usedPhysicalAntennas.includes(p));
+
+                // Add missing antennas as "Not Used"
+                missingAntennas.forEach(physicalAntenna => {
+                  processedAntennas.push({
+                    label: `Antenna ${physicalAntenna}`,
+                    display: "Not Used",
+                    percentage: 0,
+                    logicalIndex: null,
+                    physicalAntenna: physicalAntenna,
+                  });
+                });
+              }
+
+              detail.antennas = processedAntennas.sort((a, b) => {
                 // Sort by physical antenna number
                 const aPhys = a.physicalAntenna ?? 999;
                 const bPhys = b.physicalAntenna ?? 999;
