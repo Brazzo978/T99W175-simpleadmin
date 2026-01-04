@@ -1124,7 +1124,32 @@ function registerNetworkSettings() {
         }
         const data = await response.json();
         if (data.status === "success") {
-          this.arpEntries = data.entries || [];
+          // Group entries by MAC address and combine IPs
+          const macMap = new Map();
+          
+          (data.entries || []).forEach(entry => {
+            const mac = entry.mac.toUpperCase();
+            if (!macMap.has(mac)) {
+              macMap.set(mac, {
+                mac: mac,
+                ips: []
+              });
+            }
+            // Add IP if not already present
+            if (entry.ip && !macMap.get(mac).ips.includes(entry.ip)) {
+              macMap.get(mac).ips.push(entry.ip);
+            }
+          });
+          
+          // Convert map to array with combined labels
+          this.arpEntries = Array.from(macMap.values()).map(item => {
+            const ipList = item.ips.join(", ");
+            return {
+              mac: item.mac,
+              ip: item.ips[0], // Keep first IP for backward compatibility
+              label: `${item.mac} (${ipList})`
+            };
+          });
         }
       } catch (error) {
         console.error("Error loading ARP entries:", error);
