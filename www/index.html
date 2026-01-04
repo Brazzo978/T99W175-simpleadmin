@@ -1191,6 +1191,7 @@
                             <tr>
                               <th>Host</th>
                               <th>Status</th>
+                              <th>Time</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1199,6 +1200,14 @@
                                 <td x-text="result.host"></td>
                                 <td>
                                   <span class="badge" :class="result.status === 'ok' ? 'badge-success-modern' : 'bg-danger'" x-text="result.status === 'ok' ? '✓ OK' : '✗ Failed'"></span>
+                                </td>
+                                <td>
+                                  <template x-if="result.time !== undefined && result.time !== null">
+                                    <span x-text="result.time + ' ms'"></span>
+                                  </template>
+                                  <template x-if="result.time === undefined || result.time === null">
+                                    <span class="text-muted">-</span>
+                                  </template>
                                 </td>
                               </tr>
                             </template>
