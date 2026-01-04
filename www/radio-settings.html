@@ -169,6 +169,29 @@
           </div>
         </nav>
 
+        <!-- Alert Banner - positioned above Band Locking section -->
+        <div
+          x-show="showToast"
+          x-transition
+          class="row mt-3"
+          style="display: none;"
+        >
+          <div class="col-12">
+            <div
+              class="alert mb-0"
+              :class="{
+                'alert-danger': toastType === 'error',
+                'alert-warning': toastType === 'warning',
+                'alert-info': toastType === 'info',
+                'alert-success': toastType === 'success'
+              }"
+              role="alert"
+              x-text="toastMessage"
+            >
+            </div>
+          </div>
+        </div>
+
         <div class="row mt-5">
           <div class="col-12">
             <div class="card">
@@ -203,19 +226,29 @@
                 ></form>
               </div>
               <div class="card-footer">
-                <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                   <small class="text-muted">
                     To enable or disable bands, click the corresponding checkbox.
                     Changes are applied automatically after 1.5s.
                   </small>
-                  <button
-                    type="button"
-                    class="btn btn-danger"
-                    @click="resetBandLocking()"
-                    data-requires-admin
-                  >
-                    Reset to defaults
-                  </button>
+                  <div class="d-flex gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-info"
+                      @click="uncheckAllBands()"
+                      data-requires-admin
+                    >
+                      Uncheck All
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      @click="resetBandLocking()"
+                      data-requires-admin
+                    >
+                      Reset to defaults
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

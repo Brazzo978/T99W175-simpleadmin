@@ -38,6 +38,11 @@ function cellLocking() {
     showModalAPN: false,
     // Countdown timer for modals
     countdown: 5,
+    // Toast notification visibility and message
+    showToast: false,
+    toastMessage: "",
+    toastType: "info",
+    waitingForBandSelection: false,
     // Last error message string
     lastErrorMessage: "",
     // Active utility tab (apn/cell-lock/band-lock)
@@ -503,13 +508,13 @@ function cellLocking() {
         }
       };
 
-      this.trackCheckboxChanges = () => {
+      this.trackCheckboxChanges = (event) => {
         console.log(">>> trackCheckboxChanges triggered <<<");
-        
+
         const modeDropdown = document.getElementById("networkModeBand");
         const selectedMode = modeDropdown ? modeDropdown.value : null;
         console.log("Selected mode:", selectedMode);
-        
+
         const checkboxes = document.querySelectorAll(
           '#checkboxForm input[type="checkbox"]'
         );
@@ -533,6 +538,13 @@ function cellLocking() {
             alert("At least one band must be selected.\nUse 'Reset' to restore all available bands.");
           }
           return;
+        }
+
+        // Hide banner if user selected a band after using "Uncheck All"
+        if (self.waitingForBandSelection) {
+          console.log("User selected a band, hiding notification banner");
+          self.waitingForBandSelection = false;
+          self.showToast = false;
         }
 
         console.log("Updating state:");
@@ -733,9 +745,9 @@ function cellLocking() {
       }
     },
 
-    async toggleEsimManager() {
+    async toggleEsimManager(event) {
       if (this.isTogglingEsim) {
-        event.preventDefault();
+        event?.preventDefault();
         return;
       }
       
@@ -900,19 +912,66 @@ function cellLocking() {
       this.prefNetworkValue = targetValue;
       this.prefNetwork = this.describePrefNetworkValue(targetValue);
     },
+    showToastNotification(message, type = "info", autoHide = true) {
+      this.toastMessage = message;
+      this.toastType = type;
+      this.showToast = true;
+
+      // Only auto-hide if not waiting for band selection
+      if (autoHide && !this.waitingForBandSelection) {
+        setTimeout(() => {
+          this.showToast = false;
+        }, 4000);
+      }
+    },
     uncheckAllBands() {
-        document
-            .querySelectorAll('#checkboxForm input[type="checkbox"]')
-            .forEach(function (checkbox) {
-            checkbox.checked = false;
-            checkbox.dispatchEvent(new Event("change", { bubbles: true }));
-        });
+      console.log("=== uncheckAllBands called ===");
+
+      const checkboxes = document.querySelectorAll('#checkboxForm input[type="checkbox"]');
+      const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+
+      console.log(`Current selected bands: ${checkedCount}`);
+
+      // Prevent unchecking if 1 or fewer bands are selected
+      if (checkedCount <= 1) {
+        this.showToastNotification(
+          "Select at least 2 bands before using Uncheck All.",
+          "warning",
+          true
+        );
+        console.log("ABORT: Less than 2 bands selected");
+        return;
+      }
+
+      // Clear any pending timeout to prevent command execution after uncheck
+      if (this.bandLockTimeout) {
+        clearTimeout(this.bandLockTimeout);
+        console.log("Cleared pending band lock timeout");
+      }
+
+      // Uncheck all checkboxes
+      checkboxes.forEach(function (checkbox) {
+        checkbox.checked = false;
+      });
+
+      // Set flag to keep banner visible until user selects a band
+      this.waitingForBandSelection = true;
+
+      // Show info message to user via toast (won't auto-hide)
+      this.showToastNotification(
+        "All bands unchecked. Please select at least one band to apply changes.",
+        "info",
+        false
+      );
+
+      console.log("All checkboxes unchecked, waiting for user selection");
+      console.log("=== uncheckAllBands completed ===");
     },
     async lockSelectedBandsAuto() {
       console.log("=== lockSelectedBandsAuto called ===");
       console.log("currentNetworkMode:", this.currentNetworkMode);
       console.log("updatedLockedBands:", this.updatedLockedBands);
-      
+
       const selectedMode = this.currentNetworkMode;
       const newCheckedValues = Array.isArray(this.updatedLockedBands)
         ? this.updatedLockedBands
@@ -929,61 +988,39 @@ function cellLocking() {
       console.log(`Selected bands: ${newCheckedValues.length}/${allBands.length}`);
 
       // Map selectedMode to the correct AT command network type
-      let networkType;
       let atCommandPrefix;
-      
+
       if (selectedMode === "LTE") {
-        networkType = "LTE";
         atCommandPrefix = "LTE";
       } else if (selectedMode === "NSA") {
-        networkType = "NR5G";
         atCommandPrefix = "NR5G_NSA";
       } else if (selectedMode === "SA") {
-        networkType = "NR5G";
-        atCommandPrefix = "NR5G_SA";        
+        atCommandPrefix = "NR5G_SA";
       } else {
         console.warn("ABORT: Invalid network mode:", selectedMode);
         return;
       }
 
-      // Check if all bands are selected
-      const allBandsSelected = newCheckedValues.length === allBands.length;
-      
-      if (allBandsSelected) {
-        console.log("All bands selected - sending reset command");
-        const resetCmd = 'AT^BAND_PREF_EXT';
-        console.log(`Sending:`, resetCmd);
-        
-        const resetResult = await this.sendATcommand(resetCmd);
-        
-        if (!resetResult.ok) {
-          console.error("FAILED to reset bands:", this.lastErrorMessage);
-          alert(`Failed to reset bands: ${this.lastErrorMessage}`);
-          return;
-        }
-        
-        console.log("All bands enabled via reset");
-      } else {
-        // Use colon-separated format to send all bands at once
-        const bands = newCheckedValues.join(":");
-        const atcmd = `AT^BAND_PREF_EXT=${atCommandPrefix},2,${bands}`;
-        
-        console.log(`Sending enable command with ${newCheckedValues.length} bands:`, atcmd);
-        
-        const result = await this.sendATcommand(atcmd);
-        
-        if (!result.ok) {
-          console.error("FAILED to enable bands:", this.lastErrorMessage);
-          alert(`Failed to update bands: ${this.lastErrorMessage}`);
-          return;
-        }
-        
-        console.log("Bands enabled successfully");
+      // Always send the complete band list, even if all bands are selected
+      // Only use empty AT^BAND_PREF_EXT for explicit "Reset to Defaults" button
+      const bands = newCheckedValues.join(":");
+      const atcmd = `AT^BAND_PREF_EXT=${atCommandPrefix},2,${bands}`;
+
+      console.log(`Sending enable command with ${newCheckedValues.length} bands:`, atcmd);
+
+      const result = await this.sendATcommand(atcmd);
+
+      if (!result.ok) {
+        console.error("FAILED to enable bands:", this.lastErrorMessage);
+        alert(`Failed to update bands: ${this.lastErrorMessage}`);
+        return;
       }
+
+      console.log("Bands enabled successfully");
 
       // Update previous state
       this.previousLockedBands = [...newCheckedValues];
-      
+
       console.log("=== lockSelectedBandsAuto completed ===");
     },
     async applySimSelection() {
@@ -1623,21 +1660,3 @@ function addCheckboxListeners(cellLock) {
     checkbox.addEventListener("change", cellLock.trackCheckboxChanges);
   });
 }
-
-(function () {
-  const uncheckButton = document.getElementById("uncheckAll");
-
-  if (!uncheckButton) {
-    console.warn('"Uncheck All" button not found.');
-    return;
-  }
-
-  uncheckButton.addEventListener("click", function () {
-    document
-      .querySelectorAll('#checkboxForm input[type="checkbox"]')
-      .forEach(function (checkbox) {
-        checkbox.checked = false;
-        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-  });
-});
