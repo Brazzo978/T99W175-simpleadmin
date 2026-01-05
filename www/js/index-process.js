@@ -1769,6 +1769,21 @@ function processAllInfos() {
     }
   },
 
+  // Format temperature with Fahrenheit conversion
+  formatTempWithFahrenheit(tempStr) {
+    if (!tempStr || tempStr === 'Unknown') {
+      return 'Unknown';
+    }
+    // Extract numeric value (remove 'C' or any non-numeric characters except digits and decimal point)
+    const celsiusMatch = tempStr.match(/(\d+(?:\.\d+)?)/);
+    if (!celsiusMatch) {
+      return tempStr;
+    }
+    const celsius = parseFloat(celsiusMatch[1]);
+    const fahrenheit = Math.round((celsius * 9/5) + 32);
+    return `${celsius} °C (${fahrenheit} °F)`;
+  },
+
   // Get temperature icon container class based on temperature value
   getTempIconClass() {
     const tempValue = parseInt(this.temperature) || 0;
