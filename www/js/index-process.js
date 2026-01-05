@@ -952,7 +952,7 @@ function processAllInfos() {
             ];
           } else if (ratValue === "NR5G_SA") {
             this.networkModeBadges = [
-              { label: "5G-SA", class: "badge-info-modern" }
+              { label: "5G-SA", class: "badge-purple-dark-modern" }
             ];
           } else {
             // For unknown or other values, show as text

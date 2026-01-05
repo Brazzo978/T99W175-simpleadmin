@@ -32,6 +32,8 @@
   --info-light: #ecfeff;
   --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
 
+  --purple-dark-gradient: linear-gradient(135deg, #6b21a8 0%, #4c1d95 100%);
+
   /* Light Mode Colors */
   --bg-primary: #ffffff;
   --bg-secondary: #f8fafc;
@@ -1818,6 +1820,14 @@ html[data-bs-theme="light"] .btn-close {
 
 .badge-info-modern {
   background: var(--info-gradient);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0.35em 0.65em;
+  border-radius: 6px;
+}
+
+.badge-purple-dark-modern {
+  background: var(--purple-dark-gradient);
   color: #ffffff;
   font-weight: 600;
   padding: 0.35em 0.65em;
