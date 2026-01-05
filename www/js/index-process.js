@@ -127,7 +127,7 @@ function processAllInfos() {
     // New refresh rate to apply
     newRefreshRate: null,
     // Current refresh rate in seconds
-    refreshRate: 3,
+    refreshRate: 10,
     // NR (5G) download speed
     nrDownload: "0",
     // NR (5G) upload speed
@@ -1884,19 +1884,17 @@ function processAllInfos() {
   },
 
   updateRefreshRate() {
-    // Check if the refresh rate is less than 3
-    if (this.newRefreshRate < 3) {
-      this.newRefreshRate = 3;
+    // Check if the refresh rate is less than 5
+    if (this.newRefreshRate < 5) {
+      this.newRefreshRate = 5;
     }
-    // Clear the old interval
-    clearInterval(this.intervalId);
     // Set the refresh rate
     this.refreshRate = this.newRefreshRate;
     console.log("Refresh Rate Updated to " + this.refreshRate);
     // Store the refresh rate in local storage or session storage
     localStorage.setItem("refreshRate", this.refreshRate);
-    // Initialize with the new refresh rate
-    this.init();
+    // Initialize with the new refresh rate, skipping localStorage read since we just set it
+    this.init(true);
   },
 
   copyToClipboard(text) {
@@ -1936,15 +1934,22 @@ function processAllInfos() {
     }
   },
 
-  init() {
+  init(skipLocalStorage = false) {
+    // Clear any existing interval before creating a new one
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
     // Fetch system information (uptime, load, network speed)
     this.fetchSysInfo();
     // Retrieve the refresh rate from local storage or session storage
-    const storedRefreshRate = localStorage.getItem("refreshRate");
-    // If a refresh rate is stored, use it; otherwise, use a default value
-    this.refreshRate = storedRefreshRate
-      ? parseInt(storedRefreshRate)
-      : 3; // Change 3 to your desired default value
+    // Skip reading from localStorage if skipLocalStorage is true (e.g., when called from updateRefreshRate)
+    if (!skipLocalStorage) {
+      const storedRefreshRate = localStorage.getItem("refreshRate");
+      // If a refresh rate is stored, use it; otherwise, use a default value
+      this.refreshRate = storedRefreshRate
+        ? parseInt(storedRefreshRate)
+        : 10; // Default refresh rate in seconds
+    }
     this.fetchAllInfo();
 
     this.requestPing()
