@@ -944,7 +944,7 @@ function processAllInfos() {
           if (ratValue === "LTE+NR") {
             this.networkModeBadges = [
               { label: "LTE", class: "badge-success-modern" },
-              { label: "5G-NSA", class: "badge-success-modern" }
+              { label: "5G-NSA", class: "badge-info-modern" }
             ];
           } else if (ratValue === "LTE") {
             this.networkModeBadges = [
@@ -952,7 +952,7 @@ function processAllInfos() {
             ];
           } else if (ratValue === "NR5G_SA") {
             this.networkModeBadges = [
-              { label: "5G-SA", class: "badge-success-modern" }
+              { label: "5G-SA", class: "badge-info-modern" }
             ];
           } else {
             // For unknown or other values, show as text

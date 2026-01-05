@@ -544,8 +544,8 @@
                       <tr x-show="rsrqLTE != '-' || rsrpLTE != '-' || sinrLTE != '-'">
                         <td colspan="2" class="pt-3 pb-2 border-0">
                           <div class="d-flex flex-column gap-2" style="width: fit-content;">
-                            <span class="badge badge-success-modern" style="font-size: inherit; display: inline-block; width: 2.5em; text-align: center;">
-                              4G
+                            <span class="badge badge-success-modern" style="font-size: inherit; display: flex; align-items: center; justify-content: center; width: 2.5em; text-align: center;">
+                              LTE
                             </span>
                             <div class="d-flex flex-column gap-1">
                               <span x-show="eNBIDLTE && eNBIDLTE != '-' && eNBIDLTE != 'Unknown' && eNBIDLTE != ''" class="small text-muted" style="font-size: 0.85em;">
@@ -671,7 +671,7 @@
                       <tr x-show="rsrqNR != '-' || rsrpNR != '-' || sinrNR != '-'">
                         <td colspan="2" class="pt-3 pb-2 border-0">
                           <div class="d-flex flex-column gap-2" style="width: fit-content;">
-                            <span class="badge badge-success-modern" style="font-size: inherit; display: inline-block; width: fit-content; text-align: center; padding-left: 0.5em; padding-right: 0.5em;">
+                            <span class="badge badge-info-modern" style="font-size: inherit; display: inline-block; width: fit-content; text-align: center; padding-left: 0.5em; padding-right: 0.5em;">
                               <span x-text="get5GBadgeText()"></span>
                             </span>
                             <div class="d-flex flex-column gap-1">

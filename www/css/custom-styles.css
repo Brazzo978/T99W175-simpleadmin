@@ -1815,6 +1815,14 @@ html[data-bs-theme="light"] .btn-close {
   padding: 0.35em 0.65em;
   border-radius: 6px;
 }
+
+.badge-info-modern {
+  background: var(--info-gradient);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0.35em 0.65em;
+  border-radius: 6px;
+}
 /* ====================================
    Modern Loading Modal Styles
    ==================================== */
