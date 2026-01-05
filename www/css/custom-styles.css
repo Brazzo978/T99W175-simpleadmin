@@ -229,6 +229,7 @@ html[data-bs-theme="light"] .dark-mode-icon-moon {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-shrink: 0;
 }
 
 .navbar-user-avatar {
@@ -242,18 +243,25 @@ html[data-bs-theme="light"] .dark-mode-icon-moon {
   color: white;
   font-weight: 600;
   font-size: 0.875rem;
+  flex-shrink: 0;
 }
 
 .navbar-user-info {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .navbar-user-name {
   font-weight: 600;
   font-size: 0.875rem;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 
 .navbar-user-role {

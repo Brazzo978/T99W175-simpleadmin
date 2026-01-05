@@ -555,47 +555,48 @@
                           </div>
                         </td>
                       </tr>
-                      <tr x-show="rsrqLTE != '-'" style="border-top: none; padding-top: 0.5rem;">
-                        <th scope="row" class="ps-3">RSRQ</th>
+                      <tr x-show="rssiLTE != '-'">
+                        <th scope="row" class="ps-3">RSSI</th>
                         <td
                           class="gap-4 align-items-center"
-                          x-data="{ getProgressBarClass: function() {
-                          // Remove the percentage sign and convert to integer
-                          var percentage = parseInt(this.rsrqLTEPercentage);
+                          x-data="{
+                          getProgressBarClass: function() {
+                              var percentage = parseInt(this.rssiLTEPercentage);
 
-                          if (percentage >= 60) {
-                              return 'progress-bar bg-success is-medium';
-                          } else if (percentage >= 40) {
-                              return 'progress-bar bg-warning is-warning is-medium';
-                          } else {
-                              return 'progress-bar bg-danger is-medium';
+                              if (percentage >= 60) {
+                                  return 'progress-bar bg-success is-medium';
+                              } else if (percentage >= 40) {
+                                  return 'progress-bar bg-warning is-warning is-medium';
+                              } else {
+                                  return 'progress-bar bg-danger is-medium';
+                              }
                           }
-                      } }"
+                        }"
                         >
                           <div
-                            x-show="rsrqLTE != '-' && rsrqLTEPercentage != '0'"
+                            x-show="rssiLTE != '-' && rssiLTEPercentage != '0'"
                             class="progress w-100"
                             role="progressbar"
-                            aria-label="RSRQ BAR"
-                            :aria-valuenow="rsrqLTEPercentage"
+                            aria-label="RSSI BAR"
+                            :aria-valuenow="rssiLTEPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
                             style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
-                              :style="'width: ' + rsrqLTEPercentage + '%'"
+                              :style="'width: ' + rssiLTEPercentage + '%'"
                             >
                               <span
-                                x-text="rsrqLTE + ' / ' +  rsrqLTEPercentage + '%'"
+                                x-text="rssiLTE + ' / ' + rssiLTEPercentage + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
-                            x-show="rsrqLTEPercentage == '0'"
-                            x-text="rsrqLTE"
+                            x-show="rssiLTEPercentage == '0'"
+                            x-text="rssiLTE"
                           ></span>
-                          <span x-show="rsrqLTE == '-'" class="fst-italic">
+                          <span x-show="rssiLTE == '-'" class="fst-italic">
                             None
                           </span>
                         </td>
@@ -643,52 +644,6 @@
                             x-text="rsrpLTE"
                           ></span>
                           <span x-show="rsrpLTE == '-'" class="fst-italic">
-                            None
-                          </span>
-                        </td>
-                      </tr>
-                      <tr x-show="rssiLTE != '-'">
-                        <th scope="row" class="ps-3">RSSI</th>
-                        <td
-                          class="gap-4 align-items-center"
-                          x-data="{
-                          getProgressBarClass: function() {
-                              var percentage = parseInt(this.rssiLTEPercentage);
-
-                              if (percentage >= 60) {
-                                  return 'progress-bar bg-success is-medium';
-                              } else if (percentage >= 40) {
-                                  return 'progress-bar bg-warning is-warning is-medium';
-                              } else {
-                                  return 'progress-bar bg-danger is-medium';
-                              }
-                          }
-                        }"
-                        >
-                          <div
-                            x-show="rssiLTE != '-' && rssiLTEPercentage != '0'"
-                            class="progress w-100"
-                            role="progressbar"
-                            aria-label="RSSI BAR"
-                            :aria-valuenow="rssiLTEPercentage"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                            style="height: 24px"
-                          >
-                            <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + rssiLTEPercentage + '%'"
-                            >
-                              <span
-                                x-text="rssiLTE + ' / ' + rssiLTEPercentage + '%'"
-                              ></span>
-                            </div>
-                          </div>
-                          <span
-                            x-show="rssiLTEPercentage == '0'"
-                            x-text="rssiLTE"
-                          ></span>
-                          <span x-show="rssiLTE == '-'" class="fst-italic">
                             None
                           </span>
                         </td>
@@ -741,6 +696,52 @@
                           </span>
                         </td>
                       </tr>
+                      <tr x-show="rsrqLTE != '-'" style="border-bottom: none !important;">
+                        <th scope="row" class="ps-3" style="border-bottom: none !important;">RSRQ</th>
+                        <td
+                          class="gap-4 align-items-center"
+                          style="border-bottom: none !important;"
+                          x-data="{ getProgressBarClass: function() {
+                          // Remove the percentage sign and convert to integer
+                          var percentage = parseInt(this.rsrqLTEPercentage);
+
+                          if (percentage >= 60) {
+                              return 'progress-bar bg-success is-medium';
+                          } else if (percentage >= 40) {
+                              return 'progress-bar bg-warning is-warning is-medium';
+                          } else {
+                              return 'progress-bar bg-danger is-medium';
+                          }
+                      } }"
+                        >
+                          <div
+                            x-show="rsrqLTE != '-' && rsrqLTEPercentage != '0'"
+                            class="progress w-100"
+                            role="progressbar"
+                            aria-label="RSRQ BAR"
+                            :aria-valuenow="rsrqLTEPercentage"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            style="height: 24px"
+                          >
+                            <div
+                              :class="getProgressBarClass()"
+                              :style="'width: ' + rsrqLTEPercentage + '%'"
+                            >
+                              <span
+                                x-text="rsrqLTE + ' / ' +  rsrqLTEPercentage + '%'"
+                              ></span>
+                            </div>
+                          </div>
+                          <span
+                            x-show="rsrqLTEPercentage == '0'"
+                            x-text="rsrqLTE"
+                          ></span>
+                          <span x-show="rsrqLTE == '-'" class="fst-italic">
+                            None
+                          </span>
+                        </td>
+                      </tr>
                       <tr x-show="rsrqNR != '-' || rsrpNR != '-' || rssiNR != '-' || sinrNR != '-'">
                         <td colspan="2" class="pt-3 pb-2 border-0">
                           <div class="d-flex flex-column gap-2" style="width: fit-content;">
@@ -769,46 +770,48 @@
                           </div>
                         </td>
                       </tr>
-                      <tr x-show="rsrqNR != '-'" style="border-top: none; padding-top: 0.5rem;">
-                        <th scope="row" class="ps-3">RSRQ</th>
+                      <tr x-show="rssiNR != '-'">
+                        <th scope="row" class="ps-3">RSSI</th>
                         <td
-                          x-data="{ getProgressBarClass: function() {
-                          // Remove the percentage sign and convert to integer
-                          var percentage = parseInt(this.rsrqNRPercentage);
+                          class="gap-4 align-items-center"
+                          x-data="{
+                          getProgressBarClass: function() {
+                              var percentage = parseInt(this.rssiNRPercentage);
 
-                          if (percentage >= 60) {
-                              return 'progress-bar bg-success is-medium';
-                          } else if (percentage >= 40) {
-                              return 'progress-bar bg-warning is-warning is-medium';
-                          } else {
-                              return 'progress-bar bg-danger is-medium';
+                              if (percentage >= 60) {
+                                  return 'progress-bar bg-success is-medium';
+                              } else if (percentage >= 40) {
+                                  return 'progress-bar bg-warning is-warning is-medium';
+                              } else {
+                                  return 'progress-bar bg-danger is-medium';
+                              }
                           }
-                      } }"
+                        }"
                         >
                           <div
-                            x-show="rsrqNR != '-' && rsrqNRPercentage != '0'"
+                            x-show="rssiNR != '-' && rssiNRPercentage != '0'"
                             class="progress w-100"
                             role="progressbar"
-                            aria-label="RSRQ BAR"
-                            :aria-valuenow="rsrqNRPercentage"
+                            aria-label="RSSI BAR"
+                            :aria-valuenow="rssiNRPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
                             style="height: 24px"
                           >
                             <div
                               :class="getProgressBarClass()"
-                              :style="'width: ' + rsrqNRPercentage + '%'"
+                              :style="'width: ' + rssiNRPercentage + '%'"
                             >
                               <span
-                                x-text="rsrqNR + ' / ' + rsrqNRPercentage + '%'"
+                                x-text="rssiNR + ' / ' + rssiNRPercentage + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
-                            x-show="rsrqNRPercentage == '0'"
-                            x-text="rsrqNR"
+                            x-show="rssiNRPercentage == '0'"
+                            x-text="rssiNR"
                           ></span>
-                          <span x-show="rsrqNR == '-'" class="fst-italic">
+                          <span x-show="rssiNR == '-'" class="fst-italic">
                             None
                           </span>
                         </td>
@@ -860,52 +863,6 @@
                           </span>
                         </td>
                       </tr>
-                      <tr x-show="rssiNR != '-'">
-                        <th scope="row" class="ps-3">RSSI</th>
-                        <td
-                          class="gap-4 align-items-center"
-                          x-data="{
-                          getProgressBarClass: function() {
-                              var percentage = parseInt(this.rssiNRPercentage);
-
-                              if (percentage >= 60) {
-                                  return 'progress-bar bg-success is-medium';
-                              } else if (percentage >= 40) {
-                                  return 'progress-bar bg-warning is-warning is-medium';
-                              } else {
-                                  return 'progress-bar bg-danger is-medium';
-                              }
-                          }
-                        }"
-                        >
-                          <div
-                            x-show="rssiNR != '-' && rssiNRPercentage != '0'"
-                            class="progress w-100"
-                            role="progressbar"
-                            aria-label="RSSI BAR"
-                            :aria-valuenow="rssiNRPercentage"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                            style="height: 24px"
-                          >
-                            <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + rssiNRPercentage + '%'"
-                            >
-                              <span
-                                x-text="rssiNR + ' / ' + rssiNRPercentage + '%'"
-                              ></span>
-                            </div>
-                          </div>
-                          <span
-                            x-show="rssiNRPercentage == '0'"
-                            x-text="rssiNR"
-                          ></span>
-                          <span x-show="rssiNR == '-'" class="fst-italic">
-                            None
-                          </span>
-                        </td>
-                      </tr>
                       <tr x-show="sinrNR != '-'" style="border-bottom: none !important;">
                         <th scope="row" class="ps-3" style="border-bottom: none !important;">SINR</th>
                         <td
@@ -950,6 +907,52 @@
                             x-show="sinrNRPercentage == '0'"
                           ></span>
                           <span x-show="sinrNR == '-'" class="fst-italic">
+                            None
+                          </span>
+                        </td>
+                      </tr>
+                      <tr x-show="rsrqNR != '-'" style="border-bottom: none !important;">
+                        <th scope="row" class="ps-3" style="border-bottom: none !important;">RSRQ</th>
+                        <td
+                          class="gap-4 align-items-center"
+                          style="border-bottom: none !important;"
+                          x-data="{ getProgressBarClass: function() {
+                          // Remove the percentage sign and convert to integer
+                          var percentage = parseInt(this.rsrqNRPercentage);
+
+                          if (percentage >= 60) {
+                              return 'progress-bar bg-success is-medium';
+                          } else if (percentage >= 40) {
+                              return 'progress-bar bg-warning is-warning is-medium';
+                          } else {
+                              return 'progress-bar bg-danger is-medium';
+                          }
+                      } }"
+                        >
+                          <div
+                            x-show="rsrqNR != '-' && rsrqNRPercentage != '0'"
+                            class="progress w-100"
+                            role="progressbar"
+                            aria-label="RSRQ BAR"
+                            :aria-valuenow="rsrqNRPercentage"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            style="height: 24px"
+                          >
+                            <div
+                              :class="getProgressBarClass()"
+                              :style="'width: ' + rsrqNRPercentage + '%'"
+                            >
+                              <span
+                                x-text="rsrqNR + ' / ' + rsrqNRPercentage + '%'"
+                              ></span>
+                            </div>
+                          </div>
+                          <span
+                            x-show="rsrqNRPercentage == '0'"
+                            x-text="rsrqNR"
+                          ></span>
+                          <span x-show="rsrqNR == '-'" class="fst-italic">
                             None
                           </span>
                         </td>

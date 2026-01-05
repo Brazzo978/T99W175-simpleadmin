@@ -480,11 +480,11 @@ function processAllInfos() {
               };
 
               addMetric(
-                "rsrq",
-                currentEntry.technology === "NR" ? "SS_RSRQ" : "RSRQ",
-                currentEntry.metricsData.rsrq,
-                "dB",
-                this.calculateRSRQPercentage
+                "rssi",
+                "RSSI",
+                currentEntry.metricsData.rssi,
+                "dBm",
+                this.calculateRSSIPercentage
               );
               addMetric(
                 "rsrp",
@@ -494,18 +494,18 @@ function processAllInfos() {
                 this.calculateRSRPPercentage
               );
               addMetric(
-                "rssi",
-                "RSSI",
-                currentEntry.metricsData.rssi,
-                "dBm",
-                this.calculateRSSIPercentage
-              );
-              addMetric(
                 "sinr",
                 currentEntry.technology === "NR" ? "SS_SINR" : "SINR",
                 currentEntry.metricsData.sinr,
                 "dB",
                 this.calculateSINRPercentage
+              );
+              addMetric(
+                "rsrq",
+                currentEntry.technology === "NR" ? "SS_RSRQ" : "RSRQ",
+                currentEntry.metricsData.rsrq,
+                "dB",
+                this.calculateRSRQPercentage
               );
 
               // Process antennas for display
