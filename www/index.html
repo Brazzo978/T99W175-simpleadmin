@@ -447,23 +447,35 @@
                         <th scope="row">CELL ID</th>
                         <td x-text="cellID"></td>
                       </tr>
-                      <tr style="border-bottom: none !important;">
-                        <th scope="row" style="border-bottom: none !important;">eNB ID</th>
-                        <td x-text="eNBID" style="border-bottom: none !important;"></td>
-                      </tr>
                       <tr x-show="rsrqLTE != '-' || rsrpLTE != '-' || rssiLTE != '-' || sinrLTE != '-'">
                         <td colspan="2" class="pt-3 pb-2 border-0">
-                          <div class="d-flex flex-column" style="width: fit-content;">
+                          <div class="d-flex flex-column gap-2" style="width: fit-content;">
                             <span class="badge badge-success-modern" style="font-size: inherit;">
                               4G
                             </span>
-                            <span x-show="tacLTE && tacLTE != '-' && tacLTE != ''" class="small text-muted mt-1" style="font-size: 0.85em;">
-                              TAC <span x-text="tacLTE"></span>
-                            </span>
+                            <div class="d-flex flex-column gap-1">
+                              <span x-show="eNBIDLTE && eNBIDLTE != '-' && eNBIDLTE != 'Unknown' && eNBIDLTE != ''" class="small text-muted" style="font-size: 0.85em;">
+                                eNB ID <span x-text="eNBIDLTE"></span>
+                                <button 
+                                  type="button"
+                                  class="btn btn-link p-0 border-0 text-muted"
+                                  style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                                  @click="copyToClipboard(eNBIDLTE); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                                  title="Copy eNB ID to clipboard">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                  </svg>
+                                </button>
+                              </span>
+                              <span x-show="tacLTE && tacLTE != '-' && tacLTE != ''" class="small text-muted" style="font-size: 0.85em;">
+                                TAC <span x-text="tacLTE"></span>
+                              </span>
+                            </div>
                           </div>
                         </td>
                       </tr>
-                      <tr x-show="rsrqLTE != '-'" style="border-top: none;">
+                      <tr x-show="rsrqLTE != '-'" style="border-top: none; padding-top: 0.5rem;">
                         <th scope="row" class="ps-3">RSRQ</th>
                         <td
                           class="gap-4 align-items-center"
@@ -651,17 +663,33 @@
                       </tr>
                       <tr x-show="rsrqNR != '-' || rsrpNR != '-' || rssiNR != '-' || sinrNR != '-'">
                         <td colspan="2" class="pt-3 pb-2 border-0">
-                          <div class="d-flex flex-column" style="width: fit-content;">
+                          <div class="d-flex flex-column gap-2" style="width: fit-content;">
                             <span class="badge badge-success-modern" style="font-size: inherit;">
                               5G
                             </span>
-                            <span x-show="tacNR && tacNR != '-' && tacNR != ''" class="small text-muted mt-1" style="font-size: 0.85em;">
-                              TAC <span x-text="tacNR"></span>
-                            </span>
+                            <div class="d-flex flex-column gap-1">
+                              <span x-show="eNBIDNR && eNBIDNR != '-' && eNBIDNR != 'Unknown' && eNBIDNR != ''" class="small text-muted" style="font-size: 0.85em;">
+                                eNB ID <span x-text="eNBIDNR"></span>
+                                <button 
+                                  type="button"
+                                  class="btn btn-link p-0 border-0 text-muted"
+                                  style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                                  @click="copyToClipboard(eNBIDNR); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                                  title="Copy eNB ID to clipboard">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                  </svg>
+                                </button>
+                              </span>
+                              <span x-show="tacNR && tacNR != '-' && tacNR != ''" class="small text-muted" style="font-size: 0.85em;">
+                                TAC <span x-text="tacNR"></span>
+                              </span>
+                            </div>
                           </div>
                         </td>
                       </tr>
-                      <tr x-show="rsrqNR != '-'" style="border-top: none;">
+                      <tr x-show="rsrqNR != '-'" style="border-top: none; padding-top: 0.5rem;">
                         <th scope="row" class="ps-3">RSRQ</th>
                         <td
                           x-data="{ getProgressBarClass: function() {

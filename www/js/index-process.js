@@ -60,8 +60,10 @@ function processAllInfos() {
     ipv6: "0000:0000:0000:0000:0000:0000:0000:0000",
     // Cell ID
     cellID: "Unknown",
-    // eNodeB ID
-    eNBID: "Unknown",
+    // eNodeB ID for LTE
+    eNBIDLTE: "-",
+    // eNodeB ID for NR
+    eNBIDNR: "-",
     // Tracking Area Code (legacy, kept for compatibility)
     tac: "Unknown",
     // Tracking Area Code for LTE
@@ -1116,6 +1118,7 @@ function processAllInfos() {
               this.rsrpNRPercentage = 0;
               this.rsrqNRPercentage = 0;
               this.sinrNRPercentage = 0;
+              this.eNBIDNR = "-";
             }
 
             if (!hasLTEStats) {
@@ -1125,7 +1128,14 @@ function processAllInfos() {
               this.rsrpLTEPercentage = 0;
               this.rsrqLTEPercentage = 0;
               this.sinrLTEPercentage = 0;
+              this.eNBIDLTE = "-";
             }
+
+            // Track what info is available for fallback strategy
+            let lteCellIdAvailable = false;
+            let lteTacAvailable = false;
+            let nrCellIdAvailable = false;
+            let nrTacAvailable = false;
 
             if (hasLTEStats) {
               const lteCellIdLine = lines.find((line) =>
@@ -1138,7 +1148,8 @@ function processAllInfos() {
                 );
                 if (cellInfo) {
                   this.cellID = cellInfo.display;
-                  this.eNBID = cellInfo.eNbId;
+                  this.eNBIDLTE = cellInfo.eNbId;
+                  lteCellIdAvailable = true;
                   cellInfoSet = true;
                 }
               }
@@ -1156,6 +1167,7 @@ function processAllInfos() {
                   if (!Number.isNaN(numericValue)) {
                     this.tacLTE = numericValue.toString();
                     this.tac = formatTac(lteTacLine.split(":")[1]);
+                    lteTacAvailable = true;
                   }
                 }
               }
@@ -1231,15 +1243,18 @@ function processAllInfos() {
               const nrCellIdLine = lines.find((line) =>
                 line.includes('nr_cell_id:')
               );
-              if (nrCellIdLine && !cellInfoSet) {
+              if (nrCellIdLine) {
                 const nrCellIdValue = nrCellIdLine.split(":")[1];
                 const cellInfo = formatCellInfo(
                   normalizeCellId(nrCellIdValue)
                 );
                 if (cellInfo) {
                   this.cellID = cellInfo.display;
-                  this.eNBID = cellInfo.eNbId;
-                  cellInfoSet = true;
+                  this.eNBIDNR = cellInfo.eNbId;
+                  nrCellIdAvailable = true;
+                  if (!cellInfoSet) {
+                    cellInfoSet = true;
+                  }
                 }
               }
 
@@ -1255,18 +1270,17 @@ function processAllInfos() {
                     : parseInt(tacValue, 10);
                   if (!Number.isNaN(numericValue)) {
                     this.tacNR = numericValue.toString();
+                    nrTacAvailable = true;
                     if (!cellInfoSet) {
                       this.tac = formatTac(nrTacLine.split(":")[1]);
                     }
                   }
                 }
-              } else {
-                // If no NR TAC is found, use the LTE TAC value
-                if (this.tacLTE && this.tacLTE != "-") {
-                  this.tacNR = this.tacLTE;
-                }
               }
 
+            }
+
+            if (hasNRStats) {
               if (!hasLTEStats && !lines.some((line) => line.includes("+CSQ:"))) {
                 this.csq = "NR Mode";
               }
@@ -1327,6 +1341,29 @@ function processAllInfos() {
               signalSamples.push(nrSignal);
             }
 
+            // Apply fallback strategy: if any info is missing, use the remaining info for both
+            // This runs after both LTE and NR processing to ensure proper fallback
+            if (!nrCellIdAvailable && lteCellIdAvailable) {
+              if (this.eNBIDLTE && this.eNBIDLTE !== "-" && this.eNBIDLTE !== "Unknown") {
+                this.eNBIDNR = this.eNBIDLTE;
+              }
+            }
+            if (!nrTacAvailable && lteTacAvailable) {
+              if (this.tacLTE && this.tacLTE !== "-" && this.tacLTE !== "Unknown") {
+                this.tacNR = this.tacLTE;
+              }
+            }
+            if (!lteCellIdAvailable && nrCellIdAvailable) {
+              if (this.eNBIDNR && this.eNBIDNR !== "-" && this.eNBIDNR !== "Unknown") {
+                this.eNBIDLTE = this.eNBIDNR;
+              }
+            }
+            if (!lteTacAvailable && nrTacAvailable) {
+              if (this.tacNR && this.tacNR !== "-" && this.tacNR !== "Unknown") {
+                this.tacLTE = this.tacNR;
+              }
+            }
+
             if (signalSamples.length > 0) {
               const totalSignal = signalSamples.reduce(
                 (accumulator, current) => accumulator + current,
@@ -1350,7 +1387,7 @@ function processAllInfos() {
               .split(",")[4]
               .replace(/"/g, "");
             // Get the eNBID. Its just Cell ID minus the last 2 characters
-            this.eNBID = parseInt(longCID.substring(0, longCID.length - 2), 16);
+            this.eNBIDLTE = parseInt(longCID.substring(0, longCID.length - 2), 16);
             // Get the short Cell ID (Last 2 characters of the Cell ID)
             const shortCID = longCID.substring(longCID.length - 2);
             // cellID
@@ -1377,6 +1414,8 @@ function processAllInfos() {
               this.tacNR = tacNumeric.toString(); // Use LTE TAC for NR in 5G NSA mode
               this.tac = tacNumeric + " ("+localTac+")";
             }
+            // In 5G NSA mode, use LTE eNBID for both LTE and NR
+            this.eNBIDNR = this.eNBIDLTE;
             this.cellID =
               "Short " +
               shortCID +
@@ -1858,6 +1897,43 @@ function processAllInfos() {
     localStorage.setItem("refreshRate", this.refreshRate);
     // Initialize with the new refresh rate
     this.init();
+  },
+
+  copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        // Success - could add visual feedback here if needed
+      }).catch((err) => {
+        console.error('Failed to copy to clipboard:', err);
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+        } catch (fallbackErr) {
+          console.error('Fallback copy failed:', fallbackErr);
+        }
+        document.body.removeChild(textArea);
+      });
+    } else {
+      // Fallback for browsers without clipboard API
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        console.error('Copy failed:', err);
+      }
+      document.body.removeChild(textArea);
+    }
   },
 
   init() {
