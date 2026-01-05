@@ -1135,12 +1135,6 @@ function processAllInfos() {
               this.eNBIDLTE = "-";
             }
 
-            // Track what info is available for fallback strategy
-            let lteCellIdAvailable = false;
-            let lteTacAvailable = false;
-            let nrCellIdAvailable = false;
-            let nrTacAvailable = false;
-
             if (hasLTEStats) {
               const lteCellIdLine = lines.find((line) =>
                 line.includes('lte_cell_id:')
@@ -1154,7 +1148,6 @@ function processAllInfos() {
                   this.cellID = cellInfo.display;
                   this.eNBIDLTE = cellInfo.eNbId;
                   this.decimalCellId = cellInfo.decimalCellId;
-                  lteCellIdAvailable = true;
                   cellInfoSet = true;
                 }
               }
@@ -1172,7 +1165,6 @@ function processAllInfos() {
                   if (!Number.isNaN(numericValue)) {
                     this.tacLTE = numericValue.toString();
                     this.tac = formatTac(lteTacLine.split(":")[1]);
-                    lteTacAvailable = true;
                   }
                 }
               }
@@ -1257,7 +1249,6 @@ function processAllInfos() {
                   this.cellID = cellInfo.display;
                   this.eNBIDNR = cellInfo.eNbId;
                   this.decimalCellId = cellInfo.decimalCellId;
-                  nrCellIdAvailable = true;
                   if (!cellInfoSet) {
                     cellInfoSet = true;
                   }
@@ -1276,7 +1267,6 @@ function processAllInfos() {
                     : parseInt(tacValue, 10);
                   if (!Number.isNaN(numericValue)) {
                     this.tacNR = numericValue.toString();
-                    nrTacAvailable = true;
                     if (!cellInfoSet) {
                       this.tac = formatTac(nrTacLine.split(":")[1]);
                     }
@@ -1347,29 +1337,6 @@ function processAllInfos() {
               signalSamples.push(nrSignal);
             }
 
-            // Apply fallback strategy: if any info is missing, use the remaining info for both
-            // This runs after both LTE and NR processing to ensure proper fallback
-            if (!nrCellIdAvailable && lteCellIdAvailable) {
-              if (this.eNBIDLTE && this.eNBIDLTE !== "-" && this.eNBIDLTE !== "Unknown") {
-                this.eNBIDNR = this.eNBIDLTE;
-              }
-            }
-            if (!nrTacAvailable && lteTacAvailable) {
-              if (this.tacLTE && this.tacLTE !== "-" && this.tacLTE !== "Unknown") {
-                this.tacNR = this.tacLTE;
-              }
-            }
-            if (!lteCellIdAvailable && nrCellIdAvailable) {
-              if (this.eNBIDNR && this.eNBIDNR !== "-" && this.eNBIDNR !== "Unknown") {
-                this.eNBIDLTE = this.eNBIDNR;
-              }
-            }
-            if (!lteTacAvailable && nrTacAvailable) {
-              if (this.tacNR && this.tacNR !== "-" && this.tacNR !== "Unknown") {
-                this.tacLTE = this.tacNR;
-              }
-            }
-
             if (signalSamples.length > 0) {
               const totalSignal = signalSamples.reduce(
                 (accumulator, current) => accumulator + current,
@@ -1419,11 +1386,8 @@ function processAllInfos() {
             const tacNumeric = parseInt(localTac, 16);
             if (!Number.isNaN(tacNumeric)) {
               this.tacLTE = tacNumeric.toString();
-              this.tacNR = tacNumeric.toString(); // Use LTE TAC for NR in 5G NSA mode
               this.tac = tacNumeric + " ("+localTac+")";
             }
-            // In 5G NSA mode, use LTE eNBID for both LTE and NR
-            this.eNBIDNR = this.eNBIDLTE;
             this.cellID =
               "Short " +
               shortCID +
