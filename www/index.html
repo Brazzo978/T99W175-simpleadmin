@@ -1023,16 +1023,16 @@
                   <table class="table">
                     <tbody>
                       <tr>
-                        <th scope="row">Main Sensor (TSENS)</th>
-                        <td x-text="temperature"></td>
+                        <th scope="row">Baseband/Chipset</th>
+                        <td x-text="formatTempWithFahrenheit(temperature)"></td>
                       </tr>
                       <tr>
-                        <th scope="row">PA Temperature</th>
-                        <td x-text="paTemperature"></td>
+                        <th scope="row">Power amplifier</th>
+                        <td x-text="formatTempWithFahrenheit(paTemperature)"></td>
                       </tr>
                       <tr>
-                        <th scope="row">Skin Temperature</th>
-                        <td x-text="skinTemperature"></td>
+                        <th scope="row">External/Board</th>
+                        <td x-text="formatTempWithFahrenheit(skinTemperature)"></td>
                       </tr>
                     </tbody>
                   </table>
