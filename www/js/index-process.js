@@ -62,8 +62,12 @@ function processAllInfos() {
     cellID: "Unknown",
     // eNodeB ID
     eNBID: "Unknown",
-    // Tracking Area Code
+    // Tracking Area Code (legacy, kept for compatibility)
     tac: "Unknown",
+    // Tracking Area Code for LTE
+    tacLTE: "-",
+    // Tracking Area Code for NR
+    tacNR: "-",
     // Signal quality indicator
     csq: "-",
     // LTE Received Signal Strength Indicator
@@ -1143,9 +1147,16 @@ function processAllInfos() {
                 line.includes('lte_tac:')
               );
               if (lteTacLine) {
-                const tacDisplay = formatTac(lteTacLine.split(":")[1]);
-                if (tacDisplay) {
-                  this.tac = tacDisplay;
+                const tacValue = lteTacLine.split(":")[1].trim().replace(/"/g, "");
+                if (tacValue) {
+                  const isHexCandidate = /[A-Fa-f]/.test(tacValue) || /^0x/i.test(tacValue);
+                  const numericValue = isHexCandidate
+                    ? parseInt(tacValue, 16)
+                    : parseInt(tacValue, 10);
+                  if (!Number.isNaN(numericValue)) {
+                    this.tacLTE = numericValue.toString();
+                    this.tac = formatTac(lteTacLine.split(":")[1]);
+                  }
                 }
               }
 
@@ -1235,10 +1246,24 @@ function processAllInfos() {
               const nrTacLine = lines.find((line) =>
                 line.includes('nr_tac:')
               );
-              if (nrTacLine && !cellInfoSet) {
-                const tacDisplay = formatTac(nrTacLine.split(":")[1]);
-                if (tacDisplay) {
-                  this.tac = tacDisplay;
+              if (nrTacLine) {
+                const tacValue = nrTacLine.split(":")[1].trim().replace(/"/g, "");
+                if (tacValue) {
+                  const isHexCandidate = /[A-Fa-f]/.test(tacValue) || /^0x/i.test(tacValue);
+                  const numericValue = isHexCandidate
+                    ? parseInt(tacValue, 16)
+                    : parseInt(tacValue, 10);
+                  if (!Number.isNaN(numericValue)) {
+                    this.tacNR = numericValue.toString();
+                    if (!cellInfoSet) {
+                      this.tac = formatTac(nrTacLine.split(":")[1]);
+                    }
+                  }
+                }
+              } else {
+                // If no NR TAC is found, use the LTE TAC value
+                if (this.tacLTE && this.tacLTE != "-") {
+                  this.tacNR = this.tacLTE;
                 }
               }
 
@@ -1346,7 +1371,12 @@ function processAllInfos() {
               .find((line) => line.includes('+QENG: "LTE"'))
               .split(",")[10]
               .replace(/"/g, "");
-            this.tac = parseInt(localTac, 16) + " ("+localTac+")";
+            const tacNumeric = parseInt(localTac, 16);
+            if (!Number.isNaN(tacNumeric)) {
+              this.tacLTE = tacNumeric.toString();
+              this.tacNR = tacNumeric.toString(); // Use LTE TAC for NR in 5G NSA mode
+              this.tac = tacNumeric + " ("+localTac+")";
+            }
             this.cellID =
               "Short " +
               shortCID +

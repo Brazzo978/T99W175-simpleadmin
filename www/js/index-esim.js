@@ -9,19 +9,26 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-  const esimCard = document.getElementById("esimNavItem");
-
-  // Exit if required elements or modules are missing
-  if (!esimCard || typeof EsimConfig === "undefined") {
+  // Exit if required module is missing
+  if (typeof EsimConfig === "undefined") {
     return;
   }
 
-  // Load eSIM configuration and conditionally show nav item
+  // Load eSIM configuration and conditionally show/hide nav items
   EsimConfig.loadConfig().then((config) => {
     const enabled =
       config && (config.enabled === 1 || config.enabled === "1" || config.enabled === true);
-    if (enabled) {
-      esimCard.style.display = 'block';
+
+    // Hide/show ESIM menu item
+    const esimMenuItem = document.getElementById("esimMenuItem");
+    if (esimMenuItem) {
+      esimMenuItem.style.display = enabled ? "list-item" : "none";
+    }
+
+    // Update divider visibility based on both menu items
+    // Use setTimeout to allow other scripts to run first
+    if (typeof updateConfigMenuDivider === "function") {
+      setTimeout(updateConfigMenuDivider, 0);
     }
   });
 });

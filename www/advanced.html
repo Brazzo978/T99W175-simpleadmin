@@ -20,12 +20,45 @@
       })();
     </script>
 
+    <!-- Hide login UI elements immediately if login is disabled (prevents flash) -->
+    <script>
+      (function() {
+        try {
+          const cached = sessionStorage.getItem("simpleadmin_login_enabled");
+          if (cached) {
+            const config = JSON.parse(cached);
+            const enabled = config && (config.enabled === 1 || config.enabled === "1" || config.enabled === true);
+            if (!enabled) {
+              // Add style to hide login elements before body renders
+              const style = document.createElement('style');
+              style.textContent = `
+                .navbar-user-section,
+                #userAvatar,
+                #navUserName,
+                #logoutButtonDesktop,
+                #logoutButtonMobile,
+                #logoutButton,
+                #usersMenuItem {
+                  display: none !important;
+                }
+              `;
+              document.head.appendChild(style);
+            }
+          }
+        } catch (e) {
+          // Silently fail if sessionStorage is not available
+        }
+      })();
+    </script>
+
     <!--  Import BootStrap Javascript -->
     <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
     <script src="js/esim-config.js" defer></script>
     <script src="js/index-esim.js" defer></script>
+    <script src="js/login-config.js" defer></script>
+    <script src="js/index-login.js" defer></script>
     <script src="js/advanced.js"></script>
     <script src="js/atcommand-utils.js"></script>
   
@@ -108,12 +141,12 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     Monitoring
                   </a></li>
-                  <li><hr class="dropdown-divider"></li>
-                  <li><a class="dropdown-item" href="/credentials.html">
+                  <li id="configMenuDivider"><hr class="dropdown-divider"></li>
+                  <li id="usersMenuItem"><a class="dropdown-item" href="/credentials.html">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     Users
                   </a></li>
-                  <li><a class="dropdown-item" href="/esim.html">
+                  <li id="esimMenuItem"><a class="dropdown-item" href="/esim.html">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
                     eSIM
                   </a></li>
@@ -163,7 +196,7 @@
               </svg>
             </a>
           </div>
-
+
       </nav>
 
         <div class="row mt-5 mb-4">
@@ -186,7 +219,7 @@
                   </div>
                   <div>
                     <div class="col-md-4 mb-3">
-                      <label for="exampleInputEmail1" class="form-label"
+                      <label for="atCommandInput" class="form-label"
                         >AT Command</label
                       >
                       <input

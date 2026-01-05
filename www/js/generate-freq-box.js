@@ -32,6 +32,8 @@ function generateFreqNumberInputs(num) {
     <div class="input-group mb-3" x-show="cellNum >= ${i} && networkModeCell == 'LTE'">
       <input
         type="text"
+        id="earfcn${i}"
+        name="earfcn${i}"
         aria-label="EARFCN"
         placeholder="EARFCN"
         class="form-control"
@@ -39,6 +41,8 @@ function generateFreqNumberInputs(num) {
       />
       <input
         type="text"
+        id="pci${i}"
+        name="pci${i}"
         aria-label="PCI"
         placeholder="PCI"
         class="form-control"

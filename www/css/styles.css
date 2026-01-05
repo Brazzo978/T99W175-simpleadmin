@@ -1,3 +1,6 @@
+/* import fontawesome icons */
+@import url("./all.min.css");
+
 /* import poppins */
 /* poppins-300 - latin */
 @font-face {
@@ -79,8 +82,6 @@
   font-weight: 700;
   src: url('../fonts/poppins-v23-latin-700italic.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
 }
-/* import fontawesome icons */
-@import url("./all.min.css");
 
 * {
   font-family: "Poppins", sans-serif;
