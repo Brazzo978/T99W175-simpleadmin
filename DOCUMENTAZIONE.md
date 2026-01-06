@@ -121,8 +121,11 @@ For enable reboot schedulare, create `/persit/cron` folder
   - `./deploy-www.sh`: standard deployment to default host `192.168.225.1` (preserves existing config settings).
   - `./deploy-www.sh [HOST]`: deploy to a custom host IP/address (e.g., `./deploy-www.sh 192.168.1.100`).
   - `./deploy-www.sh --nologin`: disables login requirement by setting `SIMPLEADMIN_ENABLE_LOGIN=0` in the config file (uses default host).
+  - `./deploy-www.sh --login`: enables login requirement by setting `SIMPLEADMIN_ENABLE_LOGIN=1` in the config file (uses default host).
   - `./deploy-www.sh --noesim`: disables eSIM management by setting `SIMPLEADMIN_ENABLE_ESIM=0` in the config file (uses default host).
-  - `./deploy-www.sh [HOST] --nologin --noesim`: combine custom host with flags (host must be the first argument if not starting with `--`).
+  - `./deploy-www.sh --esim`: enables eSIM management by setting `SIMPLEADMIN_ENABLE_ESIM=1` in the config file (uses default host).
+  - `./deploy-www.sh [HOST] --login --esim`: combine custom host with flags (host must be the first argument if not starting with `--`).
+  - **Mutual exclusivity**: `--nologin` and `--login` cannot be used together; `--noesim` and `--esim` cannot be used together. The script will exit with an error if conflicting options are provided.
 - How it works: the script copies the local `www` directory to `/tmp` on the remote modem via `scp`, then via SSH it stops `qcmap_httpd.service`, removes the old `/WEBSERVER/www` directory, moves the new files to `/WEBSERVER/www`, sets permissions (`chmod -R 755`), optionally modifies `simpleadmin.conf` based on flags, and restarts the web server service.
 
 ## Operational notes
