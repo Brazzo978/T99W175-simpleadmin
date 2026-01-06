@@ -1010,6 +1010,54 @@
                     </div>
                   </div>
                 </template>
+
+                <div class="mt-4">
+                  <h6 class="fw-semibold">Network analysis</h6>
+                  <template x-if="!networkAnalysis">
+                    <p class="mb-0 text-muted">No network analysis available.</p>
+                  </template>
+                  <template x-if="networkAnalysis">
+                    <div class="small">
+                      <p class="mb-1">
+                        <strong x-text="networkAnalysis.primary_title"></strong>
+                      </p>
+                      <p class="mb-2" x-text="networkAnalysis.primary_message"></p>
+
+                      <template x-if="networkAnalysis.why && networkAnalysis.why.length">
+                        <div class="mb-2">
+                          <div class="text-muted fw-semibold">Why</div>
+                          <ul class="mb-2 ps-3">
+                            <template x-for="(item, idx) in networkAnalysis.why" :key="'why-' + idx">
+                              <li x-text="item"></li>
+                            </template>
+                          </ul>
+                        </div>
+                      </template>
+
+                      <template x-if="networkAnalysis.suggestions && networkAnalysis.suggestions.length">
+                        <div class="mb-2">
+                          <div class="text-muted fw-semibold">What to try</div>
+                          <ul class="mb-2 ps-3">
+                            <template x-for="(item, idx) in networkAnalysis.suggestions" :key="'suggestion-' + idx">
+                              <li x-text="item"></li>
+                            </template>
+                          </ul>
+                        </div>
+                      </template>
+
+                      <template x-if="networkAnalysis.secondary_notes && networkAnalysis.secondary_notes.length">
+                        <div class="mb-0">
+                          <div class="text-muted fw-semibold">Notes</div>
+                          <ul class="mb-0 ps-3">
+                            <template x-for="(item, idx) in networkAnalysis.secondary_notes" :key="'note-' + idx">
+                              <li x-text="item"></li>
+                            </template>
+                          </ul>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
               </div>
             </div>
           </div>

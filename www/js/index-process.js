@@ -146,6 +146,8 @@ function processAllInfos() {
     uploadStat: "0",
     // Detailed signal measurements for multiple cells
     detailedSignals: [],
+    // Network analysis advisor output
+    networkAnalysis: null,
     // Auto-refresh interval ID
     intervalId: null,
     // Phone number
@@ -448,6 +450,7 @@ function processAllInfos() {
                 id: currentEntry.id,
                 title,
                 technology: currentEntry.technology,
+                band: currentEntry.band,
                 bandDisplay,
                 bandwidthDisplay: currentEntry.bandwidth || "N/A",
                 channelDisplay: currentEntry.channel || "N/A",
@@ -836,6 +839,7 @@ function processAllInfos() {
           };
 
           this.detailedSignals = buildDetailedSignals();
+          this.networkAnalysis = this.buildNetworkAnalysis(this.detailedSignals);
 
           // --- Temperature ---
           try {
@@ -2082,6 +2086,340 @@ function processAllInfos() {
     const result = this.calculateSINRBar(sinr);
     return result.percentage;
   },
+
+  buildNetworkAnalysis(detailedSignals) {
+    if (!Array.isArray(detailedSignals) || detailedSignals.length === 0) {
+      return null;
+    }
+
+    const carriers = detailedSignals.map((entry) => {
+      const getMetricValue = (key) => {
+        const metric = Array.isArray(entry.metrics)
+          ? entry.metrics.find((item) => item.key === key)
+          : null;
+        return metric && typeof metric.value === "number" ? metric.value : null;
+      };
+
+      const bandRaw = entry.band || entry.bandDisplay || "";
+      const bandNumber = typeof bandRaw === "number"
+        ? bandRaw
+        : parseInt(String(bandRaw).replace(/\D/g, ""), 10);
+
+      return {
+        rat: entry.technology,
+        band: Number.isNaN(bandNumber) ? null : bandNumber,
+        rsrp_dBm: getMetricValue("rsrp"),
+        rsrq_dB: getMetricValue("rsrq"),
+        sinr_dB: getMetricValue("sinr"),
+        rssi_dBm: getMetricValue("rssi"),
+      };
+    });
+
+    const lteCarriers = carriers.filter((carrier) => carrier.rat === "LTE");
+    const nrCarriers = carriers.filter((carrier) => carrier.rat === "NR");
+
+    const median = (values) => {
+      const items = values.filter((value) => typeof value === "number").sort((a, b) => a - b);
+      if (items.length === 0) {
+        return null;
+      }
+      const mid = Math.floor(items.length / 2);
+      return items.length % 2 === 0
+        ? (items[mid - 1] + items[mid]) / 2
+        : items[mid];
+    };
+
+    const getTier = (band, rat) => {
+      if (!band) {
+        return null;
+      }
+      if (rat === "NR") {
+        if (band === 28) {
+          return "LOW";
+        }
+        return "HIGH";
+      }
+      if ([28, 20, 8].includes(band)) {
+        return "LOW";
+      }
+      if (band === 3) {
+        return "MID";
+      }
+      if ([1, 7, 38].includes(band)) {
+        return "HIGH";
+      }
+      return null;
+    };
+
+    const buildScores = (carrier) => {
+      const sinrPct = typeof carrier.sinr_dB === "number"
+        ? this.calculateSINRPercentage(carrier.sinr_dB)
+        : 0;
+      const rsrpPct = typeof carrier.rsrp_dBm === "number"
+        ? this.calculateRSRPPercentage(carrier.rsrp_dBm)
+        : 0;
+      const rsrqPct = typeof carrier.rsrq_dB === "number"
+        ? this.calculateRSRQPercentage(carrier.rsrq_dB)
+        : 0;
+      return this.calculateSignalPercentage(sinrPct, rsrpPct, rsrqPct);
+    };
+
+    const lteScores = lteCarriers.map(buildScores);
+    const nrScores = nrCarriers.map(buildScores);
+
+    const lteRsrpMed = median(lteCarriers.map((carrier) => carrier.rsrp_dBm));
+    const lteRsrqMed = median(lteCarriers.map((carrier) => carrier.rsrq_dB));
+    const lteSinrMed = median(lteCarriers.map((carrier) => carrier.sinr_dB));
+    const lteScoreMed = median(lteScores);
+
+    const nrRsrpMed = median(nrCarriers.map((carrier) => carrier.rsrp_dBm));
+    const nrRsrqMed = median(nrCarriers.map((carrier) => carrier.rsrq_dB));
+    const nrSinrMed = median(nrCarriers.map((carrier) => carrier.sinr_dB));
+    const nrScoreMed = median(nrScores);
+
+    const lteLowBands = lteCarriers.filter((carrier) => {
+      const tier = getTier(carrier.band, "LTE");
+      return tier === "LOW" || tier === "MID";
+    });
+    const lteHighBands = lteCarriers.filter((carrier) => getTier(carrier.band, "LTE") === "HIGH");
+
+    const lteLowRsrpMed = median(lteLowBands.map((carrier) => carrier.rsrp_dBm));
+    const lteHighRsrpMed = median(lteHighBands.map((carrier) => carrier.rsrp_dBm));
+    const lteHighCount = lteHighBands.length;
+
+    const adjustedHighRsrp = typeof lteHighRsrpMed === "number" ? lteHighRsrpMed : -140;
+    const deltaLowHigh = typeof lteLowRsrpMed === "number"
+      ? lteLowRsrpMed - adjustedHighRsrp
+      : null;
+
+    const lteBestRsrp = lteCarriers.reduce((best, carrier) => {
+      if (typeof carrier.rsrp_dBm !== "number") {
+        return best;
+      }
+      return best === null ? carrier.rsrp_dBm : Math.max(best, carrier.rsrp_dBm);
+    }, null);
+
+    const lteCaCount = lteCarriers.length;
+    const nrCount = nrCarriers.length;
+
+    const lteCongested = typeof lteRsrpMed === "number" &&
+      lteRsrpMed >= -95 &&
+      ((typeof lteSinrMed === "number" && lteSinrMed <= 3) ||
+        (typeof lteRsrqMed === "number" && lteRsrqMed <= -12));
+
+    const nrCongested = nrCount > 0 &&
+      typeof nrRsrpMed === "number" &&
+      nrRsrpMed >= -95 &&
+      ((typeof nrSinrMed === "number" && nrSinrMed <= 3) ||
+        (typeof nrRsrqMed === "number" && nrRsrqMed <= -12));
+
+    const formatValue = (value, unit) => {
+      if (typeof value !== "number") {
+        return "N/A";
+      }
+      const rounded = Math.round(value * 10) / 10;
+      return unit ? `${rounded} ${unit}` : `${rounded}`;
+    };
+
+    const buildConfidence = ({ strong = false } = {}) => {
+      let confidence = 50;
+      if (lteCaCount >= 3) {
+        confidence += 10;
+      }
+      if (lteHighCount > 0) {
+        confidence += 10;
+      }
+      if (strong) {
+        confidence += 10;
+      }
+      return Math.min(100, Math.max(0, confidence));
+    };
+
+    const secondaryNotes = [];
+
+    if (!lteCongested && !nrCongested) {
+      const overallGood = (typeof lteScoreMed === "number" && lteScoreMed >= 80) ||
+        (nrCount > 0 && typeof nrScoreMed === "number" && nrScoreMed >= 80);
+      if (overallGood) {
+        return {
+          primary_title: "No issues detected",
+          primary_message: "Signal quality looks good across the observed carriers.",
+          why: [],
+          suggestions: [],
+          secondary_notes: [],
+        };
+      }
+    }
+
+    const ruleA =
+      typeof lteLowRsrpMed === "number" &&
+      lteLowRsrpMed >= -95 &&
+      (lteHighCount === 0 || (typeof lteHighRsrpMed === "number" && lteHighRsrpMed <= -108)) &&
+      typeof deltaLowHigh === "number" &&
+      deltaLowHigh >= 12;
+
+    if (ruleA) {
+      const confidence = buildConfidence({ strong: deltaLowHigh >= 18 });
+      if (confidence >= 60) {
+        return {
+          primary_title: "Likely far from the antenna / strong attenuation",
+          primary_message: "Low-band LTE looks healthy while higher bands are weak or missing.",
+          why: [
+            `LTE low-band median RSRP: ${formatValue(lteLowRsrpMed, "dBm")}`,
+            `LTE high-band median RSRP: ${formatValue(lteHighRsrpMed, "dBm")} (${lteHighCount} bands)`,
+            `Low vs high delta: ${formatValue(deltaLowHigh, "dB")}`,
+          ],
+          suggestions: [
+            "Move the router toward a window or higher position.",
+            "Try small rotations/repositioning (especially with directional antennas).",
+          ],
+          secondary_notes: [],
+        };
+      }
+      secondaryNotes.push("Possible low vs high band imbalance (distance/attenuation).");
+    }
+
+    if (lteCongested || nrCongested) {
+      const strong = (typeof lteSinrMed === "number" && lteSinrMed < 0) ||
+        (typeof lteRsrqMed === "number" && lteRsrqMed < -15) ||
+        (typeof nrSinrMed === "number" && nrSinrMed < 0) ||
+        (typeof nrRsrqMed === "number" && nrRsrqMed < -15);
+      const confidence = buildConfidence({ strong });
+      if (confidence >= 60) {
+        let title = "Likely congestion/interference";
+        if (lteCongested && !nrCongested) {
+          title = "Likely 4G cell congestion/interference";
+        } else if (nrCongested && !lteCongested) {
+          title = "Likely 5G cell congestion/interference";
+        } else if (lteCongested && nrCongested) {
+          title = "Likely 4G/5G congestion/interference";
+        }
+        const why = [];
+        if (lteCongested) {
+          why.push(`LTE RSRP median: ${formatValue(lteRsrpMed, "dBm")}`);
+          why.push(`LTE SINR median: ${formatValue(lteSinrMed, "dB")}`);
+          why.push(`LTE RSRQ median: ${formatValue(lteRsrqMed, "dB")}`);
+        }
+        if (nrCongested) {
+          why.push(`NR RSRP median: ${formatValue(nrRsrpMed, "dBm")}`);
+          why.push(`NR SINR median: ${formatValue(nrSinrMed, "dB")}`);
+          why.push(`NR RSRQ median: ${formatValue(nrRsrqMed, "dB")}`);
+        }
+        return {
+          primary_title: title,
+          primary_message: "Strong signal levels with low quality typically indicate congestion or interference.",
+          why,
+          suggestions: [
+            "Try a different band/cell if your UI supports locking.",
+            "Test at different times of day.",
+            "If using a directional antenna, try small re-aim adjustments.",
+          ],
+          secondary_notes: [],
+        };
+      }
+      secondaryNotes.push("Possible congestion/interference detected.");
+    }
+
+    const ruleC = lteCaCount >= 3 &&
+      typeof lteScoreMed === "number" &&
+      lteScoreMed >= 75 &&
+      (nrCount === 0 ||
+        (typeof nrRsrpMed === "number" && nrRsrpMed <= -110) ||
+        (typeof nrScoreMed === "number" && nrScoreMed <= 40));
+
+    if (ruleC) {
+      const confidence = buildConfidence({ strong: nrCount === 0 || (typeof nrScoreMed === "number" && nrScoreMed <= 30) });
+      if (confidence >= 60) {
+        return {
+          primary_title: "5G reception seems suboptimal vs 4G",
+          primary_message: "LTE carrier aggregation looks good, but 5G is weak or absent.",
+          why: [
+            `LTE CA count: ${lteCaCount}`,
+            `LTE score median: ${formatValue(lteScoreMed, "")}`,
+            `NR count: ${nrCount}`,
+            `NR RSRP/score: ${formatValue(nrRsrpMed, "dBm")} / ${formatValue(nrScoreMed, "")}`,
+          ],
+          suggestions: [
+            "Reposition/rotate the device toward the likely 5G direction (n78 is more sensitive).",
+            "Verify 5G availability at your location and test near a window/outdoors.",
+          ],
+          secondary_notes: [],
+        };
+      }
+      secondaryNotes.push("5G appears weaker than strong LTE CA.");
+    }
+
+    const weakCoverage = typeof lteRsrpMed === "number" && lteRsrpMed <= -105 &&
+      (nrCount === 0 || (typeof nrRsrpMed === "number" && nrRsrpMed <= -105));
+    const lowHighBalanced = typeof deltaLowHigh === "number" ? deltaLowHigh < 12 : true;
+    const ruleD = weakCoverage &&
+      (lowHighBalanced || (lteHighCount === 0 && typeof lteLowRsrpMed === "number" && lteLowRsrpMed <= -105));
+
+    if (ruleD) {
+      const confidence = buildConfidence({ strong: typeof lteRsrpMed === "number" && lteRsrpMed <= -110 });
+      if (confidence >= 60) {
+        const why = [
+          `LTE RSRP median: ${formatValue(lteRsrpMed, "dBm")}`,
+        ];
+        if (nrCount > 0) {
+          why.push(`NR RSRP median: ${formatValue(nrRsrpMed, "dBm")}`);
+        }
+        return {
+          primary_title: "Overall coverage is weak",
+          primary_message: "All observed carriers show weak signal levels.",
+          why,
+          suggestions: [
+            "Try a better placement (near a window or higher position).",
+            "Consider an external antenna and avoid thick walls.",
+          ],
+          secondary_notes: [],
+        };
+      }
+      secondaryNotes.push("Overall coverage looks weak.");
+    }
+
+    const ruleE = lteCaCount <= 2 &&
+      ((typeof lteBestRsrp === "number" && lteBestRsrp <= -100) ||
+        (typeof lteRsrpMed === "number" && lteRsrpMed <= -100));
+
+    if (ruleE) {
+      const confidence = buildConfidence({ strong: typeof lteBestRsrp === "number" && lteBestRsrp <= -105 });
+      if (confidence >= 60) {
+        return {
+          primary_title: "Signal likely too weak for higher CA",
+          primary_message: "Limited carrier aggregation is typical when signal strength is low.",
+          why: [
+            `LTE CA count: ${lteCaCount}`,
+            `Best LTE RSRP: ${formatValue(lteBestRsrp, "dBm")}`,
+          ],
+          suggestions: [
+            "Improve RSRP first (placement/antenna) to enable more stable CA.",
+          ],
+          secondary_notes: [],
+        };
+      }
+      secondaryNotes.push("Carrier aggregation may be limited by weak signal.");
+    }
+
+    if (secondaryNotes.length > 0) {
+      return {
+        primary_title: "No issues detected",
+        primary_message: "No strong issues were detected, but see secondary notes.",
+        why: [],
+        suggestions: [],
+        secondary_notes: secondaryNotes,
+      };
+    }
+
+    return {
+      primary_title: "No issues detected",
+      primary_message: "No clear issues were detected with the current signals.",
+      why: [],
+      suggestions: [],
+      secondary_notes: [],
+    };
+  },
+
   // Calculate the overall signal assessment
   calculateSignalPercentage(sinrPercentage, rsrpPercentage, rsrqPercentage) {
     const sinr = Number.isFinite(sinrPercentage) ? sinrPercentage : 0;
