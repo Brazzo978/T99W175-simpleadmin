@@ -22,7 +22,7 @@ log_action() {
 
 log_action "Factory reset initiated by ${SESSION_USERNAME:-admin} from $REMOTE_ADDR"
 
-# Function to execute AT command (don't fail script on error)
+# Function to execute AT command and capture output (don't fail script on error)
 exec_atcmd() {
     atcli_smd8 "$1" 2>&1 || true
 }
@@ -31,8 +31,16 @@ exec_atcmd() {
 clear_band_locks() {
     log_action "Clearing band locks"
 
-    # Clear all band locks
-    exec_atcmd 'AT^BAND_PREF_EXT'
+    # Clear all band locks (capture output)
+    BAND_OUTPUT=$(exec_atcmd 'AT^BAND_PREF_EXT')
+
+    # Check if command succeeded (output should contain "OK")
+    if echo "$BAND_OUTPUT" | grep -q "OK"; then
+        BAND_CLEARED="true"
+    else
+        BAND_CLEARED="false"
+        log_action "WARNING: Band lock clear command did not return OK"
+    fi
 
     log_action "Band locks cleared"
 }
@@ -41,15 +49,34 @@ clear_band_locks() {
 clear_cell_locks() {
     log_action "Clearing cell locks"
 
-    # Clear LTE locks
-    exec_atcmd 'AT^LTE_LOCK'
+    # Clear LTE locks (capture output)
+    LTE_OUTPUT=$(exec_atcmd 'AT^LTE_LOCK')
 
-    # Clear NR5G Locks
-    exec_atcmd 'AT^NR5G_LOCK'
+    # Clear NR5G Locks (capture output)
+    NR5G_OUTPUT=$(exec_atcmd 'AT^NR5G_LOCK')
 
-    # Set Auto Mode & NSA\SA Auto
-    exec_atcmd 'AT^SLMODE=1,0'
-    exec_atcmd 'AT^NR5G_MODE=0'
+    # Set Auto Mode & NSA\SA Auto (capture output)
+    SLMODE_OUTPUT=$(exec_atcmd 'AT^SLMODE=1,0')
+    NR5G_MODE_OUTPUT=$(exec_atcmd 'AT^NR5G_MODE=0')
+
+    # Check if all commands succeeded
+    CELL_CLEARED="true"
+    if ! echo "$LTE_OUTPUT" | grep -q "OK"; then
+        CELL_CLEARED="false"
+        log_action "WARNING: LTE lock clear command did not return OK"
+    fi
+    if ! echo "$NR5G_OUTPUT" | grep -q "OK"; then
+        CELL_CLEARED="false"
+        log_action "WARNING: NR5G lock clear command did not return OK"
+    fi
+    if ! echo "$SLMODE_OUTPUT" | grep -q "OK"; then
+        CELL_CLEARED="false"
+        log_action "WARNING: SLMODE command did not return OK"
+    fi
+    if ! echo "$NR5G_MODE_OUTPUT" | grep -q "OK"; then
+        CELL_CLEARED="false"
+        log_action "WARNING: NR5G_MODE command did not return OK"
+    fi
 
     log_action "Cell locks cleared"
 }
@@ -59,21 +86,41 @@ restore_xml_configs() {
     log_action "Restoring XML configurations"
 
     local cfg_dir="/etc/data"
+    XML_RESTORED="false"
 
     # Restore factory configs
     if [ -f "$cfg_dir/factory_mobileap_cfg.xml" ]; then
-        cp "$cfg_dir/factory_mobileap_cfg.xml" "$cfg_dir/mobileap_cfg.xml" || log_action "WARNING: Failed to restore mobileap_cfg.xml"
-        log_action "Restored mobileap_cfg.xml"
+        if cp "$cfg_dir/factory_mobileap_cfg.xml" "$cfg_dir/mobileap_cfg.xml"; then
+            log_action "Restored mobileap_cfg.xml"
+            XML_RESTORED="true"
+        else
+            log_action "WARNING: Failed to restore mobileap_cfg.xml"
+        fi
     else
         log_action "WARNING: factory_mobileap_cfg.xml not found"
     fi
 
     if [ -f "$cfg_dir/factory_mobileap_firewall.xml" ]; then
-        cp "$cfg_dir/factory_mobileap_firewall.xml" "$cfg_dir/mobileap_firewall.xml" || log_action "WARNING: Failed to restore mobileap_firewall.xml"
-        log_action "Restored mobileap_firewall.xml"
+        if cp "$cfg_dir/factory_mobileap_firewall.xml" "$cfg_dir/mobileap_firewall.xml"; then
+            log_action "Restored mobileap_firewall.xml"
+        else
+            log_action "WARNING: Failed to restore mobileap_firewall.xml"
+            XML_RESTORED="false"
+        fi
     else
         log_action "WARNING: factory_mobileap_firewall.xml not found"
     fi
+
+    if [ -f "$cfg_dir/ipa/factory_IPACM_cfg.xml" ]; then
+        if cp "$cfg_dir/ipa/factory_IPACM_cfg.xml" "$cfg_dir/ipa/IPACM_cfg.xml"; then
+            log_action "Restored IPACM_cfg.xml"
+        else
+            log_action "WARNING: Failed to restore IPACM_cfg.xml"
+            XML_RESTORED="false"
+        fi
+    else
+        log_action "WARNING: factory_IPACM_cfg.xml not found"
+    fi    
 }
 
 # Function to restore system files
@@ -81,34 +128,68 @@ restore_system_files() {
     log_action "Restoring system files"
 
     local etc_dir="/etc"
+    SYSTEM_RESTORED="true"
 
     # Restore passwd.stock to both passwd and passwd-
     if [ -f "$etc_dir/passwd.stock" ]; then
-        cp "$etc_dir/passwd.stock" "$etc_dir/passwd" || log_action "WARNING: Failed to restore passwd"
-        cp "$etc_dir/passwd.stock" "$etc_dir/passwd-" || log_action "WARNING: Failed to restore passwd-"
+        if ! cp "$etc_dir/passwd.stock" "$etc_dir/passwd"; then
+            log_action "WARNING: Failed to restore passwd"
+            SYSTEM_RESTORED="false"
+        fi
+        if ! cp "$etc_dir/passwd.stock" "$etc_dir/passwd-"; then
+            log_action "WARNING: Failed to restore passwd-"
+            SYSTEM_RESTORED="false"
+        fi
         log_action "Restored passwd and passwd-"
     else
         log_action "WARNING: passwd.stock not found"
+        SYSTEM_RESTORED="false"
     fi
 
     # Restore shadow.stock to both shadow and shadow-
     if [ -f "$etc_dir/shadow.stock" ]; then
-        cp "$etc_dir/shadow.stock" "$etc_dir/shadow" || log_action "WARNING: Failed to restore shadow"
-        cp "$etc_dir/shadow.stock" "$etc_dir/shadow-" || log_action "WARNING: Failed to restore shadow-"
+        if ! cp "$etc_dir/shadow.stock" "$etc_dir/shadow"; then
+            log_action "WARNING: Failed to restore shadow"
+            SYSTEM_RESTORED="false"
+        fi
+        if ! cp "$etc_dir/shadow.stock" "$etc_dir/shadow-"; then
+            log_action "WARNING: Failed to restore shadow-"
+            SYSTEM_RESTORED="false"
+        fi
         log_action "Restored shadow and shadow-"
     else
         log_action "WARNING: shadow.stock not found"
+        SYSTEM_RESTORED="false"
     fi
 
     # Reset web UI credentials
     local credentials_file="/WEBSERVER/www/cgi-bin/credentials.stock"
     if [ -f "$credentials_file" ]; then
-        # Reset admin and guest credentials using sed
-        cp "$credentials_file" /WEBSERVER/www/cgi-bin/credentials.txt || log_action "WARNING: Failed to restore credentials.txt"
-        log_action "Reset web UI credentials to defaults"
+        if ! cp "$credentials_file" /WEBSERVER/www/cgi-bin/credentials.txt; then
+            log_action "WARNING: Failed to restore credentials.txt"
+            SYSTEM_RESTORED="false"
+        else
+            log_action "Reset web UI credentials to defaults"
+        fi
     else
         log_action "WARNING: credentials.stock not found"
+        SYSTEM_RESTORED="false"
     fi
+
+    # Reset Simple Admin configuration
+    local simpleadmin_file="/WEBSERVER/www/config/simpleadmin.conf.stock"
+    if [ -f "$simpleadmin_file" ]; then
+        if ! cp "$simpleadmin_file" /WEBSERVER/www/config/simpleadmin.conf; then
+            log_action "WARNING: Failed to restore simpleadmin.conf"
+            SYSTEM_RESTORED="false"
+        else
+            log_action "Reset Simple Admin configuration to defaults"
+        fi
+    else
+        log_action "WARNING: simpleadmin.conf.stock not found"
+        SYSTEM_RESTORED="false"
+    fi
+
 }
 
 # Function to clear SSH keys
@@ -116,10 +197,15 @@ clear_ssh_keys() {
     log_action "Clearing SSH keys"
 
     local dropbear_dir="/systemrw/data/dropbear"
+    SSH_CLEARED="false"
 
     if [ -d "$dropbear_dir" ]; then
-        rm -f "$dropbear_dir"/*_key "$dropbear_dir"/*_key.pub || log_action "WARNING: Failed to remove some SSH keys"
-        log_action "Cleared dropbear keys"
+        if rm -f "$dropbear_dir"/*_key "$dropbear_dir"/*_key.pub 2>/dev/null; then
+            log_action "Cleared dropbear keys"
+            SSH_CLEARED="true"
+        else
+            log_action "WARNING: Failed to remove some SSH keys"
+        fi
     else
         log_action "WARNING: dropbear directory not found"
     fi
@@ -130,13 +216,13 @@ reboot_system() {
     log_action "System rebooting"
 
     # Give time for response to be sent
-    (sleep 2 && reboot) &
+    (sleep 5 && reboot) &
 }
 
 # Main execution
 main() {
     local errors=0
-    
+
     # Execute all reset operations (continue even if some fail)
     clear_band_locks || errors=$((errors + 1))
     clear_cell_locks || errors=$((errors + 1))
@@ -144,33 +230,87 @@ main() {
     restore_system_files || errors=$((errors + 1))
     clear_ssh_keys || errors=$((errors + 1))
 
+    # Escape and prepare AT command outputs for JSON strings
+    # Convert newlines to literal \n for clean JSON representation
+    local band_output_cell lte_output nr5g_output slmode_output nr5g_mode_output
+    band_output_cell=$(json_escape "${BAND_OUTPUT:-}")
+    lte_output=$(json_escape "${LTE_OUTPUT:-}")
+    nr5g_output=$(json_escape "${NR5G_OUTPUT:-}")
+    slmode_output=$(json_escape "${SLMODE_OUTPUT:-}")
+    nr5g_mode_output=$(json_escape "${NR5G_MODE_OUTPUT:-}")
+
+    # Use actual status flags instead of hardcoded true
+    local band_status cell_status xml_status system_status ssh_status
+    band_status="${BAND_CLEARED:-false}"
+    cell_status="${CELL_CLEARED:-false}"
+    xml_status="${XML_RESTORED:-false}"
+    system_status="${SYSTEM_RESTORED:-false}"
+    ssh_status="${SSH_CLEARED:-false}"
+
     # Always send response, even if some operations failed
     if [ $errors -eq 0 ]; then
-        send_json_response 200 '{
+        local payload
+        payload=$(printf '{
             "status":"success",
             "message":"Factory reset completed successfully. The system will reboot now.",
             "details": {
-                "band_locks_cleared": true,
-                "cell_locks_cleared": true,
-                "xml_configs_restored": true,
-                "system_files_restored": true,
-                "ssh_keys_cleared": true
+                "band_locks_cleared": %s,
+                "cell_locks_cleared": %s,
+                "xml_configs_restored": %s,
+                "system_files_restored": %s,
+                "ssh_keys_cleared": %s,
+                "at_output": {
+                    "band_pref_ext": "%s",
+                    "lte_lock": "%s",
+                    "nr5g_lock": "%s",
+                    "slmode": "%s",
+                    "nr5g_mode": "%s"
+                }
             }
-        }'
+        }' \
+            "$band_status" \
+            "$cell_status" \
+            "$xml_status" \
+            "$system_status" \
+            "$ssh_status" \
+            "$band_output_cell" \
+            "$lte_output" \
+            "$nr5g_output" \
+            "$slmode_output" \
+            "$nr5g_mode_output")
+        send_json_response 200 "$payload"
     else
         local payload
         payload=$(printf '{
             "status":"success",
             "message":"Factory reset completed with some warnings. The system will reboot now.",
             "details": {
-                "band_locks_cleared": true,
-                "cell_locks_cleared": true,
-                "xml_configs_restored": true,
-                "system_files_restored": true,
-                "ssh_keys_cleared": true,
-                "warnings": %d
+                "band_locks_cleared": %s,
+                "cell_locks_cleared": %s,
+                "xml_configs_restored": %s,
+                "system_files_restored": %s,
+                "ssh_keys_cleared": %s,
+                "warnings": %d,
+                "at_output": {
+                    "band_pref_ext": "%s",
+                    "lte_lock": "%s",
+                    "nr5g_lock": "%s",
+                    "slmode": "%s",
+                    "nr5g_mode": "%s"
+                }
             }
-        }' "$errors")
+        }' \
+            "$band_status" \
+            "$cell_status" \
+            "$xml_status" \
+            "$system_status" \
+            "$ssh_status" \
+            "$errors" \
+            "$band_output_cell" \
+            "$lte_output" \
+            "$nr5g_output" \
+            "$slmode_output" \
+            "$nr5g_mode_output")
         send_json_response 200 "$payload"
     fi
 
