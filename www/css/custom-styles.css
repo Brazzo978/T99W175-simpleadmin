@@ -32,6 +32,8 @@
   --info-light: #ecfeff;
   --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
 
+  --orange-gradient: linear-gradient(135deg, #ff8c42 0%, #ff6b35 100%);
+
   --purple-dark-gradient: linear-gradient(135deg, #6b21a8 0%, #4c1d95 100%);
 
   /* Light Mode Colors */
@@ -1768,16 +1770,40 @@ html[data-bs-theme="light"] .btn-close {
 }
 
 /* Dynamic icon colors based on values */
+/* Temperature ranges: 
+   - Blue (cold): < 0°C (approaching lower limit of -30°C)
+   - Green (optimal): 0-35°C (typical at 25°C)
+   - Yellow (warm): 35-50°C (acceptable but getting warm)
+   - Orange (hot): 50-60°C (approaching upper limit)
+   - Red (danger): > 60°C (danger zone, near/beyond 70°C limit)
+*/
+.icon-container.temp-cold {
+  background: var(--info-gradient);
+}
+
+.icon-container.temp-optimal {
+  background: var(--success-gradient);
+}
+
+.icon-container.temp-warm {
+  background: var(--warning-gradient);
+}
+
+.icon-container.temp-hot {
+  background: var(--orange-gradient);
+}
+
+.icon-container.temp-danger {
+  background: var(--danger-gradient);
+}
+
+/* Legacy classes for backward compatibility */
 .icon-container.temp-good {
   background: var(--success-gradient);
 }
 
 .icon-container.temp-warning {
   background: var(--warning-gradient);
-}
-
-.icon-container.temp-danger {
-  background: var(--primary-gradient);
 }
 
 .icon-container.signal-poor {

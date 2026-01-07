@@ -2179,13 +2179,32 @@ function processAllInfos() {
   },
 
   // Get temperature icon container class based on temperature value
+  // Operating range: -30 to 70°C, typical at 25°C
+  // Color scheme:
+  //   Blue (cold): < 0°C (approaching lower limit)
+  //   Green (optimal): 0-35°C (typical at 25°C)
+  //   Yellow (warm): 35-50°C (acceptable but getting warm)
+  //   Orange (hot): 50-60°C (approaching upper limit)
+  //   Red (danger): > 60°C (danger zone, near/beyond 70°C limit)
   getTempIconClass() {
-    const tempValue = parseInt(this.temperature) || 0;
-    if (tempValue >= 0 && tempValue <= 40) {
-      return 'icon-container icon-temp temp-good';
-    } else if (tempValue >= 41 && tempValue <= 50) {
-      return 'icon-container icon-temp temp-warning';
+    // Parse temperature, handling both "25C" and "25" formats
+    const tempStr = String(this.temperature || '0').replace(/[^\d.-]/g, '');
+    const tempValue = parseFloat(tempStr) || 0;
+    
+    if (tempValue < 0) {
+      // Blue: Cold, approaching lower limit (-30°C)
+      return 'icon-container icon-temp temp-cold';
+    } else if (tempValue >= 0 && tempValue < 35) {
+      // Green: Optimal range (typical at 25°C)
+      return 'icon-container icon-temp temp-optimal';
+    } else if (tempValue >= 35 && tempValue < 50) {
+      // Yellow: Warm but acceptable
+      return 'icon-container icon-temp temp-warm';
+    } else if (tempValue >= 50 && tempValue <= 60) {
+      // Orange: Hot, approaching upper limit
+      return 'icon-container icon-temp temp-hot';
     } else {
+      // Red: Danger zone (near/beyond 70°C limit)
       return 'icon-container icon-temp temp-danger';
     }
   },
