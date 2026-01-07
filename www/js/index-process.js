@@ -307,7 +307,7 @@ function processAllInfos() {
       }
       // SIM is ready, execute full command set
       this.atcmd =
-        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;+COPS?;+CIMI;+ICCID;+CNUM;';
+        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;+COPS?;+CIMI;+ICCID;+CNUM;+CSCS=\"GSM\"';
 
       const result = await ATCommandService.execute(this.atcmd, {
         retries: 3,
