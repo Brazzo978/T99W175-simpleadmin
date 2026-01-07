@@ -1,4 +1,4 @@
-# Network Analysis Advisor (RM502Q)
+# Network Analysis Advisor 
 
 This document describes the logic implemented for the network analysis advisor shown in **Advanced Signal Details**.
 
