@@ -1842,6 +1842,80 @@ function processAllInfos() {
     }
   },
 
+  hexToRgb(hex) {
+    const cleanHex = hex.replace('#', '');
+    if (cleanHex.length !== 6) {
+      return null;
+    }
+    const num = parseInt(cleanHex, 16);
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255,
+    };
+  },
+
+  rgbToHex({ r, g, b }) {
+    const toHex = (value) => value.toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  },
+
+  interpolateColor(colorA, colorB, factor) {
+    const rgbA = this.hexToRgb(colorA);
+    const rgbB = this.hexToRgb(colorB);
+    if (!rgbA || !rgbB) {
+      return colorA || colorB || '#6c757d';
+    }
+    const clampFactor = Math.min(1, Math.max(0, factor));
+    const mix = (start, end) =>
+      Math.round(start + (end - start) * clampFactor);
+    return this.rgbToHex({
+      r: mix(rgbA.r, rgbB.r),
+      g: mix(rgbA.g, rgbB.g),
+      b: mix(rgbA.b, rgbB.b),
+    });
+  },
+
+  getInterpolatedSignalColor(value, thresholds, inverted = false) {
+    const numValue = typeof value === 'number' ? value : parseFloat(value);
+    if (isNaN(numValue) || numValue === null || numValue === undefined) {
+      return thresholds.min?.color || '#6c757d';
+    }
+
+    const stops = Object.values(thresholds)
+      .filter((threshold) => typeof threshold?.value === 'number')
+      .map((threshold) => ({ value: threshold.value, color: threshold.color }))
+      .sort((a, b) => a.value - b.value);
+
+    if (stops.length === 0) {
+      return '#6c757d';
+    }
+
+    if (numValue <= stops[0].value) {
+      return stops[0].color;
+    }
+    if (numValue >= stops[stops.length - 1].value) {
+      return stops[stops.length - 1].color;
+    }
+
+    for (let i = 0; i < stops.length - 1; i++) {
+      const start = stops[i];
+      const end = stops[i + 1];
+      if (numValue >= start.value && numValue <= end.value) {
+        const range = end.value - start.value;
+        if (range === 0) {
+          return end.color;
+        }
+        const factor = (numValue - start.value) / range;
+        return inverted
+          ? this.interpolateColor(start.color, end.color, factor)
+          : this.interpolateColor(start.color, end.color, factor);
+      }
+    }
+
+    return stops[stops.length - 1].color;
+  },
+
   clampValue(value, min, max) {
     return Math.min(Math.max(value, min), max);
   },
@@ -1929,7 +2003,7 @@ function processAllInfos() {
     const percentage = Math.round(
       this.piecewisePercentage(numRssi, this.signalPercentagePoints.RSSI)
     );
-    const color = this.getSignalColor(numRssi, config.thresholds);
+    const color = this.getInterpolatedSignalColor(numRssi, config.thresholds);
     
     return { color, percentage };
   },
@@ -1955,7 +2029,7 @@ function processAllInfos() {
     const percentage = Math.round(
       this.piecewisePercentage(numRsrp, this.signalPercentagePoints.RSRP)
     );
-    const color = this.getSignalColor(numRsrp, config.thresholds);
+    const color = this.getInterpolatedSignalColor(numRsrp, config.thresholds);
     
     return { color, percentage };
   },
@@ -1981,7 +2055,7 @@ function processAllInfos() {
     const percentage = Math.round(
       this.piecewisePercentage(numRsrq, this.signalPercentagePoints.RSRQ)
     );
-    const color = this.getSignalColor(numRsrq, config.thresholds);
+    const color = this.getInterpolatedSignalColor(numRsrq, config.thresholds);
     
     return { color, percentage };
   },
@@ -2016,7 +2090,7 @@ function processAllInfos() {
         }
       : config.thresholds;
     
-    const color = this.getSignalColor(numSinr, thresholds);
+    const color = this.getInterpolatedSignalColor(numSinr, thresholds);
     
     return { color, percentage };
   },
