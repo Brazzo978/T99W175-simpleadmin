@@ -172,6 +172,13 @@ function processAllInfos() {
     showImeiInputModal: false,
     imeiValidationError: "",
     isImeiValid: false,
+    // Device information (available even without SIM)
+    manufacturer: "-",
+    modelName: "-",
+    firmwareVersion: "-",
+    lanIp: "-",
+    wwanIpv4: "-",
+    wwanIpv6: "-",
   };
 
   return {
@@ -316,7 +323,7 @@ function processAllInfos() {
       }
       // SIM is ready, execute full command set
       this.atcmd =
-        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;+COPS?;+CIMI;+ICCID;+CNUM;+CSCS=\"GSM\"';
+        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;+COPS?;+CIMI;+ICCID;+CNUM;+CSCS=\"GSM\";+CGMI;+CGMM;^VERSION?;+CGSN';
 
       const result = await ATCommandService.execute(this.atcmd, {
         retries: 3,
@@ -1095,6 +1102,11 @@ function processAllInfos() {
             .find((line) => line.includes("+CGCONTRDP:"))
             .split(",")[4]
             .replace(/"/g, "");
+
+          // Also store in wwanIpv4/wwanIpv6 for device info modal
+          this.wwanIpv4 = this.ipv4;
+          this.wwanIpv6 = this.ipv6;
+
           // Signal Informations
           const currentNetworkMode = this.networkMode;
           const hasNRStats = lines.some((line) =>
@@ -1571,13 +1583,27 @@ function processAllInfos() {
             this.signalAssessment = "No Signal";
           }
 
-          // Parse SIM info: IMSI, ICCID, Phone Number
+          // Parse SIM info: IMSI, ICCID, Phone Number, Device Info
+          let ctx = null;
           for (const line of lines) {
             const trimmed = line.trim();
 
-            // Parse IMSI (15 digits)
-            if (/^\d{15}$/.test(trimmed)) {
+            // Track context for multi-line AT command responses
+            if (trimmed.startsWith("AT+")) {
+              ctx = trimmed;
+              continue;
+            }
+
+            // Parse IMSI (15 digits) - only in AT+CIMI context
+            if (ctx?.startsWith("AT+CIMI") && /^\d{15}$/.test(trimmed)) {
               this.imsi = trimmed;
+              ctx = null;
+              continue;
+            }
+            // Fallback IMSI detection
+            if ((!this.imsi || this.imsi === "Unknown" || this.imsi === "-") && /^\d{15}$/.test(trimmed) && !trimmed.startsWith("89") && trimmed !== this.imei) {
+              this.imsi = trimmed;
+              continue;
             }
 
             // Parse ICCID
@@ -1597,6 +1623,62 @@ function processAllInfos() {
                 this.phoneNumber = match[1];
               }
             }
+
+            // Parse IMEI (from AT+CGSN context or +CGSN: response)
+            if (ctx?.startsWith("AT+CGSN")) {
+              const imeiMatch = trimmed.match(/(\d{15,17})/);
+              if (imeiMatch) {
+                this.imei = imeiMatch[1].substring(0, 15);
+              }
+              ctx = null;
+              continue;
+            }
+            if (trimmed.includes('+CGSN:')) {
+              const imeiMatch = trimmed.match(/(\d{15,17})/);
+              if (imeiMatch) {
+                this.imei = imeiMatch[1].substring(0, 15);
+              }
+              continue;
+            }
+            // Fallback IMEI detection (only if not already found)
+            if ((this.imei === "Unknown" || this.imei === "-" || !this.imei) && /^\d{15,17}$/.test(trimmed) && !trimmed.startsWith("89") && trimmed !== this.imsi) {
+              this.imei = trimmed.substring(0, 15);
+              continue;
+            }
+
+            // Parse firmware version (^VERSION?)
+            if (trimmed.startsWith('^VERSION:')) {
+              this.firmwareVersion = trimmed.split(':')[1]?.trim() || trimmed;
+              // Extract model name from version if not yet set
+              if (this.modelName === "-") {
+                const modelMatch = this.firmwareVersion.match(/^([A-Za-z0-9_-]+)/);
+                if (modelMatch) {
+                  this.modelName = modelMatch[1];
+                }
+              }
+            }
+
+            // Parse manufacturer (+CGMI)
+            if (ctx?.startsWith("AT+CGMI")) {
+              this.manufacturer = trimmed;
+              ctx = null;
+              continue;
+            }
+            // Fallback manufacturer detection
+            if (this.manufacturer === "-" && /QUALCOMM|QUECTEL|HUAWEI|FIBOCOM|Sierra|Foxconn/i.test(trimmed)) {
+              this.manufacturer = trimmed;
+            }
+
+            // Parse model name (+CGMM)
+            if (ctx?.startsWith("AT+CGMM")) {
+              this.modelName = trimmed;
+              ctx = null;
+              continue;
+            }
+            // Fallback model name detection
+            if (this.modelName === "-" && /^[A-Za-z0-9_-]{3,}$/.test(trimmed) && !trimmed.startsWith('AT')) {
+              this.modelName = trimmed;
+            }
           }
 
         this.lastUpdate = new Date().toLocaleString();
@@ -1610,6 +1692,16 @@ function processAllInfos() {
         error.message || "Unknown error occurred during the AT request."
       );
     }
+
+    // Fetch LAN IP (this works even without SIM)
+    fetch("/cgi-bin/get_lanip")
+      .then(res => res.json())
+      .then(data => {
+        this.lanIp = data.lanip;
+      })
+      .catch(error => {
+        console.error("Error fetching LAN IP:", error);
+      });
   },
 
 
@@ -2792,40 +2884,92 @@ function processAllInfos() {
   },
 
   copyToClipboard(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => {
-        // Success - could add visual feedback here if needed
-      }).catch((err) => {
-        console.error('Failed to copy to clipboard:', err);
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        textArea.style.position = 'fixed';
-        textArea.style.opacity = '0';
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-          document.execCommand('copy');
-        } catch (fallbackErr) {
-          console.error('Fallback copy failed:', fallbackErr);
-        }
-        document.body.removeChild(textArea);
-      });
-    } else {
-      // Fallback for browsers without clipboard API
+    // Check if we're inside a modal
+    const modal = document.querySelector('.modal.show');
+
+    if (modal) {
+      // We're in a modal - append input INSIDE the modal-dialog to work around focus enforcement
+      const modalDialog = modal.querySelector('.modal-dialog');
+
       const textArea = document.createElement('textarea');
       textArea.value = text;
+      textArea.setAttribute('readonly', '');
       textArea.style.position = 'fixed';
-      textArea.style.opacity = '0';
-      document.body.appendChild(textArea);
+      textArea.style.top = '0';
+      textArea.style.left = '0';
+      textArea.style.width = '2em';
+      textArea.style.height = '2em';
+      textArea.style.padding = '0';
+      textArea.style.border = 'none';
+      textArea.style.outline = 'none';
+      textArea.style.boxShadow = 'none';
+      textArea.style.background = 'transparent';
+
+      // Append to modal dialog instead of body - this works with Bootstrap's focus enforcement
+      modalDialog.appendChild(textArea);
+
+      textArea.focus();
       textArea.select();
+      textArea.setSelectionRange(0, 99999);
+
       try {
-        document.execCommand('copy');
+        const successful = document.execCommand('copy');
+        if (!successful) {
+          console.error('Copy command failed');
+        }
       } catch (err) {
         console.error('Copy failed:', err);
       }
-      document.body.removeChild(textArea);
+
+      modalDialog.removeChild(textArea);
+    } else {
+      // Not in a modal - use standard method
+      this.doCopy(text);
     }
+  },
+
+  doCopy(text) {
+    // Create a textarea element for copying (works across browsers including iOS)
+    const textArea = document.createElement('textarea');
+
+    // Set the value
+    textArea.value = text;
+
+    // Make it read-only to prevent keyboard from showing on mobile
+    textArea.setAttribute('readonly', '');
+
+    // Position it off-screen but still in the DOM
+    textArea.style.position = 'fixed';
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.width = '2em';
+    textArea.style.height = '2em';
+    textArea.style.padding = '0';
+    textArea.style.border = 'none';
+    textArea.style.outline = 'none';
+    textArea.style.boxShadow = 'none';
+    textArea.style.background = 'transparent';
+
+    document.body.appendChild(textArea);
+
+    // Select the text
+    textArea.select();
+
+    // Most modern browsers also require setSelectionRange for iOS
+    textArea.setSelectionRange(0, 99999);
+
+    // Execute the copy command
+    try {
+      const successful = document.execCommand('copy');
+      if (!successful) {
+        console.error('Copy command failed');
+      }
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+
+    // Remove the textarea
+    document.body.removeChild(textArea);
   },
 
   /**

@@ -63,7 +63,8 @@
     <script src="js/atcommand-utils.js"></script>
     <script src="js/reboot-utils.js" defer></script>
     <script src="js/monitor.js"></script>
-    <script src="js/device-info.js"></script>
+    <!-- device-info.js no longer needed - all data is now in index-process.js -->
+    <!-- <script src="js/device-info.js"></script> -->
     <script src="js/dark-mode.js" defer></script>
   </head>
   <body data-require-auth="true">
@@ -1323,7 +1324,7 @@
         </div>
 
         <!-- Device Info Modal -->
-        <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" x-data="fetchDeviceInfo()">
+        <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
           <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
               <div class="modal-header">
