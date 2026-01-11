@@ -165,6 +165,13 @@ function processAllInfos() {
       ping: null,
       dns: null
     },
+    // IMEI editing state (for device info modal)
+    imei: "Unknown",
+    newImei: "",
+    showImeiWarningModal: false,
+    showImeiInputModal: false,
+    imeiValidationError: "",
+    isImeiValid: false,
   };
 
   return {
@@ -2976,6 +2983,126 @@ function processAllInfos() {
       const toast = new bootstrap.Toast(toastElement);
       toast.show();
     }
+  },
+
+  // ===== IMEI Modal Functions =====
+
+  openImeiModal() {
+    this.showImeiWarningModal = true;
+  },
+
+  closeImeiWarningModal() {
+    this.showImeiWarningModal = false;
+  },
+
+  acceptImeiWarning() {
+    this.showImeiWarningModal = false;
+    this.showImeiInputModal = true;
+    this.newImei = "";
+    this.imeiValidationError = "";
+    this.isImeiValid = false;
+  },
+
+  closeImeiInputModal() {
+    this.showImeiInputModal = false;
+    this.newImei = "";
+    this.imeiValidationError = "";
+    this.isImeiValid = false;
+  },
+
+  /**
+   * Validate IMEI input
+   */
+  validateImeiInput() {
+    const imei = this.newImei.trim();
+
+    // Check if empty
+    if (imei === "") {
+      this.imeiValidationError = "";
+      this.isImeiValid = false;
+      return;
+    }
+
+    // Check if only digits
+    if (!/^\d+$/.test(imei)) {
+      this.imeiValidationError = "IMEI must contain only digits";
+      this.isImeiValid = false;
+      return;
+    }
+
+    // Check length
+    if (imei.length < 15) {
+      this.imeiValidationError = `IMEI must be 15 digits (current: ${imei.length})`;
+      this.isImeiValid = false;
+      return;
+    }
+
+    if (imei.length > 15) {
+      this.imeiValidationError = "IMEI must be exactly 15 digits";
+      this.isImeiValid = false;
+      return;
+    }
+
+    // Check if same as current IMEI
+    if (imei === this.imei) {
+      this.imeiValidationError = "New IMEI is the same as current IMEI";
+      this.isImeiValid = false;
+      return;
+    }
+
+    // Valid
+    this.imeiValidationError = "";
+    this.isImeiValid = true;
+  },
+
+  confirmImeiChange() {
+    if (!this.isImeiValid) {
+      return;
+    }
+    this.updateIMEI();
+    this.showImeiInputModal = false;
+    // Trigger global reboot modal
+    const modal = document.getElementById('globalRebootModal');
+    if (modal) {
+      modal.style.display = 'flex';
+    }
+  },
+
+  /**
+   * Process IMEI for AT command format
+   * @param {string} imei - 15-digit IMEI
+   * @returns {string} Formatted IMEI string
+   */
+  processImei(imei) {
+    const withPrefix = "80A" + imei;
+
+    const pairs = [];
+    for (let i = 0; i < withPrefix.length; i += 2) {
+      pairs.push(withPrefix.substring(i, i + 2));
+    }
+
+    const swappedPairs = pairs.map(pair => {
+      if (pair.length === 1) return pair;
+      return pair[1] + pair[0];
+    });
+
+    return swappedPairs.join(',').toLowerCase();
+  },
+
+  /**
+   * Update IMEI via AT commands
+   */
+  async updateIMEI() {
+    const formatted = this.processImei(this.newImei);
+    const byteCount = formatted.split(',').length;
+
+    // Clear existing IMEI
+    const clearCmd = `AT^NV=550,0`;
+    await ATCommandService.execute(clearCmd, { retries: 1, timeout: 5000 });
+
+    // Set new IMEI
+    const setCmd = `AT^NV=550,${byteCount},"${formatted}"`;
+    await ATCommandService.execute(setCmd, { retries: 1, timeout: 5000 });
   },
 };
 }

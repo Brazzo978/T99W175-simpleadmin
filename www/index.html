@@ -386,7 +386,7 @@
                           </button>
                         </td>
                       </tr>
-                      <tr>
+                      <tr x-show="ipv6 && ipv6 !== '0000:0000:0000:0000:0000:0000:0000:0000' && ipv6 !== '-' && ipv6 !== 'Unknown'">
                         <th scope="row">IPv6</th>
                         <td>
                           <span x-text="ipv6"></span>
@@ -1447,7 +1447,7 @@
                           </button>
                         </td>
                       </tr>
-                      <tr>
+                      <tr x-show="wwanIpv6 && wwanIpv6 !== '0000:0000:0000:0000:0000:0000:0000:0000' && wwanIpv6 !== '-' && wwanIpv6 !== 'Unknown'">
                         <th scope="row">WAN IPv6</th>
                         <td class="col-md-2" style="white-space: nowrap;">
                           <span x-text="wwanIpv6"></span>
@@ -1471,12 +1471,9 @@
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- IMEI Edit Modals (from deviceinfo.html) -->
-        <div class="modal-overlay" x-show="showImeiWarningModal" x-cloak>
+              <!-- IMEI Edit Modals (inside deviceInfoModal scope) -->
+              <div class="modal-overlay" x-show="showImeiWarningModal" x-cloak>
           <div class="loading-modal" style="max-width: 500px;">
             <div class="loading-text" style="display: flex; flex-direction: column">
               <h4 class="text-warning">⚠️ Legal Warning</h4>
@@ -1546,6 +1543,9 @@
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
             </div>
           </div>
         </div>
