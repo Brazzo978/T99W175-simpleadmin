@@ -1675,10 +1675,6 @@ function processAllInfos() {
               ctx = null;
               continue;
             }
-            // Fallback model name detection
-            if (this.modelName === "-" && /^[A-Za-z0-9_-]{3,}$/.test(trimmed) && !trimmed.startsWith('AT')) {
-              this.modelName = trimmed;
-            }
           }
 
         this.lastUpdate = new Date().toLocaleString();
