@@ -203,6 +203,8 @@ function processAllInfos() {
         refreshRate: this.refreshRate,
         newRefreshRate: this.newRefreshRate,
         intervalId: this.intervalId,
+        simPin: this.simPin,
+        simPinDisableMode: this.simPinDisableMode,
       };
 
       Object.assign(
@@ -2795,6 +2797,12 @@ function processAllInfos() {
   isSimPinRequired() {
     const status = String(this.simStatus || '').trim().toUpperCase();
     return status.includes('SIM PIN');
+  },
+
+  isSimPinSectionDisabled() {
+    const status = String(this.simStatus || '').trim().toUpperCase();
+    const simReady = status === 'ACTIVE' || status === 'READY';
+    return simReady && !this.isSimPinRequired();
   },
 
   async unlockSimPin() {
