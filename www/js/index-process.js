@@ -156,6 +156,12 @@ function processAllInfos() {
     imsi: "Unknown",
     // Integrated Circuit Card Identifier
     iccid: "Unknown",
+    // SIM PIN unlock state
+    simPin: "",
+    simPinDisableMode: "permanent",
+    simUnlockMessage: "",
+    simUnlockError: "",
+    isSimUnlocking: false,
     // Power Amplifier temperature
     paTemperature: "Unknown",
     // Skin temperature
@@ -2783,6 +2789,80 @@ function processAllInfos() {
     } else {
       // Red: No SIM or error state
       return 'icon-container icon-sim sim-error';
+    }
+  },
+
+  isSimPinRequired() {
+    const status = String(this.simStatus || '').trim().toUpperCase();
+    return status.includes('SIM PIN');
+  },
+
+  async unlockSimPin() {
+    const pin = String(this.simPin || '').trim();
+    this.simUnlockError = "";
+    this.simUnlockMessage = "";
+
+    if (!pin) {
+      this.simUnlockError = "Please enter the SIM PIN.";
+      return;
+    }
+
+    this.isSimUnlocking = true;
+
+    try {
+      const unlockCmd = `AT+CPIN="${pin}"`;
+      const unlockResult = await ATCommandService.execute(unlockCmd, {
+        retries: 2,
+        timeout: 10000,
+      });
+
+      if (!unlockResult.ok) {
+        const message = unlockResult.error
+          ? unlockResult.error.message
+          : "Failed to unlock the SIM.";
+        this.simUnlockError = message;
+        return;
+      }
+
+      const verifyResult = await ATCommandService.execute('AT+CPIN?', {
+        retries: 2,
+        timeout: 5000,
+      });
+
+      if (!verifyResult.ok || !verifyResult.data || !verifyResult.data.includes('READY')) {
+        this.simUnlockError = "SIM PIN accepted but SIM is not ready.";
+        return;
+      }
+
+      let successMessage = "SIM unlocked successfully.";
+
+      if (this.simPinDisableMode === "permanent") {
+        const disableCmd = `AT+CLCK="SC",0,"${pin}"`;
+        const disableResult = await ATCommandService.execute(disableCmd, {
+          retries: 2,
+          timeout: 10000,
+        });
+
+        if (disableResult.ok) {
+          successMessage = "SIM unlocked and PIN disabled permanently.";
+        } else {
+          const disableError = disableResult.error
+            ? disableResult.error.message
+            : "Failed to disable SIM PIN permanently.";
+          this.simUnlockError = `SIM unlocked, but ${disableError}`;
+        }
+      } else {
+        successMessage = "SIM unlocked until reboot. The SIM will require the PIN again after restart.";
+      }
+
+      this.simUnlockMessage = successMessage;
+      this.simStatus = "Active";
+      this.simPin = "";
+      this.fetchAllInfo();
+    } catch (error) {
+      this.simUnlockError = error.message || "Unexpected error while unlocking SIM.";
+    } finally {
+      this.isSimUnlocking = false;
     }
   },
 
