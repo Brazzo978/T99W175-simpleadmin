@@ -687,31 +687,236 @@ OK
 
 ## WIP
 
-### AT
+### AT Just to Chek if Modem Answer 
 
 ```text
 AT
+OK
 ```
 
-### AT&F
+### AT&F — Reset AT Command Settings to Factory Default Values
+
+**Purpose:** Resets AT command settings to **factory default values**.  
+**Note:** Does **not** change the current UART baud rate.
 
 ```text
+AT&F[<value>]
+```
+value: 0 Reset parameters to factory default values
+
+Example:
+```text
 AT&F
+OK
 ```
 
-### AT+CFUN
+### AT+CFUN — Set Phone Functionality
+
+#### Purpose
+
+Selects the MT functionality level (<fun>). Full functionality draws the highest power, while minimum functionality draws the lowest power. Intermediate levels are vendor/manufacturer-defined. If supported, the optional <rst> parameter can reset/restart the UE when applying the new functionality level.
+
+---
+
+#### Syntax
+
+| Type | Command | Typical Response | Notes |
+| --- | --- | --- | --- |
+| Read | AT+CFUN? | +CFUN: <fun> then OK | Reads current functionality level |
+| Test | AT+CFUN=? | +CFUN: (0-1,4-7),(0-1) then OK | Lists supported <fun> and <rst> values |
+| Write | AT+CFUN=<fun>[,<rst>] | OK / ERROR | Sets the requested functionality |
+
+---
+
+#### Parameters
+
+| Parameter | Value | Description |
+| --- | --- | --- |
+| <fun> | 0 | Minimum functionality |
+|  | 1 | Full functionality |
+|  | 4 | Disable both transmit and receive RF circuits |
+|  | 5 | Factory Test Mode |
+|  | 6 | Reset mode |
+|  | 7 | Offline |
+| <rst> | 0 | Do not reset the MT before setting <fun> |
+|  | 1 | UE resets and restarts |
+
+---
+
+#### Examples
+
+Read current setting:
 
 ```text
 AT+CFUN?
-AT+CFUN=0
-AT+CFUN=1
-AT+CFUN=1,1
++CFUN: 1
+OK
 ```
 
-### AT+CPIN?
+Check supported values:
+
+```text
+AT+CFUN=?
++CFUN: (0-1,4-7),(0-1)
+OK
+```
+
+Set minimum functionality:
+
+```text
+AT+CFUN=0
+OK
+```
+
+Disable RF (Tx+Rx off):
+
+```text
+AT+CFUN=4
+OK
+```
+
+Back to full functionality:
+
+```text
+AT+CFUN=1
+OK
+```
+
+Reset & restart (common “reboot” usage):
+
+```text
+AT+CFUN=1,1
+OK
+```
+
+---
+
+### AT+CPIN — Enter PIN / Provide SIM or Phone Password
+
+#### Purpose
+
+Sends to the MT the password required before it can be operated (e.g. SIM PIN, SIM PUK, PH-SIM PIN, etc.).
+
+If the PIN must be entered twice, the TA will automatically repeat it.
+
+If no PIN request is pending, the MT takes no action and returns +CME ERROR.
+
+If the required password is SIM PUK or SIM PUK2, a second value (<newpin>) is mandatory and is used to replace the old PIN stored on the SIM/UICC.
+
+> Note: SIM PIN / PUK / PIN2 / PUK2 and the phone-related PINs refer to the PIN of the selected application on the UICC (e.g., USIM in UTRAN context).
+
+---
+
+#### Syntax
+
+| Type | Command | Typical Response | Notes |
+| --- | --- | --- | --- |
+| Read | AT+CPIN? | +CPIN: <state> then OK | Reads whether a password is required |
+| Test | AT+CPIN=? | OK | No parameter range is returned |
+| Write | AT+CPIN=<pin>[,<newpin>] | OK / +CME ERROR | Sends PIN/PUK (and optional new PIN) |
+
+---
+
+#### Read Responses (<state>) — What the modem is asking for
+
+Common values include:
+
+| <state> | Meaning |
+| --- | --- |
+| READY | No password required; SIM/UICC is unlocked |
+| SIM PIN | Enter SIM/USIM PIN |
+| SIM PUK | Enter PUK + new PIN |
+| SIM PIN2 | Enter PIN2 |
+| SIM PUK2 | Enter PUK2 + new PIN2 |
+| PH-SIM PIN | Phone-to-SIM PIN required |
+| PH-FSIM PIN | Phone-to-(fixed) SIM PIN required |
+| PH-FSIM PUK | Phone-to-(fixed) SIM PUK required |
+
+---
+
+#### Parameters
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| <pin> | string | The requested password (e.g. PIN, PUK, phone PIN) |
+| <newpin> | string | New PIN to replace the old one (required for SIM PUK / SIM PUK2 flows) |
+
+---
+
+#### Examples
+
+Check if a password is required:
 
 ```text
 AT+CPIN?
++CPIN: READY
+OK
+```
+
+Enter SIM PIN:
+
+```text
+AT+CPIN="1234"
+OK
+```
+
+Enter SIM PUK (PUK + new PIN):
+
+```text
+AT+CPIN="12345678","4321"
+OK
+```
+
+---
+
+#### Notes
+
+* While pending SIM PIN, SIM PUK, or PH-SIM, only a limited set of commands is accepted, including: +CGMI, +CGMM, +CGMR, +CGSN, D112 (emergency call), +CPAS, +CFUN, +CPIN, +CDIS (read/test only), and +CIND (read/test only).
+### AT+CSQ — Signal Quality
+
+#### Purpose
+
+Returns a coarse signal strength indicator (<rssi>) and channel bit error rate (<ber>).
+
+#### Syntax
+
+```text
+AT+CSQ
+```
+
+Response:
+
+```text
++CSQ: ,
+OK
+```
+
+Test (supported ranges):
+
+```text
+AT+CSQ=?
++CSQ: (0-31,99),(0-7,99)
+OK
+```
+
+#### Parameters
+
+| Field | Values | Meaning |
+| --- | --- | --- |
+| <rssi> | 0 | −113 dBm or less |
+|  | 1 | −111 dBm |
+|  | 2–30 | −109 … −53 dBm (approx. −113 + 2×rssi) |
+|  | 31 | −51 dBm or greater |
+|  | 99 | Unknown / not detectable |
+| <ber> | 0–7 | RXQUAL class (per 3GPP) |
+|  | 99 | Unknown / not detectable |
+
+#### Example
+
+```text
+AT+CSQ
++CSQ: 18,99
+OK
 ```
 
 ### AT+CGMI
@@ -793,12 +998,6 @@ AT+CREG?
 
 ```text
 AT+COPS?
-```
-
-### AT+CSQ
-
-```text
-AT+CSQ
 ```
 
 ### AT^SLMODE
