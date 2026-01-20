@@ -3460,16 +3460,18 @@ function processAllInfos() {
     this.isImeiValid = true;
   },
 
-  confirmImeiChange() {
+  async confirmImeiChange() {
     if (!this.isImeiValid) {
       return;
     }
-    this.updateIMEI();
-    this.showImeiInputModal = false;
-    // Trigger global reboot modal
-    const modal = document.getElementById('globalRebootModal');
-    if (modal) {
-      modal.style.display = 'flex';
+    const updated = await this.updateIMEI();
+    if (updated) {
+      this.showImeiInputModal = false;
+      // Trigger global reboot modal
+      const modal = document.getElementById('globalRebootModal');
+      if (modal) {
+        modal.style.display = 'flex';
+      }
     }
   },
 
@@ -3498,16 +3500,38 @@ function processAllInfos() {
    * Update IMEI via AT commands
    */
   async updateIMEI() {
+    if (!/^\d{15}$/.test(this.newImei)) {
+      console.error("Invalid IMEI format. Must be exactly 15 digits.");
+      return false;
+    }
+
     const formatted = this.processImei(this.newImei);
     const byteCount = formatted.split(',').length;
 
+    if (!formatted || byteCount !== 9) {
+      console.error("Invalid IMEI formatting. Please re-enter and try again.");
+      return false;
+    }
+
     // Clear existing IMEI
     const clearCmd = `AT^NV=550,0`;
-    await ATCommandService.execute(clearCmd, { retries: 1, timeout: 5000 });
+    const clearResult = await ATCommandService.execute(clearCmd, { retries: 1, timeout: 5000 });
+    if (!clearResult.ok) {
+      console.error("Failed to clear IMEI:", clearResult.error?.message || "Unknown error");
+      return false;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Set new IMEI
     const setCmd = `AT^NV=550,${byteCount},"${formatted}"`;
-    await ATCommandService.execute(setCmd, { retries: 1, timeout: 5000 });
+    const setResult = await ATCommandService.execute(setCmd, { retries: 1, timeout: 5000 });
+    if (!setResult.ok) {
+      console.error("Failed to set IMEI:", setResult.error?.message || "Unknown error");
+      return false;
+    }
+
+    return true;
   },
 };
 }

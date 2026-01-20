@@ -47,6 +47,7 @@ function fetchDeviceInfo() {
      * Execute custom AT command
      */
     async sendATCommand() {
+      let result = null;
       if (!this.atcmd) {
         console.log("AT Command is empty, using ATI as default command: ");
       }
@@ -54,7 +55,7 @@ function fetchDeviceInfo() {
       this.isLoading = true;
 
       try {
-        const result = await ATCommandService.execute(this.atcmd, {
+        result = await ATCommandService.execute(this.atcmd, {
           retries: 3,
           timeout: 12000,
         });
@@ -64,7 +65,7 @@ function fetchDeviceInfo() {
             ? result.error.message
             : "Unknown error while executing the command.";
           this.handleError(message, result.data);
-          return;
+          return result;
         }
 
         this.atCommandResponse = result.data;
@@ -74,6 +75,8 @@ function fetchDeviceInfo() {
       } finally {
         this.isLoading = false;
       }
+
+      return result;
     },
 
     /**
@@ -328,13 +331,15 @@ function fetchDeviceInfo() {
       this.isImeiValid = true;
     },
 
-    confirmImeiChange() {
+    async confirmImeiChange() {
       if (!this.isImeiValid) {
         return;
       }
-      this.updateIMEI();
-      this.showImeiInputModal = false;
-      this.showRebootModal = true;
+      const updated = await this.updateIMEI();
+      if (updated) {
+        this.showImeiInputModal = false;
+        this.showRebootModal = true;
+      }
     },
 
     closeRebootModal() {
@@ -373,17 +378,37 @@ function fetchDeviceInfo() {
     /**
      * Update IMEI via AT commands
      */
-    updateIMEI() {
+    async updateIMEI() {
+      if (!/^\d{15}$/.test(this.newImei)) {
+        this.handleError("Invalid IMEI format. Must be exactly 15 digits.");
+        return false;
+      }
+
       const formatted = this.processImei(this.newImei);
       const byteCount = formatted.split(',').length;
 
+      if (!formatted || byteCount !== 9) {
+        this.handleError("Invalid IMEI formatting. Please re-enter and try again.");
+        return false;
+      }
+
       this.atcmd = `AT^NV=550,0`;
       console.log("Sending IMEI clear command:", this.atcmd);
-      this.sendATCommand();
+      const clearResult = await this.sendATCommand();
+      if (!clearResult?.ok) {
+        return false;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       this.atcmd = `AT^NV=550,${byteCount},"${formatted}"`;
       console.log("Sending IMEI update command:", this.atcmd);
-      this.sendATCommand();
+      const setResult = await this.sendATCommand();
+      if (!setResult?.ok) {
+        return false;
+      }
+
+      return true;
     },
 
     /**
