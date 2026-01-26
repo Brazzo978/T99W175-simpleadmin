@@ -127,11 +127,11 @@ set_xml_value() {
     local file="$3"
 
     if grep -q "<$key>" "$file"; then
-        if ! sed "0,/<$key>/{s|<$key>.*</$key>|<$key>$value</$key>|}" "$file" > "$TMP_FILE"; then
+        if ! sed "s|<$key>[^<]*</$key>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
             return 1
         fi
     elif grep -Eq "<$key[[:space:]]*/>" "$file"; then
-        if ! sed "0,/<$key[[:space:]]*\/>/{s|<$key[[:space:]]*\/>|<$key>$value</$key>|}" "$file" > "$TMP_FILE"; then
+        if ! sed "s|<$key[[:space:]]*/>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
             return 1
         fi
     else
@@ -143,6 +143,7 @@ set_xml_value() {
         return 1
     fi
 
+    sync
     rm -f "$TMP_FILE"
 
     return 0
@@ -182,6 +183,7 @@ set_scoped_xml_value() {
         return 1
     fi
 
+    sync
     rm -f "$TMP_FILE"
 
     return 0
@@ -260,6 +262,8 @@ DMZ_IP=""
 IPV6_ENABLED="1"
 BRIDGE_ENABLED="0"
 BRIDGE_MAC="0"
+AUTO_CONNECT="1"
+ROAMING_ENABLED="0"
 
 apply_params() {
     local input="$1"
@@ -311,6 +315,12 @@ apply_params() {
                 ;;
             bridge_mac)
                 BRIDGE_MAC="$value"
+                ;;
+            auto_connect)
+                AUTO_CONNECT="$value"
+                ;;
+            roaming_enabled)
+                ROAMING_ENABLED="$value"
                 ;;
         esac
     done
@@ -386,6 +396,8 @@ handle_get() {
         bridge_mac=$(get_xml_value "IPPassthroughMacAddr" "$CONFIG_FILE")
     fi
     bridge_mac=$(printf '%s' "$bridge_mac" | strip_comments | tr -d '\r' | trim | tr '[:lower:]' '[:upper:]')
+    auto_connect=$(get_xml_value "AutoConnect" "$CONFIG_FILE")
+    roaming=$(get_xml_value "Roaming" "$CONFIG_FILE")
 
     local dhcp_flag="false"
     if [ "$dhcp_enable" = "1" ]; then
@@ -411,8 +423,18 @@ handle_get() {
         bridge_value="$bridge_mac"
     fi
 
+    local auto_connect_flag="false"
+    if [ "$auto_connect" = "1" ]; then
+        auto_connect_flag="true"
+    fi
+
+    local roaming_flag="false"
+    if [ "$roaming" = "1" ]; then
+        roaming_flag="true"
+    fi
+
     local data
-    data=$(printf '{"ipAddress":"%s","subnetMask":"%s","dhcpEnabled":%s,"dhcpStart":"%s","dhcpEnd":"%s","dhcpLease":"%s","dmzEnabled":%s,"dmzIp":"%s","ipv6Enabled":%s,"bridgeEnabled":%s,"bridgeMac":"%s"}' \
+    data=$(printf '{"ipAddress":"%s","subnetMask":"%s","dhcpEnabled":%s,"dhcpStart":"%s","dhcpEnd":"%s","dhcpLease":"%s","dmzEnabled":%s,"dmzIp":"%s","ipv6Enabled":%s,"bridgeEnabled":%s,"bridgeMac":"%s","autoConnect":%s,"roamingEnabled":%s}' \
         "$(json_escape "$ip")" \
         "$(json_escape "$mask")" \
         "$dhcp_flag" \
@@ -423,7 +445,9 @@ handle_get() {
         "$(json_escape "$dmz_value")" \
         "$ipv6_flag" \
         "$bridge_flag" \
-        "$(json_escape "$bridge_value")")
+        "$(json_escape "$bridge_value")" \
+        "$auto_connect_flag" \
+        "$roaming_flag")
 
     respond true "Network configuration loaded." "$data"
 }
@@ -447,6 +471,8 @@ handle_update() {
     local bridge_flag="${BRIDGE_ENABLED// /}"
     [ -z "$bridge_flag" ] && bridge_flag="0"
     local bridge_mac="${BRIDGE_MAC// /}"
+    local auto_connect="${AUTO_CONNECT:-1}"
+    local roaming="${ROAMING_ENABLED:-0}"
 
     if [ -z "$ip" ] || ! is_valid_ip "$ip"; then
         add_error "Invalid LAN IP address provided."
@@ -574,6 +600,12 @@ handle_update() {
     fi
     if ! set_scoped_xml_value "IPPassthroughCfg" "IPPassthroughMacAddr" "$bridge_mac" "$CONFIG_FILE"; then
         respond false "Missing XML element: IPPassthroughMacAddr"
+    fi
+    if ! set_xml_value "AutoConnect" "$auto_connect" "$CONFIG_FILE"; then
+        respond false "Missing XML element: AutoConnect"
+    fi
+    if ! set_xml_value "Roaming" "$roaming" "$CONFIG_FILE"; then
+        respond false "Missing XML element: Roaming"
     fi
 
     respond true "Network configuration updated successfully."

@@ -1,9 +1,22 @@
+/**
+ * User Credentials Management Module
+ *
+ * Provides CRUD operations for user account management.
+ * Handles user listing, addition, password updates, role changes, and deletion.
+ * Requires admin privileges for all operations.
+ *
+ * @module credentials
+ * @requires SimpleAdminAuth
+ */
+
 (function () {
+  // API endpoints
   const endpoints = {
     list: "/cgi-bin/manage_credentials?action=list",
     manage: "/cgi-bin/manage_credentials",
   };
 
+  // DOM element IDs
   const selectors = {
     tableBody: "usersTableBody",
     addForm: "addUserForm",
@@ -16,6 +29,12 @@
     deleteUserSelect: "deleteUserSelect",
   };
 
+  /**
+   * Displays a feedback message to the user.
+   *
+   * @param {string} message - The message to display
+   * @param {string} [type="success"] - Alert type (success, danger, warning, info)
+   */
   function showFeedback(message, type = "success") {
     const alertBox = document.getElementById(selectors.feedback);
     if (!alertBox) {
@@ -27,6 +46,9 @@
     alertBox.classList.remove("d-none");
   }
 
+  /**
+   * Hides the feedback alert box.
+   */
   function clearFeedback() {
     const alertBox = document.getElementById(selectors.feedback);
     if (alertBox) {
@@ -34,6 +56,14 @@
     }
   }
 
+  /**
+   * Creates an option element for a user select dropdown.
+   *
+   * @param {Object} user - User object
+   * @param {string} user.username - Username
+   * @param {string} user.role - User role (admin or user)
+   * @returns {HTMLOptionElement} Option element
+   */
   function createOption(user) {
     const option = document.createElement("option");
     option.value = user.username;
@@ -41,6 +71,12 @@
     return option;
   }
 
+  /**
+   * Populates a select dropdown with user options.
+   *
+   * @param {string} selectId - ID of the select element
+   * @param {Array<Object>} users - Array of user objects
+   */
   function populateSelect(selectId, users) {
     const select = document.getElementById(selectId);
     if (!select) {
@@ -57,17 +93,24 @@
     }
   }
 
+  /**
+   * Updates the users table with the provided user list.
+   *
+   * @param {Array<Object>} users - Array of user objects
+   */
   function updateTable(users) {
     const tbody = document.getElementById(selectors.tableBody);
     if (!tbody) {
       return;
     }
 
+    // Display message if no users exist
     if (!Array.isArray(users) || users.length === 0) {
       tbody.innerHTML = '<tr><td colspan="2" class="text-center">No users configured.</td></tr>';
       return;
     }
 
+    // Clear and populate table
     tbody.innerHTML = "";
     users.forEach((user) => {
       const row = document.createElement("tr");
@@ -81,6 +124,11 @@
     });
   }
 
+  /**
+   * Loads users from the server and updates the UI.
+   *
+   * Fetches the user list and populates the table and all select dropdowns.
+   */
   async function loadUsers() {
     try {
       const response = await fetch(endpoints.list, {
@@ -97,6 +145,7 @@
         throw new Error("Invalid response format");
       }
 
+      // Update all UI elements
       updateTable(payload.data);
       populateSelect(selectors.passwordUserSelect, payload.data);
       populateSelect(selectors.roleUserSelect, payload.data);
@@ -107,6 +156,13 @@
     }
   }
 
+  /**
+   * Submits a user management form to the server.
+   *
+   * @param {Event} event - Form submit event
+   * @param {string} action - Action to perform (add, update_password, update_role, delete)
+   * @param {string} successMessage - Message to display on success
+   */
   async function submitForm(event, action, successMessage) {
     event.preventDefault();
     clearFeedback();
@@ -136,6 +192,7 @@
         return;
       }
 
+      // Success - update UI
       showFeedback(successMessage, "success");
       form.reset();
       await loadUsers();
@@ -149,18 +206,27 @@
     }
   }
 
+  /**
+   * Initialize credentials management on page load.
+   *
+   * Requires admin privileges. Sets up form event listeners and loads initial user list.
+   */
   document.addEventListener("DOMContentLoaded", () => {
+    // Ensure authentication module is available
     if (typeof SimpleAdminAuth === "undefined") {
       return;
     }
 
+    // Verify admin privileges
     SimpleAdminAuth.requireAdmin().then((session) => {
       if (!session) {
         return;
       }
 
+      // Load initial user list
       loadUsers();
 
+      // Attach form listeners
       const addForm = document.getElementById(selectors.addForm);
       if (addForm) {
         addForm.addEventListener("submit", (event) =>

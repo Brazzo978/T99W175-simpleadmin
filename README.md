@@ -12,12 +12,19 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 ## Quick overview
 - Responsive HTML pages (Bootstrap 5 + Alpine.js) served from the modem web partition.
 - Bash CGI scripts in `www/cgi-bin/` that drive AT commands, Watchcat, TTL override, and utility actions.
-- Front-end settings via `www/config/simpleadmin.conf`, here you can enable or disable the login pagem,by default login is on.
+- Front-end settings via `www/config/simpleadmin.conf`, here you can enable or disable the login page and the esim configuration page,by default login is on , and esim is off
 ```
 # SimpleAdmin configuration
 # Set to 0 to completely disable login and allow open access.
 # Set to 1 (default) to require user login.
 SIMPLEADMIN_ENABLE_LOGIN=1
+
+# eSIM management page (requires the intermediate euicc-client server)
+# Set to 1 to show and enable the eSIM management UI, 0 to hide it.
+SIMPLEADMIN_ENABLE_ESIM=0
+
+# Base URL for the eSIM intermediate server (default: local euicc-client API)
+SIMPLEADMIN_ESIM_BASE_URL="http://localhost:8080/api/v1"
 ```
 Check [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md) for file-by-file behavior, request flows, and how each page uses the CGI helpers.
 
@@ -63,3 +70,4 @@ For any questions, feature requests or support, feel free to reach out on Telegr
 
 ## Troubleshooting
 Ssh password not known : connect the modem via usb and install needed driver if windows doesnt automatically , then connect to adb using adb shell and run passwd , then you can change root password , and you can use that to access ssh.
+

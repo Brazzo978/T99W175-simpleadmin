@@ -1,0 +1,15 @@
+[Unit]
+Description=eUICC SD Client
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/root/euicc-sd-client -server -daemon -config /home/root/client.yaml
+KillSignal=SIGTERM
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

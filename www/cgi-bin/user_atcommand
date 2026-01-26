@@ -7,32 +7,38 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/session_utils.sh"
 
 if ! session_load; then
-    printf 'Status: 401 Unauthorized\r\n'
-    printf 'Content-type: text/plain\r\n\r\n'
-    printf 'Authentication required\n'
+    send_json_response 401 '{"success":false,"message":"Authentication required"}'
     exit 0
 fi
 
 if ! session_require_role "admin"; then
-    printf 'Status: 403 Forbidden\r\n'
-    printf 'Content-type: text/plain\r\n\r\n'
-    printf 'Admin privileges required\n'
+    send_json_response 403 '{"success":false,"message":"Admin privileges required"}'
     exit 0
 fi
 
+# URL decode helper
 urldecode() {
     local data="${1//+/ }"
     printf '%b' "${data//%/\\x}"
 }
 
+# Strip ANSI escape codes
 strip_ansi() {
     sed -E 's/\x1B\[[0-9;]*[mG]//g'
 }
 
-print_headers() {
-    printf 'Content-type: text/plain\n\n'
+# JSON escape helper
+json_escape() {
+    local str="$1"
+    str="${str//\\/\\\\}"
+    str="${str//\"/\\\"}"
+    str="${str//$'\n'/\\n}"
+    str="${str//$'\r'/\\r}"
+    str="${str//$'\t'/\\t}"
+    printf '%s' "$str"
 }
 
+# Parse query string
 raw_query="${QUERY_STRING:-}"
 clean_query="${raw_query//;/}"
 
@@ -53,42 +59,58 @@ if [ -n "$clean_query" ]; then
     done
 fi
 
+# Validate atcmd parameter
 if [ -z "$atcmd_param" ]; then
-    print_headers
-    printf 'ERROR\n\nMissing atcmd parameter.\n'
+    send_json_response 400 '{"success":false,"message":"Missing atcmd parameter"}'
     exit 0
 fi
 
+# Decode the AT command
 decoded_atcmd="$(urldecode "$atcmd_param")"
 if [ -z "$decoded_atcmd" ]; then
-    print_headers
-    printf 'ERROR\n\nUnable to decode the atcmd parameter.\n'
+    send_json_response 400 '{"success":false,"message":"Unable to decode the atcmd parameter"}'
     exit 0
 fi
 
+# Check if atcli_smd8 command exists
 if ! command -v atcli_smd8 >/dev/null 2>&1; then
-    print_headers
-    printf '%s\n\nERROR: atcli_smd8 command not found.\n' "$decoded_atcmd"
+    send_json_response 500 '{"success":false,"message":"atcli_smd8 command not found"}'
     exit 0
 fi
 
+# Execute the AT command
 command_output=""
 exit_code=0
 if ! command_output=$(atcli_smd8 "$decoded_atcmd" 2>&1); then
     exit_code=$?
 fi
 
-clean_output=$(printf '%s\n' "$command_output" | strip_ansi)
+# Clean ANSI codes from output
+clean_output=$(printf '%s' "$command_output" | strip_ansi)
 
-print_headers
-printf '%s\n\n' "$decoded_atcmd"
-
-if [ -n "$clean_output" ]; then
-    printf '%s\n' "$clean_output"
-else
+# Prepare response
+if [ -z "$clean_output" ]; then
     if [ $exit_code -ne 0 ]; then
-        printf 'ERROR: atcli_smd8 exited with code %s.\n' "$exit_code"
+        error_msg="atcli_smd8 exited with code $exit_code"
     else
-        printf 'ERROR: empty response from modem.\n'
+        error_msg="Empty response from modem"
     fi
+    send_json_response 500 "{\"success\":false,\"message\":\"$error_msg\",\"command\":\"$(json_escape "$decoded_atcmd")\",\"exit_code\":$exit_code}"
+    exit 0
 fi
+
+# Success response
+escaped_command=$(json_escape "$decoded_atcmd")
+escaped_output=$(json_escape "$clean_output")
+
+payload=$(cat <<EOF
+{
+  "success":true,
+  "command":"$escaped_command",
+  "output":"$escaped_output",
+  "exit_code":$exit_code
+}
+EOF
+)
+
+send_json_response 200 "$payload"

@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple T99</title>
+    <!-- Import all the bootstrap css files from css folder -->
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/custom-styles.css" />
+
+    <!-- Logo -->
+    <link rel="simpleadmin-logo" href="favicon.ico" />
+
+    <!-- Apply theme immediately to prevent flash -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      })();
+    </script>
+
+    <!-- Hide login UI elements immediately if login is disabled (prevents flash) -->
+    <script>
+      (function() {
+        try {
+          const cached = sessionStorage.getItem("simpleadmin_login_enabled");
+          if (cached) {
+            const config = JSON.parse(cached);
+            const enabled = config && (config.enabled === 1 || config.enabled === "1" || config.enabled === true);
+            if (!enabled) {
+              // Add style to hide login elements before body renders
+              const style = document.createElement('style');
+              style.textContent = `
+                .navbar-user-section,
+                #userAvatar,
+                #navUserName,
+                #logoutButtonDesktop,
+                #logoutButtonMobile,
+                #logoutButton,
+                #usersMenuItem {
+                  display: none !important;
+                }
+              `;
+              document.head.appendChild(style);
+            }
+          }
+        } catch (e) {
+          // Silently fail if sessionStorage is not available
+        }
+      })();
+    </script>
+
+    <!--  Import BootStrap Javascript -->
+    <script src="js/auth.js" defer></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/alpinejs.min.js" defer></script>
+    <script src="js/esim-config.js" defer></script>
+    <script src="js/index-esim.js" defer></script>
+    <script src="js/login-config.js" defer></script>
+    <script src="js/index-login.js" defer></script>
+    <script src="js/radio-settings.js"></script>
+    <script src="js/generate-freq-box.js"></script>
+    <script src="js/populate-checkbox.js"></script>
+    <script src="js/parse-settings.js"></script>
+    <script src="js/atcommand-utils.js"></script>
+    <script src="js/reboot-utils.js" defer></script>
+    <script src="js/device-info.js"></script>
+    <script src="js/dark-mode.js" defer></script>
+    <script src="js/app-version.js" defer></script>
+  </head>
+  <body data-require-auth="true">
+    <main>
+      <div class="container my-4" x-data="cellLocking()" x-init="init()">
+        <nav class="navbar navbar-expand-lg mt-2">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+              <img id="themeLogo" src="img/logo-light.png" alt="Simple T99" style="height: 50px; width: auto;">
+            </a>
+            <!-- RIGHT CONTROLS (mobile + desktop) -->
+            <div class="d-flex align-items-center ms-auto gap-1 order-lg-3">
+              <!-- Dark mode MOBILE -->
+              <button
+                id="darkModeToggleMobile"
+                class="btn btn-blink btn-sm d-lg-none"
+                type="button"
+                aria-label="Toggle dark mode">
+                  <svg class="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                  <svg class="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                          <!-- Device Info MOBILE -->
+            <button
+              id="deviceInfoToggleMobile"
+              class="btn btn-blink btn-sm d-lg-none"
+              type="button"
+              aria-label="Device Information"
+              data-bs-toggle="modal"
+              data-bs-target="#deviceInfoModal">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </button>
+</button>
+              <!-- Reboot MOBILE -->
+              <button
+                data-reboot-action
+                class="btn btn-blink btn-sm d-lg-none"
+                type="button"
+                aria-label="Reboot device"
+                data-requires-admin>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                  <path d="M21 3v5h-5"/>
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                  <path d="M3 21v-5h5"/>
+                </svg>
+              </button>
+              <!-- Hamburger -->
+              <button
+                class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarText"
+                aria-controls="navbarText"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+              </button>
+              <!-- Logout MOBILE -->
+              <button
+                class="btn btn-outline-secondary btn-sm d-lg-none"
+                id="logoutButtonMobile"
+                type="button"
+                aria-label="Logout">
+                Logout
+              </button>
+            </div>
+            <!-- COLLAPSABLE MENU -->
+            <div class="collapse navbar-collapse order-lg-2 flex-grow-1 justify-content-lg-center" id="navbarText">
+              <ul class="navbar-nav mb-2 mb-lg-0">
+                  <a class="nav-link" href="/">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                      <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    Home
+                  </a>
+                <li class="nav-item dropdown" data-role-access="admin">
+                  <a class="nav-link dropdown-toggle active-admin" href="#" role="button" data-bs-toggle="dropdown">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M12 1v6m0 6v6"/>
+                      <path d="m1 12h6m6 0h6"/>
+                    </svg>
+                    Configuration
+                  </a>
+                  <ul class="dropdown-menu">
+                    <li><a class="dropdown-item active" href="/radio-settings.html">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+                      Radio Settings
+                    </a></li>
+                    <li><a class="dropdown-item" href="/settings.html">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                      System Settings
+                    </a></li>
+                    <li><a class="dropdown-item" href="/advanced.html">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                      Advanced
+                    </a></li>
+                    <li id="configMenuDivider"><hr class="dropdown-divider"></li>
+                    <li id="usersMenuItem"><a class="dropdown-item" href="/credentials.html">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      Users
+                    </a></li>
+                    <li id="esimMenuItem"><a class="dropdown-item" href="/esim.html">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                      eSIM
+                    </a></li>
+                  </ul>
+                </li>
+                  <a class="nav-link" href="/sms.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    SMS
+                  </a>
+              </ul>
+          </div>
+          <!-- DESKTOP RIGHT SIDE -->
+          <div class="d-none d-lg-flex align-items-center gap-1 ms-auto order-lg-3">
+            <div class="navbar-user-section">
+              <div class="navbar-user-avatar" id="userAvatar">A</div>
+              <span class="navbar-user-name" id="navUserName"></span>
+            </div>
+            <!-- Dark mode DESKTOP -->
+            <button
+              id="darkModeToggleDesktop"
+              class="btn btn-blink btn-sm"
+              type="button"
+              aria-label="Toggle dark mode">
+              <svg class="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              <svg class="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                        <!-- Device Info DESKTOP -->
+            <button
+              id="deviceInfoToggleDesktop"
+              class="btn btn-blink btn-sm"
+              type="button"
+              aria-label="Device Information"
+              data-bs-toggle="modal"
+              data-bs-target="#deviceInfoModal">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </button>
+</button>
+            <!-- Reboot DESKTOP -->
+            <button
+              data-reboot-action
+              class="btn btn-blink btn-sm"
+              type="button"
+              aria-label="Reboot device"
+              data-requires-admin>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M3 21v-5h5"/>
+              </svg>
+            </button>
+            <!-- Logout DESKTOP -->
+            <a href="#" class="logout-link" id="logoutButtonDesktop">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </a>
+          </div>
+          </div>
+        </nav>
+
+        <!-- Alert Banner - positioned above Band Locking section -->
+        <div
+          x-show="showToast"
+          x-transition
+          class="row mt-3"
+          style="display: none;"
+        >
+          <div class="col-12">
+            <div
+              class="alert mb-0"
+              :class="{
+                'alert-danger': toastType === 'error',
+                'alert-warning': toastType === 'warning',
+                'alert-info': toastType === 'info',
+                'alert-success': toastType === 'success'
+              }"
+              role="alert"
+              x-text="toastMessage"
+            >
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-5">
+          <div class="col-12">
+            <div class="card">
+              <div class="card-header">
+                <div class="row align-items-center">
+                <div class="col">
+                  <div class="fw-semibold">Band Locking</div>
+                  <small class="text-muted" x-text="'Active bands: ' + selectedBandsCount"></small>
+                </div>
+                  <div class="col-md-3">
+                    <select
+                      class="form-select"
+                      id="networkModeBand"
+                      aria-label="LTE"
+                      data-requires-admin
+                    >
+                      <option selected value="LTE">LTE</option>
+                      <option value="NSA">NR5G-NSA</option>
+                      <option value="SA">NR5G-SA</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="card-body">
+                <h5 class="card-subtitle" x-show="isGettingBands === true">
+                  Fetching supported bands...
+                </h5>
+                <form
+                  id="checkboxForm"
+                  x-show="isGettingBands === false"
+                  data-requires-admin
+                ></form>
+              </div>
+              <div class="card-footer">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <small class="text-muted">
+                    To enable or disable bands, click the corresponding checkbox.
+                    Changes are applied automatically after 1.5s.
+                  </small>
+                  <div class="d-flex gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-info"
+                      @click="uncheckAllBands()"
+                      data-requires-admin
+                    >
+                      Uncheck All
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      @click="resetBandLocking()"
+                      data-requires-admin
+                    >
+                      Reset to defaults
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4 g-3">
+          <div class="col-12 col-lg-5">
+            <div class="card h-100">
+              <div class="card-body p-0">
+                <ul class="nav nav-tabs">
+                    <button
+                      type="button"
+                      class="nav-link"
+                      :class="{ active: activeUtilityTab === 'apn' }"
+                      @click="activeUtilityTab = 'apn'"
+                    >
+                      APN Settings
+                    </button>
+                    <button
+                      type="button"
+                      class="nav-link"
+                      :class="{ active: activeUtilityTab === 'sim' }"
+                      @click="activeUtilityTab = 'sim'"
+                    >
+                      SIM Management
+                    </button>
+                  </li>
+                </ul>
+                <div class="p-3">
+                <div x-show="activeUtilityTab === 'apn'">
+                  <div class="row">
+                    <div class="col">
+                      <div class="mb-4">
+                        <label for="APN" class="form-label">APN</label>
+                        <input
+                          type="text"
+                          class="form-control"
+                          id="APN"
+                          x-model="newApn"
+                          aria-describedby="APN"
+                          maxlength="63"
+                          x-bind:placeholder="apn === '-' ? 'Fetching...' : apn"
+                          data-requires-admin
+                        />
+                      </div>
+
+                      <div class="mb-4">
+                        <label for="ipForAPN" class="form-label"
+                          >Choose APN PDP Type</label
+                        >
+                        <select
+                          class="form-select"
+                          id="ipForAPN"
+                          x-model="newApnIP"
+                          aria-label="ipForAPN"
+                          data-requires-admin
+                        >
+                          <option
+                            value=""
+                            selected
+                            x-text="apnIP === '-' ? 'Fetching...' : 'Current: ' + apnIP"
+                          ></option>
+                          <option value="1">IPv4 Only</option>
+                          <option value="3">IPv4v6</option>
+                        </select>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+                <div x-show="activeUtilityTab === 'sim'">
+                  <div class="row">
+                    <div class="col-12">
+
+                      <!-- eSIM Manager -->
+                      <div class="mb-4">
+                        <h6 class="fw-semibold mb-3">eSIM Manager</h6>
+
+                        <div class="form-check form-switch mb-2">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            role="switch"
+                            id="esimManagerToggle"
+                            x-model="esimManagerEnabled"
+                            @change="toggleEsimManager($event)"
+                            :disabled="isTogglingEsim"
+                            data-requires-admin
+                          />
+                          <label class="form-check-label" for="esimManagerToggle">
+                            Enable eSIM Manager
+                          </label>
+                        </div>
+
+                        <small class="text-body-secondary">
+                          Enables the eSIM management interface and starts the eUICC service.<br>
+                          <strong class="text-warning">Note:</strong> You must have an embedded or physical eSIM installed to use this feature!
+                          <span x-show="isTogglingEsim" class="text-primary">
+                            <span
+                              class="spinner-border spinner-border-sm ms-2"
+                              role="status"
+                            ></span>
+                            Processing...
+                          </span>
+                        </small>
+                      </div>
+
+                      <div class="border-top my-4"></div>
+
+                      <!-- SIM selection -->
+                      <p class="text-muted mt-4">
+                        Currently active SIM:
+                        <span class="fw-semibold" x-text="formatActiveSimLabel()"></span>
+                      </p>
+
+                      <div class="form-check mb-2">
+                        <input
+                          class="form-check-input"
+                          type="radio"
+                          name="simSelection"
+                          id="sim1Option"
+                          value="0"
+                          x-model="pendingSimSlot"
+                          data-requires-admin
+                        />
+                        <label class="form-check-label" for="sim1Option">
+                          SIM 1
+                        </label>
+                      </div>
+
+                      <div class="form-check mb-2">
+                        <input
+                          class="form-check-input"
+                          type="radio"
+                          name="simSelection"
+                          id="sim2Option"
+                          value="1"
+                          x-model="pendingSimSlot"
+                          data-requires-admin
+                        />
+                        <label class="form-check-label" for="sim2Option">
+                          SIM 2 / eSIM
+                        </label>
+                      </div>
+
+                      <small class="text-body-secondary">
+                        Select the SIM to use and press "Apply" to confirm.
+                      </small>
+
+                    </div>
+                  </div>
+
+                </div>
+                </div>
+              </div>
+              <div class="card-footer d-flex justify-content-end gap-2">
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  @click="resetApnSettings()"
+                  x-show="activeUtilityTab === 'apn'"
+                  data-requires-admin
+                >
+                  Reset APN Settings
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  @click="saveChanges()"
+                  x-show="activeUtilityTab === 'apn'"
+                  data-requires-admin
+                >
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  @click="applySimSelection()"
+                  x-show="activeUtilityTab === 'sim'"
+                  :disabled="isApplyingSimChange || !canApplySimSelection()"
+                  data-requires-admin
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-3">
+            <div class="card h-100">
+              <div class="card-header">Preferred Network</div>
+              <div class="card-body">
+                <p class="text-muted">
+                  Current selection:
+                  <span class="fw-semibold" x-text="formatPreferredNetworkLabel()"></span>
+                </p>
+                <div class="form-check form-switch mb-2">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="prefNetwork3g"
+                    x-model="preferredNetworkSelection.threeG"
+                    data-requires-admin
+                  />
+                  <label class="form-check-label" for="prefNetwork3g">3G</label>
+                </div>
+                <div class="form-check form-switch mb-2">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="prefNetwork4g"
+                    x-model="preferredNetworkSelection.fourG"
+                    data-requires-admin
+                  />
+                  <label class="form-check-label" for="prefNetwork4g">4G</label>
+                </div>
+                <div class="form-check form-switch mb-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="prefNetwork5g"
+                    x-model="preferredNetworkSelection.fiveG"
+                    data-requires-admin
+                  />
+                  <label class="form-check-label" for="prefNetwork5g">5G</label>
+                </div>
+                <small class="text-body-secondary"
+                  >Leave all options unchecked to enable Auto mode (value 0).</small
+                >
+              </div>
+              <div class="card-footer d-flex justify-content-end">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  @click="savePreferredNetwork()"
+                  :disabled="isSavingPrefNetwork || prefNetworkValue === null"
+                  data-requires-admin
+                >Apply
+                </button>
+              </div>
+            </div>
+          </div>
+
+        <div class="col-12 col-lg-4">
+          <div class="card h-100">
+            <div class="card-header">Cell Locking</div>
+            <div class="card-body">
+              <select
+                class="form-select"
+                id="networkModeCell"
+                x-model="networkModeCell"
+                aria-label="Network Mode"
+                data-requires-admin
+              >
+                <option
+                  selected
+                  x-text="'Cell Lock: ' + cellLockStatus"
+                ></option>
+                <option>LTE</option>
+                <option>NR5G-SA</option>
+              </select>
+
+              <div class="my-4">
+                <!-- LTE Lock Configuration -->
+                <div id="lteElementsCell" x-show="networkModeCell == 'LTE'">
+                  <div class="input-group mb-3">
+                    <span class="input-group-text" id="basic-addon1">Num Cells</span>
+                    <input
+                      type="number"
+                      id="numCells"
+                      name="numCells"
+                      class="form-control"
+                      placeholder="1-10"
+                      min="1"
+                      max="10"
+                      aria-label="NumCells"
+                      aria-describedby="basic-addon1"
+                      x-model="cellNum"
+                      data-requires-admin
+                    />
+                  </div>
+
+                  <div id="freqNumbersContainer"></div>
+
+                  <button
+                    type="button"
+                    class="btn btn-primary w-100"
+                    @click="cellLockEnableLTE()"
+                    data-requires-admin
+                  >
+                    Lock LTE Cells
+                  </button>
+                </div>
+
+                <!-- NR5G-SA Lock Configuration -->
+                <div id="saElementsCell" x-show="networkModeCell == 'NR5G-SA'">
+                  <div class="input-group mb-3">
+                    <input
+                      type="text"
+                      id="earfcn1"
+                      name="earfcn1"
+                      aria-label="EARFCN"
+                      placeholder="EARFCN"
+                      class="form-control"
+                      x-model="earfcn1"
+                      data-requires-admin
+                    />
+                    <input
+                      type="text"
+                      id="pci1"
+                      name="pci1"
+                      aria-label="PCI"
+                      placeholder="PCI"
+                      class="form-control"
+                      x-model="pci1"
+                      data-requires-admin
+                    />
+                  </div>
+
+                  <div class="input-group mb-3">
+                    <select
+                      class="form-select"
+                      id="scs"
+                      name="scs"
+                      x-model="scs"
+                      aria-label="SCS"
+                      data-requires-admin
+                    >
+                      <option selected>SCS</option>
+                      <option value="0">15</option>
+                      <option value="1">30</option>
+                      <option value="2">60</option>
+                      <option value="3">120</option>
+                      <option value="4">240</option>
+                    </select>
+                    <input
+                      type="text"
+                      id="band"
+                      name="band"
+                      aria-label="band"
+                      placeholder="Band"
+                      class="form-control"
+                      x-model="band"
+                      data-requires-admin
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    class="btn btn-primary w-100"
+                    @click="cellLockEnableNR()"
+                    data-requires-admin
+                  >
+                    Lock NR5G-SA Cells
+                  </button>
+                </div>
+
+                <!-- Unlock Buttons - shown when locks are active -->
+                <div class="mt-4 pt-3 border-top" x-show="cellLockStatus !== 'Not Locked' && cellLockStatus !== 'Unknown'">
+                  <h6 class="mb-3">Active Locks</h6>
+                  <div class="d-flex flex-column gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      @click="cellLockDisableLTE()"
+                      x-show="cellLockStatus.includes('LTE')"
+                      data-requires-admin
+                    >
+                      Unlock LTE
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      @click="cellLockDisableNR()"
+                      x-show="cellLockStatus.includes('NR5G') || cellLockStatus.includes('5G')"
+                      data-requires-admin
+                    >
+                      Unlock 5G SA
+                    </button>
+                  </div>
+                </div>
+
+                <!-- NR5G Mode Section -->
+                <div class="mt-4 pt-3 border-top">
+                  <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="mb-0">NR5G Mode</h6>
+                    <span class="text-muted" x-text="`Current: ${nr5gMode}`"></span>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-primary flex-fill"
+                      @click="setNr5gMode('NSA')"
+                      :disabled="isUpdatingNr5gMode"
+                      data-requires-admin
+                    >
+                      Set NSA
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-primary flex-fill"
+                      @click="setNr5gMode('SA')"
+                      :disabled="isUpdatingNr5gMode"
+                      data-requires-admin
+                    >
+                      Set SA
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger flex-fill"
+                      @click="resetNr5gMode()"
+                      :disabled="isUpdatingNr5gMode"
+                      data-requires-admin
+                    >
+                      Set Auto
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer">
+              <small class="text-muted">
+                Cell locking is supported only on the primary cell and requires a
+                reboot to take effect. Once applied, the lock persists across reboots.
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading Modal for Cell lock -->
+        <div class="modal-overlay" x-show="showModalCellLock" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+          <div class="loading-modal">
+            <div class="loader"></div>
+            <div
+              class="loading-text"
+              style="display: flex; flex-direction: column"
+            >
+              <h3>Setting Cell Lock...</h3>
+              <p style="margin-top: 0.5rem">
+                Please wait for
+                <span x-text="countdown" style="font-weight: 500"></span>
+                seconds.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading Modal for Locking Band -->
+        <div class="modal-overlay" x-show="showModalBand" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+          <div class="loading-modal">
+            <div class="loader"></div>
+            <div
+              class="loading-text"
+              style="display: flex; flex-direction: column"
+            >
+              <h3>Resetting Bands...</h3>
+              <p style="margin-top: 0.5rem">
+                Please wait for
+                <span x-text="countdown" style="font-weight: 500"></span>
+                seconds.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading Modal for Switching Slot -->
+        <div class="modal-overlay" x-show="showModalSim" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+          <div class="loading-modal">
+            <div class="loader"></div>
+            <div
+              class="loading-text"
+              style="display: flex; flex-direction: column"
+            >
+              <h3>Changing SIM Slot...</h3>
+              <p style="margin-top: 0.5rem">
+                Please wait for
+                <span x-text="countdown" style="font-weight: 500"></span>
+                seconds.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading Modal for APN -->
+        <div class="modal-overlay" x-show="showModalAPN" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+          <div class="loading-modal">
+            <div class="loader"></div>
+            <div
+              class="loading-text"
+              style="display: flex; flex-direction: column"
+            >
+              <h3>Updating APN Settings...</h3>
+              <p style="margin-top: 0.5rem">
+                Please wait for
+                <span x-text="countdown" style="font-weight: 500"></span>
+                seconds.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        </div>
+      </div>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 border-top">
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-md-6 text-center text-md-start mb-2 mb-md-0">
+            <span class="text-muted small d-inline-flex align-items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span data-app-version></span>
+            </span>
+          </div>
+          <div class="col-md-6 text-center text-md-end">
+            <a href="https://github.com/Brazzo978/T99W175-simpleadmin" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted small d-inline-flex align-items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+              </svg>
+              <span>GitHub</span>
+            </a>
+          </div>
+        </div>
+        <div class="row mt-2">
+          <div class="col-12 text-center">
+            <span class="text-muted small" style="opacity: 0.7;">
+              © 2026 T99W175 SimpleAdmin. Released under MIT License.
+            </span>
+          </div>
+        </div>
+      </div>
+    </footer>
+    </main>
+
+    <!-- Device Info Modal -->
+  <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" x-data="fetchDeviceInfo()">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="deviceInfoModalLabel">Device Information</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="table-responsive">
+            <table class="table">
+              <tbody>
+                <tr>
+                  <th scope="row">Manufacturer</th>
+                  <td x-text="manufacturer"></td>
+                </tr>
+                <tr>
+                  <th scope="row">Model Name</th>
+                  <td x-text="modelName"></td>
+                </tr>
+                <tr>
+                  <th scope="row">Firmware version</th>
+                  <td class="col-md-2" x-text="firmwareVersion"></td>
+                </tr>
+                <tr>
+                  <th scope="row">Phone Number</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="phoneNumber"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(phoneNumber); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy Phone Number to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">IMSI</th>
+                  <td class="col-md-2" x-text="imsi"></td>
+                </tr>
+                <tr>
+                  <th scope="row">ICCID</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="iccid"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(iccid); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy ICCID to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">IMEI</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="imei"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(imei); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy IMEI to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                    <button 
+                      type="button" 
+                      class="btn btn-sm btn-link p-0"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      data-requires-admin="hide"
+                      @click="openImeiModal()"
+                      title="Edit IMEI"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="grey" class="bi bi-pencil" viewBox="0 0 16 16">
+                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">LAN IP</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="lanIp"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(lanIp); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy LAN IP to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">WAN IPv4</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="wwanIpv4"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(wwanIpv4); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy WAN IPv4 to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">WAN IPv6</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="wwanIpv6"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(wwanIpv6); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy WAN IPv6 to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMEI Edit Modals (from deviceinfo.html) -->
+  <div class="modal-overlay" x-show="showImeiWarningModal" x-cloak>
+    <div class="loading-modal" style="max-width: 500px;">
+      <div class="loading-text" style="display: flex; flex-direction: column">
+        <h4 class="text-warning">⚠️ Legal Warning</h4>
+        <p style="margin-top: 1rem; text-align: left;">
+          Changing the IMEI is <strong>only permitted in countries where it is legal</strong>. 
+          In many jurisdictions, modifying the IMEI is <strong>illegal</strong> and may result in criminal penalties.
+        </p>
+        <p style="text-align: left;">
+          By proceeding, you confirm that you are authorized to modify this device's IMEI 
+          and that doing so is legal in your jurisdiction.
+        </p>
+      </div>
+      <div class="d-flex justify-content-center gap-3 mt-3">
+        <button
+          class="btn btn-primary"
+          type="button"
+          @click="acceptImeiWarning()"
+        >
+          I Understand - Continue
+        </button>
+        <button
+          class="btn btn-secondary"
+          type="button"
+          @click="closeImeiWarningModal()"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" x-show="showImeiInputModal" x-cloak>
+    <div class="loading-modal" style="max-width: 450px;">
+      <div class="loading-text" style="display: flex; flex-direction: column">
+        <h4>Edit IMEI</h4>
+        <p style="margin-top: 0.5rem; text-align: left;">
+          Current IMEI: <strong x-text="imei"></strong>
+        </p>
+        <div class="mb-3 text-start">
+          <label for="newImeiInput" class="form-label">New IMEI (15 digits)</label>
+          <input 
+            type="text" 
+            class="form-control" 
+            id="newImeiInput"
+            x-model="newImei"
+            maxlength="15"
+            pattern="[0-9]{15}"
+            placeholder="Enter 15 digit IMEI"
+            @input="validateImeiInput()"
+          />
+          <div class="form-text" x-show="imeiValidationError" x-text="imeiValidationError" style="color: #dc3545;"></div>
+        </div>
+      </div>
+      <div class="d-flex justify-content-center gap-3 mt-3">
+        <button
+          class="btn btn-primary"
+          type="button"
+          @click="confirmImeiChange()"
+          :disabled="!isImeiValid"
+        >
+          Change IMEI
+        </button>
+        <button
+          class="btn btn-danger"
+          type="button"
+          @click="closeImeiInputModal()"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  
+    <!-- Global Reboot Modal Confirmation -->
+    <div class="modal-overlay" id="globalRebootModal" style="display: none;">
+      <div class="loading-modal">
+        <div class="loading-text" style="display: flex; flex-direction: column">
+          <h3>This will reboot the modem.</h3>
+          <p style="margin-top: 0.5rem">Continue?</p>
+        </div>
+        <div class="d-grid gap-2 d-md-block">
+          <button class="btn btn-primary" type="button" id="globalRebootConfirm">
+            Reboot
+          </button>
+          <button class="btn btn-danger" type="button" id="globalRebootCancel">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Reboot Modal Countdown -->
+    <div class="modal-overlay" id="globalRebootCountdownModal" style="display: none;">
+      <div class="loading-modal">
+        <div class="loader"></div>
+        <div class="loading-text" style="display: flex; flex-direction: column">
+          <h3>Rebooting...</h3>
+          <p style="margin-top: 0.5rem">
+            Please wait for
+            <span id="rebootCountdown" style="font-weight: 500">40</span>
+            seconds.
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

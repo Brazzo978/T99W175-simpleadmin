@@ -96,9 +96,20 @@
   function updateNav(session) {
     const nameEl = document.getElementById("navUserName");
     const roleEl = document.getElementById("navUserRole");
+    const avatarEl = document.getElementById("userAvatar");
 
     if (nameEl) {
       nameEl.textContent = session ? session.username : "";
+    }
+
+    if (avatarEl) {
+      if (session) {
+        // Use "A" for admin, "U" for user, or first letter of username as fallback
+        const initial = session.role === "admin" ? "A" : "U";
+        avatarEl.textContent = initial;
+      } else {
+        avatarEl.textContent = "";
+      }
     }
 
     if (roleEl) {
@@ -120,6 +131,17 @@
         link.classList.add("d-none");
       } else {
         link.classList.remove("d-none");
+      }
+    });
+
+    // Role-based menu item visibility
+    const menuItems = document.querySelectorAll("[data-role-access]");
+    menuItems.forEach((item) => {
+      const allowedRoles = item.dataset.roleAccess.split(",");
+      if (session && allowedRoles.includes(session.role)) {
+        item.classList.remove("d-none");
+      } else {
+        item.classList.add("d-none");
       }
     });
   }
@@ -218,7 +240,27 @@
     if (window.location.pathname.endsWith("/login.html")) {
       return;
     }
+    // Store intended destination for post-login redirect
+    const hash = window.location.hash;
+    if (hash) {
+      sessionStorage.setItem('preLoginHash', hash);
+    }
     window.location.replace("/login.html");
+  }
+
+  function restorePostLoginRoute() {
+    const savedHash = sessionStorage.getItem('preLoginHash');
+    sessionStorage.removeItem('preLoginHash');
+
+    if (savedHash && savedHash !== '#') {
+      // Navigate to the saved route
+      setTimeout(() => {
+        window.location.hash = savedHash;
+      }, 100);
+    } else {
+      // Go to dashboard by default
+      window.location.hash = '';
+    }
   }
 
   async function logout() {
@@ -239,14 +281,38 @@
 
   function handleLogoutButton() {
     const logoutButton = document.getElementById("logoutButton");
-    if (!logoutButton) {
-      return;
-    }
+    const logoutButtonMobile = document.getElementById("logoutButtonMobile");
+    const logoutButtonDesktop = document.getElementById("logoutButtonDesktop");
 
-    logoutButton.addEventListener("click", (event) => {
+    const handleLogout = (event) => {
       event.preventDefault();
       logout();
+    };
+
+    if (logoutButton) {
+      logoutButton.addEventListener('click', handleLogout);
+    }
+    if (logoutButtonMobile) {
+      logoutButtonMobile.addEventListener('click', handleLogout);
+    }
+    if (logoutButtonDesktop) {
+      logoutButtonDesktop.addEventListener('click', handleLogout);
+    }
+  }
+
+  // Re-initialize event listeners (called after SPA navigation)
+  function reinitEventListeners() {
+    // Remove existing listeners by cloning and replacing
+    ['logoutButton', 'logoutButtonMobile', 'logoutButtonDesktop'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) {
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+      }
     });
+
+    // Re-attach listeners
+    handleLogoutButton();
   }
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -291,5 +357,7 @@
       return session;
     },
     logout,
+    restorePostLoginRoute,
+    reinitEventListeners,
   };
 })(window);

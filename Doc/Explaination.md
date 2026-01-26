@@ -9,12 +9,17 @@
 - `Default config files/`: XML baselines extracted from default modem env.
   - `mobileap_cfg.xml`: LAN IP, DHCP, APN template, and network defaults.
   - `mobileap_firewall.xml`: default firewall ruleset.
-- `modem_config`: interactive Bash CLI that mirrors most UI features (APN, band/cell lock, TTL, roaming, LAN IP, bridge mode, reboot, etc.)all credits to [stich86](https://github.com/stich86).
-- `www/`: root of the web payload the modem serves.
+- `modem_config`: interactive Bash CLI that mirrors most UI features (APN, band/cell lock, TTL, roaming, LAN IP, bridge mode, reboot, etc.) all credits to [stich86](https://github.com/stich86).
+- `www`: root of the web payload the modem serves.
   - HTML pages (`*.html`).
   - Static assets (`css/`, `js/`, `fonts/`, `favicon.ico`).
   - CGI helpers in `cgi-bin/`.
   - Front-end settings in `config/simpleadmin.conf`.
+- `scripts`: root of Linux scripts used by TTL and scheduler
+  - `ttl-override`: the script that set or remove the custom TTL configured with WebUI
+  - `init.d/crontab`: the script used to start or stop `crontab` daemon
+  - `systemd/crontab.service`: the wrapper that calls `/etc/init.d/crontab` script
+  - `systemd/ttl-override.service`: the wrapper that calls `/opt/scripts/ttl/ttl-override`
 
 ## HTML pages: what they do and how they do it
 ### `www/index.html` — Home / status
@@ -45,6 +50,27 @@
 ### `www/config/simpleadmin.conf`
 - Purpose: front-end feature toggle.
 - How: the flag `SIMPLEADMIN_ENABLE_LOGIN` sets whether the interface requires credentials (1) or is openly accessible (0).
+- Additional flags:
+  - `SIMPLEADMIN_ENABLE_ESIM` shows/hides the eSIM management page powered by the `euicc-client` REST server.
+  - `SIMPLEADMIN_ESIM_BASE_URL` sets the base URL for the intermediate eSIM server (default `http://localhost:8080/api/v1`).
+
+### `www/esim.html` — eSIM management
+- Purpose: GUI to interact with the intermediate `euicc-client` REST API (EID, profile lifecycle, downloads, notifications).
+- How: enabled only when `SIMPLEADMIN_ENABLE_ESIM=1`; the page uses `js/esim.js` + `js/esim-config.js` to fetch the base URL from `/cgi-bin/esim_config` and make REST calls to the configured server.
+
+#### Advanced flow and operation mapping
+- Bootstrapping: `esimManager.bootstrap()` reads the configuration from `/cgi-bin/esim_config` (includes the `enabled` flag and `base_url`). If the endpoint points to `localhost`, `computeFallbackBaseUrl()` tries to rewrite it using the browser’s `hostname` to allow cross-device access to the same `euicc-client` instance.
+- Health check: before loading data, `checkHealth()` queries `GET /health` on the API and sets `serverHealthy`; if the endpoint does not respond, it shows a blocking alert.
+- Data refresh: `refreshAll()` runs `GET /eid`, `GET /profiles`, and `GET /notifications` in parallel to populate the EID, profile list, and notification queue.
+- Profile management: commands always act on `/profile/*` with JSON payload `{ iccid }`:
+  - `POST /profile/enable` and `POST /profile/disable` apply the operational state and reload the table.
+  - `POST /profile/delete` requires a client-side `confirm()`, then calls `refreshAll()` to update everything.
+  - `POST /profile/nickname` accepts `iccid` and `nickname` (empty = removal) to annotate local aliases.
+- Downloading a new profile: `POST /download` sends `{ smdp, matching_id, confirmation_code?, auto_confirm }`. The confirmation code is optional and is removed from the payload when empty. Afterwards, the form is cleared and a `refreshAll()` is triggered to show the status.
+- GSMA notifications: the table is fed by `GET /notifications` and two dedicated actions:
+  - `POST /notifications/process` with `{ iccid, process_all, sequence_number? }` to consume the queue (response `processed_count`).
+  - `POST /notifications/remove` accepts optional filters (`remove_all`, `iccid`, `sequence_number`) and returns `removed_count` to confirm cleanup.
+- Error handling and fallback: `apiFetch()` first tries `baseUrl`, then the optional fallback; it treats non-OK responses as invalid, exposes the error message returned by the server, and dynamically updates `baseUrl` if the fallback responds correctly.
 
 ## JavaScript files
 - `www/js/dark-mode.js`: toggles light/dark themes by updating `data-bs-theme`, saves preference in `localStorage`, and defaults to dark when no choice exists.
@@ -73,6 +99,25 @@
 - `set_watchcat`: creates/updates the `watchcat.service` unit with parameters (`status`, `IpDNS`, `cooldown`, `failures`, `action`); when enabled it writes `/usrdata/simpleadmin/script/watchat.sh` to ping targets, log results, and reboot or swap SIM. Supports full removal when disabled.
 - `watchcat_maker`: simplified helper that validates params and delegates to `create_watchcat.sh`/`remove_watchcat.sh`, returning plain-text messages.
 - `send_sms`: accepts number and UCS-2 message, runs `AT+CMGS` through `atcli_smd8`, pipes the body to `microcom` with `CTRL+Z`, and returns the raw modem reply.
+- `esim_config`: reads `SIMPLEADMIN_ENABLE_ESIM` and `SIMPLEADMIN_ESIM_BASE_URL` from `simpleadmin.conf`, enforces authentication, and returns a JSON payload for the front-end feature toggle.
+
+
+
+
+## Development tools
+### `deploy-www.sh` — Deployment script
+- Purpose: automated deployment of the `www` directory to the modem's web server partition.
+- Prerequisites: the script assumes an SSH key is already installed for the `root` user on the modem. Ensure passwordless SSH access is configured before running.
+- Usage: execute from the repository root with optional host and flags:
+  - `./deploy-www.sh`: standard deployment to default host `192.168.225.1` (preserves existing config settings).
+  - `./deploy-www.sh [HOST]`: deploy to a custom host IP/address (e.g., `./deploy-www.sh 192.168.1.100`).
+  - `./deploy-www.sh --nologin`: disables login requirement by setting `SIMPLEADMIN_ENABLE_LOGIN=0` in the config file (uses default host).
+  - `./deploy-www.sh --login`: enables login requirement by setting `SIMPLEADMIN_ENABLE_LOGIN=1` in the config file (uses default host).
+  - `./deploy-www.sh --noesim`: disables eSIM management by setting `SIMPLEADMIN_ENABLE_ESIM=0` in the config file (uses default host).
+  - `./deploy-www.sh --esim`: enables eSIM management by setting `SIMPLEADMIN_ENABLE_ESIM=1` in the config file (uses default host).
+  - `./deploy-www.sh [HOST] --login --esim`: combine custom host with flags (host must be the first argument if not starting with `--`).
+  - **Mutual exclusivity**: `--nologin` and `--login` cannot be used together; `--noesim` and `--esim` cannot be used together. The script will exit with an error if conflicting options are provided.
+- How it works: the script copies the local `www` directory to `/tmp` on the remote modem via `scp`, then via SSH it stops `qcmap_httpd.service`, removes the old `/WEBSERVER/www` directory, moves the new files to `/WEBSERVER/www`, sets permissions (`chmod -R 755`), optionally modifies `simpleadmin.conf` based on flags, and restarts the web server service.
 
 ## Operational notes
 - All pages load `js/dark-mode.js` so theme preference stays consistent through `localStorage`.

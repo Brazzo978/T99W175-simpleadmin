@@ -1,0 +1,62 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"status":"error","message":"Authentication required"}'
+    exit 0
+fi
+
+# Only admin can modify connection config
+if [ "$SESSION_ROLE" != "admin" ]; then
+    send_json_response 403 '{"status":"error","message":"Admin access required"}'
+    exit 0
+fi
+
+CONFIG_FILE="$SCRIPT_DIR/../config/simpleadmin.conf"
+
+# Read POST data
+if [ "$REQUEST_METHOD" = "POST" ]; then
+    CONTENT_LENGTH=$(echo "$CONTENT_LENGTH" | tr -d '\r')
+    if [ -n "$CONTENT_LENGTH" ]; then
+        POST_DATA=$(head -c "$CONTENT_LENGTH")
+
+        # Parse JSON using simple string manipulation
+        PING_TARGETS=$(echo "$POST_DATA" | grep -o '"pingTargets":"[^"]*"' | cut -d'"' -f4)
+        DNS_TESTS=$(echo "$POST_DATA" | grep -o '"dnsTests":"[^"]*"' | cut -d'"' -f4)
+
+        # Backup the config file
+        cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
+
+        # Update or add the configuration values
+        if grep -q "^SIMPLEADMIN_PING_TARGETS=" "$CONFIG_FILE"; then
+            # Replace existing value
+            sed -i "s|^SIMPLEADMIN_PING_TARGETS=.*|SIMPLEADMIN_PING_TARGETS=\"$PING_TARGETS\"|" "$CONFIG_FILE"
+        else
+            # Add new value
+            echo "" >> "$CONFIG_FILE"
+            echo "# Connection monitoring configuration" >> "$CONFIG_FILE"
+            echo "# Ping targets: comma-separated list of hosts to ping" >> "$CONFIG_FILE"
+            echo "SIMPLEADMIN_PING_TARGETS=\"$PING_TARGETS\"" >> "$CONFIG_FILE"
+        fi
+
+        if grep -q "^SIMPLEADMIN_DNS_TESTS=" "$CONFIG_FILE"; then
+            # Replace existing value
+            sed -i "s|^SIMPLEADMIN_DNS_TESTS=.*|SIMPLEADMIN_DNS_TESTS=\"$DNS_TESTS\"|" "$CONFIG_FILE"
+        else
+            # Add new value
+            echo "" >> "$CONFIG_FILE"
+            echo "# DNS tests: comma-separated list of server:domain pairs for DNS resolution tests" >> "$CONFIG_FILE"
+            echo "SIMPLEADMIN_DNS_TESTS=\"$DNS_TESTS\"" >> "$CONFIG_FILE"
+        fi
+
+        send_json_response 200 '{"status":"success","message":"Configuration updated successfully"}'
+    else
+        send_json_response 400 '{"status":"error","message":"No data received"}'
+    fi
+else
+    send_json_response 405 '{"status":"error","message":"Method not allowed"}'
+fi

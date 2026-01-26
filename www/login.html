@@ -1,28 +1,50 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Simple T99 &mdash; Login</title>
+    <title>Simple T99</title>
+    <!-- Import all the bootstrap css files from css folder -->
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/bootstrap.min.css" />
-    <link rel="icon" href="favicon.ico" />
+    <link rel="stylesheet" href="css/custom-styles.css" />
+
+    <!-- Logo -->
+    <link rel="simpleadmin-logo" href="favicon.ico" />
+
+    <!-- Apply theme immediately to prevent flash -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      })();
+    </script>
+
+    <!--  Import BootStrap Javascript -->
     <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
     <script src="js/login.js" defer></script>
+    <script src="js/dark-mode.js" defer></script>
   </head>
   <body data-require-auth="false">
     <main>
       <div class="container my-5">
         <nav class="navbar navbar-expand-lg mt-2">
           <div class="container-fluid">
-            <a class="navbar-brand" href="/login.html"
-              ><span class="mb-0 h4">Simple T99</span></a
-            >
+            <a class="navbar-brand" href="/login.html">
+              <img id="themeLogo" src="img/logo-light.png" alt="Simple T99" style="height: 50px; width: auto;">
+            </a>
+              <button
+                id="darkModeToggleDesktop"
+                class="btn btn-blink btn-sm d-flex align-items-center justify-content-center"
+                type="button"
+                aria-label="Toggle dark mode">
+                <svg class="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg class="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              </button>                      
           </div>
-        </nav>
-
+        </nav>       
         <div class="row justify-content-center mt-5">
           <div class="col-lg-5 col-md-7">
             <div class="card shadow-sm">
@@ -80,18 +102,5 @@
         </div>
       </div>
     </main>
-    <footer class="border-top py-3 mt-4">
-      <div class="container d-flex justify-content-end">
-        <button
-          class="btn btn-link text-reset"
-          id="darkModeToggle"
-          type="button"
-          data-allow-user="true"
-        >
-          Dark Mode
-        </button>
-      </div>
-    </footer>
-    <script src="js/dark-mode.js"></script>
   </body>
 </html>

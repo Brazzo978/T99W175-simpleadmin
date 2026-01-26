@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,23 +7,115 @@
     <!-- Import all the bootstrap css files from css folder -->
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/custom-styles.css" />
 
     <!-- Logo -->
     <link rel="simpleadmin-logo" href="favicon.ico" />
+
+    <!-- Apply theme immediately to prevent flash -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      })();
+    </script>
+
+    <!-- Hide login UI elements immediately if login is disabled (prevents flash) -->
+    <script>
+      (function() {
+        try {
+          const cached = sessionStorage.getItem("simpleadmin_login_enabled");
+          if (cached) {
+            const config = JSON.parse(cached);
+            const enabled = config && (config.enabled === 1 || config.enabled === "1" || config.enabled === true);
+            if (!enabled) {
+              // Add style to hide login elements before body renders
+              const style = document.createElement('style');
+              style.textContent = `
+                .navbar-user-section,
+                #userAvatar,
+                #navUserName,
+                #logoutButtonDesktop,
+                #logoutButtonMobile,
+                #logoutButton,
+                #usersMenuItem {
+                  display: none !important;
+                }
+              `;
+              document.head.appendChild(style);
+            }
+          }
+        } catch (e) {
+          // Silently fail if sessionStorage is not available
+        }
+      })();
+    </script>
 
     <!--  Import BootStrap Javascript -->
     <script src="js/auth.js" defer></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/alpinejs.min.js" defer></script>
+    <script src="js/esim-config.js" defer></script>
+    <script src="js/index-esim.js" defer></script>
+    <script src="js/login-config.js" defer></script>
+    <script src="js/index-login.js" defer></script>
+    <script src="js/index-process.js"></script>
+    <script src="js/atcommand-utils.js"></script>
+    <script src="js/reboot-utils.js" defer></script>
+    <script src="js/monitor.js"></script>
+    <!-- device-info.js no longer needed - all data is now in index-process.js -->
+    <!-- <script src="js/device-info.js"></script> -->
+    <script src="js/dark-mode.js" defer></script>
+    <script src="js/app-version.js" defer></script>
   </head>
   <body data-require-auth="true">
-    <main>
-      <div class="container my-4" x-data="processAllInfos()">
-        <nav class="navbar navbar-expand-lg mt-2">
-          <div class="container-fluid">
-            <a class="navbar-brand" href="/"
-              ><span class="mb-0 h4">Simple T99</span></a
-            >
+    <main x-data="processAllInfos()">
+      <div class="container my-4">
+      <nav class="navbar navbar-expand-lg mt-2">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="/">
+            <img id="themeLogo" src="img/logo-light.png" alt="Simple T99" style="height: 50px; width: auto;">
+          </a>
+          <!-- RIGHT CONTROLS (mobile + desktop) -->
+          <div class="d-flex align-items-center ms-auto gap-1 order-lg-3">
+            <!-- Dark mode MOBILE -->
+            <button
+              id="darkModeToggleMobile"
+              class="btn btn-blink btn-sm d-lg-none"
+              type="button"
+              aria-label="Toggle dark mode">
+                <svg class="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg class="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+            <!-- Device Info MOBILE -->
+            <button
+              id="deviceInfoToggleMobile"
+              class="btn btn-blink btn-sm d-lg-none"
+              type="button"
+              aria-label="Device Information"
+              data-bs-toggle="modal"
+              data-bs-target="#deviceInfoModal">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </button>
+            <!-- Reboot MOBILE -->
+            <button
+              data-reboot-action
+              class="btn btn-blink btn-sm d-lg-none"
+              type="button"
+              aria-label="Reboot device"
+              data-requires-admin>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M3 21v-5h5"/>
+              </svg>
+            </button>
+            <!-- Hamburger -->
             <button
               class="navbar-toggler"
               type="button"
@@ -31,148 +123,187 @@
               data-bs-target="#navbarText"
               aria-controls="navbarText"
               aria-expanded="false"
-              aria-label="Toggle navigation"
-              data-allow-user="true"
-            >
+              aria-label="Toggle navigation">
               <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarText">
-              <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                <li class="nav-item">
-                  <a class="nav-link active" aria-current="page" href="/"
-                    >Home</a
-                  >
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="network.html">4G/5G Settings</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="/network-settings.html">Network Settings</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="/settings.html">AT Terminal</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="/sms.html">SMS</a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="/deviceinfo.html"
-                    >Device Information</a
-                  >
-                </li>
-              </ul>
-              <div
-                class="navbar-text d-flex align-items-center gap-3 flex-wrap justify-content-end"
-              >
-                <span
-                  class="badge rounded-pill fw-semibold text-uppercase d-none"
-                  id="navUserRole"
-                ></span>
-                <span class="fw-semibold" id="navUserName"></span>
-                <button
-                  class="btn btn-outline-secondary btn-sm"
-                  id="logoutButton"
-                  type="button"
-                >
+          </div>
+          <!-- COLLAPSABLE MENU -->
+          <div class="collapse navbar-collapse order-lg-2 flex-grow-1 justify-content-lg-center" id="navbarText">
+            <ul class="navbar-nav mb-2 mb-lg-0">
+              <li class="nav-item">
+                <a class="nav-link active" href="/">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  Home
+                </a>
+              </li>
+              <li class="nav-item dropdown" data-role-access="admin">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6"/>
+                    <path d="m1 12h6m6 0h6"/>
+                  </svg>
+                  Configuration
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="/radio-settings.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+                    Radio Settings
+                  </a></li>
+                  <li><a class="dropdown-item" href="/settings.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    System Settings
+                  </a></li>
+                  <li><a class="dropdown-item" href="/advanced.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    Advanced
+                  </a></li>
+                  <li id="configMenuDivider"><hr class="dropdown-divider"></li>
+                  <li id="usersMenuItem"><a class="dropdown-item" href="/credentials.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Users
+                  </a></li>
+                  <li id="esimMenuItem"><a class="dropdown-item" href="/esim.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                    eSIM
+                  </a></li>
+                </ul>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/sms.html">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  SMS
+                </a>
+              </li>
+              <li class="nav-item d-lg-none">
+                <a href="#" class="nav-link logout-link" id="logoutButton">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
                   Logout
-                </button>
+                </a>
+              </li>
+            </ul>
+          </div>
+          <!-- DESKTOP RIGHT SIDE -->
+          <div class="d-none d-lg-flex align-items-center gap-1 ms-auto order-lg-3">
+            <div class="navbar-user-section">
+              <div class="navbar-user-avatar" id="userAvatar">A</div>
+              <span class="navbar-user-name" id="navUserName"></span>
+            </div>
+            <!-- Dark mode DESKTOP -->
+            <button
+              id="darkModeToggleDesktop"
+              class="btn btn-blink btn-sm"
+              type="button"
+              aria-label="Toggle dark mode">
+              <svg class="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              <svg class="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+            <!-- Device Info DESKTOP -->
+            <button
+              id="deviceInfoToggleDesktop"
+              class="btn btn-blink btn-sm"
+              type="button"
+              aria-label="Device Information"
+              data-bs-toggle="modal"
+              data-bs-target="#deviceInfoModal">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </button>
+            <!-- Reboot DESKTOP -->
+            <button
+              data-reboot-action
+              class="btn btn-blink btn-sm"
+              type="button"
+              aria-label="Reboot device"
+              data-requires-admin>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M3 21v-5h5"/>
+              </svg>
+            </button>
+            <!-- Logout DESKTOP -->
+            <a href="#" class="logout-link" id="logoutButtonDesktop">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </a>
+          </div>
+        </div>
+      </nav>
+
+        <div class="row mt-5 g-3">
+          <!-- Temperature Card -->
+          <div class="col-6 col-lg-3">
+            <div class="card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#temperatureModal">
+              <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                <div :class="getTempIconClass()">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="45" height="45">
+                    <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>
+                  </svg>
+                </div>
+                <h1 class="card-text mt-4" x-text="temperature.replace('C', '') + '°C'"></h1>
               </div>
+              <div class="card-footer text-center">Temperature</div>
             </div>
           </div>
-        </nav>
 
-        <div class="row align-items-center mt-5 gap-md-3 gap-2">
-          <div class="col align-self-center">
-            <div class="card">
-              <div
-                class="card-body d-flex flex-column align-items-center justify-content-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 320 512"
-                  height="85"
-                  width="85"
-                >
-                  <path
-                    fill="#fdb53c"
-                    d="M160 64c-26.5 0-48 21.5-48 48V276.5c0 17.3-7.1 31.9-15.3 42.5C86.2 332.6 80 349.5 80 368c0 44.2 35.8 80 80 80s80-35.8 80-80c0-18.5-6.2-35.4-16.7-48.9c-8.2-10.6-15.3-25.2-15.3-42.5V112c0-26.5-21.5-48-48-48zM48 112C48 50.2 98.1 0 160 0s112 50.1 112 112V276.5c0 .1 .1 .3 .2 .6c.2 .6 .8 1.6 1.7 2.8c18.9 24.4 30.1 55 30.1 88.1c0 79.5-64.5 144-144 144S16 447.5 16 368c0-33.2 11.2-63.8 30.1-88.1c.9-1.2 1.5-2.2 1.7-2.8c.1-.3 .2-.5 .2-.6V112zM208 368c0 26.5-21.5 48-48 48s-48-21.5-48-48c0-20.9 13.4-38.7 32-45.3V272c0-8.8 7.2-16 16-16s16 7.2 16 16v50.7c18.6 6.6 32 24.4 32 45.3z"
-                  />
-                </svg>
-                <h1
-                  class="card-text mt-4"
-                  x-text="temperature.replace('C', '') + '&deg;C'"
-                ></h1>
-              </div>
-              <div class="card-footer">Temperature</div>
-            </div>
-          </div>
-
-          <div class="col align-self-center">
-            <div class="card">
-              <div
-                class="card-body d-flex flex-column align-items-center justify-content-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 384 512"
-                  height="85"
-                  width="85"
-                >
-                  <path
-                    fill="#6a46d8"
-                    d="M64 0H242.7c17 0 33.3 6.7 45.3 18.7L365.3 96c12 12 18.7 28.3 18.7 45.3V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V64C0 28.7 28.7 0 64 0zM96 192c-17.7 0-32 14.3-32 32v32h64V192H96zM64 352h80 96 80V288H240 144 64v64zM320 224c0-17.7-14.3-32-32-32H256v64h64V224zM160 192v64h64V192H160zM288 448c17.7 0 32-14.3 32-32V384H256v64h32zM160 384v64h64V384H160zM64 416c0 17.7 14.3 32 32 32h32V384H64v32z"
-                  />
-                </svg>
+          <!-- SIM Status Card -->
+          <div class="col-6 col-lg-3">
+            <div class="card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#simInfoModal">
+              <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                <div :class="getSimIconClass()">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 25" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="45" height="45">
+                    <path d="M7 2h7l5 5v15a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>
+                    <path d="M9 14h6M9 11h6M9 8h2"/>
+                  </svg>
+                </div>
                 <h1 class="card-text mt-4" x-text="simStatus"></h1>
               </div>
-              <div class="card-footer">SIM Status</div>
+              <div class="card-footer text-center">SIM Status</div>
             </div>
           </div>
 
-          <div class="col align-self-center">
-            <div class="card">
-              <div
-                class="card-body d-flex flex-column align-items-center justify-content-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 640 512"
-                  height="85"
-                  width="85"
-                >
-                  <path
-                    fill="#2fa7fb"
-                    d="M576 0c17.7 0 32 14.3 32 32V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V32c0-17.7 14.3-32 32-32zM448 96c17.7 0 32 14.3 32 32V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V128c0-17.7 14.3-32 32-32zM352 224V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V224c0-17.7 14.3-32 32-32s32 14.3 32 32zM192 288c17.7 0 32 14.3 32 32V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V320c0-17.7 14.3-32 32-32zM96 416v64c0 17.7-14.3 32-32 32s-32-14.3-32-32V416c0-17.7 14.3-32 32-32s32 14.3 32 32z"
-                  />
-                </svg>
+          <!-- Signal Percentage Card -->
+          <div class="col-6 col-lg-3">
+            <div class="card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#advancedSignalModal">
+              <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                <div :class="getSignalIconClass()">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="45" height="45">
+                    <path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16"/>
+                  </svg>
+                </div>
                 <h1 class="card-text mt-4" x-text="signalPercentage + '%'"></h1>
               </div>
-              <div class="card-footer">Signal Percentage</div>
+              <div class="card-footer text-center">Signal Percentage</div>
             </div>
           </div>
 
-          <div class="col align-self-center">
-            <div class="card">
-              <div
-                class="card-body d-flex flex-column align-items-center justify-content-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 640 512"
-                  height="85"
-                  width="85"
-                >
-                  <path
-                    fill="#20c0ae"
-                    d="M0 336c0 79.5 64.5 144 144 144H512c70.7 0 128-57.3 128-128c0-61.9-44-113.6-102.4-125.4c4.1-10.7 6.4-22.4 6.4-34.6c0-53-43-96-96-96c-19.7 0-38.1 6-53.3 16.2C367 64.2 315.3 32 256 32C167.6 32 96 103.6 96 192c0 2.7 .1 5.4 .2 8.1C40.2 219.8 0 273.2 0 336z"
-                  />
-                </svg>
-                <h1
-                  class="card-text mt-4"
-                  x-text="internetConnectionStatus"
-                ></h1>
+          <!-- Internet Connection Card -->
+          <div class="col-6 col-lg-3">
+            <div class="card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#connectionModal">
+              <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                <div :class="getConnectionIconClass()">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="45" height="45">
+                    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+                  </svg>
+                </div>
+                <h1 class="card-text mt-4" x-text="internetConnectionStatus"></h1>
               </div>
-              <div class="card-footer">Internet Connection</div>
+              <div class="card-footer text-center">Internet Connection</div>
             </div>
           </div>
         </div>
@@ -180,7 +311,7 @@
         <div class="row mt-5 gap-3">
           <div class="col">
             <div class="card">
-              <div class="card-header">Network Information</div>
+              <div class="card-header">Network & System Information</div>
               <div class="card-body">
                 <div class="card-text table-responsive-sm">
                   <table class="table">
@@ -195,24 +326,129 @@
                       </tr>
                       <tr>
                         <th scope="row">MCCMNC</th>
-                        <td x-text="mccmnc"></td>
+                        <td>
+                          <span x-text="mccmnc"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(mccmnc); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy MCCMNC to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                          <button 
+                            x-show="getMccMncUrl() !== null"
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="window.open(getMccMncUrl(), '_blank')"
+                            title="Open network information on MCC-MNC.org">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <line x1="2" y1="12" x2="22" y2="12"></line>
+                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                          </button>
+                        </td>
                       </tr>
                       <tr>
                         <th scope="row">APN</th>
-                        <td x-text="apn"></td>
+                        <td>
+                          <span x-text="apn"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(apn); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy APN to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </td>
                       </tr>
                       <tr>
-                        <th scope="row">IPv<sup>4</sup></th>
-                        <td x-text="ipv4"></td>
+                        <th scope="row">IPv4</th>
+                        <td>
+                          <span x-text="ipv4"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(ipv4); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy IPv4 to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </td>
                       </tr>
-                      <tr>
-                        <th scope="row">IPv<sup>6</sup></th>
-                        <td x-text="ipv6"></td>
+                      <tr x-show="ipv6 && ipv6 !== '0000:0000:0000:0000:0000:0000:0000:0000' && ipv6 !== '-' && ipv6 !== 'Unknown'">
+                        <th scope="row">IPv6</th>
+                        <td>
+                          <span x-text="ipv6"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(ipv6); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy IPv6 to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </td>
                       </tr>
                       <tr>
                         <th scope="row">Uptime</th>
                         <td x-text="uptime"></td>
                       </tr>
+                      <tr>
+                        <th scope="row">CPU Usage</th>
+                        <td class="gap-4 align-items-center">
+                          <div class="progress w-100" role="progressbar" aria-label="CPU usage" aria-valuemin="0" aria-valuemax="100" style="height: 24px">
+                            <div
+                              class="progress-bar is-medium"
+                              :style="'width: ' + calculateCPUBar(cpuUsage).percentage + '%; background: ' + calculateCPUBar(cpuUsage).color + ';'"
+                            >
+                              <span x-text="cpuUsage + '%'"></span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Memory Usage</th>
+                        <td class="gap-4 align-items-center">
+                          <div class="progress w-100" role="progressbar" aria-label="Memory usage" aria-valuemin="0" aria-valuemax="100" style="height: 24px">
+                            <div
+                              class="progress-bar is-medium"
+                              :style="'width: ' + calculateMemoryBar(memPercent).percentage + '%; background: ' + calculateMemoryBar(memPercent).color + ';'"
+                            >
+                              <span x-text="(memUsed / 1024).toFixed(1) + 'MB / ' + (memTotal / 1024).toFixed(1) + 'MB (' + memPercent + '%)'"></span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Ethernet Speed</th>
+                        <td>
+                          <span x-text="systemSpeed"></span>
+                          <template x-if="systemDuplex !== 'Unknown' && systemDuplex !== ''">
+                            <span class="ms-2 d-inline-flex align-items-center">
+                              <span class="badge" :class="{
+                                'badge-success-modern': systemDuplex === 'Full',
+                                'badge-warning-modern': systemDuplex === 'Half'
+                              }" x-text="systemDuplex + ' Duplex'"></span>
+                            </span>
+                          </template>
+                        </td>
+                      </tr>                      
                     </tbody>
                   </table>
                 </div>
@@ -220,15 +456,17 @@
               <div class="card-footer">
                 <div class="row row-cols-2">
                   <div class="col">
-                    <p class="btn">Refresh Rate (min 3s)</p>
+                    <p class="btn">Refresh Rate (min 5s)</p>
                   </div>
                   <div class="col">
                     <div class="input-group">
                       <input
+                        id="refreshRate"
+                        name="refreshRate"
                         x-model="newRefreshRate"
                         class="form-control"
                         type="number"
-                        min="3"
+                        min="5"
                         max="60"
                         x-bind:placeholder="refreshRate + 's'"
                         data-requires-admin
@@ -261,7 +499,18 @@
                       </tr>
                       <tr>
                         <th scope="row">Network Mode</th>
-                        <td x-text="networkMode"></td>
+                        <td>
+                          <template x-if="networkModeBadges.length > 0">
+                            <span class="d-inline-flex align-items-center gap-2">
+                              <template x-for="badge in networkModeBadges" :key="badge.label">
+                                <span class="badge" :class="badge.class" x-text="badge.label"></span>
+                              </template>
+                            </span>
+                          </template>
+                          <template x-if="networkModeBadges.length === 0">
+                            <span x-text="networkMode"></span>
+                          </template>
+                        </td>
                       </tr>
                       <tr>
                         <th scope="row">Bands</th>
@@ -290,80 +539,85 @@
                       </tr>
                       <tr>
                         <th scope="row">CELL ID</th>
-                        <td x-text="cellID"></td>
+                        <td>
+                          <span x-text="cellID"></span>
+                          <button 
+                            x-show="getMapUrl() !== null"
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="window.open(getMapUrl(), '_blank')"
+                            title="Open cell location on LTE Italy map">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <line x1="2" y1="12" x2="22" y2="12"></line>
+                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                          </button>
+                        </td>
                       </tr>
-                      <tr>
-                        <th scope="row">eNB ID <sup>4G/5G</sup></th>
-                        <td x-text="eNBID"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">TAC<sup>4G/5G</sup></th>
-                        <td x-text="tac"></td>
-                      </tr>
-                      <tr x-show="rsrqLTE != '-'">
-                        <th scope="row">SS_RSRQ<sup>4G</sup></th>
-                        <td
-                          class="gap-4 align-items-center"
-                          x-data="{ getProgressBarClass: function() {
-                          // Remove the percentage sign and convert to integer
-                          var percentage = parseInt(this.rsrqLTEPercentage);
-
-                          if (percentage >= 60) {
-                              return 'progress-bar bg-success is-medium';
-                          } else if (percentage >= 40) {
-                              return 'progress-bar bg-warning is-warning is-medium';
-                          } else {
-                              return 'progress-bar bg-danger is-medium';
-                          }
-                      } }"
-                        >
+                      <tr x-show="(rssiLTE != '-' && rssiLTE) || (rssiNR != '-' && rssiNR)">
+                        <th scope="row" style="border-bottom: 0 !important;">RSSI</th>
+                        <td class="gap-4 align-items-center" style="border-bottom: 0 !important;">
                           <div
-                            x-show="rsrqLTE != '-' && rsrqLTEPercentage != '0'"
+                            x-show="getOverallRSSI() != '-' && getOverallRSSIPercentage() != 0"
                             class="progress w-100"
                             role="progressbar"
-                            aria-label="RSRQ BAR"
-                            :aria-valuenow="rsrqLTEPercentage"
+                            aria-label="RSSI BAR"
+                            :aria-valuenow="getOverallRSSIPercentage()"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + rsrqLTEPercentage + '%'"
+                              class="progress-bar is-medium"
+                              :style="(rssiLTE && rssiLTE != '-') ? ('width: ' + calculateRSSIBar(parseFloat(rssiLTE), 'LTE').percentage + '%; background: ' + calculateRSSIBar(parseFloat(rssiLTE), 'LTE').color + ';') : ('width: ' + calculateRSSIBar(parseFloat(rssiNR), 'NR').percentage + '%; background: ' + calculateRSSIBar(parseFloat(rssiNR), 'NR').color + ';')"
                             >
                               <span
-                                x-text="rsrqLTE + ' / ' +  rsrqLTEPercentage + '%'"
+                                x-text="getOverallRSSI() + ' / ' + getOverallRSSIPercentage() + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
-                            x-show="rsrqLTEPercentage == '0'"
-                            x-text="rsrqLTE"
+                            x-show="getOverallRSSIPercentage() == 0 && getOverallRSSI() != '-'"
+                            x-text="getOverallRSSI()"
                           ></span>
-                          <span x-show="rsrqLTE == '-'" class="fst-italic">
+                          <span x-show="getOverallRSSI() == '-'" class="fst-italic">
                             None
                           </span>
                         </td>
                       </tr>
+                      <tr x-show="rsrqLTE != '-' || rsrpLTE != '-' || sinrLTE != '-'">
+                        <td colspan="2" class="pb-2 border-0" style="border-top: 0 !important;">
+                          <div class="d-flex flex-column gap-2" style="width: fit-content;">
+                            <span class="badge badge-success-modern" style="font-size: inherit; display: flex; align-items: center; justify-content: center; width: 2.5em; text-align: center;">
+                              LTE
+                            </span>
+                            <div class="d-flex flex-column gap-1">
+                              <span x-show="eNBIDLTE && eNBIDLTE != '-' && eNBIDLTE != 'Unknown' && eNBIDLTE != ''" class="small text-muted" style="font-size: 0.85em;">
+                                eNB ID <span x-text="eNBIDLTE"></span>
+                                <button 
+                                  type="button"
+                                  class="btn btn-link p-0 border-0 text-muted"
+                                  style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                                  @click="copyToClipboard(eNBIDLTE); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                                  title="Copy eNB ID to clipboard">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                  </svg>
+                                </button>
+                              </span>
+                              <span x-show="tacLTE && tacLTE != '-' && tacLTE != ''" class="small text-muted" style="font-size: 0.85em;">
+                                TAC <span x-text="tacLTE"></span>
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                       <tr x-show="rsrpLTE != '-'">
-                        <th scope="row">RSRP<sup>4G</sup></th>
-                        <td
-                          class="gap-4 align-items-center"
-                          x-data="{
-                          getProgressBarClass: function() {
-                              // Remove the percentage sign and convert to integer
-                              var percentage = parseInt(this.rsrpLTEPercentage);
-
-                              if (percentage >= 60) {
-                                  return 'progress-bar bg-success is-medium';
-                              } else if (percentage >= 40) {
-                                  return 'progress-bar bg-warning is-warning is-medium';
-                              } else {
-                                  return 'progress-bar bg-danger is-medium';
-                              }
-                          }
-                        }"
-                        >
+                        <th scope="row" class="ps-3">RSRP</th>
+                        <td class="gap-4 align-items-center">
                           <div
                             x-show="rsrpLTE != '-' && rsrpLTEPercentage != '0'"
                             class="progress w-100"
@@ -372,11 +626,11 @@
                             :aria-valuenow="rsrpLTEPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + rsrpLTEPercentage + '%'"
+                              class="progress-bar is-medium"
+                              :style="'width: ' + calculateRSRPBar(parseFloat(rsrpLTE)).percentage + '%; background: ' + calculateRSRPBar(parseFloat(rsrpLTE)).color + ';'"
                             >
                               <span
                                 x-text="rsrpLTE + ' / ' + rsrpLTEPercentage + '%'"
@@ -392,71 +646,9 @@
                           </span>
                         </td>
                       </tr>
-                      <tr x-show="rssiLTE != '-'">
-                        <th scope="row">RSSI<sup>4G</sup></th>
-                        <td
-                          class="gap-4 align-items-center"
-                          x-data="{
-                          getProgressBarClass: function() {
-                              var percentage = parseInt(this.rssiLTEPercentage);
-
-                              if (percentage >= 60) {
-                                  return 'progress-bar bg-success is-medium';
-                              } else if (percentage >= 40) {
-                                  return 'progress-bar bg-warning is-warning is-medium';
-                              } else {
-                                  return 'progress-bar bg-danger is-medium';
-                              }
-                          }
-                        }"
-                        >
-                          <div
-                            x-show="rssiLTE != '-' && rssiLTEPercentage != '0'"
-                            class="progress w-100"
-                            role="progressbar"
-                            aria-label="RSSI BAR"
-                            :aria-valuenow="rssiLTEPercentage"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                            style="height: 18px"
-                          >
-                            <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + rssiLTEPercentage + '%'"
-                            >
-                              <span
-                                x-text="rssiLTE + ' / ' + rssiLTEPercentage + '%'"
-                              ></span>
-                            </div>
-                          </div>
-                          <span
-                            x-show="rssiLTEPercentage == '0'"
-                            x-text="rssiLTE"
-                          ></span>
-                          <span x-show="rssiLTE == '-'" class="fst-italic">
-                            None
-                          </span>
-                        </td>
-                      </tr>
                       <tr x-show="sinrLTE != '-'">
-                        <th scope="row">SINR<sup>4G</sup></th>
-                        <td
-                          class="gap-4 align-items-center"
-                          x-data="{
-                          getProgressBarClass: function() {
-                              // Remove the percentage sign and convert to integer
-                              var percentage = parseInt(this.sinrLTEPercentage);
-
-                              if (percentage >= 60) {
-                                  return 'progress-bar bg-success is-medium';
-                              } else if (percentage >= 40) {
-                                  return 'progress-bar bg-warning is-warning is-medium';
-                              } else {
-                                  return 'progress-bar bg-danger is-medium';
-                              }
-                          }
-                        }"
-                        >
+                        <th scope="row" class="ps-3">SINR</th>
+                        <td class="gap-4 align-items-center">
                           <div
                             x-show="sinrLTE != '-' && sinrLTEPercentage != '0'"
                             class="progress w-100"
@@ -465,11 +657,11 @@
                             :aria-valuenow="sinrLTEPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + sinrLTEPercentage +'%'"
+                              class="progress-bar is-medium"
+                              :style="'width: ' + calculateSINRBar(parseFloat(sinrLTE), 'LTE').percentage + '%; background: ' + calculateSINRBar(parseFloat(sinrLTE), 'LTE').color + ';'"
                             >
                               <span
                                 x-text="sinrLTE + ' / ' + sinrLTEPercentage +'%'"
@@ -485,69 +677,71 @@
                           </span>
                         </td>
                       </tr>
-                      <tr x-show="rsrqNR != '-'">
-                        <th scope="row">SS_RSRQ<sup>5G</sup></th>
+                      <tr x-show="rsrqLTE != '-'" style="border-bottom: none !important;">
+                        <th scope="row" class="ps-3" style="border-bottom: none !important;">RSRQ</th>
                         <td
-                          x-data="{ getProgressBarClass: function() {
-                          // Remove the percentage sign and convert to integer
-                          var percentage = parseInt(this.rsrqNRPercentage);
-
-                          if (percentage >= 60) {
-                              return 'progress-bar bg-success is-medium';
-                          } else if (percentage >= 40) {
-                              return 'progress-bar bg-warning is-warning is-medium';
-                          } else {
-                              return 'progress-bar bg-danger is-medium';
-                          }
-                      } }"
+                          class="gap-4 align-items-center"
+                          style="border-bottom: none !important;"
                         >
                           <div
-                            x-show="rsrqNR != '-' && rsrqNRPercentage != '0'"
+                            x-show="rsrqLTE != '-' && rsrqLTEPercentage != '0'"
                             class="progress w-100"
                             role="progressbar"
                             aria-label="RSRQ BAR"
-                            :aria-valuenow="rsrqNRPercentage"
+                            :aria-valuenow="rsrqLTEPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + rsrqNRPercentage + '%'"
+                              class="progress-bar is-medium"
+                              :style="'width: ' + calculateRSRQBar(parseFloat(rsrqLTE)).percentage + '%; background: ' + calculateRSRQBar(parseFloat(rsrqLTE)).color + ';'"
                             >
                               <span
-                                x-text="rsrqNR + ' / ' + rsrqNRPercentage + '%'"
+                                x-text="rsrqLTE + ' / ' +  rsrqLTEPercentage + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
-                            x-show="rsrqNRPercentage == '0'"
-                            x-text="rsrqNR"
+                            x-show="rsrqLTEPercentage == '0'"
+                            x-text="rsrqLTE"
                           ></span>
-                          <span x-show="rsrqNR == '-'" class="fst-italic">
+                          <span x-show="rsrqLTE == '-'" class="fst-italic">
                             None
                           </span>
                         </td>
                       </tr>
+                      <tr x-show="rsrqNR != '-' || rsrpNR != '-' || sinrNR != '-'">
+                        <td colspan="2" class="pt-3 pb-2 border-0">
+                          <div class="d-flex flex-column gap-2" style="width: fit-content;">
+                            <span class="badge badge-info-modern" style="font-size: inherit; display: inline-block; width: fit-content; text-align: center; padding-left: 0.5em; padding-right: 0.5em;">
+                              <span x-text="get5GBadgeText()"></span>
+                            </span>
+                            <div class="d-flex flex-column gap-1">
+                              <span x-show="eNBIDNR && eNBIDNR != '-' && eNBIDNR != 'Unknown' && eNBIDNR != ''" class="small text-muted" style="font-size: 0.85em;">
+                                eNB ID <span x-text="eNBIDNR"></span>
+                                <button 
+                                  type="button"
+                                  class="btn btn-link p-0 border-0 text-muted"
+                                  style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                                  @click="copyToClipboard(eNBIDNR); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                                  title="Copy eNB ID to clipboard">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                  </svg>
+                                </button>
+                              </span>
+                              <span x-show="tacNR && tacNR != '-' && tacNR != ''" class="small text-muted" style="font-size: 0.85em;">
+                                TAC <span x-text="tacNR"></span>
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                       <tr x-show="rsrpNR != '-'">
-                        <th scope="row">SS_RSRP<sup>5G</sup></th>
-                        <td
-                          class="gap-4 align-items-center"
-                          x-data="{
-                          getProgressBarClass: function() {
-                              // Remove the percentage sign and convert to integer
-                              var percentage = parseInt(this.rsrpNRPercentage);
-
-                              if (percentage >= 60) {
-                                  return 'progress-bar bg-success is-medium';
-                              } else if (percentage >= 40) {
-                                  return 'progress-bar bg-warning is-warning is-medium';
-                              } else {
-                                  return 'progress-bar bg-danger is-medium';
-                              }
-                          }
-                        }"
-                        >
+                        <th scope="row" class="ps-3">RSRP</th>
+                        <td class="gap-4 align-items-center">
                           <div
                             x-show="rsrpNR != '-' && rsrpNRPercentage != '0'"
                             class="progress w-100"
@@ -556,11 +750,11 @@
                             :aria-valuenow="rsrpNRPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + rsrpNRPercentage + '%'"
+                              class="progress-bar is-medium"
+                              :style="'width: ' + calculateRSRPBar(parseFloat(rsrpNR), 'NR').percentage + '%; background: ' + calculateRSRPBar(parseFloat(rsrpNR), 'NR').color + ';'"
                             >
                               <span
                                 x-text="rsrpNR + ' / ' + rsrpNRPercentage + '%'"
@@ -576,71 +770,9 @@
                           </span>
                         </td>
                       </tr>
-                      <tr x-show="rssiNR != '-'">
-                        <th scope="row">RSSI<sup>5G</sup></th>
-                        <td
-                          class="gap-4 align-items-center"
-                          x-data="{
-                          getProgressBarClass: function() {
-                              var percentage = parseInt(this.rssiNRPercentage);
-
-                              if (percentage >= 60) {
-                                  return 'progress-bar bg-success is-medium';
-                              } else if (percentage >= 40) {
-                                  return 'progress-bar bg-warning is-warning is-medium';
-                              } else {
-                                  return 'progress-bar bg-danger is-medium';
-                              }
-                          }
-                        }"
-                        >
-                          <div
-                            x-show="rssiNR != '-' && rssiNRPercentage != '0'"
-                            class="progress w-100"
-                            role="progressbar"
-                            aria-label="RSSI BAR"
-                            :aria-valuenow="rssiNRPercentage"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                            style="height: 18px"
-                          >
-                            <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + rssiNRPercentage + '%'"
-                            >
-                              <span
-                                x-text="rssiNR + ' / ' + rssiNRPercentage + '%'"
-                              ></span>
-                            </div>
-                          </div>
-                          <span
-                            x-show="rssiNRPercentage == '0'"
-                            x-text="rssiNR"
-                          ></span>
-                          <span x-show="rssiNR == '-'" class="fst-italic">
-                            None
-                          </span>
-                        </td>
-                      </tr>
                       <tr x-show="sinrNR != '-'">
-                        <th scope="row">SINR<sup>5G</sup></th>
-                        <td
-                          class="gap-4 align-items-center"
-                          x-data="{
-                          getProgressBarClass: function() {
-                              // Remove the percentage sign and convert to integer
-                              var percentage = parseInt(this.sinrNRPercentage);
-
-                              if (percentage >= 60) {
-                                  return 'progress-bar bg-success is-medium';
-                              } else if (percentage >= 40) {
-                                  return 'progress-bar bg-warning is-warning is-medium';
-                              } else {
-                                  return 'progress-bar bg-danger is-medium';
-                              }
-                          }
-                        }"
-                        >
+                        <th scope="row" class="ps-3">SINR</th>
+                        <td class="gap-4 align-items-center">
                           <div
                             x-show="sinrNR != '-' && sinrNRPercentage != '0'"
                             class="progress w-100"
@@ -649,11 +781,11 @@
                             :aria-valuenow="sinrNRPercentage"
                             aria-valuemin="0"
                             aria-valuemax="100"
-                            style="height: 18px"
+                            style="height: 24px"
                           >
                             <div
-                              :class="getProgressBarClass()"
-                              :style="'width: ' + sinrNRPercentage +'%'"
+                              class="progress-bar is-medium"
+                              :style="'width: ' + calculateSINRBar(parseFloat(sinrNR), 'NR').percentage + '%; background: ' + calculateSINRBar(parseFloat(sinrNR), 'NR').color + ';'"
                             >
                               <span
                                 x-text="sinrNR + ' / ' + sinrNRPercentage +'%'"
@@ -669,6 +801,40 @@
                           </span>
                         </td>
                       </tr>
+                      <tr x-show="rsrqNR != '-'" style="border-bottom: none !important;">
+                        <th scope="row" class="ps-3" style="border-bottom: none !important;">RSRQ</th>
+                        <td
+                          class="gap-4 align-items-center"
+                          style="border-bottom: none !important;"
+                        >
+                          <div
+                            x-show="rsrqNR != '-' && rsrqNRPercentage != '0'"
+                            class="progress w-100"
+                            role="progressbar"
+                            aria-label="RSRQ BAR"
+                            :aria-valuenow="rsrqNRPercentage"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            style="height: 24px"
+                          >
+                            <div
+                              class="progress-bar is-medium"
+                              :style="'width: ' + calculateRSRQBar(parseFloat(rsrqNR), 'NR').percentage + '%; background: ' + calculateRSRQBar(parseFloat(rsrqNR), 'NR').color + ';'"
+                            >
+                              <span
+                                x-text="rsrqNR + ' / ' + rsrqNRPercentage + '%'"
+                              ></span>
+                            </div>
+                          </div>
+                          <span
+                            x-show="rsrqNRPercentage == '0'"
+                            x-text="rsrqNR"
+                          ></span>
+                          <span x-show="rsrqNR == '-'" class="fst-italic">
+                            None
+                          </span>
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -677,73 +843,265 @@
           </div>
         </div>
 
-        <div class="row mt-4">
-          <div class="col-12">
-            <div class="card">
-              <div
-                class="card-header d-flex justify-content-between align-items-center"
-              >
-                <span>Advanced Signal Details</span>
-                <button
-                  class="btn btn-sm btn-outline-primary"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#advancedSignalCollapse"
-                  aria-expanded="false"
-                  aria-controls="advancedSignalCollapse"
-                >
-                  Show details
-                </button>
+        <!-- Temperature Modal -->
+        <div class="modal fade" id="temperatureModal" tabindex="-1" aria-labelledby="temperatureModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="temperatureModalLabel">Temperature Sensors</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
-              <div id="advancedSignalCollapse" class="collapse">
-                <div class="card-body">
-                  <template x-if="detailedSignals.length === 0">
-                    <p class="mb-0 text-muted">
-                      No advanced details available.
-                    </p>
+              <div class="modal-body">
+                <div class="card-text table-responsive-sm">
+                  <table class="table">
+                    <tbody>
+                      <tr>
+                        <th scope="row">Baseband/Chipset</th>
+                        <td x-text="formatTempWithFahrenheit(temperature)"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Power amplifier</th>
+                        <td x-text="formatTempWithFahrenheit(paTemperature)"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">External/Board</th>
+                        <td x-text="formatTempWithFahrenheit(skinTemperature)"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SIM Info Modal -->
+        <div class="modal fade" id="simInfoModal" tabindex="-1" aria-labelledby="simInfoModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="simInfoModalLabel">SIM Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="card-text table-responsive-sm">
+                  <table class="table">
+                    <tbody>
+                      <tr>
+                        <th scope="row">Phone Number</th>
+                        <td x-text="phoneNumber"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">IMSI</th>
+                        <td x-text="imsi"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">ICCID</th>
+                        <td x-text="iccid"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div
+                  class="mt-3"
+                  x-show="!isSimPinSectionDisabled() || shouldShowDisablePinOption()"
+                >
+                  <hr class="my-3" />
+
+                  <!-- Scenario 1: Show disable PIN options (unlocked from prompt) -->
+                  <template x-if="shouldShowDisablePinOption()">
+                    <div>
+                      <h6 class="fw-semibold">Disable SIM PIN</h6>
+                      <p class="text-muted small mb-3">Your SIM is unlocked. You can now disable the PIN requirement permanently or until reboot.</p>
+                      <div class="alert alert-success py-2" role="alert" x-show="simUnlockMessage" x-text="simUnlockMessage"></div>
+                      <div class="alert alert-danger py-2" role="alert" x-show="simUnlockError" x-text="simUnlockError"></div>
+                      <div class="mb-3">
+                        <label for="simPinDisableInput" class="form-label">SIM PIN (required to disable)</label>
+                        <input
+                          id="simPinDisableInput"
+                          type="password"
+                          inputmode="numeric"
+                          class="form-control"
+                          x-model="simPin"
+                          :disabled="isSimUnlocking"
+                          placeholder="Enter PIN to disable"
+                          autocomplete="off"
+                        />
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label d-block">Disable PIN behavior</label>
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" id="disableSimPinPermanent" value="permanent" x-model="simPinDisableMode" :disabled="isSimUnlocking">
+                          <label class="form-check-label" for="disableSimPinPermanent">
+                            Disable SIM PIN permanently
+                          </label>
+                        </div>
+                        <div class="form-check mt-1">
+                          <input class="form-check-input" type="radio" id="disableSimPinTemporary" value="temporary" x-model="simPinDisableMode" :disabled="isSimUnlocking">
+                          <label class="form-check-label" for="disableSimPinTemporary">
+                            Disable SIM PIN until reboot (SIM will require PIN again after restart)
+                          </label>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn btn-warning w-100"
+                        :disabled="isSimUnlocking"
+                        @click="disableSimPinOnly()">
+                        <span x-show="!isSimUnlocking">Disable SIM PIN</span>
+                        <span x-show="isSimUnlocking">Disabling...</span>
+                      </button>
+                    </div>
                   </template>
 
-                  <template x-for="(entry, index) in detailedSignals" :key="entry.id ?? index">
+                  <!-- Scenario 2: Show unlock options (skipped prompt or SIM still locked) -->
+                  <template x-if="!shouldShowDisablePinOption()">
+                    <div>
+                      <h6 class="fw-semibold">Unlock SIM PIN</h6>
+                      <p class="text-muted small mb-3">Enter the SIM PIN to unlock the SIM. Choose whether to disable the PIN permanently or until reboot.</p>
+                      <div class="alert alert-success py-2" role="alert" x-show="simUnlockMessage" x-text="simUnlockMessage"></div>
+                      <div class="alert alert-danger py-2" role="alert" x-show="simUnlockError" x-text="simUnlockError"></div>
+                      <div class="mb-3">
+                        <label for="simPinInput" class="form-label">SIM PIN</label>
+                        <input
+                          id="simPinInput"
+                          type="password"
+                          inputmode="numeric"
+                          class="form-control"
+                          x-model="simPin"
+                          :disabled="isSimUnlocking"
+                          placeholder="Enter PIN"
+                          autocomplete="off"
+                        />
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label d-block">PIN behavior</label>
+                        <div class="form-check">
+                          <input class="form-check-input" type="radio" id="disableSimPinPermanent2" value="permanent" x-model="simPinDisableMode" :disabled="isSimUnlocking">
+                          <label class="form-check-label" for="disableSimPinPermanent2">
+                            Disable SIM PIN permanently
+                          </label>
+                        </div>
+                        <div class="form-check mt-1">
+                          <input class="form-check-input" type="radio" id="disableSimPinTemporary2" value="temporary" x-model="simPinDisableMode" :disabled="isSimUnlocking">
+                          <label class="form-check-label" for="disableSimPinTemporary2">
+                            Disable SIM PIN until reboot (SIM will require PIN again after restart)
+                          </label>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn btn-primary w-100"
+                        :disabled="isSimUnlocking"
+                        @click="unlockSimPin()">
+                        <span x-show="!isSimUnlocking">Unlock SIM</span>
+                        <span x-show="isSimUnlocking">Unlocking...</span>
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Signal Modal -->
+        <div class="modal fade" id="advancedSignalModal" tabindex="-1" aria-labelledby="advancedSignalModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="advancedSignalModalLabel">Advanced Signal Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <template x-if="detailedSignals.length === 0">
+                  <p class="mb-0 text-muted">
+                    No advanced details available.
+                  </p>
+                </template>
+
+                <template x-for="(entry, index) in detailedSignals" :key="entry.id ?? index">
+                  <div
+                    class="mb-4 pb-3 border-bottom"
+                    :class="{ 'border-0 pb-0 mb-0': index === detailedSignals.length - 1 }"
+                  >
                     <div
-                      class="mb-4 pb-3 border-bottom"
-                      :class="{ 'border-0 pb-0 mb-0': index === detailedSignals.length - 1 }"
+                      class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-2"
                     >
-                      <div
-                        class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-2"
-                      >
+                      <div>
+                        <h5 class="mb-1" x-text="entry.title"></h5>
+                        <p class="mb-0 text-muted">
+                          <span x-text="'Technology: ' + entry.technology"></span>
+                        </p>
+                      </div>
+                      <div class="text-md-end text-muted small">
+                        <div class="d-flex align-items-center justify-content-md-end gap-1">
+                          <span x-text="'PCI: ' + entry.pciDisplay"></span>
+                          <button 
+                            x-show="entry.pciDisplay && entry.pciDisplay !== 'N/A'"
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(entry.pciDisplay); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy PCI to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-md-end gap-1">
+                          <span x-text="'Channel: ' + entry.channelDisplay"></span>
+                          <button 
+                            x-show="entry.channelDisplay && entry.channelDisplay !== 'N/A'"
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(entry.channelDisplay); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy Channel to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="row small text-muted mt-2">
+                      <div class="col-md-6">
+                        <p class="mb-1" x-text="'Bandwidth: ' + entry.bandwidthDisplay"></p>
+                      </div>
+                      <div class="col-md-6 text-md-end" x-show="entry.rxDiversityDisplay">
+                        <p class="mb-1" x-text="'RX Diversity: ' + entry.rxDiversityDisplay"></p>
+                      </div>
+                    </div>
+
+                    <div class="mt-3">
+                      <template x-for="(metric, metricIndex) in entry.metrics" :key="metric.key">
                         <div>
-                          <h5 class="mb-1" x-text="entry.title"></h5>
-                          <p class="mb-0 text-muted">
-                            <span x-text="'Technology: ' + entry.technology"></span>
-                            <span class="ms-3" x-text="'Band: ' + entry.bandDisplay"></span>
-                          </p>
-                        </div>
-                        <div class="text-md-end text-muted small">
-                          <div x-text="'PCI: ' + entry.pciDisplay"></div>
-                          <div x-text="'Channel: ' + entry.channelDisplay"></div>
-                        </div>
-                      </div>
-
-                      <div class="row small text-muted mt-2">
-                        <div class="col-md-6">
-                          <p class="mb-1" x-text="'Bandwidth: ' + entry.bandwidthDisplay"></p>
-                        </div>
-                        <div class="col-md-6 text-md-end" x-show="entry.rxDiversityDisplay">
-                          <p class="mb-1" x-text="'RX Diversity: ' + entry.rxDiversityDisplay"></p>
-                        </div>
-                      </div>
-
-                      <div class="mt-3">
-                        <template x-for="metric in entry.metrics" :key="metric.key">
-                          <div class="mb-3">
-                            <div class="d-flex justify-content-between">
-                              <span class="fw-semibold" x-text="metric.label"></span>
-                              <span x-text="metric.display"></span>
-                            </div>
+                          <div class="mb-2 d-flex align-items-center gap-2">
+                            <span class="fw-semibold d-flex align-items-center gap-1" 
+                              style="min-width: 80px; text-align: left;">
+                              <span x-text="metric.label"></span>
+                              <button
+                                x-show="metric.key === 'sinr' && metric.isCA"
+                                type="button"
+                                class="btn btn-link p-0 border-0 text-info"
+                                style="padding: 0 !important; line-height: 1; display: inline-flex; align-items: center;"
+                                @click="showSinrInfoToast()"
+                                title="SINR on CA bands information">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em;">
+                                  <circle cx="12" cy="12" r="10"/>
+                                  <line x1="12" y1="16" x2="12" y2="12"/>
+                                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                                </svg>
+                              </button>
+                            </span>
                             <template x-if="metric.percentage > 0">
                               <div
-                                class="progress"
-                                style="height: 18px"
+                                class="progress flex-grow-1"
+                                style="height: 24px"
                                 role="progressbar"
                                 aria-valuemin="0"
                                 aria-valuemax="100"
@@ -751,8 +1109,7 @@
                               >
                                 <div
                                   class="progress-bar"
-                                  :class="getProgressBarClass(metric.percentage)"
-                                  :style="'width: ' + metric.percentage + '%'"
+                                  :style="'width: ' + metric.percentage + '%; background: ' + (metric.color || '#6c757d') + ';'"
                                 >
                                   <span
                                     x-text="metric.display + ' / ' + metric.percentage + '%'"
@@ -761,42 +1118,85 @@
                               </div>
                             </template>
                             <template x-if="metric.percentage === 0">
-                              <span class="fst-italic text-muted">Value not available</span>
+                              <span class="fst-italic text-muted flex-grow-1">Value not available</span>
                             </template>
                           </div>
-                        </template>
-                      </div>
-
-                      <template x-if="entry.antennas && entry.antennas.length">
-                        <div class="mt-3">
-                          <h6 class="fw-semibold">RSRP per Antenna</h6>
-                          <template x-for="antenna in entry.antennas" :key="antenna.label">
-                            <div class="mb-2">
-                              <div class="d-flex justify-content-between small">
-                                <span x-text="antenna.label"></span>
-                                <span x-text="antenna.display"></span>
-                              </div>
-                              <template x-if="antenna.percentage > 0">
-                                <div
-                                  class="progress"
-                                  style="height: 12px"
-                                  role="progressbar"
-                                  aria-valuemin="0"
-                                  aria-valuemax="100"
-                                  :aria-valuenow="antenna.percentage"
-                                >
+                          <!-- Show antennas right after RSRP metric -->
+                          <template x-if="metric.key === 'rsrp' && entry.antennas && entry.antennas.length > 0">
+                            <template x-for="(antenna, antennaIndex) in entry.antennas" :key="'antenna-' + antennaIndex">
+                              <div class="mb-2 d-flex align-items-center gap-2">
+                                <span class="fw-semibold" style="min-width: 80px; text-align: left;" x-html="'RSRP<sub>(ANT' + (typeof antenna.physicalAntenna === 'number' ? antenna.physicalAntenna : antennaIndex) + ')</sub>'"></span>
+                                <template x-if="antenna.percentage > 0">
                                   <div
-                                    class="progress-bar"
-                                    :class="getProgressBarClass(antenna.percentage)"
-                                    :style="'width: ' + antenna.percentage + '%'"
-                                  ></div>
-                                </div>
-                              </template>
-                              <template x-if="antenna.percentage === 0">
-                                <span class="fst-italic text-muted">Value not available</span>
-                              </template>
-                            </div>
+                                    class="progress flex-grow-1"
+                                    style="height: 24px"
+                                    role="progressbar"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    :aria-valuenow="antenna.percentage"
+                                  >
+                                    <div
+                                      class="progress-bar"
+                                      :style="'width: ' + antenna.percentage + '%; background: ' + (antenna.color || '#6c757d') + ';'"
+                                    >
+                                      <span x-text="antenna.display + ' / ' + antenna.percentage + '%'"></span>
+                                    </div>
+                                  </div>
+                                </template>
+                                <template x-if="antenna.percentage === 0">
+                                  <span class="fst-italic text-muted flex-grow-1">Value not available</span>
+                                </template>
+                              </div>
+                            </template>
                           </template>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <div class="mt-4">
+                  <h6 class="fw-semibold">Network analysis</h6>
+                  <template x-if="!networkAnalysis">
+                    <p class="mb-0 text-muted">No network analysis available.</p>
+                  </template>
+                  <template x-if="networkAnalysis">
+                    <div class="small">
+                      <p class="mb-1">
+                        <strong x-text="networkAnalysis.primary_title"></strong>
+                      </p>
+                      <p class="mb-2" x-text="networkAnalysis.primary_message"></p>
+
+                      <template x-if="networkAnalysis.why && networkAnalysis.why.length">
+                        <div class="mb-2">
+                          <div class="text-muted fw-semibold">Why</div>
+                          <ul class="mb-2 ps-3">
+                            <template x-for="(item, idx) in networkAnalysis.why" :key="'why-' + idx">
+                              <li x-text="item"></li>
+                            </template>
+                          </ul>
+                        </div>
+                      </template>
+
+                      <template x-if="networkAnalysis.suggestions && networkAnalysis.suggestions.length">
+                        <div class="mb-2">
+                          <div class="text-muted fw-semibold">What to try</div>
+                          <ul class="mb-2 ps-3">
+                            <template x-for="(item, idx) in networkAnalysis.suggestions" :key="'suggestion-' + idx">
+                              <li x-text="item"></li>
+                            </template>
+                          </ul>
+                        </div>
+                      </template>
+
+                      <template x-if="networkAnalysis.secondary_notes && networkAnalysis.secondary_notes.length">
+                        <div class="mb-0">
+                          <div class="text-muted fw-semibold">Notes</div>
+                          <ul class="mb-0 ps-3">
+                            <template x-for="(item, idx) in networkAnalysis.secondary_notes" :key="'note-' + idx">
+                              <li x-text="item"></li>
+                            </template>
+                          </ul>
                         </div>
                       </template>
                     </div>
@@ -806,1717 +1206,588 @@
             </div>
           </div>
         </div>
+
+        <!-- Connection Details Modal -->
+        <div class="modal fade" id="connectionModal" tabindex="-1" aria-labelledby="connectionModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header d-flex justify-content-between align-items-center">
+                <h5 class="modal-title" id="connectionModalLabel">Connection Details</h5>
+                <div class="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    class="btn-close btn-close-cog"
+                    @click="closeAndOpenMonitoring()"
+                    aria-label="Configure monitoring"
+                    title="Configure monitoring"
+                    style="background-image: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+              </div>
+              <div class="modal-body">
+                <div class="card-text">
+                  <!-- Ping Status -->
+                  <h6 class="fw-semibold mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="22" y1="12" x2="18" y2="12"/>
+                      <line x1="6" y1="12" x2="2" y2="12"/>
+                      <line x1="12" y1="6" x2="12" y2="2"/>
+                      <line x1="12" y1="22" x2="12" y2="18"/>
+                    </svg>
+                    Ping Test
+                  </h6>
+                  <div class="mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                      <span class="text-muted">Status:</span>
+                      <span>
+                        <span class="badge" :class="{
+                          'badge-success-modern': connectionDetails.ping && connectionDetails.ping.passed === connectionDetails.ping.total,
+                          'badge-warning-modern': connectionDetails.ping && connectionDetails.ping.passed > 0 && connectionDetails.ping.passed < connectionDetails.ping.total,
+                          'bg-danger': connectionDetails.ping && connectionDetails.ping.passed === 0
+                        }" x-text="connectionDetails.ping ? connectionDetails.ping.passed + '/' + connectionDetails.ping.total + ' Passed' : 'Loading...'"></span>
+                      </span>
+                    </div>
+                    <template x-if="connectionDetails.ping && connectionDetails.ping.results">
+                      <div class="table-responsive">
+                        <table class="table table-sm">
+                          <thead>
+                            <tr>
+                              <th>Host</th>
+                              <th>Status</th>
+                              <th>Time</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <template x-for="result in connectionDetails.ping.results" :key="result.host">
+                              <tr>
+                                <td x-text="result.host"></td>
+                                <td>
+                                  <span class="badge" :class="result.status === 'ok' ? 'badge-success-modern' : 'bg-danger'" x-text="result.status === 'ok' ? '✓ OK' : '✗ Failed'"></span>
+                                </td>
+                                <td>
+                                  <template x-if="result.time !== undefined && result.time !== null">
+                                    <span x-text="result.time + ' ms'"></span>
+                                  </template>
+                                  <template x-if="result.time === undefined || result.time === null">
+                                    <span class="text-muted">-</span>
+                                  </template>
+                                </td>
+                              </tr>
+                            </template>
+                          </tbody>
+                        </table>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- DNS Status -->
+                  <h6 class="fw-semibold mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+                      <path d="M2 12h20"/>
+                    </svg>
+                    DNS Resolution
+                  </h6>
+                  <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                      <span class="text-muted">Status:</span>
+                      <span>
+                        <span class="badge" :class="{
+                          'badge-success-modern': connectionDetails.dns && connectionDetails.dns.passed === connectionDetails.dns.total,
+                          'badge-warning-modern': connectionDetails.dns && connectionDetails.dns.passed > 0 && connectionDetails.dns.passed < connectionDetails.dns.total,
+                          'bg-danger': connectionDetails.dns && connectionDetails.dns.passed === 0
+                        }" x-text="connectionDetails.dns ? connectionDetails.dns.passed + '/' + connectionDetails.dns.total + ' Passed' : 'Loading...'"></span>
+                      </span>
+                    </div>
+                    <template x-if="connectionDetails.dns && connectionDetails.dns.results">
+                      <div class="table-responsive">
+                        <table class="table table-sm">
+                          <thead>
+                            <tr>
+                              <th>Server</th>
+                              <th>Domain</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <template x-for="(result, index) in connectionDetails.dns.results" :key="result.server + '-' + result.domain + '-' + index">
+                              <tr>
+                                <td x-text="result.server"></td>
+                                <td x-text="result.domain"></td>
+                                <td>
+                                  <span class="badge" :class="result.status === 'ok' ? 'badge-success-modern' : 'bg-danger'" x-text="result.status === 'ok' ? '✓ OK' : '✗ Failed'"></span>
+                                </td>
+                              </tr>
+                            </template>
+                          </tbody>
+                        </table>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monitoring Configuration Modal -->
+        <div class="modal fade" id="monitoringConfigModal" tabindex="-1" aria-labelledby="monitoringConfigModalLabel" aria-hidden="true" x-data="monitorPage()">
+          <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+              <div class="modal-header d-flex justify-content-between align-items-center">
+                <h5 class="modal-title" id="monitoringConfigModalLabel">Connection Monitoring Configuration</h5>
+                <button
+                  type="button"
+                  class="btn-close"
+                  @click="closeAndOpenConnection()"
+                  aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <template x-if="connectionConfigSuccessMessage">
+                  <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                    <span x-text="connectionConfigSuccessMessage"></span>
+                    <button type="button" class="btn-close" @click="connectionConfigSuccessMessage = ''"></button>
+                  </div>
+                </template>
+
+                <template x-if="connectionConfigErrorMessage">
+                  <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                    <span x-text="connectionConfigErrorMessage"></span>
+                    <button type="button" class="btn-close" @click="connectionConfigErrorMessage = ''"></button>
+                  </div>
+                </template>
+
+                <p class="text-body-secondary mb-3">
+                  Configure ping targets and DNS resolution tests for connection monitoring.
+                </p>
+
+                <div class="mb-4">
+                  <label class="form-label" for="pingTargets">Ping Targets</label>
+                  <input
+                    id="pingTargets"
+                    class="form-control"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="8.8.8.8,1.1.1.1"
+                    x-model="connectionConfigForm.pingTargets"
+                    :disabled="connectionConfigSaving"
+                  />
+                  <div class="form-text">
+                    Enter multiple hosts separated by commas. These hosts will be pinged to test connectivity.
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <label class="form-label" for="dnsTests">DNS Resolution Tests</label>
+                  <input
+                    id="dnsTests"
+                    class="form-control"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="8.8.8.8:www.google.com,1.1.1.1:www.google.com"
+                    x-model="connectionConfigForm.dnsTests"
+                    :disabled="connectionConfigSaving"
+                  />
+                  <div class="form-text">
+                    Enter DNS server and domain pairs in the format <code>server:domain</code>, separated by commas. Example: <code>8.8.8.8:www.google.com,1.1.1.1:www.google.com</code>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  @click="closeAndOpenConnection()">Close</button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  :disabled="connectionConfigSaving"
+                  @click="saveAndReturn()"
+                >
+                  <span x-show="!connectionConfigSaving">Save Configuration</span>
+                  <span x-show="connectionConfigSaving">
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    Saving...
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Device Info Modal -->
+        <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+          <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="deviceInfoModalLabel">Device Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="table-responsive">
+                  <table class="table">
+                    <tbody>
+                      <tr>
+                        <th scope="row">Manufacturer</th>
+                        <td x-text="manufacturer"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Model Name</th>
+                        <td x-text="modelName"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Firmware version</th>
+                        <td class="col-md-2" x-text="firmwareVersion"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Phone Number</th>
+                        <td class="col-md-2" style="white-space: nowrap;">
+                          <span x-text="phoneNumber"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(phoneNumber); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy Phone Number to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">IMSI</th>
+                        <td class="col-md-2" x-text="imsi"></td>
+                      </tr>
+                      <tr>
+                        <th scope="row">ICCID</th>
+                        <td class="col-md-2" style="white-space: nowrap;">
+                          <span x-text="iccid"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(iccid); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy ICCID to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">IMEI</th>
+                        <td class="col-md-2" style="white-space: nowrap;">
+                          <span x-text="imei"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(imei); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy IMEI to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                          <button 
+                            type="button" 
+                            class="btn btn-sm btn-link p-0"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            data-requires-admin="hide"
+                            @click="openImeiModal()"
+                            title="Edit IMEI"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="grey" class="bi bi-pencil" viewBox="0 0 16 16">
+                              <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">LAN IP</th>
+                        <td class="col-md-2" style="white-space: nowrap;">
+                          <span x-text="lanIp"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(lanIp); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy LAN IP to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row">WAN IPv4</th>
+                        <td class="col-md-2" style="white-space: nowrap;">
+                          <span x-text="wwanIpv4"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(wwanIpv4); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy WAN IPv4 to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr x-show="wwanIpv6 && wwanIpv6 !== '0000:0000:0000:0000:0000:0000:0000:0000' && wwanIpv6 !== '-' && wwanIpv6 !== 'Unknown'">
+                        <th scope="row">WAN IPv6</th>
+                        <td class="col-md-2" style="white-space: nowrap;">
+                          <span x-text="wwanIpv6"></span>
+                          <button 
+                            type="button"
+                            class="btn btn-link p-0 border-0 text-muted"
+                            style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                            @click="copyToClipboard(wwanIpv6); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                            title="Copy WAN IPv6 to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              
+
+        <!-- IMEI Edit Modals (inside deviceInfoModal scope) -->
+        <div class="modal-overlay" x-show="showImeiWarningModal" x-cloak>
+          <div class="loading-modal" style="max-width: 500px;">
+            <div class="loading-text" style="display: flex; flex-direction: column">
+              <h4 class="text-warning">⚠️ Legal Warning</h4>
+              <p style="margin-top: 1rem; text-align: left;">
+                Changing the IMEI is <strong>only permitted in countries where it is legal</strong>. 
+                In many jurisdictions, modifying the IMEI is <strong>illegal</strong> and may result in criminal penalties.
+              </p>
+              <p style="text-align: left;">
+                By proceeding, you confirm that you are authorized to modify this device's IMEI 
+                and that doing so is legal in your jurisdiction.
+              </p>
+            </div>
+            <div class="d-flex justify-content-center gap-3 mt-3">
+              <button
+                class="btn btn-primary"
+                type="button"
+                @click="acceptImeiWarning()"
+              >
+                I Understand - Continue
+              </button>
+              <button
+                class="btn btn-secondary"
+                type="button"
+                @click="closeImeiWarningModal()"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay" x-show="showImeiInputModal" x-cloak>
+          <div class="loading-modal" style="max-width: 450px;">
+            <div class="loading-text" style="display: flex; flex-direction: column">
+              <h4>Edit IMEI</h4>
+              <p style="margin-top: 0.5rem; text-align: left;">
+                Current IMEI: <strong x-text="imei"></strong>
+              </p>
+              <div class="mb-3 text-start">
+                <label for="newImeiInput" class="form-label">New IMEI (15 digits)</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  id="newImeiInput"
+                  x-model="newImei"
+                  maxlength="15"
+                  pattern="[0-9]{15}"
+                  placeholder="Enter 15 digit IMEI"
+                  @input="validateImeiInput()"
+                />
+                <div class="form-text" x-show="imeiValidationError" x-text="imeiValidationError" style="color: #dc3545;"></div>
+              </div>
+            </div>
+            <div class="d-flex justify-content-center gap-3 mt-3">
+              <button
+                class="btn btn-primary"
+                type="button"
+                @click="confirmImeiChange()"
+                :disabled="!isImeiValid"
+              >
+                Change IMEI
+              </button>
+              <button
+                class="btn btn-danger"
+                type="button"
+                @click="closeImeiInputModal()"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SIM Unlock Prompt Modal (first time only) -->
+        <div class="modal-overlay" x-show="showSimUnlockPrompt" x-cloak>
+          <div class="loading-modal" style="max-width: 500px;">
+            <div class="loading-text" style="display: flex; flex-direction: column">
+              <h4 class="text-warning">🔐 SIM PIN Required</h4>
+              <p style="margin-top: 1rem; text-align: left;">
+                Your SIM card is locked and requires a PIN to be unlocked.
+                You can unlock it now or skip and do it later from the SIM Status tab.
+              </p>
+
+              <!-- Error message -->
+              <div x-show="simUnlockError" class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                <span x-text="simUnlockError"></span>
+                <button type="button" class="btn-close" @click="simUnlockError = ''" aria-label="Close"></button>
+              </div>
+
+              <!-- Success message -->
+              <div x-show="simUnlockMessage" class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                <span x-text="simUnlockMessage"></span>
+                <button type="button" class="btn-close" @click="simUnlockMessage = ''" aria-label="Close"></button>
+              </div>
+
+              <!-- PIN Input -->
+              <div class="mb-3 mt-3" style="width: 100%;">
+                <label for="simPinPrompt" class="form-label">Enter SIM PIN:</label>
+                <input
+                  type="password"
+                  id="simPinPrompt"
+                  class="form-control"
+                  x-model="simPin"
+                  :disabled="isSimUnlocking"
+                  maxlength="8"
+                  placeholder="Enter your PIN"
+                  @keyup.enter="unlockFromPrompt()">
+              </div>
+            </div>
+            <div class="d-flex justify-content-center gap-3 mt-3">
+              <button
+                class="btn btn-secondary"
+                type="button"
+                @click="dismissSimUnlockPrompt()"
+                :disabled="isSimUnlocking">
+                Skip
+              </button>
+              <button
+                class="btn btn-success"
+                type="button"
+                @click="unlockFromPrompt()"
+                :disabled="isSimUnlocking">
+                <span x-show="!isSimUnlocking">Unlock SIM</span>
+                <span x-show="isSimUnlocking">
+                  <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                  Unlocking...
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>        
       </div>
-    </main>
-    <footer class="border-top py-3 mt-4">
-      <div
-        class="container d-flex flex-wrap gap-3 justify-content-between align-items-center"
-      >
-        <a
-          class="btn btn-outline-secondary btn-sm"
-          href="/credentials.html"
-          data-requires-admin="hide"
-        >
-          Credential Management
-        </a>
-        <button
-          class="btn btn-link text-reset"
-          id="darkModeToggle"
-          type="button"
-          data-allow-user="true"
-        >
-          Dark Mode
-        </button>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 border-top">
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-md-6 text-center text-md-start mb-2 mb-md-0">
+            <span class="text-muted small d-inline-flex align-items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span data-app-version></span>
+            </span>
+          </div>
+          <div class="col-md-6 text-center text-md-end">
+            <a href="https://github.com/Brazzo978/T99W175-simpleadmin" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted small d-inline-flex align-items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+              </svg>
+              <span>GitHub</span>
+            </a>
+          </div>
+        </div>
+        <div class="row mt-2">
+          <div class="col-12 text-center">
+            <span class="text-muted small" style="opacity: 0.7;">
+              © 2026 T99W175 SimpleAdmin. Released under MIT License.
+            </span>
+          </div>
+        </div>
       </div>
     </footer>
-    <script src="js/atcommand-utils.js"></script>
-    <script src="js/dark-mode.js"></script>
 
-    <script>
-      function processAllInfos() {
-        const italianNetworkProviders = {
-          "22201": "TIM",
-          "22202": "Elsacom",
-          "22204": "Intermatica",
-          "22205": "Telespazio",
-          "22206": "Vodafone Italia",
-          "22207": "Kena Mobile",
-          "22208": "Fastweb",
-          "22210": "Vodafone Italia",
-          "22230": "RFI",
-          "22233": "PosteMobile",
-          "22234": "BT Italia",
-          "22235": "Lycamobile",
-          "22236": "Digi Mobil",
-          "22237": "Wind Tre",
-          "22238": "Linkem",
-          "22239": "SMS Italia",
-          "22241": "GO Internet",
-          "22243": "TIM",
-          "22247": "Fastweb",
-          "22248": "TIM",
-          "22249": "Vianova",
-          "22250": "Iliad",
-          "22253": "CoopVoce",
-          "22254": "Plintron",
-          "22256": "spusu",
-          "22277": "IPSE 2000",
-          "22288": "Wind Tre",
-          "22298": "Blu",
-          "22299": "Wind Tre",
-        };
-
-        const defaultDataState = {
-          atcmd: "",
-          internetConnectionStatus: "Disconnected",
-          temperature: "0",
-          simStatus: "No SIM",
-          activeSim: "No SIM",
-          networkProvider: "N/A",
-          mccmnc: "00000",
-          apn: "Unknown",
-          networkMode: "Disconnected",
-          bands: "Unknown Bands",
-          bandwidth: "Unknown Bandwidth",
-          earfcns: "000",
-          pccPCI: "0",
-          sccPCI: "-",
-          ipv4: "000.000.000.000",
-          ipv6: "0000:0000:0000:0000:0000:0000:0000:0000",
-          cellID: "Unknown",
-          eNBID: "Unknown",
-          tac: "Unknown",
-          csq: "-",
-          rssiLTE: "-",
-          rssiNR: "-",
-          rssiLTEPercentage: "0%",
-          rssiNRPercentage: "0%",
-          rsrpLTE: "-",
-          rsrpNR: "-",
-          rsrpLTEPercentage: "0%",
-          rsrpNRPercentage: "0%",
-          rsrqLTE: "-",
-          rsrqNR: "-",
-          rsrqLTEPercentage: "0%",
-          rsrqNRPercentage: "0%",
-          sinrLTE: "-",
-          sinrNR: "-",
-          sinrLTEPercentage: "0%",
-          sinrNRPercentage: "0%",
-          signalPercentage: "0",
-          signalAssessment: "Unknown",
-          uptime: "Unknown",
-          lastUpdate: new Date().toLocaleString(),
-          newRefreshRate: null,
-          refreshRate: 3,
-          nrDownload: "0",
-          nrUpload: "0",
-          nonNrDownload: "0",
-          nonNrUpload: "0",
-          downloadStat: "0",
-          uploadStat: "0",
-          detailedSignals: [],
-          intervalId: null,
-        };
-
-        return {
-          ...defaultDataState,
-
-          resetData(overrides = {}) {
-            const preservedState = {
-              refreshRate: this.refreshRate,
-              newRefreshRate: this.newRefreshRate,
-              intervalId: this.intervalId,
-            };
-
-            Object.assign(
-              this,
-              {
-                ...defaultDataState,
-                ...preservedState,
-                lastUpdate: new Date().toLocaleString(),
-              },
-              overrides
-            );
-
-            this.detailedSignals = Array.isArray(overrides.detailedSignals)
-              ? [...overrides.detailedSignals]
-              : [];
-          },
-
-          applyFallback(message) {
-            const fallbackMessage = message
-              ? `Unavailable (${message})`
-              : defaultDataState.activeSim;
-
-            this.resetData({
-              activeSim: fallbackMessage,
-              signalAssessment: "Unknown",
-              internetConnectionStatus: "Disconnected",
-            });
-          },
-
-          async fetchAllInfo() {
-            this.atcmd =
-              'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;';
-
-            try {
-              const result = await ATCommandService.execute(this.atcmd, {
-                retries: 3,
-                timeout: 15000,
-              });
-
-              if (!result.ok) {
-                const fallbackMessage = result.error
-                  ? result.error.message
-                  : 'Risposta AT non valida.';
-
-                this.applyFallback(fallbackMessage);
-                return;
-              }
-
-              const rawdata = result.data;
-
-              if (!rawdata || !rawdata.trim()) {
-                this.applyFallback('Risposta AT vuota dal modem.');
-                return;
-              }
-
-              if (rawdata.includes('ERROR')) {
-                this.applyFallback('Il modem ha restituito un errore.');
-                return;
-              }
-
-              try {
-                  const lines = rawdata.split("\n");
-
-                  console.log(lines);
-
-                  const buildDetailedSignals = () => {
-                    const details = [];
-                    let currentEntry = null;
-                    let scellCounter = 0;
-                    let entryCounter = 0;
-                    let pendingLteAntennas = [];
-                    let pendingLteDiversity = null;
-
-                    const roundValue = (value) => {
-                      if (typeof value !== "number" || Number.isNaN(value)) {
-                        return null;
-                      }
-                      return Math.round(value * 10) / 10;
-                    };
-
-                    const parseAntennaLine = (line, prefix) => {
-                      const match = line.match(/\(([^)]+)\)/);
-                      if (!match) {
-                        return [];
-                      }
-
-                      return match[1].split(",").map((item, index) => {
-                        const trimmed = item.trim();
-                        const numeric = parseFloat(trimmed);
-                        return {
-                          label: `${prefix} ${index + 1}`,
-                          value: Number.isNaN(numeric) ? null : numeric,
-                        };
-                      });
-                    };
-
-                    const finalizeEntry = () => {
-                      if (!currentEntry) {
-                        return;
-                      }
-
-                      const bandDisplay = currentEntry.band
-                        ? currentEntry.technology === "LTE"
-                          ? `Band ${currentEntry.band}`
-                          : currentEntry.band
-                        : "N/A";
-
-                      let title = "";
-                      if (currentEntry.technology === "LTE") {
-                        if (currentEntry.role === "primary") {
-                          title = "Primary 4G";
-                        } else {
-                          title = currentEntry.caIndex
-                            ? `CA 4G #${currentEntry.caIndex}`
-                            : "CA 4G";
-                        }
-                      } else {
-                        title = "Primary 5G";
-                      }
-
-                      if (bandDisplay !== "N/A") {
-                        title += ` (${bandDisplay})`;
-                      }
-
-                      const detail = {
-                        id: currentEntry.id,
-                        title,
-                        technology: currentEntry.technology,
-                        bandDisplay,
-                        bandwidthDisplay: currentEntry.bandwidth || "N/A",
-                        channelDisplay: currentEntry.channel || "N/A",
-                        pciDisplay: currentEntry.pci || "N/A",
-                        rxDiversityDisplay: currentEntry.rxDiversity || "",
-                        metrics: [],
-                        antennas: [],
-                      };
-
-                      const addMetric = (key, label, value, unit, calculator) => {
-                        const normalized = roundValue(value);
-                        if (normalized === null) {
-                          detail.metrics.push({
-                            key,
-                            label,
-                            display: "N/A",
-                            percentage: 0,
-                          });
-                          return;
-                        }
-
-                        const displayValue = unit ? `${normalized} ${unit}` : `${normalized}`;
-                        const percentage = typeof calculator === "function"
-                          ? calculator.call(this, normalized)
-                          : 0;
-
-                        detail.metrics.push({
-                          key,
-                          label,
-                          display: displayValue,
-                          percentage,
-                        });
-                      };
-
-                      addMetric(
-                        "rsrq",
-                        currentEntry.technology === "NR" ? "SS_RSRQ" : "RSRQ",
-                        currentEntry.metricsData.rsrq,
-                        "dB",
-                        this.calculateRSRQPercentage
-                      );
-                      addMetric(
-                        "rsrp",
-                        currentEntry.technology === "NR" ? "SS_RSRP" : "RSRP",
-                        currentEntry.metricsData.rsrp,
-                        "dBm",
-                        this.calculateRSRPPercentage
-                      );
-                      addMetric(
-                        "rssi",
-                        "RSSI",
-                        currentEntry.metricsData.rssi,
-                        "dBm",
-                        this.calculateRSSIPercentage
-                      );
-                      addMetric(
-                        "sinr",
-                        currentEntry.technology === "NR" ? "SS_SINR" : "SINR",
-                        currentEntry.metricsData.sinr,
-                        "dB",
-                        this.calculateSINRPercentage
-                      );
-
-                      detail.antennas = (currentEntry.antennas || []).map((antenna, index) => {
-                        const normalized = roundValue(antenna.value);
-                        const label = antenna.label || `Antenna ${index + 1}`;
-                        if (normalized === null) {
-                          return {
-                            label,
-                            display: "N/A",
-                            percentage: 0,
-                          };
-                        }
-
-                        return {
-                          label,
-                          display: `${normalized} dBm`,
-                          percentage: this.calculateRSRPPercentage(normalized),
-                        };
-                      });
-
-                      details.push(detail);
-                      currentEntry = null;
-                    };
-
-                    for (const rawLine of lines) {
-                      const line = rawLine.trim();
-                      if (!line) {
-                        continue;
-                      }
-
-                      if (line.startsWith("lte_ant_rsrp")) {
-                        pendingLteAntennas = parseAntennaLine(line, "Antenna");
-                        const diversityMatch = line.match(/rx_diversity:([0-9]+)/i);
-                        if (diversityMatch) {
-                          pendingLteDiversity = diversityMatch[1];
-                        }
-                        continue;
-                      }
-
-                      if (line.startsWith("pcell:")) {
-                        finalizeEntry();
-                        currentEntry = {
-                          id: `lte-primary-${entryCounter++}`,
-                          technology: "LTE",
-                          role: "primary",
-                          band: null,
-                          bandwidth: null,
-                          channel: null,
-                          pci: null,
-                          rxDiversity: pendingLteDiversity,
-                          antennas: pendingLteAntennas,
-                          metricsData: {},
-                        };
-                        pendingLteAntennas = [];
-                        pendingLteDiversity = null;
-
-                        const bandMatch = line.match(/lte_band:(\d+)/i);
-                        if (bandMatch) {
-                          currentEntry.band = bandMatch[1];
-                        }
-                        const bwMatch = line.match(/lte_band_width:([^\s]+)/i);
-                        if (bwMatch) {
-                          currentEntry.bandwidth = bwMatch[1];
-                        }
-                        continue;
-                      }
-
-                      if (line.startsWith("scell:")) {
-                        finalizeEntry();
-                        scellCounter += 1;
-                        currentEntry = {
-                          id: `lte-scell-${entryCounter++}`,
-                          technology: "LTE",
-                          role: "secondary",
-                          caIndex: scellCounter,
-                          band: null,
-                          bandwidth: null,
-                          channel: null,
-                          pci: null,
-                          rxDiversity: null,
-                          antennas: [],
-                          metricsData: {},
-                        };
-
-                        const bandMatch = line.match(/lte_band:(\d+)/i);
-                        if (bandMatch) {
-                          currentEntry.band = bandMatch[1];
-                        }
-                        const bwMatch = line.match(/lte_band_width:([^\s]+)/i);
-                        if (bwMatch) {
-                          currentEntry.bandwidth = bwMatch[1];
-                        }
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("channel:") &&
-                        currentEntry &&
-                        currentEntry.technology === "LTE"
-                      ) {
-                        const channelMatch = line.match(/channel:(\d+)/i);
-                        if (channelMatch) {
-                          currentEntry.channel = channelMatch[1];
-                        }
-                        const pciMatch = line.match(/pci:(\d+)/i);
-                        if (pciMatch) {
-                          currentEntry.pci = pciMatch[1];
-                        }
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("lte_rsrp:") &&
-                        currentEntry &&
-                        currentEntry.technology === "LTE"
-                      ) {
-                        const rsrpMatch = line.match(/lte_rsrp:([\-\d\.]+)/i);
-                        if (rsrpMatch) {
-                          currentEntry.metricsData.rsrp = parseFloat(rsrpMatch[1]);
-                        }
-                        const rsrqMatch = line.match(/rsrq:([\-\d\.]+)/i);
-                        if (rsrqMatch) {
-                          currentEntry.metricsData.rsrq = parseFloat(rsrqMatch[1]);
-                        }
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("lte_rssi:") &&
-                        currentEntry &&
-                        currentEntry.technology === "LTE"
-                      ) {
-                        const rssiMatch = line.match(/lte_rssi:([\-\d\.]+)/i);
-                        if (rssiMatch) {
-                          currentEntry.metricsData.rssi = parseFloat(rssiMatch[1]);
-                        }
-                        const snrMatch = line.match(/lte_snr:([\-\d\.]+)/i);
-                        if (snrMatch) {
-                          currentEntry.metricsData.sinr = parseFloat(snrMatch[1]);
-                        }
-                        continue;
-                      }
-
-                      if (line.startsWith("nr_band:")) {
-                        finalizeEntry();
-                        currentEntry = {
-                          id: `nr-primary-${entryCounter++}`,
-                          technology: "NR",
-                          role: "primary",
-                          band: null,
-                          bandwidth: null,
-                          channel: null,
-                          pci: null,
-                          rxDiversity: null,
-                          antennas: [],
-                          metricsData: {},
-                        };
-                        const bandMatch = line.match(/nr_band:([^\s]+)/i);
-                        if (bandMatch) {
-                          currentEntry.band = bandMatch[1];
-                        }
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("nr_band_width:") &&
-                        currentEntry &&
-                        currentEntry.technology === "NR"
-                      ) {
-                        const parts = line.split(":");
-                        currentEntry.bandwidth = parts.length > 1 ? parts[1].trim() : null;
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("nr_channel:") &&
-                        currentEntry &&
-                        currentEntry.technology === "NR"
-                      ) {
-                        const parts = line.split(":");
-                        currentEntry.channel = parts.length > 1 ? parts[1].trim() : null;
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("nr_pci:") &&
-                        currentEntry &&
-                        currentEntry.technology === "NR"
-                      ) {
-                        const parts = line.split(":");
-                        currentEntry.pci = parts.length > 1 ? parts[1].trim() : null;
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("nr_rsrp:") &&
-                        currentEntry &&
-                        currentEntry.technology === "NR"
-                      ) {
-                        const rsrpMatch = line.match(/nr_rsrp:([\-\d\.]+)/i);
-                        if (rsrpMatch) {
-                          currentEntry.metricsData.rsrp = parseFloat(rsrpMatch[1]);
-                        }
-                        const diversityMatch = line.match(/rx_diversity:\s*([\d]+)/i);
-                        if (diversityMatch) {
-                          currentEntry.rxDiversity = diversityMatch[1];
-                        }
-                        currentEntry.antennas = parseAntennaLine(line, "Antenna");
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("nr_rsrq:") &&
-                        currentEntry &&
-                        currentEntry.technology === "NR"
-                      ) {
-                        const rsrqMatch = line.match(/nr_rsrq:([\-\d\.]+)/i);
-                        if (rsrqMatch) {
-                          currentEntry.metricsData.rsrq = parseFloat(rsrqMatch[1]);
-                        }
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("nr_rssi:") &&
-                        currentEntry &&
-                        currentEntry.technology === "NR"
-                      ) {
-                        const rssiMatch = line.match(/nr_rssi:([\-\d\.]+)/i);
-                        if (rssiMatch) {
-                          currentEntry.metricsData.rssi = parseFloat(rssiMatch[1]);
-                        }
-                        continue;
-                      }
-
-                      if (
-                        line.startsWith("nr_snr:") &&
-                        currentEntry &&
-                        currentEntry.technology === "NR"
-                      ) {
-                        const snrMatch = line.match(/nr_snr:([\-\d\.]+)/i);
-                        if (snrMatch) {
-                          currentEntry.metricsData.sinr = parseFloat(snrMatch[1]);
-                        }
-                        continue;
-                      }
-                    }
-
-                    finalizeEntry();
-                    return details;
-                  };
-
-                  this.detailedSignals = buildDetailedSignals();
-
-                  // --- Temperature ---
-                  // find this example value from lines "+QTEMP:"cpuss-0-usr","50"
-                  try {
-                    this.temperature = lines
-                      .find((line) => line.includes('TSENS:'))
-                      .split(":")[1]
-                      .replace(/"/g, "");
-                  } catch (error) {
-                    this.temperature = lines
-                      .find((line) => line.includes('TSENS:'))
-                      .split(",")[1]
-                      .replace(/"/g, "");
-                  }
-
-                  // --- SIM Status ---
-                  // find this example value from lines "+QSIMSTAT: 0,1"
-                  // Only get the last digit of 0,1
-                  const sim_status = lines
-                    .find((line) => line.includes("+CPIN:"))
-                    .split(":")[1]
-                    .replace(/"/g, "")
-                    
-		 // console.log(sim_status)
-                  if (sim_status == "READY") {
-                    this.simStatus = "Active";
-                  } else {
-                    this.simStatus = sim_status;
-                  }
-
-                  // --- Active SIM ---
-                  // find this example value from lines "+QUIMSLOT: 1"
-                  const current_sim = lines
-                    .find((line) => line.includes("ENABLE"))
-                    .split(" ")[0]
-                    .replace(/\D/g, "");
-                  if (current_sim == 1) {
-                    this.activeSim = "SIM 1";
-                  } else if (current_sim == 2) {
-                    this.activeSim = "SIM 2";
-                  } else {
-                    this.activeSim = "No SIM";
-                  }
-
-                  // --- Network Provider & MCCMNC ---
-                  const mccLine = lines.find((line) => line.includes("mcc:"));
-                  if (mccLine) {
-                    const mccMatch = mccLine.match(/mcc:\s*(\d+)/i);
-                    const mncMatch = mccLine.match(/mnc:\s*(\d+)/i);
-                    const mccmncCode =
-                      mccMatch && mncMatch
-                        ? `${mccMatch[1]}${mncMatch[1].padStart(2, "0")}`
-                        : mccLine.replace(/\D/g, "");
-
-                    const networkProviderMap = {
-                      ...italianNetworkProviders,
-                      "46000": "China Mobile",
-                      "46001": "China Unicom",
-                      "46011": "China Telecom",
-                    };
-
-                    this.mccmnc = mccmncCode || "Unknown";
-                    this.networkProvider =
-                      networkProviderMap[mccmncCode] ||
-                      (mccmncCode ? mccmncCode : "Unknown");
-                  } else {
-                    this.mccmnc = "Unknown";
-                    this.networkProvider = "Unknown";
-                  }
-                  // --- APN ---
-                  // find this example value from lines "+CGCONTRDP: 1,0,\"internet.dito.ph\",\"100.65.141.236\",\"36.5.141.64.76.204.39.68.23.210.251.16.49.239.42.149\", \"254.128.0.0.0.0.0.0.0.0.0.0.0.0.0.1\",\"131.226.72.19\",\"131.226.73.19\"\r"
-                  this.apn = lines
-                    .find((line) => line.includes("+CGCONTRDP:"))
-                    .split(",")[2]
-                    .replace(/"/g, "");
-
-                  // --- Network Mode ---
-                  // find this example value from lines "+QENG: \"servingcell\",\"NOCONN\",\"NR5G-SA\",\"TDD\",515,66,7000C4001,475,702000,620640,78,12,-83,-3,16,1,-\r"
-
-                  const ratLine = lines.find((line) => line.includes('RAT:'));
-                  const network_mode = ratLine
-                    ? ratLine.split(":")[1].trim()
-                    : "Unknown";
-                  this.networkMode = network_mode;
-
-                  // --- Bands ---
-                  // Get all the values with LTE BAND n (for example, LTE BAND 3, LTE BAND 1) and then store them in an array
-                  const bands = lines.filter((line) =>
-                    line.includes("lte_band:")
-                  );
-
-                  // since it includes the whole line, we need to extract the band part only
-                  for (let i = 0; i < bands.length; i++) {
-                    bands[i] = bands[i].split(":")[2].split(" ")[0].replace(/"/g, "");
-                  }
-
-                  // Get all the values with NR BAND n (for example, NR BAND 3, NR BAND 1) and then store them in an array
-                  const bands_5g = lines.filter((line) =>
-                    line.includes("nr_band:")
-                  );
-                  // since it includes the whole line, we need to extract the band number only
-                  for (let i = 0; i < bands_5g.length; i++) {
-                    bands_5g[i] = bands_5g[i].split(":")[1].replace(/"/g, "");
-                  }
-
-                  // Combine the bands and bands_5g arrays seperated by a comma. however, bands or bands_5g can be empty
-                  if (bands.length > 0 && bands_5g.length > 0) {
-                    this.bands = bands.join(", ") + ", " + bands_5g.join(", ");
-                  } else if (bands.length > 0) {
-                    this.bands = bands.join(", ");
-                  } else if (bands_5g.length > 0) {
-                    this.bands = bands_5g.join(", ");
-                  } else {
-                    this.bands = "No Bands";
-                  }
-
-                  // --- Bandwidth ---
-                  const bandwidth = lines.filter((line) =>
-                    line.includes("lte_band_width:")
-                  );
-                  for (let i = 0; i < bandwidth.length; i++) {
-                    bandwidth[i] = bandwidth[i].split(":")[3].replace(/"/g, "");
-                  }
-                  const bandwidth_5gs = lines.filter((line) =>
-                    line.includes("nr_band_width:")
-                  );
-		  console.log(bandwidth_5gs)
-                  for (let i = 0; i < bandwidth_5gs.length; i++) {
-                    bandwidth_5gs[i] = bandwidth_5gs[i].split(":")[1];
-                  }
-                  if (bandwidth.length > 0 && bandwidth_5gs.length > 0) {
-                    this.bandwidth = bandwidth.join(", ") + ", " + bandwidth_5gs.join(", ");
-                  } else if (bandwidth.length > 0) {
-                    this.bandwidth = bandwidth.join(", ");
-                  } else if (bandwidth_5gs.length > 0) {
-                    this.bandwidth = bandwidth_5gs.join(", ");
-                  } else {
-                    this.bandwidth = "Unknown Bandwidth";
-                  }
-
-                  // --- E/ARFCN ---
-                  const lteArfcnLines = lines.filter((line) =>
-                    line.startsWith("channel:")
-                  );
-                  const nrArfcnLines = lines.filter((line) =>
-                    line.includes("nr_channel:")
-                  );
-
-                  const lteArfcns = lteArfcnLines
-                    .map((line) => {
-                      const segment = line.split(":")[1];
-                      if (!segment) {
-                        return null;
-                      }
-                      return segment.split(" ")[0].trim();
-                    })
-                    .filter((value) => value && value.length > 0);
-
-                  const nrArfcns = nrArfcnLines
-                    .map((line) => {
-                      const segment = line.split(":")[1];
-                      return segment ? segment.trim() : null;
-                    })
-                    .filter((value) => value && value.length > 0);
-
-                  const allArfcns = [...lteArfcns, ...nrArfcns];
-                  if (allArfcns.length > 0) {
-                    this.earfcns = allArfcns.join(", ");
-                  } else {
-                    this.earfcns = "Unknown E/ARFCN";
-                  }
-
-                  // --- PCI ---
-                  const ltePciLines = lines.filter(
-                    (line) => line.startsWith("channel:") && line.includes('pci:')
-                  );
-                  const nrPciLines = lines.filter((line) =>
-                    line.includes('nr_pci:')
-                  );
-
-                  const ltePcis = ltePciLines
-                    .map((line) => {
-                      const segment = line.split('pci:')[1];
-                      return segment ? segment.trim().split(' ')[0] : null;
-                    })
-                    .filter((value) => value && value.length > 0);
-
-                  const nrPcis = nrPciLines
-                    .map((line) => {
-                      const segment = line.split(":")[1];
-                      return segment ? segment.trim() : null;
-                    })
-                    .filter((value) => value && value.length > 0);
-
-                  const allPcis = [...ltePcis, ...nrPcis];
-                  if (allPcis.length > 0) {
-                    this.pccPCI = allPcis.join(", ");
-                    this.sccPCI = "-";
-                  } else {
-                    this.pccPCI = "0";
-                    this.sccPCI = "-";
-                  }
-
-                  // --- IPv4 and IPv6 ---
-                  // find the value from line "IPV4"
-                  this.ipv4 = lines
-                    .find((line) => line.includes("+CGCONTRDP:"))
-                    .split(",")[3]
-                    .replace(/"/g, "");
-
-                  // find the value from line "IPV6"
-                  this.ipv6 = lines
-                    .find((line) => line.includes("+CGCONTRDP:"))
-                    .split(",")[4]
-                    .replace(/"/g, "");
-		/*
-                  // Traffic Stats
-                  // for NR traffic stats: +QGDNRCNT: 3263753367,109876105
-                  this.nrDownload = lines
-                    .find((line) => line.includes("+QGDNRCNT:"))
-                    //.split(",")[0]
-                    // remove the +QGDNRCNT: part
-                    .replace("+QGDNRCNT: ", "");
-
-                  this.nrUpload = lines
-                    .find((line) => line.includes("+QGDNRCNT:"))
-                    //.split(",")[1];
-
-                  // for non-NR traffic stats: +QGDCNT: 247357510,6864571506
-                  this.nonNrDownload = lines
-                    .find((line) => line.includes("+QGDCNT:"))
-                    //.split(",")[1];
-
-                  this.nonNrUpload = lines
-                    .find((line) => line.includes("+QGDCNT:"))
-                    .split(",")[0]
-                    // remove the +QGDCNT: part
-                    .replace("+QGDCNT: ", "");
-
-                  // Add the nrDownload and nonNrDownload together
-                  this.downloadStat =
-                    parseInt(this.nrDownload) + parseInt(this.nonNrDownload);
-
-                  // Add the nrUpload and nonNrUpload together
-                  this.uploadStat =
-                    parseInt(this.nrUpload) + parseInt(this.nonNrUpload);
-
-                  // Convert the downloadStat and uploadStat bytes to readable size
-                  this.downloadStat = this.bytesToSize(this.downloadStat);
-                  this.uploadStat = this.bytesToSize(this.uploadStat);
-
-                  console.log(this.downloadStat);
-                  console.log(this.uploadStat);
-		   */	
-                  // Signal Informations
-
-                  const currentNetworkMode = this.networkMode;
-                  const hasNRStats = lines.some((line) =>
-                    line.includes('nr_rsrp:')
-                  );
-                  const hasLTEStats = lines.some((line) =>
-                    line.includes('lte_rsrp:')
-                  );
-
-                  const normalizeCellId = (value) => {
-                    if (!value) {
-                      return null;
-                    }
-                    const trimmed = value.trim().replace(/"/g, "");
-                    if (trimmed === "") {
-                      return null;
-                    }
-                    if (/^0x/i.test(trimmed)) {
-                      return trimmed.replace(/^0x/i, "").toUpperCase();
-                    }
-                    if (/^[0-9A-Fa-f]+$/.test(trimmed) && /[A-Fa-f]/.test(trimmed)) {
-                      return trimmed.toUpperCase();
-                    }
-                    const decimalValue = parseInt(trimmed, 10);
-                    if (Number.isNaN(decimalValue)) {
-                      return null;
-                    }
-                    return decimalValue.toString(16).toUpperCase();
-                  };
-
-                  const formatCellInfo = (hexValue) => {
-                    if (!hexValue) {
-                      return null;
-                    }
-                    const longDec = parseInt(hexValue, 16);
-                    const shortHex = hexValue.slice(-2);
-                    const shortDec = parseInt(shortHex, 16);
-                    const eNbHex = hexValue.slice(0, -2);
-                    const eNbDec = eNbHex ? parseInt(eNbHex, 16) : NaN;
-                    const cellDisplay =
-                      "Short " +
-                      shortHex +
-                      "(" +
-                      (Number.isNaN(shortDec) ? "-" : shortDec) +
-                      ")" +
-                      ", " +
-                      "Long " +
-                      hexValue +
-                      "(" +
-                      (Number.isNaN(longDec) ? "-" : longDec) +
-                      ")";
-                    return {
-                      display: cellDisplay,
-                      eNbId: Number.isNaN(eNbDec) ? "-" : eNbDec,
-                    };
-                  };
-
-                  const formatTac = (value) => {
-                    if (!value) {
-                      return null;
-                    }
-                    const trimmed = value.trim().replace(/"/g, "");
-                    if (trimmed === "") {
-                      return null;
-                    }
-                    const isHexCandidate = /[A-Fa-f]/.test(trimmed) || /^0x/i.test(trimmed);
-                    const numericValue = isHexCandidate
-                      ? parseInt(trimmed, 16)
-                      : parseInt(trimmed, 10);
-                    if (Number.isNaN(numericValue)) {
-                      const fallback = parseInt(trimmed, 16);
-                      if (Number.isNaN(fallback)) {
-                        return null;
-                      }
-                      return fallback + " (" + trimmed + ")";
-                    }
-                    return numericValue + " (" + trimmed + ")";
-                  };
-
-                  let cellInfoSet = false;
-                  let signalSamples = [];
-
-                  if (hasNRStats || hasLTEStats) {
-                    if (!hasNRStats) {
-                      this.rsrpNR = "-";
-                      this.rsrqNR = "-";
-                      this.sinrNR = "-";
-                      this.rsrpNRPercentage = 0;
-                      this.rsrqNRPercentage = 0;
-                      this.sinrNRPercentage = 0;
-                    }
-
-                    if (!hasLTEStats) {
-                      this.rsrpLTE = "-";
-                      this.rsrqLTE = "-";
-                      this.sinrLTE = "-";
-                      this.rsrpLTEPercentage = 0;
-                      this.rsrqLTEPercentage = 0;
-                      this.sinrLTEPercentage = 0;
-                    }
-
-                    if (hasLTEStats) {
-                      const lteCellIdLine = lines.find((line) =>
-                        line.includes('lte_cell_id:')
-                      );
-                      if (lteCellIdLine) {
-                        const lteCellIdValue = lteCellIdLine.split(":")[1];
-                        const cellInfo = formatCellInfo(
-                          normalizeCellId(lteCellIdValue)
-                        );
-                        if (cellInfo) {
-                          this.cellID = cellInfo.display;
-                          this.eNBID = cellInfo.eNbId;
-                          cellInfoSet = true;
-                        }
-                      }
-
-                      const lteTacLine = lines.find((line) =>
-                        line.includes('lte_tac:')
-                      );
-                      if (lteTacLine) {
-                        const tacDisplay = formatTac(lteTacLine.split(":")[1]);
-                        if (tacDisplay) {
-                          this.tac = tacDisplay;
-                        }
-                      }
-
-                      const csqLine = lines.find((line) =>
-                        line.includes("+CSQ:")
-                      );
-                      if (csqLine) {
-                        this.csq = csqLine
-                          .split(" ")[1]
-                          .replace("+CSQ: ", "")
-                          .replace(/"/g, "");
-                      } else {
-                        this.csq = hasNRStats ? "LTE+NR Mode" : "LTE Mode";
-                      }
-
-                      const lteRsrpLine = lines.find((line) =>
-                        line.includes('lte_rsrp:')
-                      );
-                      if (lteRsrpLine) {
-                        const rsrpParts = lteRsrpLine.split(',');
-                        const rsrpValue = rsrpParts[0]
-                          ? rsrpParts[0].split(":")[1].trim()
-                          : null;
-                        const rsrqValue = rsrpParts[1]
-                          ? rsrpParts[1].split(":")[1].trim()
-                          : null;
-                        this.rsrpLTE = rsrpValue || "-";
-                        this.rsrqLTE = rsrqValue || "-";
-                      }
-
-                      const lteSnrLine = lines.find((line) =>
-                        line.includes('lte_snr:')
-                      );
-                      if (lteSnrLine) {
-                        const snrSegment = lteSnrLine.split('lte_snr:')[1];
-                        this.sinrLTE = snrSegment
-                          ? snrSegment.trim().split(',')[0]
-                          : "-";
-                      }
-
-                      const lteRssiLine = lines.find((line) =>
-                        line.includes('lte_rssi:')
-                      );
-                      if (lteRssiLine) {
-                        const rssiMatch = lteRssiLine.match(/lte_rssi:([^,\s]+)/i);
-                        this.rssiLTE = rssiMatch ? rssiMatch[1].trim() : "-";
-                      } else {
-                        this.rssiLTE = "-";
-                      }
-
-                      this.rsrpLTEPercentage = this.calculateRSRPPercentage(
-                        parseFloat(this.rsrpLTE)
-                      );
-                      this.rsrqLTEPercentage = this.calculateRSRQPercentage(
-                        parseFloat(this.rsrqLTE)
-                      );
-                      this.sinrLTEPercentage = this.calculateSINRPercentage(
-                        parseFloat(this.sinrLTE)
-                      );
-                      this.rssiLTEPercentage = this.calculateRSSIPercentage(
-                        parseFloat(this.rssiLTE)
-                      );
-
-                      const lteSignal = this.calculateSignalPercentage(
-                        this.rsrpLTEPercentage,
-                        this.sinrLTEPercentage
-                      );
-                      signalSamples.push(lteSignal);
-                    }
-
-                    if (hasNRStats) {
-                      const nrCellIdLine = lines.find((line) =>
-                        line.includes('nr_cell_id:')
-                      );
-                      if (nrCellIdLine && !cellInfoSet) {
-                        const nrCellIdValue = nrCellIdLine.split(":")[1];
-                        const cellInfo = formatCellInfo(
-                          normalizeCellId(nrCellIdValue)
-                        );
-                        if (cellInfo) {
-                          this.cellID = cellInfo.display;
-                          this.eNBID = cellInfo.eNbId;
-                          cellInfoSet = true;
-                        }
-                      }
-
-                      const nrTacLine = lines.find((line) =>
-                        line.includes('nr_tac:')
-                      );
-                      if (nrTacLine && !cellInfoSet) {
-                        const tacDisplay = formatTac(nrTacLine.split(":")[1]);
-                        if (tacDisplay) {
-                          this.tac = tacDisplay;
-                        }
-                      }
-
-                      if (!hasLTEStats && !lines.some((line) => line.includes("+CSQ:"))) {
-                        this.csq = "NR Mode";
-                      }
-
-                      const nrRsrpLine = lines.find((line) =>
-                        line.includes('nr_rsrp:')
-                      );
-                      if (nrRsrpLine) {
-                        const rsrpSegment = nrRsrpLine.split(":")[1];
-                        this.rsrpNR = rsrpSegment
-                          ? rsrpSegment.split(" ")[0].trim()
-                          : "-";
-                      }
-
-                      const nrRsrqLine = lines.find((line) =>
-                        line.includes('nr_rsrq:')
-                      );
-                      if (nrRsrqLine) {
-                        const rsrqSegment = nrRsrqLine.split(":")[1];
-                        this.rsrqNR = rsrqSegment ? rsrqSegment.trim() : "-";
-                      }
-
-                      const nrSnrLine = lines.find((line) =>
-                        line.includes('nr_snr:')
-                      );
-                      if (nrSnrLine) {
-                        const snrSegment = nrSnrLine.split(":")[1];
-                        this.sinrNR = snrSegment ? snrSegment.trim() : "-";
-                      }
-
-                      const nrRssiLine = lines.find((line) =>
-                        line.includes('nr_rssi:')
-                      );
-                      if (nrRssiLine) {
-                        const rssiMatch = nrRssiLine.match(/nr_rssi:([^,\s]+)/i);
-                        this.rssiNR = rssiMatch ? rssiMatch[1].trim() : "-";
-                      } else {
-                        this.rssiNR = "-";
-                      }
-
-                      this.rsrpNRPercentage = this.calculateRSRPPercentage(
-                        parseFloat(this.rsrpNR)
-                      );
-                      this.rsrqNRPercentage = this.calculateRSRQPercentage(
-                        parseFloat(this.rsrqNR)
-                      );
-                      this.sinrNRPercentage = this.calculateSINRPercentage(
-                        parseFloat(this.sinrNR)
-                      );
-                      this.rssiNRPercentage = this.calculateRSSIPercentage(
-                        parseFloat(this.rssiNR)
-                      );
-
-                      const nrSignal = this.calculateSignalPercentage(
-                        this.rsrpNRPercentage,
-                        this.sinrNRPercentage
-                      );
-                      signalSamples.push(nrSignal);
-                    }
-
-                    if (signalSamples.length > 0) {
-                      const totalSignal = signalSamples.reduce(
-                        (accumulator, current) => accumulator + current,
-                        0
-                      );
-                      this.signalPercentage = Math.round(
-                        totalSignal / signalSamples.length
-                      );
-                      this.signalAssessment = this.signalQuality(
-                        this.signalPercentage
-                      );
-                    } else {
-                      this.signalPercentage = 0;
-                      this.signalAssessment = "No Signal";
-                    }
-                  } else if (currentNetworkMode == "5G NSA") {
-                    // find the value from line "+QENG: \"LTE\" for LTE
-                    // LongCID
-                    const longCID = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[4]
-                      .replace(/"/g, "");
-
-                    // Get the eNBID. Its just Cell ID minus the last 2 characters
-                    this.eNBID = parseInt(longCID.substring(0, longCID.length - 2), 16);
-
-                    // Get the short Cell ID (Last 2 characters of the Cell ID)
-                    const shortCID = longCID.substring(longCID.length - 2);
-
-                    // cellID
-                    this.cellID =
-                      "Short " +
-                      shortCID +
-                      "(" +
-                      parseInt(shortCID, 16) +
-                      ")" +
-                      ", " +
-                      "Long " +
-                      longCID +
-                      "(" +
-                      parseInt(longCID, 16) +
-                      ")";
-
-                    // TAC
-                    const localTac = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[10]
-                      .replace(/"/g, "");
-                    this.tac = parseInt(localTac, 16) + " ("+localTac+")";
-
-                    this.cellID =
-                      "Short " +
-                      shortCID +
-                      "(" +
-                      parseInt(shortCID, 16) +
-                      ")" +
-                      ", " +
-                      "Long " +
-                      longCID +
-                      "(" +
-                      parseInt(longCID, 16) +
-                      ")";
-                    // CSQ
-                    this.csq = lines
-                      .find((line) => line.includes("+CSQ:"))
-                      .split(" ")[1]
-                      .replace("+CSQ: ", "")
-                      .replace(/"/g, "");
-
-                    // RSRP LTE
-                    this.rsrpLTE = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[11]
-                      .replace(/"/g, "");
-
-                    // RSRQ LTE
-                    this.rsrqLTE = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[12]
-                      .replace(/"/g, "");
-
-                    // RSSI LTE
-                    this.rssiLTE = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[13]
-                      .replace(/"/g, "");
-
-                    // SINR LTE
-                    this.sinrLTE = lines
-                      .find((line) => line.includes('+QENG: "LTE"'))
-                      .split(",")[14]
-                      .replace(/"/g, "");
-
-                    // Calculate the RSRP LTE Percentage
-                    this.rsrpLTEPercentage = this.calculateRSRPPercentage(
-                      parseInt(this.rsrpLTE)
-                    );
-
-                    // Calculate the RSRQ LTE Percentage
-                    this.rsrqLTEPercentage = this.calculateRSRQPercentage(
-                      parseInt(this.rsrqLTE)
-                    );
-
-                    // Calculate the SINR LTE Percentage
-                    this.sinrLTEPercentage = this.calculateSINRPercentage(
-                      parseInt(this.sinrLTE)
-                    );
-
-                    // Calculate the RSSI LTE Percentage
-                    this.rssiLTEPercentage = this.calculateRSSIPercentage(
-                      parseInt(this.rssiLTE)
-                    );
-
-                    // Calculate the Signal Percentage
-                    const lte_signal_percentage =
-                      this.calculateSignalPercentage(
-                        this.rsrpLTEPercentage,
-                        this.sinrLTEPercentage
-                      );
-
-                    // find the value from line "+QENG: \"NR5G-NSA\" for NR5G
-                    // RSRP NR
-                    this.rsrpNR = lines
-                      .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-                      .split(",")[4]
-                      .replace(/"/g, "");
-
-                    // SINR NR
-                    this.sinrNR = lines
-                      .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-                      .split(",")[5]
-                      .replace(/"/g, "");
-
-                    // RSRQ NR
-                    this.rsrqNR = lines
-                      .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-                      .split(",")[6]
-                      .replace(/"/g, "");
-
-                    try {
-                      this.rssiNR = lines
-                        .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-                        .split(",")[7]
-                        .replace(/"/g, "");
-                    } catch (error) {
-                      this.rssiNR = "-";
-                    }
-
-                    // Calculate the RSRP NR Percentage
-                    this.rsrpNRPercentage = this.calculateRSRPPercentage(
-                      parseInt(this.rsrpNR)
-                    );
-
-                    // Calculate the RSRQ NR Percentage
-                    this.rsrqNRPercentage = this.calculateRSRQPercentage(
-                      parseInt(this.rsrqNR)
-                    );
-
-                    // Calculate the SINR NR Percentage
-                    this.sinrNRPercentage = this.calculateSINRPercentage(
-                      parseInt(this.sinrNR)
-                    );
-
-                    // Calculate the RSSI NR Percentage
-                    this.rssiNRPercentage = this.calculateRSSIPercentage(
-                      parseInt(this.rssiNR)
-                    );
-
-                    // Calculate the Signal Percentage
-                    const nr_signal_percentage = this.calculateSignalPercentage(
-                      this.rsrpNRPercentage,
-                      this.sinrNRPercentage
-                    );
-
-                    // Average the LTE and NR Signal Percentages
-                    this.signalPercentage =
-                      (lte_signal_percentage + nr_signal_percentage) / 2;
-
-                    // Calculate the Signal Assessment
-                    this.signalAssessment = this.signalQuality(
-                      this.signalPercentage
-                    );
-                  } else {
-                    this.signalAssessment = "No Signal";
-                  }
-                this.lastUpdate = new Date().toLocaleString();
-              } catch (parseError) {
-                console.error("Error while parsing the AT response", parseError);
-                this.applyFallback("Failed to parse the AT response.");
-              }
-            } catch (error) {
-              console.error("Error while executing the AT command", error);
-              this.applyFallback(
-                error.message || "Unknown error occurred during the AT request."
-              );
-            }
-          },
-
-
-          bytesToSize(bytes) {
-            const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-            if (bytes == 0) return "0 Byte";
-            const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-            return Math.round(bytes / Math.pow(1024, i), 2) + " " + sizes[i];
-          },
-
-          requestPing() {
-            return fetch("/cgi-bin/get_ping")
-              .then((response) => response.text())
-              .then((data) => {
-                return data;
-              })
-              .catch((error) => {
-                console.error("Error:", error);
-                // Throw the error again to ensure it's propagated
-                throw error;
-              });
-          },
-
-          calculate_lte_bw(lte_bw) {
-            const BANDWIDTH_MAP = {
-              0: 1.4,
-              1: 3,
-              2: 5,
-              3: 10,
-              4: 15,
-              5: 20,
-              6: 40,
-              7: 80,
-              8: 100,
-              9: 200,
-            };
-            return BANDWIDTH_MAP[lte_bw];
-          },
-
-          calculate_nr_bw(nr_bw) {
-            const NR_BANDWIDTH_MAP = {
-              0: 5,
-              1: 10,
-              2: 15,
-              3: 20,
-              4: 25,
-              5: 30,
-              6: 40,
-              7: 50,
-              8: 60,
-              9: 70,
-              10: 80,
-              11: 90,
-              12: 100,
-              13: 200,
-              14: 400,
-            };
-            return NR_BANDWIDTH_MAP[nr_bw];
-          },
-
-          calculateRSSIPercentage(rssi) {
-            const RSSI_MIN = -110;
-            const RSSI_MAX = -30;
-
-            if (isNaN(rssi)) {
-              return 0;
-            }
-
-            if (rssi <= RSSI_MIN) {
-              return 0;
-            }
-
-            let percentage =
-              ((rssi - RSSI_MIN) / (RSSI_MAX - RSSI_MIN)) * 100;
-
-            if (percentage > 100) {
-              percentage = 100;
-            }
-
-            if (percentage < 15) {
-              percentage = 15;
-            }
-
-            return Math.round(percentage);
-          },
-
-          calculateRSRPPercentage(rsrp) {
-            let RSRP_min = -135;
-            let RSRP_max = -65;
-
-            // If rsrp is null, return 0%
-            if (isNaN(rsrp) || rsrp < -140) {
-              return 0;
-            }
-
-            let percentage = ((rsrp - RSRP_min) / (RSRP_max - RSRP_min)) * 100;
-
-            if (percentage > 100) {
-              percentage = 100;
-            }
-
-            // if percentage is less than 15%, make it 15%
-            if (percentage < 15) {
-              percentage = 15;
-            }
-
-            return Math.round(percentage);
-          },
-
-          calculateRSRQPercentage(rsrq) {
-            let RSRQ_min = -20;
-            let RSRQ_max = -8;
-
-            // If rsrq is null, return 0%
-            if (isNaN(rsrq) || rsrq < -20) {
-              return 0;
-            }
-
-            let percentage = ((rsrq - RSRQ_min) / (RSRQ_max - RSRQ_min)) * 100;
-
-            if (percentage > 100) {
-              percentage = 100;
-            }
-
-            // if percentage is less than 15%, make it 15%
-            if (percentage < 15) {
-              percentage = 15;
-            }
-
-            return Math.round(percentage);
-          },
-
-          calculateSINRPercentage(sinr) {
-            let SINR_min = -10; // Changed from 0
-            let SINR_max = 35;
-
-            // If sinr is null, return 0%
-            if (isNaN(sinr) || sinr < -10) {
-              return 0;
-            }
-
-            let percentage = ((sinr - SINR_min) / (SINR_max - SINR_min)) * 100;
-
-            if (percentage > 100) {
-              percentage = 100;
-            }
-
-            // if percentage is less than 15%, make it 15%
-            if (percentage < 15) {
-              percentage = 15;
-            }
-
-            return Math.round(percentage);
-          },
-
-          // Calculate the overall signal assessment
-          calculateSignalPercentage(rsrpNRPercentage, sinrNRPercentage) {
-            // Get the average of the RSRP Percentage and SINR Percentage
-            let average = (rsrpNRPercentage + sinrNRPercentage) / 2;
-            return Math.round(average);
-          },
-
-          getProgressBarClass(percentage) {
-            if (percentage >= 60) {
-              return "bg-success is-medium";
-            } else if (percentage >= 40) {
-              return "bg-warning is-warning is-medium";
-            }
-            return "bg-danger is-medium";
-          },
-
-          signalQuality(percentage) {
-            if (percentage >= 80) {
-              return "Excellent";
-            } else if (percentage >= 60) {
-              return "Good";
-            } else if (percentage >= 40) {
-              return "Fair";
-            } else if (percentage >= 0) {
-              return "Poor";
-            } else {
-              return "No Signal";
-            }
-          },
-
-          fetchUpTime() {
-            // Content-Type: text/plain
-            //
-            // 1 hour 44, minute
-            fetch("/cgi-bin/get_uptime")
-              .then((response) => response.text())
-              .then((data) => {
-                // Example result
-                // 01:17:02 up 3 days,  2:41,  load average: 0.65, 0.66, 0.60
-
-                // Look for xx days in the result
-                const days = data.match(/(\d+) day/);
-                // Do the same for hours
-                const hours = data.match(/(\d+) hour/);
-                // Do the same for minutes
-                const minutes = data.match(/(\d+) min/);
-                // 2:41
-                const hoursAndMinutes = data.match(/(\d+):(\d+),/);
-
-                if (hoursAndMinutes != null) {
-                  if (days != null) {
-                    if (days[1] === "1") {
-                      if (hoursAndMinutes[1] === "1") {
-                        this.uptime =
-                          days[1] +
-                          " day, " +
-                          hoursAndMinutes[1] +
-                          " hour " +
-                          hoursAndMinutes[2] +
-                          " minutes";
-                      } else if (hoursAndMinutes[2] === 1) {
-                        this.uptime =
-                          days[1] +
-                          " day, " +
-                          hoursAndMinutes[1] +
-                          " hours " +
-                          hoursAndMinutes[2] +
-                          " minute";
-                      } else {
-                        this.uptime =
-                          days[1] +
-                          " day, " +
-                          hoursAndMinutes[1] +
-                          " hours " +
-                          hoursAndMinutes[2] +
-                          " minutes";
-                      }
-                    } else {
-                      if (hoursAndMinutes[1] === "1") {
-                        this.uptime =
-                          days[1] +
-                          " days, " +
-                          hoursAndMinutes[1] +
-                          " hour " +
-                          hoursAndMinutes[2] +
-                          " minutes";
-                      } else if (hoursAndMinutes[2] === 1) {
-                        this.uptime =
-                          days[1] +
-                          " days, " +
-                          hoursAndMinutes[1] +
-                          " hours " +
-                          hoursAndMinutes[2] +
-                          " minute";
-                      } else {
-                        this.uptime =
-                          days[1] +
-                          " days, " +
-                          hoursAndMinutes[1] +
-                          " hours " +
-                          hoursAndMinutes[2] +
-                          " minutes";
-                      }
-                    }
-                  } else {
-                    if (hoursAndMinutes[1] === "1") {
-                      this.uptime =
-                        hoursAndMinutes[1] +
-                        " hour " +
-                        hoursAndMinutes[2] +
-                        " minutes";
-                    } else if (hoursAndMinutes[2] === 1) {
-                      this.uptime =
-                        hoursAndMinutes[1] +
-                        " hours " +
-                        hoursAndMinutes[2] +
-                        " minute";
-                    } else {
-                      this.uptime =
-                        hoursAndMinutes[1] +
-                        " hours " +
-                        hoursAndMinutes[2] +
-                        " minutes";
-                    }
-                  }
-                } else if (days != null) {
-                  if (hours != null) {
-                    if (days[1] === "1") {
-                      if (hours[1] === "1") {
-                        this.uptime = days[1] + " day, " + hours[1] + " hour";
-                      } else {
-                        this.uptime = days[1] + " day, " + hours[1] + " hours";
-                      }
-                    } else {
-                      if (hours[1] === "1") {
-                        this.uptime = days[1] + " days, " + hours[1] + " hour";
-                      } else {
-                        this.uptime = days[1] + " days, " + hours[1] + " hours";
-                      }
-                    }
-                  } else if (minutes != null) {
-                    if (days[1] === "1") {
-                      if (minutes[1] === "1") {
-                        this.uptime =
-                          days[1] + " day, " + minutes[1] + " minute";
-                      } else {
-                        this.uptime =
-                          days[1] + " day, " + minutes[1] + " minutes";
-                      }
-                    } else {
-                      if (minutes[1] === "1") {
-                        this.uptime =
-                          days[1] + " days, " + minutes[1] + " minute";
-                      } else {
-                        this.uptime =
-                          days[1] + " days, " + minutes[1] + " minutes";
-                      }
-                    }
-                  } else {
-                    if (days[1] === "1") {
-                      this.uptime = days[1] + " day";
-                    } else {
-                      this.uptime = days[1] + " days";
-                    }
-                  }
-                } else if (hours != null) {
-                  if (hours[1] === "1") {
-                    this.uptime = hours[1] + " hour";
-                  } else {
-                    this.uptime = hours[1] + " hours";
-                  }
-                } else if (minutes != null) {
-                  if (minutes[1] === "1") {
-                    this.uptime = minutes[1] + " minute";
-                  } else {
-                    this.uptime = minutes[1] + " minutes";
-                  }
-                } else {
-                  this.uptime = "Unknown Time";
-                }
-              });
-          },
-
-          updateRefreshRate() {
-            // Check if the refresh rate is less than 3
-            if (this.newRefreshRate < 3) {
-              this.newRefreshRate = 3;
-            }
-
-            // Clear the old interval
-            clearInterval(this.intervalId);
-
-            // Set the refresh rate
-            this.refreshRate = this.newRefreshRate;
-            console.log("Refresh Rate Updated to " + this.refreshRate);
-
-            // Store the refresh rate in local storage or session storage
-            localStorage.setItem("refreshRate", this.refreshRate);
-
-            // Initialize with the new refresh rate
-            this.init();
-          },
-
-          init() {
-            // Fetch uptime
-            this.fetchUpTime();
-
-            // Retrieve the refresh rate from local storage or session storage
-            const storedRefreshRate = localStorage.getItem("refreshRate");
-
-            // If a refresh rate is stored, use it; otherwise, use a default value
-            this.refreshRate = storedRefreshRate
-              ? parseInt(storedRefreshRate)
-              : 3; // Change 3 to your desired default value
-
-            this.fetchAllInfo();
-
-            this.requestPing()
-              .then((data) => {
-                const response = data.trim();
-                // Trim any leading/trailing spaces
-                if (response === "OK") {
-                  this.internetConnectionStatus = "Connected";
-                } else {
-                  this.internetConnectionStatus = "Disconnected";
-                }
-              })
-              .catch((error) => {
-                console.error("Error:", error);
-                this.internetConnectionStatus = "Disconnected";
-              });
-
-            this.lastUpdate = new Date().toLocaleString();
-            console.log("Initialized");
-
-            // Set the refresh rate for interval
-            this.intervalId = setInterval(() => {
-              this.fetchUpTime();
-
-              this.fetchAllInfo();
-
-              this.requestPing()
-                .then((data) => {
-                  const response = data.trim();
-                  // Trim any leading/trailing spaces
-                  if (response === "OK") {
-                    this.internetConnection = "Connected";
-                  } else {
-                    this.internetConnection = "Disconnected";
-                  }
-                })
-                .catch((error) => {
-                  console.error("Error:", error);
-                  this.internetConnection = "Disconnected";
-                });
-
-              this.lastUpdate = new Date().toLocaleString();
-              console.log("Refreshed");
-            }, this.refreshRate * 1000);
-          },
-        };
-      }
-    </script>
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed top-50 start-50 translate-middle" style="z-index: 9999;">
+      <div id="sinrInfoToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+          <strong class="me-auto">Information</strong>
+          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+          SINR on CA bands can appear as 0 dB when the secondary carriers are not carrying traffic. In no-load situations the modem may also drop CA carriers, which can trigger advisory rules.
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Reboot Modal Confirmation -->
+    <div class="modal-overlay" id="globalRebootModal" style="display: none;">
+      <div class="loading-modal">
+        <div class="loading-text" style="display: flex; flex-direction: column">
+          <h3>This will reboot the modem.</h3>
+          <p style="margin-top: 0.5rem">Continue?</p>
+        </div>
+        <div class="d-grid gap-2 d-md-block">
+          <button class="btn btn-primary" type="button" id="globalRebootConfirm">
+            Reboot
+          </button>
+          <button class="btn btn-danger" type="button" id="globalRebootCancel">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Reboot Modal Countdown -->
+    <div class="modal-overlay" id="globalRebootCountdownModal" style="display: none;">
+      <div class="loading-modal">
+        <div class="loader"></div>
+        <div class="loading-text" style="display: flex; flex-direction: column">
+          <h3>Rebooting...</h3>
+          <p style="margin-top: 0.5rem">
+            Please wait for
+            <span id="rebootCountdown" style="font-weight: 500">40</span>
+            seconds.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    </main>
   </body>
 </html>
