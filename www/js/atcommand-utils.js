@@ -105,12 +105,31 @@
    *   - command: string - The executed command
    */
   async function execute(atcmd, options = {}) {
-    const sanitized = sanitize(atcmd);
+    let adaptedCommand = atcmd;
+    const adapter = global.ModemLogicAdapter;
+
+    if (adapter && typeof adapter.adaptCommand === "function") {
+      const adaptation = adapter.adaptCommand(atcmd);
+      if (adaptation && adaptation.supported === false) {
+        return createResult(false, "", new Error(adaptation.message || "AT command not supported."), {
+          busy: false,
+          attempts: 0,
+          command: atcmd,
+          logic: adapter.logic,
+        });
+      }
+      if (adaptation && typeof adaptation.command === "string") {
+        adaptedCommand = adaptation.command;
+      }
+    }
+
+    const sanitized = sanitize(adaptedCommand);
 
     if (!sanitized) {
       return createResult(false, "", new Error("Empty or invalid AT command."), {
         busy: false,
         attempts: 0,
+        logic: adapter?.logic,
       });
     }
 
@@ -153,7 +172,10 @@
         const serverAttempts = json.attempts || 1;
         
         if (json.success) {
-          lastData = json.output || "";
+          const rawOutput = json.output || "";
+          lastData = adapter?.normalizeResponse
+            ? adapter.normalizeResponse(rawOutput, { command: sanitized, endpoint })
+            : rawOutput;
           
           // Check if output contains ERROR token (modem-level error)
           const hasErrorToken = json.has_error || false;
@@ -166,6 +188,7 @@
               busy: false,
               attempts: serverAttempts,
               command: json.command,
+              logic: adapter?.logic,
             }
           );
         } else {

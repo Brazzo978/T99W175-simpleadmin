@@ -82,6 +82,10 @@ if [ -z "$phone_number" ] || [ -z "$message_encoded" ]; then
     exit 0
 fi
 
+if [ "$SIMPLEADMIN_MODEM_LOGIC" = "quectel" ]; then
+    exec "$SCRIPT_DIR/modem_logic/quectel_send_sms" "$phone_number" "$message_encoded"
+fi
+
 # Check if serial device exists
 if [ ! -e "/dev/smd8" ]; then
     send_json_response 500 '{"success":false,"message":"Serial device /dev/smd8 not found"}'
