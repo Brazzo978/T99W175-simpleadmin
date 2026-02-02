@@ -16,6 +16,10 @@ if [ "$SESSION_ROLE" != "admin" ]; then
     exit 0
 fi
 
+if [ "$SIMPLEADMIN_MODEM_LOGIC" = "quectel" ]; then
+    exec "$SCRIPT_DIR/modem_logic/quectel_factory_reset"
+fi
+
 log_action() {
     logger -t "simpleadmin-factory-reset" "$1"
 }

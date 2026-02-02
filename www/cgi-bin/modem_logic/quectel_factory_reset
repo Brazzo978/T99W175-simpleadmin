@@ -1,0 +1,10 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/../session_utils.sh"
+
+payload=$(printf '{\n  "status":"error",\n  "message":"Quectel modem logic placeholder: implement factory reset modem commands here.",\n  "logic":"quectel",\n  "implemented":false\n}\n')
+
+send_json_response 501 "$payload"

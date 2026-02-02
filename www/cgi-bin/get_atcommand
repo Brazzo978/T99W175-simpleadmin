@@ -55,6 +55,10 @@ if [ -z "$decoded_atcmd" ]; then
     exit 0
 fi
 
+if [ "$SIMPLEADMIN_MODEM_LOGIC" = "quectel" ]; then
+    exec "$SCRIPT_DIR/modem_logic/quectel_get_atcommand" "$decoded_atcmd"
+fi
+
 # Check if atcli_smd8 command exists
 if ! command -v atcli_smd8 >/dev/null 2>&1; then
     send_json_response 500 '{"success":false,"message":"atcli_smd8 command not found"}'

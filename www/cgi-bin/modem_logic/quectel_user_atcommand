@@ -1,0 +1,18 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/../session_utils.sh"
+
+at_command="${1:-}"
+if [ -z "$at_command" ]; then
+    send_json_response 400 '{"success":false,"message":"Missing AT command"}'
+    exit 0
+fi
+
+escaped_command=$(json_escape "$at_command")
+
+payload=$(printf '{\n  "success":false,\n  "command":"%s",\n  "message":"Quectel modem logic placeholder: implement admin command transport and parsing here.",\n  "logic":"quectel",\n  "implemented":false\n}\n' "$escaped_command")
+
+send_json_response 501 "$payload"
