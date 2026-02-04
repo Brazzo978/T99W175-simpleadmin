@@ -1,0 +1,59 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+ensure_credentials_file
+ensure_session_store
+
+read_request_body() {
+    local length="${CONTENT_LENGTH:-0}"
+    if [ "$length" -gt 0 ]; then
+        head -c "$length"
+    else
+        cat
+    fi
+}
+
+urldecode() {
+    local data="${1//+/ }"
+    printf '%b' "${data//%/\\x}"
+}
+
+if [ "${REQUEST_METHOD:-GET}" != "POST" ]; then
+    send_json_response 405 '{"success":false,"message":"Method not allowed"}'
+    exit 0
+fi
+
+raw_body="$(read_request_body)"
+username=""
+password=""
+IFS='&' read -r -a params <<< "$raw_body"
+for pair in "${params[@]}"; do
+    key="${pair%%=*}"
+    value="${pair#*=}"
+    case "$key" in
+        username) username="$(urldecode "$value")" ;;
+        password) password="$(urldecode "$value")" ;;
+    esac
+done
+
+if [ -z "$username" ] || [ -z "$password" ]; then
+    send_json_response 400 '{"success":false,"message":"Missing credentials"}'
+    exit 0
+fi
+
+if authenticate_user "$username" "$password"; then
+    create_session "$SESSION_USERNAME" "$SESSION_ROLE"
+    cookie="simpleadmin_session=$SESSION_TOKEN; HttpOnly; SameSite=Lax; Path=/"
+    echo "Status: 200 OK"
+    echo "Set-Cookie: $cookie"
+    echo "Content-type: application/json"
+    echo "Cache-Control: no-store"
+    echo
+    printf '{"success":true,"message":"Authenticated","data":{"username":"%s","role":"%s"}}\n' "$(json_escape "$SESSION_USERNAME")" "$(json_escape "$SESSION_ROLE")"
+else
+    send_json_response 401 '{"success":false,"message":"Invalid username or password"}'
+fi

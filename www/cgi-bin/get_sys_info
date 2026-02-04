@@ -1,0 +1,132 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"status":"error","message":"Authentication required"}'
+    exit 0
+fi
+
+# Execute the uptime command for raw display
+uptime_output=$(uptime)
+
+# Calculate uptime from /proc/uptime (much more reliable than parsing)
+# /proc/uptime contains seconds.idle since boot
+read uptime_seconds uptime_idle < /proc/uptime
+
+# Convert to integer (truncate decimal)
+uptime_seconds=${uptime_seconds%.*}
+
+# Convert seconds to days, hours, minutes
+days=$((uptime_seconds / 86400))
+hours=$(((uptime_seconds % 86400) / 3600))
+minutes=$(((uptime_seconds % 3600) / 60))
+
+# Get CPU usage from /proc/stat (delta method - most accurate)
+# We need two samples 1 second apart, so we save state in a temp file
+STATE_FILE="/tmp/cpu_stats_state.txt"
+
+# Read current CPU stats from /proc/stat
+read cpu user nice system idle iowait irq softirq steal guest < /proc/stat
+
+# Calculate current totals
+idle=$((idle + iowait))
+total=$((user + nice + system + idle + iowait + irq + softirq + steal))
+
+# Check if we have previous stats
+cpu_usage=0
+if [ -f "$STATE_FILE" ]; then
+    # Read previous values
+    read prev_idle prev_total < "$STATE_FILE"
+
+    # Calculate deltas
+    diff_idle=$((idle - prev_idle))
+    diff_total=$((total - prev_total))
+
+    # Calculate usage percentage
+    if [ $diff_total -gt 0 ]; then
+        cpu_usage=$((100 * (diff_total - diff_idle) / diff_total))
+    fi
+fi
+
+# Save current stats for next time
+echo "$idle $total" > "$STATE_FILE"
+
+# Get Memory usage from top
+# Output format: "Mem: 215536K used, 13916K free, 10128K shrd, 0K buff, 79800K cached"
+# Note: cached memory is reclaimable, so actual used = used - cached
+mem_output=$(top -b -n 1 | grep "^Mem")
+
+mem_used=0
+mem_total=0
+mem_percent=0
+
+if [ -n "$mem_output" ]; then
+    # Extract used memory (in KB)
+    mem_used_str=$(echo "$mem_output" | sed 's/Mem: \([0-9]*\)K.*/\1/')
+    mem_used=${mem_used_str:-0}
+
+    # Extract free memory (in KB)
+    mem_free_str=$(echo "$mem_output" | sed 's/.* \([0-9]*\)K free.*/\1/')
+    mem_free=${mem_free_str:-0}
+
+    # Extract cached memory (in KB) - this is reclaimable!
+    mem_cached_str=$(echo "$mem_output" | sed 's/.* \([0-9]*\)K cached.*/\1/')
+    mem_cached=${mem_cached_str:-0}
+
+    # Calculate total memory
+    mem_total=$((mem_used + mem_free))
+
+    # Calculate actual used memory (excluding cache)
+    # used_actual = used - cached
+    mem_used_actual=$((mem_used - mem_cached))
+
+    # Ensure we don't go negative
+    if [ $mem_used_actual -lt 0 ]; then
+        mem_used_actual=0
+    fi
+
+    # Calculate percentage of actual used memory
+    if [ $mem_total -gt 0 ]; then
+        mem_percent=$((mem_used_actual * 100 / mem_total))
+    fi
+
+    # Update mem_used to actual value for JSON output
+    mem_used=$mem_used_actual
+fi
+
+# Extract ethernet link speed and duplex
+eth_info=""
+if command -v ethtool >/dev/null 2>&1; then
+  eth_info=$(ethtool eth0 2>/dev/null || true)
+fi
+eth_speed=$(echo "$eth_info" | grep Speed | awk '{print $2}' || echo "Unknown")
+eth_duplex=$(echo "$eth_info" | grep Duplex | awk '{print $2}' || echo "Unknown")
+
+if echo "$eth_speed" | grep -qi "unknown" || echo "$eth_duplex" | grep -qi "unknown"; then
+  eth_speed="Install ethtool if you want network speed"
+  eth_duplex=""
+fi
+
+# Build JSON payload
+json_payload=$(cat <<EOF
+{
+  "status":"ok",
+  "days":${days},
+  "hours":${hours},
+  "minutes":${minutes},
+  "raw":"${uptime_output}",
+  "speed":"${eth_speed}",
+  "duplex":"${eth_duplex}",
+  "cpu_usage":${cpu_usage},
+  "mem_used":${mem_used},
+  "mem_total":${mem_total},
+  "mem_percent":${mem_percent}
+}
+EOF
+)
+
+send_json_response 200 "$json_payload"
