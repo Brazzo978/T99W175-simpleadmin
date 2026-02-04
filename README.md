@@ -1,6 +1,9 @@
-# Simpleadmin for Foxconn T99W175
+# My flavor of SimpleT99 ported to Quectel modem
 
-Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W175 modem. This version is heavily inspired by the work at [iamromulan/quectel-rgmii-toolkit](https://github.com/iamromulan/quectel-rgmii-toolkit) has some heavy edits to make it work with the T99W175 and some changes that i thought would make it better for us.
+## WIP WIP WIP 
+
+
+Static web interface (HTML/JS with Bash CGI helpers) to administer quectel modems. This version is based on the work at [iamromulan/quectel-rgmii-toolkit](https://github.com/iamromulan/quectel-rgmii-toolkit) has some heavy edits that i thought would make it better for us.
 
 ## Credits and thanks
 - Original project: [iamromulan](https://github.com/iamromulan) – repo: [quectel-rgmii-toolkit](https://github.com/iamromulan/quectel-rgmii-toolkit).
@@ -36,7 +39,7 @@ Follow these steps to deploy it safely.
 
 1 Download or clone the repository
 
-2 Extract the ZIP and locate the www folder
+2 Extract the ZIP and locate the www folder , /usrdata/simpleadmin/ there is the www folder
 
 3 Connect via SSH to the modem (default IP: 192.168.225.1, default user: root)
 
@@ -55,7 +58,7 @@ chmod -R 777 /www
 8 Either reboot the modem or restart the webserver:
 
 ```bash
-systemctl restart qcmap_httpd.service
+systemctl restart idktheservicenameyet
 ```
 
 Browse to the GUI and use Simpleadmin
@@ -68,6 +71,5 @@ For any questions, feature requests or support, feel free to reach out on Telegr
 👉 [Telegram Group](https://t.me/ltesperimentazioni)
 
 
-## Troubleshooting
-Ssh password not known : connect the modem via usb and install needed driver if windows doesnt automatically , then connect to adb using adb shell and run passwd , then you can change root password , and you can use that to access ssh.
+
 
