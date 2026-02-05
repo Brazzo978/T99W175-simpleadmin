@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web UI Locked</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/custom-styles.css" />
+    <link rel="simpleadmin-logo" href="favicon.ico" />
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      })();
+    </script>
+    <script src="js/dark-mode.js" defer></script>
+    <script src="js/webui-guard.js" defer></script>
+  </head>
+  <body>
+    <main class="container py-5">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="card shadow-sm">
+            <div class="card-body p-4">
+              <h1 class="h3 mb-3">Web UI in modalità manutenzione</h1>
+              <p class="mb-3">
+                L'interfaccia di gestione è stata temporaneamente disabilitata per motivi di sicurezza o manutenzione.
+              </p>
+              <div class="alert alert-info" role="alert">
+                Per assistenza, contattare il supporto tecnico o il referente indicato dall'installatore.
+              </div>
+              <p class="mb-0 text-muted">
+                Se sei un tecnico autorizzato, usa il link dedicato con chiave per riattivare la GUI.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
