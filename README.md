@@ -25,6 +25,13 @@ SIMPLEADMIN_ENABLE_ESIM=0
 
 # Base URL for the eSIM intermediate server (default: local euicc-client API)
 SIMPLEADMIN_ESIM_BASE_URL="http://localhost:8080/api/v1"
+
+# Web UI maintenance mode
+# Set to 1 to redirect all pages to /webguioff.html, 0 to serve the GUI normally.
+SIMPLEADMIN_WEBUI_DISABLED=0
+
+# Key used to toggle the Web UI state via URL (example: /cgi-bin/toggle_webui?key=CHANGE_ME)
+SIMPLEADMIN_WEBUI_KEY="CHANGE_ME"
 ```
 Check [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md) for file-by-file behavior, request flows, and how each page uses the CGI helpers.
 
@@ -70,4 +77,3 @@ For any questions, feature requests or support, feel free to reach out on Telegr
 
 ## Troubleshooting
 Ssh password not known : connect the modem via usb and install needed driver if windows doesnt automatically , then connect to adb using adb shell and run passwd , then you can change root password , and you can use that to access ssh.
-
