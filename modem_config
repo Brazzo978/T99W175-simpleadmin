@@ -305,7 +305,7 @@ update_dynamic_info() {
     output+="Press $(colorize "CTRL+C" yellow) to quit\n"
  
     echo -ne "$RESTORE_CURSOR"
-    PATEMP_ROW=$(grep -n "========================================" <file_buffer> | cut -d: -f1)
+    PATEMP_ROW=$(echo -e "$output" | grep -n "========================================" | head -n 1 | cut -d: -f1)
     echo -ne "\033[${PATEMP_ROW};0H"
     echo -ne "\033[J"
     printf "%b" "$output"
