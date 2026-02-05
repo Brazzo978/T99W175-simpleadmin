@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple T99</title>
+    <!-- Import all the bootstrap css files from css folder -->
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/custom-styles.css" />
+
+    <!-- Logo -->
+    <link rel="simpleadmin-logo" href="favicon.ico" />
+
+    <!-- Apply theme immediately to prevent flash -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      })();
+    </script>
+
+    <!-- Hide login UI elements immediately if login is disabled (prevents flash) -->
+    <script>
+      (function() {
+        try {
+          const cached = sessionStorage.getItem("simpleadmin_login_enabled");
+          if (cached) {
+            const config = JSON.parse(cached);
+            const enabled = config && (config.enabled === 1 || config.enabled === "1" || config.enabled === true);
+            if (!enabled) {
+              // Add style to hide login elements before body renders
+              const style = document.createElement('style');
+              style.textContent = `
+                .navbar-user-section,
+                #userAvatar,
+                #navUserName,
+                #logoutButtonDesktop,
+                #logoutButtonMobile,
+                #logoutButton,
+                #usersMenuItem {
+                  display: none !important;
+                }
+              `;
+              document.head.appendChild(style);
+            }
+          }
+        } catch (e) {
+          // Silently fail if sessionStorage is not available
+        }
+      })();
+    </script>
+
+    <!--  Import BootStrap Javascript -->
+    <script src="js/auth.js" defer></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/alpinejs.min.js" defer></script>
+    <script src="js/esim-config.js" defer></script>
+    <script src="js/index-esim.js" defer></script>
+    <script src="js/login-config.js" defer></script>
+    <script src="js/index-login.js" defer></script>
+    <script src="js/settings.js"></script>
+    <script src="js/modem-logic.js"></script>
+    <script src="js/atcommand-utils.js"></script>
+    <script src="js/reboot-utils.js" defer></script>
+    <script src="js/device-info.js"></script>
+    <script src="js/dark-mode.js" defer></script>
+    <script src="js/app-version.js" defer></script>
+    <script src="js/compat-nav.js" defer></script>
+  </head>
+  <body data-require-auth="true">
+    <main>
+      <div class="container my-4" x-data="networkSettings()" x-init="init()">
+      <nav class="navbar navbar-expand-lg mt-2">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="/">
+            <img id="themeLogo" src="img/logo-light.png" alt="Simple T99" style="height: 50px; width: auto;">
+          </a>
+          <!-- RIGHT CONTROLS (mobile + desktop) -->
+          <div class="d-flex align-items-center ms-auto gap-1 order-lg-3">
+            <!-- Dark mode MOBILE -->
+            <button
+              id="darkModeToggleMobile"
+              class="btn btn-blink btn-sm d-lg-none"
+              type="button"
+              aria-label="Toggle dark mode">
+                <svg class="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg class="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+            <!-- Device Info MOBILE -->
+            <button
+              id="deviceInfoToggleMobile"
+              class="btn btn-blink btn-sm d-lg-none"
+              type="button"
+              aria-label="Device Information"
+              data-bs-toggle="modal"
+              data-bs-target="#deviceInfoModal">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </button>
+            <!-- Reboot MOBILE -->
+            <button
+              data-reboot-action
+              class="btn btn-blink btn-sm d-lg-none"
+              type="button"
+              aria-label="Reboot device"
+              data-requires-admin>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M3 21v-5h5"/>
+              </svg>
+            </button>
+            <!-- Hamburger -->
+            <button
+              class="navbar-toggler"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#navbarText"
+              aria-controls="navbarText"
+              aria-expanded="false"
+              aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <!-- Logout MOBILE -->
+            <button
+              class="btn btn-outline-secondary btn-sm d-lg-none"
+              id="logoutButtonMobile"
+              type="button"
+              aria-label="Logout">
+              Logout
+            </button>
+          </div>
+          <!-- COLLAPSABLE MENU -->
+          <div class="collapse navbar-collapse order-lg-2 flex-grow-1 justify-content-lg-center" id="navbarText">
+            <ul class="navbar-nav mb-2 mb-lg-0">
+                <a class="nav-link" href="/">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  Home
+                </a>
+              <li class="nav-item dropdown" data-role-access="admin">
+                <a class="nav-link dropdown-toggle active-admin" href="#" role="button" data-bs-toggle="dropdown">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6"/>
+                    <path d="m1 12h6m6 0h6"/>
+                  </svg>
+                  Configuration
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="/radio-settings.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+                    Radio Settings
+                  </a></li>
+                  <li><a class="dropdown-item active" href="/settings.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    System Settings
+                  </a></li>
+                  <li><a class="dropdown-item" href="/advanced.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    Advanced
+                  </a></li>
+                  <li id="configMenuDivider"><hr class="dropdown-divider"></li>
+                  <li id="usersMenuItem"><a class="dropdown-item" href="/credentials.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Users
+                  </a></li>
+                  <li id="esimMenuItem"><a class="dropdown-item" href="/esim.html">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                    eSIM
+                  </a></li>
+                </ul>
+              </li>
+                <a class="nav-link" href="/sms.html">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="vertical-align: text-bottom; margin-right: 0.5rem;">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  SMS
+                </a>
+            </ul>
+          </div>
+          <!-- DESKTOP RIGHT SIDE -->
+          <div class="d-none d-lg-flex align-items-center gap-1 ms-auto order-lg-3">
+            <div class="navbar-user-section">
+              <div class="navbar-user-avatar" id="userAvatar">A</div>
+              <span class="navbar-user-name" id="navUserName"></span>
+            </div>
+            <!-- Dark mode DESKTOP -->
+            <button
+              id="darkModeToggleDesktop"
+              class="btn btn-blink btn-sm"
+              type="button"
+              aria-label="Toggle dark mode">
+              <svg class="dark-mode-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              <svg class="dark-mode-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+            <!-- Device Info DESKTOP -->
+            <button
+              id="deviceInfoToggleDesktop"
+              class="btn btn-blink btn-sm"
+              type="button"
+              aria-label="Device Information"
+              data-bs-toggle="modal"
+              data-bs-target="#deviceInfoModal">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </button>
+            <!-- Reboot DESKTOP -->
+            <button
+              data-reboot-action
+              class="btn btn-blink btn-sm"
+              type="button"
+              aria-label="Reboot device"
+              data-requires-admin>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M3 21v-5h5"/>
+              </svg>
+            </button>
+            <!-- Logout DESKTOP -->
+            <a href="#" class="logout-link" id="logoutButtonDesktop">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </a>
+          </div>
+
+      </nav>
+
+        <div class="row mt-5">
+          <div class="col-12">
+
+            <template x-if="loadError">
+              <div class="alert alert-danger" role="alert" x-text="loadError"></div>
+            </template>
+
+            <template x-if="pendingRestartWarning">
+              <div class="alert alert-warning" role="alert">
+                <strong>⚠️ Restart Required:</strong> Changes to network settings or WAN Connection will require a modem restart to take effect.
+              </div>
+            </template>
+
+            <template x-if="successMessage">
+              <div class="alert alert-success" role="alert" x-text="successMessage"></div>
+            </template>
+
+            <template x-if="restartMessage">
+              <div class="alert" :class="restartStatusClass" role="alert" x-text="restartMessage"></div>
+            </template>
+
+            <template x-if="validationErrors.length > 0">
+              <div class="alert alert-danger" role="alert">
+                <ul class="mb-0">
+                  <template x-for="error in validationErrors" :key="error">
+                    <li x-text="error"></li>
+                  </template>
+                </ul>
+              </div>
+            </template>
+
+            <template x-if="isLoading">
+              <div class="d-flex align-items-center gap-2">
+                <div class="spinner-border" role="status" aria-hidden="true"></div>
+                <span>Loading configuration...</span>
+              </div>
+            </template>
+
+            <form
+              x-show="!isLoading"
+              @submit.prevent="saveSettings"
+              data-requires-admin
+            >
+              <div class="row g-4">
+                <!-- Left Column: IP & DHCP Settings -->
+                <div class="col-lg-6">
+                  <div class="card">
+                    <div class="card-header">Network Configuration</div>
+                    <div class="card-body">
+                      
+                      <!-- LAN Settings -->
+                      <div class="row g-3">
+                        <div class="col-md-6">
+                          <label class="form-label" for="ipAddress">LAN IP address</label>
+                          <input
+                            id="ipAddress"
+                            class="form-control"
+                            :class="{'is-invalid': ipErrors.ipAddress}"
+                            type="text"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            :disabled="isSaving"
+                            x-model.trim="form.ipAddress"
+                            @change="handleIpChange"
+                            @input="validateIpField('ipAddress', form.ipAddress)"
+                          />
+                          <template x-if="ipErrors.ipAddress">
+                            <div class="invalid-feedback d-block">Invalid IP address</div>
+                          </template>
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="subnetMask">Subnet mask</label>
+                          <select
+                            id="subnetMask"
+                            class="form-select"
+                            :disabled="isSaving"
+                            x-model="form.subnetMask"
+                            @change="handleMaskChange"
+                          >
+                            <template x-for="option in maskOptions" :key="option.value">
+                              <option :value="option.value" x-text="option.label"></option>
+                            </template>
+                          </select>
+                        </div>
+                      </div>
+
+                      <hr class="my-4" />
+
+                      <!-- DHCP Settings -->
+                      <div class="form-check form-switch mb-3">
+                        <input
+                          id="dhcpEnabled"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          :disabled="isSaving || form.bridgeEnabled"
+                          x-model="form.dhcpEnabled"
+                        />
+                        <label class="form-check-label" for="dhcpEnabled">
+                          Enable DHCP server
+                          <template x-if="form.bridgeEnabled">
+                            <span class="text-muted small ms-0">(required in bridge mode)</span>
+                          </template>
+                        </label>
+                      </div>
+
+                      <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                          <label class="form-label" for="dhcpStart">DHCP range start</label>
+                          <input
+                            id="dhcpStart"
+                            class="form-control"
+                            :class="{'is-invalid': ipErrors.dhcpStart}"
+                            type="text"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            :disabled="isSaving || !form.dhcpEnabled || form.bridgeEnabled"
+                            x-model.trim="form.dhcpStart"
+                            @input="dhcpRangeEdited = true; validateIpField('dhcpStart', form.dhcpStart)"
+                          />
+                          <template x-if="ipErrors.dhcpStart">
+                            <div class="invalid-feedback d-block">Invalid IP address</div>
+                          </template>
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="dhcpEnd">DHCP range end</label>
+                          <input
+                            id="dhcpEnd"
+                            class="form-control"
+                            :class="{'is-invalid': ipErrors.dhcpEnd}"
+                            type="text"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            :disabled="isSaving || !form.dhcpEnabled || form.bridgeEnabled"
+                            x-model.trim="form.dhcpEnd"
+                            @input="dhcpRangeEdited = true; validateIpField('dhcpEnd', form.dhcpEnd)"
+                          />
+                          <template x-if="ipErrors.dhcpEnd">
+                            <div class="invalid-feedback d-block">Invalid IP address</div>
+                          </template>
+                        </div>
+                      </div>
+
+                      <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                          <label class="form-label" for="dhcpLease">Lease time (seconds)</label>
+                          <input
+                            id="dhcpLease"
+                            class="form-control"
+                            :class="{'is-invalid': ipErrors.dhcpLease}"
+                            type="number"
+                            min="60"
+                            step="60"
+                            :disabled="isSaving || !form.dhcpEnabled || form.bridgeEnabled"
+                            x-model.trim="form.dhcpLease"
+                            @input="validateDhcpLease(form.dhcpLease)"
+                          />
+                          <template x-if="ipErrors.dhcpLease">
+                            <div class="invalid-feedback d-block">Lease time must be a positive number</div>
+                          </template>
+                        </div>
+                      </div>
+
+                      <hr class="my-4" />
+
+                      <!-- DMZ Settings -->
+                      <div class="form-check form-switch mb-3">
+                        <input
+                          id="dmzEnabled"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          :disabled="isSaving"
+                          x-model="form.dmzEnabled"
+                          @change="clearDmzError()"
+                        />
+                        <label class="form-check-label" for="dmzEnabled">Enable DMZ</label>
+                      </div>
+
+                      <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                          <label class="form-label" for="dmzIp">DMZ client IP address</label>
+                          <input
+                            id="dmzIp"
+                            class="form-control"
+                            :class="{'is-invalid': ipErrors.dmzIp}"
+                            type="text"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            :disabled="isSaving || !form.dmzEnabled"
+                            x-model.trim="form.dmzIp"
+                            @input="validateIpField('dmzIp', form.dmzIp)"
+                          />
+                          <template x-if="ipErrors.dmzIp">
+                            <div class="invalid-feedback d-block">Invalid IP address</div>
+                          </template>
+                        </div>
+                      </div>
+
+                      <hr class="my-4" />
+
+                      <!-- Bridge Mode -->
+                      <div class="form-check form-switch mb-3">
+                        <input
+                          id="bridgeEnabled"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          :disabled="isSaving"
+                          x-model="form.bridgeEnabled"
+                          @change="clearBridgeError()"
+                        />
+                        <label class="form-check-label" for="bridgeEnabled">Enable bridge mode (IP passthrough)</label>
+                      </div>
+
+                      <div class="row g-3 mt-1">
+                        <div class="col-md-12">
+                          <label class="form-label" for="bridgeMac">Bridge client MAC address</label>
+
+                          <!-- Show currently configured MAC (if any) -->
+                          <template x-if="originalData && originalData.bridgeMac && originalData.bridgeEnabled">
+                            <div class="mb-2">
+                              <span class="small text-muted">Currently configured: </span>
+                              <code class="text-danger" x-text="originalData.bridgeMac.toUpperCase()"></code>
+                            </div>
+                          </template>
+
+                          <div class="input-group">
+                            <select
+                              id="bridgeMac"
+                              class="form-select"
+                              :disabled="isSaving || !form.bridgeEnabled"
+                              x-model.trim="form.bridgeMac"
+                            >
+                              <option value="">Select a device from the network</option>
+                              <template x-for="entry in arpEntries" :key="entry.mac">
+                                <option :value="entry.mac" x-text="entry.label"></option>
+                              </template>
+                            </select>
+                            <button
+                              class="btn btn-outline-secondary"
+                              type="button"
+                              :disabled="isSaving || !form.bridgeEnabled"
+                              @click="fetchArpEntries()"
+                              title="Refresh device list">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                            </button>
+                          </div>
+                          <div class="form-text">
+                            When bridge mode is enabled, the selected device receives the public IP directly and the router interface remains on the LAN subnet.
+                          </div>
+                        </div>
+                      </div>
+
+                      <template x-if="form.bridgeEnabled">
+                        <div class="alert alert-warning mt-3" role="alert">
+                          While bridge mode is active, the selected client will receive its address directly from the mobile network and skip the LAN DHCP pool. Access to the router interface may only be possible from devices that remain on the LAN subnet.
+                        </div>
+                      </template>
+
+                      <hr class="my-4" />
+
+                      <!-- IPv6 -->
+                      <div class="form-check form-switch mb-3">
+                        <input
+                          id="ipv6Enabled"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          :disabled="isSaving"
+                          x-model="form.ipv6Enabled"
+                        />
+                        <label class="form-check-label" for="ipv6Enabled">Enable IPv6</label>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right Column: TTL & Reboot -->
+                <div class="col-lg-6">
+                  
+                  <!-- WAN Connection -->
+                  <div class="card">
+                    <div class="card-header">WAN Connection</div>
+                    <div class="card-body">
+
+                      <div class="mb-3">
+                        <div class="form-check form-switch">
+                          <input
+                            id="autoConnect"
+                            class="form-check-input"
+                            type="checkbox"
+                            role="switch"
+                            :disabled="isSaving"
+                            x-model="form.autoConnect"
+                          />
+                          <label class="form-check-label" for="autoConnect">
+                            Enable Auto Connect
+                          </label>
+                        </div>
+                        <div class="form-text text-muted ps-0 mt-3">
+                          Automatically connect to the mobile network when the modem starts.
+                        </div>
+                      </div>
+
+                      <div class="mb-3">
+                        <div class="form-check form-switch">
+                          <input
+                            id="roamingEnabled"
+                            class="form-check-input"
+                            type="checkbox"
+                            role="switch"
+                            :disabled="isSaving"
+                            x-model="form.roamingEnabled"
+                          />
+                          <label class="form-check-label" for="roamingEnabled">
+                            Enable Roaming
+                          </label>
+                        </div>
+                        <div class="form-text text-warning ps-0 mt-3">
+                          ⚠️ Enabling roaming may incur additional charges depending on your mobile plan. Please check with your carrier before enabling.
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  <!-- Custom TTL -->
+                  <div class="card mt-4">
+                    <div class="card-header">Custom TTL</div>
+                    <div class="card-body">
+
+                      <template x-if="ttlSuccessMessage">
+                        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                          <span x-text="ttlSuccessMessage"></span>
+                          <button type="button" class="btn-close" @click="ttlSuccessMessage = ''"></button>
+                        </div>
+                      </template>
+
+                      <template x-if="ttlErrorMessage">
+                        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                          <span x-text="ttlErrorMessage"></span>
+                          <button type="button" class="btn-close" @click="ttlErrorMessage = ''"></button>
+                        </div>
+                      </template>
+
+                      <p class="text-body-secondary mb-3">
+                        Set up a custom time-to-live for each outbound packet.
+                      </p>
+
+                      <div class="form-check form-switch mb-3">
+                        <input
+                          id="ttlEnabled"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          :disabled="ttlSaving"
+                          x-model="ttlForm.enabled"
+                          @change="onTTLToggle"
+                        />
+                        <label class="form-check-label" for="ttlEnabled">
+                          Enable Custom TTL
+                          <span x-show="ttlSaving" class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                        </label>
+                      </div>
+
+                      <div x-show="ttlForm.enabled">
+                        <div class="row g-3 mt-1">
+                          <div class="col-md-8">
+                            <label class="form-label" for="ttlValue">TTL Value</label>
+                            <div class="input-group">
+                              <input
+                                id="ttlValue"
+                                class="form-control"
+                                type="number"
+                                min="1"
+                                max="255"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                placeholder="64"
+                                x-model.number="ttlForm.value"
+                                @keydown.enter="applyTTL"
+                              />
+                              <button
+                                class="btn btn-primary"
+                                type="button"
+                                :disabled="ttlSaving || !ttlForm.enabled || ttlForm.value === currentTtlSettings.value"
+                                @click="applyTTL"
+                              >
+                                <span x-show="!ttlSaving">Apply</span>
+                                <span x-show="ttlSaving">
+                                  <span class="spinner-border spinner-border-sm" role="status"></span>
+                                </span>
+                              </button>
+                            </div>
+                            <div class="form-text">
+                              Set a value between 1 and 255. Changes are applied immediately without restarting the modem.
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <template x-if="ttlForm.enabled && ttlForm.value">
+                          <div class="alert alert-info mt-3" role="alert">
+                            <strong>Custom TTL is applied:</strong> Packets will be sent with TTL value of <span x-text="ttlForm.value"></span>.
+                          </div>
+                        </template>
+
+                      </div>
+                    </div>
+                  </div>                
+
+                  <!-- Automatic Reboot -->
+                  <div class="card mt-4">
+                    <div class="card-header">Automatic reboot</div>
+                    <div class="card-body">
+
+                      <template x-if="rebootSuccessMessage">
+                        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                          <span x-text="rebootSuccessMessage"></span>
+                          <button type="button" class="btn-close" @click="rebootSuccessMessage = ''"></button>
+                        </div>
+                      </template>
+
+                      <template x-if="rebootErrorMessage">
+                        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                          <span x-text="rebootErrorMessage"></span>
+                          <button type="button" class="btn-close" @click="rebootErrorMessage = ''"></button>
+                        </div>
+                      </template>
+
+                      <p class="text-body-secondary mb-3">
+                        Set up a scheduled reboot: the configuration is saved as a cron-tab job to reboot the module.
+                      </p>
+
+                      <div class="form-check form-switch mb-3 d-inline-flex align-items-center gap-2">
+                        <input
+                          id="rebootEnabled"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          :disabled="rebootSaving"
+                          x-model="rebootForm.enabled"
+                          @change="
+                            if (!rebootForm.enabled) {
+                              clearRebootSchedule()
+                            }"                          
+                        />
+                        <label class="form-check-label mb-0" for="rebootEnabled">
+                          Enable automatic reboot
+                          <span x-show="rebootSaving" class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                        </label>
+                      </div>
+
+                      <div x-show="rebootForm.enabled">
+                        <div class="row g-3">
+                          <div class="col-md-7">
+                            <div class="form-label d-block mb-2">When?</div>
+                            <div class="btn-group mb-3" role="group" aria-label="Auto reboot options">
+                              <button type="button" class="btn"
+                                      :class="rebootForm.mode === 'interval' ? 'btn-primary' : 'btn-outline-primary'"
+                                      @click="rebootForm.mode = 'interval'"
+                                      :disabled="rebootSaving">
+                                Every X hours
+                              </button>
+                              <button type="button" class="btn"
+                                      :class="rebootForm.mode === 'schedule' ? 'btn-primary' : 'btn-outline-primary'"
+                                      @click="rebootForm.mode = 'schedule'"
+                                      :disabled="rebootSaving">
+                                Schedule
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="row g-2" x-show="rebootForm.mode === 'interval'">
+                          <div class="col-md-7">
+                            <label class="form-label" for="rebootIntervalHours">Every how many hours?</label>
+                            <div class="input-group">
+                              <input
+                                id="rebootIntervalHours"
+                                class="form-control"
+                                type="number"
+                                min="1"
+                                max="24"
+                                :disabled="rebootSaving"
+                                x-model.number="rebootForm.intervalHours"
+                              />
+                              <span class="input-group-text">hours</span>
+                            </div>
+                            <div class="form-text">Performs a reboot every N hours (e.g. 12 => <code>0 */12 * * * reboot</code>).</div>
+                          </div>
+
+                          <div class="col-md-5">
+                            <div class="form-label">&nbsp;</div>
+                            <button type="button" class="btn btn-primary w-100" :disabled="rebootSaving" @click="applyRebootImmediately()">
+                              <span x-show="!rebootSaving">Apply</span>
+                              <span x-show="rebootSaving">
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div class="row g-3" x-show="rebootForm.mode === 'schedule'">
+                          <div class="col-md-6">
+                            <label class="form-label" for="rebootFrequency">Frequency</label>
+                            <select
+                              id="rebootFrequency"
+                              class="form-select"
+                              :disabled="rebootSaving"
+                              x-model="rebootForm.frequency"
+                            >
+                              <option value="daily">Every day</option>
+                              <option value="weekly">Every week</option>
+                              <option value="monthly">Every month</option>
+                            </select>
+                          </div>
+
+                          <div class="col-md-6" x-show="rebootForm.frequency === 'weekly'">
+                            <label class="form-label" for="rebootDayOfWeek">Day</label>
+                            <select
+                              id="rebootDayOfWeek"
+                              class="form-select"
+                              :disabled="rebootSaving"
+                              x-model="rebootForm.dayOfWeek"
+                            >
+                              <option value="1">Monday</option>
+                              <option value="2">Tuesday</option>
+                              <option value="3">Wednesday</option>
+                              <option value="4">Thursday</option>
+                              <option value="5">Friday</option>
+                              <option value="6">Saturday</option>
+                              <option value="0">Sunday</option>
+                            </select>
+                          </div>
+
+                          <div class="col-md-6" x-show="rebootForm.frequency === 'monthly'">
+                            <label class="form-label" for="rebootDayOfMonth">Day of the month</label>
+                            <input
+                              id="rebootDayOfMonth"
+                              class="form-control"
+                              type="number"
+                              min="1"
+                              max="31"
+                              :disabled="rebootSaving"
+                              x-model.number="rebootForm.dayOfMonth"
+                            />
+                            <div class="form-text">Example: 1 = the first day of every month.</div>
+                          </div>
+
+                          <div class="col-md-6">
+                            <label class="form-label" for="rebootTime">Time</label>
+                            <input
+                              id="rebootTime"
+                              class="form-control"
+                              type="time"
+                              step="60"
+                              :disabled="rebootSaving"
+                              x-model="rebootForm.time"
+                            />
+                            <div class="form-text">Examples: 00:00 (midnight), 16:00 (every day at 4 PM).</div>
+                          </div>
+
+                          <div class="col-12">
+                            <button type="button" class="btn btn-primary w-100" :disabled="rebootSaving" @click="applyRebootImmediately()">
+                              <span x-show="!rebootSaving">Apply</span>
+                              <span x-show="rebootSaving">
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <template x-if="rebootSchedule && rebootForm.enabled">
+                          <div class="alert alert-info mt-3" role="alert">
+                            <strong>Current schedule:</strong>
+                            <code x-text="rebootSchedule"></code>
+                          </div>
+                        </template>
+
+                      </div>
+                    </div>
+                  </div>
+                  
+                </div>
+              </div>
+
+              <!-- Validation and Action Buttons -->
+              <div class="row mt-4">
+                <div class="col-12">
+                  <template x-if="validationErrors.length">
+                    <div class="alert alert-warning" role="alert">
+                      <h6 class="alert-heading">Please review the following:</h6>
+                      <ul class="mb-0">
+                        <template x-for="(error, index) in validationErrors" :key="index">
+                          <li x-text="error"></li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+
+                  <div class="card">
+                    <div class="card-footer">
+                      <div class="d-flex justify-content-end">
+                        <div class="d-flex gap-2">
+                          <button type="button" class="btn btn-danger" :disabled="isSaving" @click="resetForm">Reset</button>
+                          <button type="submit" class="btn btn-primary" :disabled="isSaving">
+                            <template x-if="!isSaving">
+                              <span>Save Configuration</span>
+                            </template>
+                            <template x-if="isSaving">
+                              <span class="d-flex align-items-center gap-2">
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                <span>Saving...</span>
+                              </span>
+                            </template>
+                          </button>                    
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            <!-- Save Confirmation Modal -->
+      <div class="modal-overlay" x-cloak x-show="showSaveConfirmModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="modern-confirm-modal" @click.stop>
+          <div class="modern-confirm-content">
+            <div class="modern-confirm-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            <h4 class="modern-confirm-title">Settings Saved Successfully!</h4>
+            <p class="modern-confirm-text">
+              Your network configuration has been saved.
+            </p>
+            <div class="modern-confirm-warning" x-show="requiresRestart">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span>Modem restart required for changes to take effect.</span>
+            </div>
+            <div class="modern-confirm-buttons">
+              <button type="button" class="btn btn-secondary" @click="cancelRestart()">
+                Reboot Later
+              </button>
+              <button type="button" class="btn btn-primary" @click="confirmRestart()">
+                Reboot Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reboot Progress Modal -->
+      <div class="modal-overlay" x-cloak x-show="showRebootModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="loading-modal">
+          <div class="loader"></div>
+          <div
+            class="loading-text"
+            style="display: flex; flex-direction: column"
+          >
+            <h3>Rebooting...</h3>
+            <p style="margin-top: 0.5rem">
+              Please wait for
+              <span x-text="rebootCountdown" style="font-weight: 500"></span>
+              seconds.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bridge Mode Enable Confirmation Modal -->
+      <div class="modal fade" id="bridgeEnableModal" tabindex="-1" aria-labelledby="bridgeEnableModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="bridgeEnableModalLabel">Enable Bridge Mode</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p>You are about to enable bridge mode (IP passthrough).</p>
+              <p class="text-info"><strong>Important notes:</strong></p>
+              <ul class="mb-0">
+                <li>The public IP will be routed directly to the selected client device</li>
+                <li>The router interface will remain on the LAN subnet and may be harder to access</li>
+                <li>DHCP will be automatically enabled if not already active</li>
+                <li>Make sure to select the correct device from the MAC address list</li>
+              </ul>
+              <p class="mt-3 small text-muted">You can select a device after confirming.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @click="cancelBridgeEnable()">Cancel</button>
+              <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="confirmBridgeEnable()">Enable Bridge Mode</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bridge Mode Disable Confirmation Modal -->
+      <div class="modal fade" id="bridgeDisableModal" tabindex="-1" aria-labelledby="bridgeDisableModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="bridgeDisableModalLabel">Disable Bridge Mode</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p>You are about to disable bridge mode (IP passthrough).</p>
+              <p class="text-warning"><strong>This will remove the MAC address association:</strong></p>
+              <p class="mb-0"><code x-text="form.bridgeMac || ''"></code></p>
+              <p class="mt-3 small text-muted">The device will revert to standard NAT routing mode.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @click="cancelBridgeDisable()">Cancel</button>
+              <button type="button" class="btn btn-danger" data-bs-dismiss="modal" @click="confirmBridgeDisable()">Disable Bridge Mode</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+            </form>
+          </div>
+        </div>
+      </div>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 border-top">
+      <div class="container">
+        <div class="row align-items-center">
+          <div class="col-md-6 text-center text-md-start mb-2 mb-md-0">
+            <span class="text-muted small d-inline-flex align-items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span data-app-version></span>
+            </span>
+          </div>
+          <div class="col-md-6 text-center text-md-end">
+            <a href="https://github.com/Brazzo978/T99W175-simpleadmin" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted small d-inline-flex align-items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+              </svg>
+              <span>GitHub</span>
+            </a>
+          </div>
+        </div>
+        <div class="row mt-2">
+          <div class="col-12 text-center">
+            <span class="text-muted small" style="opacity: 0.7;">
+              © 2026 T99W175 SimpleAdmin. Released under MIT License.
+            </span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+
+
+  </main>
+
+  <!-- Device Info Modal -->
+  <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" x-data="fetchDeviceInfo()" x-init="fetchATCommand(); fetchlanIp()">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="deviceInfoModalLabel">Device Information</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="table-responsive">
+            <table class="table">
+              <tbody>
+                <tr>
+                  <th scope="row">Manufacturer</th>
+                  <td x-text="manufacturer"></td>
+                </tr>
+                <tr>
+                  <th scope="row">Model Name</th>
+                  <td x-text="modelName"></td>
+                </tr>
+                <tr>
+                  <th scope="row">Firmware version</th>
+                  <td class="col-md-2" x-text="firmwareVersion"></td>
+                </tr>
+                <tr>
+                  <th scope="row">Phone Number</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="phoneNumber"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(phoneNumber); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy Phone Number to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">IMSI</th>
+                  <td class="col-md-2" x-text="imsi"></td>
+                </tr>
+                <tr>
+                  <th scope="row">ICCID</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="iccid"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(iccid); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy ICCID to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">IMEI</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="imei"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(imei); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy IMEI to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                    <button 
+                      type="button" 
+                      class="btn btn-sm btn-link p-0"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      data-requires-admin="hide"
+                      @click="openImeiModal()"
+                      title="Edit IMEI"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="grey" class="bi bi-pencil" viewBox="0 0 16 16">
+                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">LAN IP</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="lanIp"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(lanIp); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy LAN IP to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">WAN IPv4</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="wwanIpv4"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(wwanIpv4); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy WAN IPv4 to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">WAN IPv6</th>
+                  <td class="col-md-2" style="white-space: nowrap;">
+                    <span x-text="wwanIpv6"></span>
+                    <button 
+                      type="button"
+                      class="btn btn-link p-0 border-0 text-muted"
+                      style="padding: 0 !important; margin-left: 0.25em; vertical-align: baseline; line-height: inherit; display: inline-block;"
+                      @click="copyToClipboard(wwanIpv6); const btn = $event.target.closest('button'); btn.classList.add('text-success'); setTimeout(() => btn.classList.remove('text-success'), 1000);"
+                      title="Copy WAN IPv6 to clipboard">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; display: inline-block; vertical-align: middle;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMEI Edit Modals (from deviceinfo.html) -->
+  <div class="modal-overlay" x-show="showImeiWarningModal" x-cloak>
+    <div class="loading-modal" style="max-width: 500px;">
+      <div class="loading-text" style="display: flex; flex-direction: column">
+        <h4 class="text-warning">⚠️ Legal Warning</h4>
+        <p style="margin-top: 1rem; text-align: left;">
+          Changing the IMEI is <strong>only permitted in countries where it is legal</strong>. 
+          In many jurisdictions, modifying the IMEI is <strong>illegal</strong> and may result in criminal penalties.
+        </p>
+        <p style="text-align: left;">
+          By proceeding, you confirm that you are authorized to modify this device's IMEI 
+          and that doing so is legal in your jurisdiction.
+        </p>
+      </div>
+      <div class="d-flex justify-content-center gap-3 mt-3">
+        <button
+          class="btn btn-primary"
+          type="button"
+          @click="acceptImeiWarning()"
+        >
+          I Understand - Continue
+        </button>
+        <button
+          class="btn btn-secondary"
+          type="button"
+          @click="closeImeiWarningModal()"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" x-show="showImeiInputModal" x-cloak>
+    <div class="loading-modal" style="max-width: 450px;">
+      <div class="loading-text" style="display: flex; flex-direction: column">
+        <h4>Edit IMEI</h4>
+        <p style="margin-top: 0.5rem; text-align: left;">
+          Current IMEI: <strong x-text="imei"></strong>
+        </p>
+        <div class="mb-3 text-start">
+          <label for="newImeiInput" class="form-label">New IMEI (15 digits)</label>
+          <input 
+            type="text" 
+            class="form-control" 
+            id="newImeiInput"
+            x-model="newImei"
+            maxlength="15"
+            pattern="[0-9]{15}"
+            placeholder="Enter 15 digit IMEI"
+            @input="validateImeiInput()"
+          />
+          <div class="form-text" x-show="imeiValidationError" x-text="imeiValidationError" style="color: #dc3545;"></div>
+        </div>
+      </div>
+      <div class="d-flex justify-content-center gap-3 mt-3">
+        <button
+          class="btn btn-primary"
+          type="button"
+          @click="confirmImeiChange()"
+          :disabled="!isImeiValid"
+        >
+          Change IMEI
+        </button>
+        <button
+          class="btn btn-danger"
+          type="button"
+          @click="closeImeiInputModal()"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Reboot Modal Confirmation -->
+    <div class="modal-overlay" id="globalRebootModal" style="display: none;">
+      <div class="loading-modal">
+        <div class="loading-text" style="display: flex; flex-direction: column">
+          <h3>This will reboot the modem.</h3>
+          <p style="margin-top: 0.5rem">Continue?</p>
+        </div>
+        <div class="d-grid gap-2 d-md-block">
+          <button class="btn btn-primary" type="button" id="globalRebootConfirm">
+            Reboot
+          </button>
+          <button class="btn btn-danger" type="button" id="globalRebootCancel">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Reboot Modal Countdown -->
+    <div class="modal-overlay" id="globalRebootCountdownModal" style="display: none;">
+      <div class="loading-modal">
+        <div class="loader"></div>
+        <div class="loading-text" style="display: flex; flex-direction: column">
+          <h3>Rebooting...</h3>
+          <p style="margin-top: 0.5rem">
+            Please wait for
+            <span id="rebootCountdown" style="font-weight: 500">40</span>
+            seconds.
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
