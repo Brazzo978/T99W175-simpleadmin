@@ -53,8 +53,6 @@
 - Additional flags:
   - `SIMPLEADMIN_ENABLE_ESIM` shows/hides the eSIM management page powered by the `euicc-client` REST server.
   - `SIMPLEADMIN_ESIM_BASE_URL` sets the base URL for the intermediate eSIM server (default `http://localhost:8080/api/v1`).
-  - `SIMPLEADMIN_WEBUI_DISABLED` redirects every page to `webguioff.html` when set to 1.
-  - `SIMPLEADMIN_WEBUI_KEY` defines the key required to toggle the UI via `/cgi-bin/toggle_webui`.
 
 ### `www/esim.html` — eSIM management
 - Purpose: GUI to interact with the intermediate `euicc-client` REST API (EID, profile lifecycle, downloads, notifications).
@@ -102,8 +100,6 @@
 - `watchcat_maker`: simplified helper that validates params and delegates to `create_watchcat.sh`/`remove_watchcat.sh`, returning plain-text messages.
 - `send_sms`: accepts number and UCS-2 message, runs `AT+CMGS` through `atcli_smd8`, pipes the body to `microcom` with `CTRL+Z`, and returns the raw modem reply.
 - `esim_config`: reads `SIMPLEADMIN_ENABLE_ESIM` and `SIMPLEADMIN_ESIM_BASE_URL` from `simpleadmin.conf`, enforces authentication, and returns a JSON payload for the front-end feature toggle.
-- `webui_config`: returns whether the GUI is disabled, so the browser can redirect to `webguioff.html`.
-- `toggle_webui`: toggles `SIMPLEADMIN_WEBUI_DISABLED` when called with the correct key (ex: `/cgi-bin/toggle_webui?key=CHANGE_ME`).
 
 
 
