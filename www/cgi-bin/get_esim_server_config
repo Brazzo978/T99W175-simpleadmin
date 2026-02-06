@@ -1,0 +1,48 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"ok":false,"message":"Authentication required"}'
+    exit 0
+fi
+
+CONFIG_FILE="/home/root/client.yaml"
+
+# Check if config file exists
+if [ ! -f "$CONFIG_FILE" ]; then
+    send_json_response 404 '{"ok":false,"message":"Configuration file not found"}'
+    exit 1
+fi
+
+# Extract values from YAML
+IMEI=$(sed -n 's/^[[:space:]]*imei:[[:space:]]*"\([^"]*\)".*/\1/p' "$CONFIG_FILE")
+SLOT=$(sed -n 's/^[[:space:]]*slot:[[:space:]]*\([0-9]\+\).*/\1/p' "$CONFIG_FILE")
+REFRESH=$(sed -n 's/^[[:space:]]*refresh:[[:space:]]*\(true\|false\).*/\1/p' "$CONFIG_FILE")
+
+# Validate extracted values
+if [ -z "$IMEI" ] || [ -z "$SLOT" ] || [ -z "$REFRESH" ]; then
+    send_json_response 500 '{"ok":false,"message":"Failed to parse configuration"}'
+    exit 1
+fi
+
+# Escape any special characters in IMEI for JSON
+IMEI_ESCAPED=$(echo "$IMEI" | sed 's/\\/\\\\/g; s/"/\\"/g')
+
+# Build JSON payload
+json_payload=$(cat <<EOF
+{
+  "ok":true,
+  "data":{
+    "imei":"${IMEI_ESCAPED}",
+    "slot":${SLOT},
+    "refresh":${REFRESH}
+  }
+}
+EOF
+)
+
+send_json_response 200 "$json_payload"

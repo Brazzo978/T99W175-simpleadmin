@@ -1,0 +1,147 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"success":false,"message":"Authentication required"}'
+    exit 0
+fi
+
+# URL decode helper
+urldecode() {
+    local data="${1//+/ }"
+    printf '%b' "${data//%/\\x}"
+}
+
+# JSON escape helper
+json_escape() {
+    local str="$1"
+    str="${str//\\/\\\\}"
+    str="${str//\"/\\\"}"
+    str="${str//$'\n'/\\n}"
+    str="${str//$'\r'/\\r}"
+    str="${str//$'\t'/\\t}"
+    printf '%s' "$str"
+}
+
+# Parse query string
+raw_query="${QUERY_STRING:-}"
+atcmd_param=""
+
+if [ -n "$raw_query" ]; then
+    IFS='&' read -r -a pairs <<< "$raw_query"
+    for pair in "${pairs[@]}"; do
+        key="${pair%%=*}"
+        value="${pair#*=}"
+        if [ "$key" = "atcmd" ]; then
+            atcmd_param="$value"
+        fi
+    done
+fi
+
+# Validate atcmd parameter
+if [ -z "$atcmd_param" ]; then
+    send_json_response 400 '{"success":false,"message":"Missing atcmd parameter"}'
+    exit 0
+fi
+
+# Decode the AT command
+decoded_atcmd="$(urldecode "$atcmd_param")"
+if [ -z "$decoded_atcmd" ]; then
+    send_json_response 400 '{"success":false,"message":"Unable to decode the atcmd parameter"}'
+    exit 0
+fi
+
+# Check if atcli_smd8 command exists
+if ! command -v atcli_smd8 >/dev/null 2>&1; then
+    send_json_response 500 '{"success":false,"message":"atcli_smd8 command not found"}'
+    exit 0
+fi
+
+# Execute AT command with retry logic
+max_attempts=5
+attempt=1
+runcmd=""
+exit_code=1
+busy_detected=false
+
+while [ $attempt -le $max_attempts ]; do
+    runcmd="$(atcli_smd8 "$decoded_atcmd" 2>&1)"
+    exit_code=$?
+
+    if [ $exit_code -eq 0 ]; then
+        if echo "$runcmd" | grep -qiE 'device busy|resource busy|port busy|in use'; then
+            busy_detected=true
+        fi
+        if echo "$runcmd" | grep -qE 'OK|ERROR'; then
+            break
+        fi
+    else
+        if echo "$runcmd" | grep -qiE 'busy|in use|locked'; then
+            busy_detected=true
+        fi
+    fi
+
+    if [ $attempt -lt $max_attempts ]; then
+        sleep 1
+    fi
+
+    attempt=$((attempt + 1))
+done
+
+# Prepare response
+escaped_command=$(json_escape "$decoded_atcmd")
+escaped_output=$(json_escape "$runcmd")
+
+if [ $exit_code -ne 0 ]; then
+    if [ "$busy_detected" = true ]; then
+        error_msg="Modem busy or port in use"
+    else
+        error_msg="atcli_smd8 exited with code ${exit_code}"
+    fi
+    
+    payload=$(cat <<EOF
+{
+  "success":false,
+  "command":"$escaped_command",
+  "output":"$escaped_output",
+  "message":"$error_msg",
+  "exit_code":$exit_code,
+  "busy":$busy_detected,
+  "attempts":$attempt
+}
+EOF
+)
+    send_json_response 500 "$payload"
+    exit 0
+fi
+
+if [ -z "$runcmd" ]; then
+    send_json_response 500 '{"success":false,"message":"Empty response from modem","command":"'"$escaped_command"'","attempts":'"$attempt"'}'
+    exit 0
+fi
+
+# Check if response contains ERROR
+has_error=false
+if echo "$runcmd" | grep -qE 'ERROR'; then
+    has_error=true
+fi
+
+# Success response
+payload=$(cat <<EOF
+{
+  "success":true,
+  "command":"$escaped_command",
+  "output":"$escaped_output",
+  "exit_code":$exit_code,
+  "busy":false,
+  "attempts":$attempt,
+  "has_error":$has_error
+}
+EOF
+)
+
+send_json_response 200 "$payload"

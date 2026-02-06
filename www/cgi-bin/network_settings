@@ -1,0 +1,627 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"success":false,"message":"Authentication required"}'
+    exit 0
+fi
+
+if ! session_require_role "admin"; then
+    send_json_response 403 '{"success":false,"message":"Admin privileges required"}'
+    exit 0
+fi
+
+CONFIG_FILE="${MOBILEAP_CONFIG_PATH:-/etc/data/mobileap_cfg.xml}"
+TMP_FILE="/tmp/mobileap_cfg_tmp.xml"
+
+print_headers() {
+    echo "Content-type: application/json"
+    echo
+}
+
+json_escape() {
+    local str="${1:-}"
+    str=${str//\\/\\\\}
+    str=${str//\"/\\\"}
+    str=${str//$'\n'/\\n}
+    str=${str//$'\r'/}
+    str=${str//$'\t'/\\t}
+    echo "$str"
+}
+
+respond() {
+    local success="$1"
+    local message="$2"
+    local data_json="${3:-}"
+    local errors_json="${4:-}"
+
+    local escaped_message
+    escaped_message=$(json_escape "$message")
+
+    print_headers
+    printf '{"success":%s,"message":"%s"' "$success" "$escaped_message"
+    if [ -n "$data_json" ]; then
+        printf ',"data":%s' "$data_json"
+    fi
+    if [ -n "$errors_json" ]; then
+        printf ',"errors":%s' "$errors_json"
+    fi
+    printf '}'
+    printf '\n'
+    exit 0
+}
+
+config_exists() {
+    [ -f "$CONFIG_FILE" ]
+}
+
+strip_comments() {
+    sed 's/<!--.*-->//g'
+}
+
+trim() {
+    sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+get_xml_value() {
+    local key="$1"
+    local file="$2"
+
+    if ! [ -f "$file" ]; then
+        echo ""
+        return
+    fi
+
+    local value
+    value=$(sed -n "s/.*<$key>\\(.*\\)<\/$key>.*/\\1/p" "$file" | head -n 1)
+    if [ -z "$value" ]; then
+        echo ""
+        return
+    fi
+
+    value=$(printf '%s' "$value" | strip_comments | tr -d '\r' | trim)
+    echo "$value"
+}
+
+get_scoped_xml_value() {
+    local parent="$1"
+    local key="$2"
+    local file="$3"
+
+    if ! [ -f "$file" ]; then
+        echo ""
+        return
+    fi
+
+    awk -v parent="$parent" -v key="$key" '
+        BEGIN { in_parent = 0 }
+        $0 ~ "<" parent "[[:space:]>]" { in_parent = 1 }
+        {
+            if (in_parent) {
+                if ($0 ~ "<" key "[[:space:]]*/>") {
+                    print ""
+                    exit 0
+                }
+                if ($0 ~ "<" key ">") {
+                    line = $0
+                    gsub(/<!--.*-->/, "", line)
+                    gsub(/\r/, "", line)
+                    sub(".*<" key ">", "", line)
+                    sub("</" key ">.*", "", line)
+                    print line
+                    exit 0
+                }
+            }
+        }
+        $0 ~ "</" parent ">" { if (in_parent) { exit 0 } in_parent = 0 }
+    ' "$file"
+}
+
+set_xml_value() {
+    local key="$1"
+    local value="$2"
+    local file="$3"
+
+    if grep -q "<$key>" "$file"; then
+        if ! sed "s|<$key>[^<]*</$key>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
+            return 1
+        fi
+    elif grep -Eq "<$key[[:space:]]*/>" "$file"; then
+        if ! sed "s|<$key[[:space:]]*/>|<$key>$value</$key>|" "$file" > "$TMP_FILE"; then
+            return 1
+        fi
+    else
+        return 1
+    fi
+
+    if ! cp "$TMP_FILE" "$file"; then
+        rm -f "$TMP_FILE"
+        return 1
+    fi
+
+    sync
+    rm -f "$TMP_FILE"
+
+    return 0
+}
+
+set_scoped_xml_value() {
+    local parent="$1"
+    local key="$2"
+    local value="$3"
+    local file="$4"
+
+    if ! awk -v parent="$parent" -v key="$key" -v value="$value" '
+        BEGIN { in_parent = 0; replaced = 0 }
+        $0 ~ "<" parent "[[:space:]>]" { in_parent = 1 }
+        {
+            if (in_parent) {
+                if ($0 ~ "<" key "[[:space:]]*/>") {
+                    sub("<" key "[[:space:]]*/>", "<" key ">" value "</" key ">");
+                    replaced = 1;
+                } else if ($0 ~ "<" key ">") {
+                    sub("<" key ">[^<]*</" key ">", "<" key ">" value "</" key ">");
+                    replaced = 1;
+                }
+            }
+            if ($0 ~ "</" parent ">" && in_parent) {
+                in_parent = 0;
+            }
+            print
+        }
+        END { exit(replaced ? 0 : 1) }
+    ' "$file" > "$TMP_FILE"; then
+        return 1
+    fi
+
+    if ! cp "$TMP_FILE" "$file"; then
+        rm -f "$TMP_FILE"
+        return 1
+    fi
+
+    sync
+    rm -f "$TMP_FILE"
+
+    return 0
+}
+
+is_valid_ip() {
+    local value="$1"
+    if [[ $value =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        IFS='.' read -r o1 o2 o3 o4 <<< "$value"
+        for octet in "$o1" "$o2" "$o3" "$o4"; do
+            if ! [[ $octet =~ ^[0-9]+$ ]]; then
+                return 1
+            fi
+            if ((10#$octet < 0 || 10#$octet > 255)); then
+                return 1
+            fi
+        done
+        return 0
+    fi
+    return 1
+}
+
+is_valid_netmask() {
+    local value="$1"
+    case "$value" in
+        255.255.255.252|255.255.255.248|255.255.255.240|255.255.255.224|\
+255.255.255.192|255.255.255.128|255.255.255.0)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+is_valid_mac() {
+    local value="$1"
+    if [[ "$value" =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]]; then
+        return 0
+    fi
+    return 1
+}
+
+ip_to_int() {
+    local value="$1"
+    IFS='.' read -r o1 o2 o3 o4 <<< "$value"
+    echo $(( (10#$o1 << 24) + (10#$o2 << 16) + (10#$o3 << 8) + 10#$o4 ))
+}
+
+same_subnet() {
+    local ip1="$1"
+    local ip2="$2"
+    local mask="$3"
+    local i1 i2 m
+    i1=$(ip_to_int "$ip1")
+    i2=$(ip_to_int "$ip2")
+    m=$(ip_to_int "$mask")
+    if [ $((i1 & m)) -eq $((i2 & m)) ]; then
+        return 0
+    fi
+    return 1
+}
+
+urldecode() {
+    local data="${1//+/ }"
+    printf '%b' "${data//%/\\x}"
+}
+
+ACTION="get"
+IP_ADDRESS=""
+SUBNET_MASK=""
+DHCP_ENABLED="1"
+DHCP_START=""
+DHCP_END=""
+DHCP_LEASE=""
+DMZ_ENABLED="0"
+DMZ_IP=""
+IPV6_ENABLED="1"
+BRIDGE_ENABLED="0"
+BRIDGE_MAC="0"
+AUTO_CONNECT="1"
+ROAMING_ENABLED="0"
+
+apply_params() {
+    local input="$1"
+    [ -z "$input" ] && return
+
+    IFS='&' read -r -a pairs <<< "$input"
+    for pair in "${pairs[@]}"; do
+        [ -z "$pair" ] && continue
+        local key="${pair%%=*}"
+        local value=""
+        if [[ "$pair" == *"="* ]]; then
+            value="${pair#*=}"
+        fi
+        key=$(urldecode "$key")
+        value=$(urldecode "$value")
+        case "$key" in
+            action)
+                ACTION=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
+                ;;
+            ip_address)
+                IP_ADDRESS="$value"
+                ;;
+            subnet_mask)
+                SUBNET_MASK="$value"
+                ;;
+            dhcp_enabled)
+                DHCP_ENABLED="$value"
+                ;;
+            dhcp_start)
+                DHCP_START="$value"
+                ;;
+            dhcp_end)
+                DHCP_END="$value"
+                ;;
+            dhcp_lease)
+                DHCP_LEASE="$value"
+                ;;
+            dmz_enabled)
+                DMZ_ENABLED="$value"
+                ;;
+            dmz_ip)
+                DMZ_IP="$value"
+                ;;
+            ipv6_enabled)
+                IPV6_ENABLED="$value"
+                ;;
+            bridge_enabled)
+                BRIDGE_ENABLED="$value"
+                ;;
+            bridge_mac)
+                BRIDGE_MAC="$value"
+                ;;
+            auto_connect)
+                AUTO_CONNECT="$value"
+                ;;
+            roaming_enabled)
+                ROAMING_ENABLED="$value"
+                ;;
+        esac
+    done
+}
+
+read_request() {
+    if [ -n "${QUERY_STRING:-}" ]; then
+        apply_params "$QUERY_STRING"
+    fi
+
+    if [ "${REQUEST_METHOD:-}" = "POST" ]; then
+        local length="${CONTENT_LENGTH:-0}"
+        if [[ "$length" =~ ^[0-9]+$ ]] && [ "$length" -gt 0 ]; then
+            local body
+            body=$(dd bs=1 count="$length" 2>/dev/null)
+            apply_params "$body"
+        fi
+    fi
+}
+
+errors=()
+add_error() {
+    errors+=("$1")
+}
+
+errors_to_json() {
+    if [ ${#errors[@]} -eq 0 ]; then
+        echo ""
+        return
+    fi
+
+    local json="["
+    local first=1
+    for err in "${errors[@]}"; do
+        local escaped
+        escaped=$(json_escape "$err")
+        if [ $first -eq 1 ]; then
+            json+="\"$escaped\""
+            first=0
+        else
+            json+=",\"$escaped\""
+        fi
+    done
+    json+="]"
+    echo "$json"
+}
+
+handle_get() {
+    if ! config_exists; then
+        respond false "Configuration file not found at $CONFIG_FILE."
+    fi
+
+    local ip mask dhcp_enable dhcp_start dhcp_end dhcp_lease dmz_ip ipv6_enable bridge_enable bridge_mac
+    ip=$(get_xml_value "APIPAddr" "$CONFIG_FILE")
+    mask=$(get_xml_value "SubNetMask" "$CONFIG_FILE")
+    dhcp_enable=$(get_xml_value "EnableDHCPServer" "$CONFIG_FILE")
+    dhcp_start=$(get_xml_value "StartIP" "$CONFIG_FILE")
+    dhcp_end=$(get_xml_value "EndIP" "$CONFIG_FILE")
+    dhcp_lease=$(get_xml_value "LeaseTime" "$CONFIG_FILE")
+    dmz_ip=$(get_scoped_xml_value "MobileAPNatCfg" "DmzIP" "$CONFIG_FILE")
+    if [ -z "$dmz_ip" ]; then
+        dmz_ip=$(get_xml_value "DmzIP" "$CONFIG_FILE")
+    fi
+    dmz_ip=$(printf '%s' "$dmz_ip" | strip_comments | tr -d '\r' | trim)
+    ipv6_enable=$(get_xml_value "EnableIPV6" "$CONFIG_FILE")
+    bridge_enable=$(get_scoped_xml_value "IPPassthroughCfg" "IPPassthroughEnable" "$CONFIG_FILE")
+    if [ -z "$bridge_enable" ]; then
+        bridge_enable=$(get_xml_value "IPPassthroughEnable" "$CONFIG_FILE")
+    fi
+    bridge_enable=$(printf '%s' "$bridge_enable" | strip_comments | tr -d '\r' | trim)
+    bridge_mac=$(get_scoped_xml_value "IPPassthroughCfg" "IPPassthroughMacAddr" "$CONFIG_FILE")
+    if [ -z "$bridge_mac" ]; then
+        bridge_mac=$(get_xml_value "IPPassthroughMacAddr" "$CONFIG_FILE")
+    fi
+    bridge_mac=$(printf '%s' "$bridge_mac" | strip_comments | tr -d '\r' | trim | tr '[:lower:]' '[:upper:]')
+    auto_connect=$(get_xml_value "AutoConnect" "$CONFIG_FILE")
+    roaming=$(get_xml_value "Roaming" "$CONFIG_FILE")
+
+    local dhcp_flag="false"
+    if [ "$dhcp_enable" = "1" ]; then
+        dhcp_flag="true"
+    fi
+
+    local dmz_flag="false"
+    local dmz_value=""
+    if [ -n "$dmz_ip" ] && [ "$dmz_ip" != "0.0.0.0" ]; then
+        dmz_flag="true"
+        dmz_value="$dmz_ip"
+    fi
+
+    local ipv6_flag="false"
+    if [ "$ipv6_enable" = "1" ]; then
+        ipv6_flag="true"
+    fi
+
+    local bridge_flag="false"
+    local bridge_value=""
+    if [ "$bridge_enable" = "1" ]; then
+        bridge_flag="true"
+        bridge_value="$bridge_mac"
+    fi
+
+    local auto_connect_flag="false"
+    if [ "$auto_connect" = "1" ]; then
+        auto_connect_flag="true"
+    fi
+
+    local roaming_flag="false"
+    if [ "$roaming" = "1" ]; then
+        roaming_flag="true"
+    fi
+
+    local data
+    data=$(printf '{"ipAddress":"%s","subnetMask":"%s","dhcpEnabled":%s,"dhcpStart":"%s","dhcpEnd":"%s","dhcpLease":"%s","dmzEnabled":%s,"dmzIp":"%s","ipv6Enabled":%s,"bridgeEnabled":%s,"bridgeMac":"%s","autoConnect":%s,"roamingEnabled":%s}' \
+        "$(json_escape "$ip")" \
+        "$(json_escape "$mask")" \
+        "$dhcp_flag" \
+        "$(json_escape "$dhcp_start")" \
+        "$(json_escape "$dhcp_end")" \
+        "$(json_escape "$dhcp_lease")" \
+        "$dmz_flag" \
+        "$(json_escape "$dmz_value")" \
+        "$ipv6_flag" \
+        "$bridge_flag" \
+        "$(json_escape "$bridge_value")" \
+        "$auto_connect_flag" \
+        "$roaming_flag")
+
+    respond true "Network configuration loaded." "$data"
+}
+
+handle_update() {
+    if ! config_exists; then
+        respond false "Configuration file not found at $CONFIG_FILE."
+    fi
+
+    errors=()
+
+    local ip="${IP_ADDRESS// /}"
+    local mask="${SUBNET_MASK// /}"
+    local dhcp_flag="${DHCP_ENABLED:-1}"
+    local dhcp_start="${DHCP_START// /}"
+    local dhcp_end="${DHCP_END// /}"
+    local dhcp_lease="${DHCP_LEASE// /}"
+    local dmz_flag="${DMZ_ENABLED:-0}"
+    local dmz_ip="${DMZ_IP// /}"
+    local ipv6_flag="${IPV6_ENABLED:-1}"
+    local bridge_flag="${BRIDGE_ENABLED// /}"
+    [ -z "$bridge_flag" ] && bridge_flag="0"
+    local bridge_mac="${BRIDGE_MAC// /}"
+    local auto_connect="${AUTO_CONNECT:-1}"
+    local roaming="${ROAMING_ENABLED:-0}"
+
+    if [ -z "$ip" ] || ! is_valid_ip "$ip"; then
+        add_error "Invalid LAN IP address provided."
+    fi
+
+    if [ -z "$mask" ] || ! is_valid_netmask "$mask"; then
+        add_error "Invalid subnet mask provided (/24 to /30 required)."
+    fi
+
+    if [ "$dhcp_flag" != "0" ] && [ "$dhcp_flag" != "1" ]; then
+        add_error "Invalid DHCP server status provided."
+    fi
+
+    if [ "$dhcp_flag" = "1" ]; then
+        if [ -z "$dhcp_start" ] || ! is_valid_ip "$dhcp_start"; then
+            add_error "Invalid DHCP range start provided."
+        fi
+        if [ -z "$dhcp_end" ] || ! is_valid_ip "$dhcp_end"; then
+            add_error "Invalid DHCP range end provided."
+        fi
+        if ! [[ "$dhcp_lease" =~ ^[0-9]+$ ]] || [ "$dhcp_lease" -le 0 ]; then
+            add_error "Lease time must be a positive number of seconds."
+        fi
+
+        if [ ${#errors[@]} -eq 0 ]; then
+            if ! same_subnet "$ip" "$dhcp_start" "$mask"; then
+                add_error "The DHCP range start must be in the same subnet as the LAN IP."
+            fi
+            if ! same_subnet "$ip" "$dhcp_end" "$mask"; then
+                add_error "The DHCP range end must be in the same subnet as the LAN IP."
+            fi
+            if is_valid_ip "$dhcp_start" && is_valid_ip "$dhcp_end"; then
+                local start_int end_int
+                start_int=$(ip_to_int "$dhcp_start")
+                end_int=$(ip_to_int "$dhcp_end")
+                if [ "$start_int" -gt "$end_int" ]; then
+                    add_error "The DHCP range start must be lower than the end address."
+                fi
+            fi
+        fi
+    fi
+
+    if [ "$dmz_flag" != "0" ] && [ "$dmz_flag" != "1" ]; then
+        add_error "Invalid DMZ status provided."
+    fi
+
+    if [ "$dmz_flag" = "1" ]; then
+        if [ -z "$dmz_ip" ] || ! is_valid_ip "$dmz_ip" || [ "$dmz_ip" = "0.0.0.0" ]; then
+            add_error "Invalid DMZ IP address provided."
+        fi
+        if [ -z "$ip" ] || ! is_valid_ip "$ip" || [ -z "$mask" ] || ! is_valid_netmask "$mask"; then
+            :
+        else
+            if ! same_subnet "$ip" "$dmz_ip" "$mask"; then
+                add_error "The DMZ IP must be in the same subnet as the LAN IP."
+            fi
+        fi
+        if [ "$dmz_ip" = "$ip" ]; then
+            add_error "The DMZ IP cannot be the same as the LAN IP."
+        fi
+    else
+        dmz_ip="0.0.0.0"
+    fi
+
+    if [ "$ipv6_flag" != "0" ] && [ "$ipv6_flag" != "1" ]; then
+        add_error "Invalid IPv6 status provided."
+    fi
+
+    if [ "$bridge_flag" != "0" ] && [ "$bridge_flag" != "1" ]; then
+        add_error "Invalid bridge mode status provided."
+    fi
+
+    if [ "$bridge_flag" = "1" ]; then
+        if [ -z "$bridge_mac" ]; then
+            add_error "Invalid bridge MAC address provided."
+        elif ! is_valid_mac "$bridge_mac"; then
+            add_error "Invalid bridge MAC address provided."
+        else
+            bridge_mac=$(printf '%s' "$bridge_mac" | tr '[:lower:]' '[:upper:]')
+        fi
+    else
+        bridge_mac="0"
+    fi
+
+    if [ ${#errors[@]} -gt 0 ]; then
+        local errors_json
+        errors_json=$(errors_to_json)
+        respond false "Unable to update the network configuration." "" "$errors_json"
+    fi
+
+    mkdir -p "$(dirname "$CONFIG_FILE")"
+
+    if ! set_xml_value "APIPAddr" "$ip" "$CONFIG_FILE"; then
+        respond false "Missing XML element: APIPAddr"
+    fi
+    if ! set_xml_value "SubNetMask" "$mask" "$CONFIG_FILE"; then
+        respond false "Missing XML element: SubNetMask"
+    fi
+    if ! set_xml_value "EnableDHCPServer" "$dhcp_flag" "$CONFIG_FILE"; then
+        respond false "Missing XML element: EnableDHCPServer"
+    fi
+
+    if [ "$dhcp_flag" = "1" ]; then
+        if ! set_xml_value "StartIP" "$dhcp_start" "$CONFIG_FILE"; then
+            respond false "Missing XML element: StartIP"
+        fi
+        if ! set_xml_value "EndIP" "$dhcp_end" "$CONFIG_FILE"; then
+            respond false "Missing XML element: EndIP"
+        fi
+        if ! set_xml_value "LeaseTime" "$dhcp_lease" "$CONFIG_FILE"; then
+            respond false "Missing XML element: LeaseTime"
+        fi
+    fi
+
+    if ! set_scoped_xml_value "MobileAPNatCfg" "DmzIP" "$dmz_ip" "$CONFIG_FILE"; then
+        respond false "Missing XML element: DmzIP"
+    fi
+
+    if ! set_xml_value "EnableIPV6" "$ipv6_flag" "$CONFIG_FILE"; then
+        respond false "Missing XML element: EnableIPV6"
+    fi
+
+    if ! set_scoped_xml_value "IPPassthroughCfg" "IPPassthroughEnable" "$bridge_flag" "$CONFIG_FILE"; then
+        respond false "Missing XML element: IPPassthroughEnable"
+    fi
+    if ! set_scoped_xml_value "IPPassthroughCfg" "IPPassthroughMacAddr" "$bridge_mac" "$CONFIG_FILE"; then
+        respond false "Missing XML element: IPPassthroughMacAddr"
+    fi
+    if ! set_xml_value "AutoConnect" "$auto_connect" "$CONFIG_FILE"; then
+        respond false "Missing XML element: AutoConnect"
+    fi
+    if ! set_xml_value "Roaming" "$roaming" "$CONFIG_FILE"; then
+        respond false "Missing XML element: Roaming"
+    fi
+
+    respond true "Network configuration updated successfully."
+}
+
+main() {
+    read_request
+
+    case "$ACTION" in
+        update)
+            handle_update
+            ;;
+        *)
+            handle_get
+            ;;
+    esac
+}
+
+main

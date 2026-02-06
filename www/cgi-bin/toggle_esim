@@ -1,0 +1,65 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"ok":false,"message":"Authentication required"}'
+    exit 0
+fi
+
+# Read POST data
+POST_DATA="$(cat)"
+
+# Extract the 'enabled' parameter (0 or 1)
+ENABLED=$(echo "$POST_DATA" | sed -n 's/.*"enabled"[[:space:]]*:[[:space:]]*"\?\([01]\)"\?.*/\1/p')
+
+if [ -z "$ENABLED" ]; then
+    send_json_response 400 '{"ok":false,"message":"Invalid request: missing enabled parameter"}'
+    exit 1
+fi
+
+CONF_FILE="/WEBSERVER/www/config/simpleadmin.conf"
+SERVICE_NAME="euicc"
+
+# Check if config file exists
+if [ ! -f "$CONF_FILE" ]; then
+    send_json_response 404 '{"ok":false,"message":"Configuration file not found"}'
+    exit 1
+fi
+
+# Update the config file
+sed -i "s/^SIMPLEADMIN_ENABLE_ESIM=.*/SIMPLEADMIN_ENABLE_ESIM=$ENABLED/" "$CONF_FILE"
+
+# Verify the change was made
+if ! grep -q "^SIMPLEADMIN_ENABLE_ESIM=$ENABLED" "$CONF_FILE"; then
+    send_json_response 500 '{"ok":false,"message":"Failed to update configuration file"}'
+    exit 1
+fi
+
+# Enable or disable the systemd service
+if [ "$ENABLED" = "1" ]; then
+    # Enable and start the service
+    systemctl enable "$SERVICE_NAME" > /dev/null 2>&1
+    systemctl start "$SERVICE_NAME" > /dev/null 2>&1
+    
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+        send_json_response 200 '{"ok":true,"message":"eSIM manager enabled and service started"}'
+    else
+        send_json_response 500 '{"ok":false,"message":"Service failed to start. Check systemd logs."}'
+        exit 1
+    fi
+else
+    # Stop and disable the service
+    systemctl stop "$SERVICE_NAME" > /dev/null 2>&1
+    systemctl disable "$SERVICE_NAME" > /dev/null 2>&1
+    
+    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+        send_json_response 200 '{"ok":true,"message":"eSIM manager disabled and service stopped"}'
+    else
+        send_json_response 500 '{"ok":false,"message":"Failed to stop the service"}'
+        exit 1
+    fi
+fi

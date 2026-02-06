@@ -1,0 +1,35 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"status":"error","message":"Authentication required"}'
+    exit 0
+fi
+
+CONFIG_FILE="$SCRIPT_DIR/../config/simpleadmin.conf"
+
+# Load configuration
+if [ -f "$CONFIG_FILE" ]; then
+    . "$CONFIG_FILE"
+fi
+
+# Get values with defaults
+PING_TARGETS="${SIMPLEADMIN_PING_TARGETS:-8.8.8.8,1.1.1.1}"
+DNS_TESTS="${SIMPLEADMIN_DNS_TESTS:-8.8.8.8:www.google.com,1.1.1.1:www.google.com}"
+
+# Escape values for JSON
+PING_TARGETS_JSON=$(echo "$PING_TARGETS" | sed 's/"/\\"/g')
+DNS_TESTS_JSON=$(echo "$DNS_TESTS" | sed 's/"/\\"/g')
+
+# Build response
+response="{
+  \"status\": \"success\",
+  \"pingTargets\": \"$PING_TARGETS_JSON\",
+  \"dnsTests\": \"$DNS_TESTS_JSON\"
+}"
+
+send_json_response 200 "$response"
