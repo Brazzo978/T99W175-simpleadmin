@@ -342,7 +342,7 @@
         </div>
 
         <!-- Loading Modal for Reboot -->
-        <div class="modal-overlay" x-show="showModal">
+        <div class="modal-overlay" x-show="showModal" x-cloak>
           <div class="loading-modal">
             <div
               class="loading-text"
@@ -371,7 +371,7 @@
         </div>
 
         <!-- Reboot Modal Countdown -->
-        <div class="modal-overlay" x-show="isRebooting">
+        <div class="modal-overlay" x-show="isRebooting" x-cloak>
           <div class="loading-modal">
             <div class="loader"></div>
             <div
@@ -389,7 +389,7 @@
         </div>
 
         <!-- Factory Reset Confirmation Modal -->
-        <div class="modal-overlay" x-show="showFactoryResetModal">
+        <div class="modal-overlay" x-show="showFactoryResetModal" x-cloak>
           <div class="loading-modal" style="max-width: 600px">
             <div
               class="loading-text"
@@ -427,7 +427,7 @@
         </div>
 
         <!-- Factory Reset Progress Modal -->
-        <div class="modal-overlay" x-show="isFactoryResetting">
+        <div class="modal-overlay" x-show="isFactoryResetting" x-cloak>
           <div class="loading-modal">
             <div class="loader"></div>
             <div
