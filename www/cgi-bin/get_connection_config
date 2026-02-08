@@ -20,6 +20,7 @@ fi
 # Get values with defaults
 PING_TARGETS="${SIMPLEADMIN_PING_TARGETS:-8.8.8.8,1.1.1.1}"
 DNS_TESTS="${SIMPLEADMIN_DNS_TESTS:-8.8.8.8:www.google.com,1.1.1.1:www.google.com}"
+MODEM_LOGIC="${SIMPLEADMIN_MODEM_LOGIC:-default}"
 
 # Escape values for JSON
 PING_TARGETS_JSON=$(echo "$PING_TARGETS" | sed 's/"/\\"/g')
@@ -29,7 +30,8 @@ DNS_TESTS_JSON=$(echo "$DNS_TESTS" | sed 's/"/\\"/g')
 response="{
   \"status\": \"success\",
   \"pingTargets\": \"$PING_TARGETS_JSON\",
-  \"dnsTests\": \"$DNS_TESTS_JSON\"
+  \"dnsTests\": \"$DNS_TESTS_JSON\",
+  \"modemLogic\": \"$MODEM_LOGIC\"
 }"
 
 send_json_response 200 "$response"

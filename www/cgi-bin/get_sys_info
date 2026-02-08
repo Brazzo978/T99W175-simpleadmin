@@ -99,9 +99,17 @@ if [ -n "$mem_output" ]; then
 fi
 
 # Extract ethernet link speed and duplex
-eth_info=$(ethtool eth0 2>/dev/null)
+eth_info=""
+if command -v ethtool >/dev/null 2>&1; then
+  eth_info=$(ethtool eth0 2>/dev/null || true)
+fi
 eth_speed=$(echo "$eth_info" | grep Speed | awk '{print $2}' || echo "Unknown")
 eth_duplex=$(echo "$eth_info" | grep Duplex | awk '{print $2}' || echo "Unknown")
+
+if echo "$eth_speed" | grep -qi "unknown" || echo "$eth_duplex" | grep -qi "unknown"; then
+  eth_speed="Ethernet port not connected"
+  eth_duplex=""
+fi
 
 # Build JSON payload
 json_payload=$(cat <<EOF

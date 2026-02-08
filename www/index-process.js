@@ -190,7 +190,6 @@ function processAllInfos() {
     lanIp: "-",
     wwanIpv4: "-",
     wwanIpv6: "-",
-    deviceInfoLoaded: false,
     // SIM unlock prompt modal (first time only)
     showSimUnlockPrompt: false,
     simUnlockPromptDismissed: false,
@@ -227,18 +226,6 @@ function processAllInfos() {
         memPercent: this.memPercent,
         internetConnectionStatus: this.internetConnectionStatus,
         connectionDetails: this.connectionDetails,
-        // Preserve device info across refreshes to avoid flicker
-        manufacturer: this.manufacturer,
-        modelName: this.modelName,
-        firmwareVersion: this.firmwareVersion,
-        imsi: this.imsi,
-        iccid: this.iccid,
-        imei: this.imei,
-        phoneNumber: this.phoneNumber,
-        lanIp: this.lanIp,
-        wwanIpv4: this.wwanIpv4,
-        wwanIpv6: this.wwanIpv6,
-        deviceInfoLoaded: this.deviceInfoLoaded,
       };
 
       Object.assign(
@@ -288,29 +275,11 @@ function processAllInfos() {
     }
     return outputs.join("\n");
   },
-  fetchLanIp() {
-    return fetch("/cgi-bin/get_lanip")
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((data) => {
-        this.lanIp = data && data.lanip ? data.lanip : "Unknown";
-      })
-      .catch((error) => {
-        console.warn("LAN IP not available, using fallback:", error);
-        this.lanIp = "Unknown";
-      });
-  },
   async fetchAllInfo() {
     if (this.isFetching) {
       return;
     }
     this.isFetching = true;
-    const shouldFetchDeviceInfo = !this.deviceInfoLoaded;
-    const shouldFetchLanIp = !this.lanIp || this.lanIp === "-" || this.lanIp === "Unknown";
     try {
     // First check if SIM is present
     const simCheckCmd = 'AT+CPIN?';
@@ -424,14 +393,8 @@ function processAllInfos() {
         decimalCellId: null
       });
 
-      if (shouldFetchLanIp) {
-        this.fetchLanIp().finally(() => {
-          // Check if we should show SIM unlock prompt (only once per session)
-          this.checkSimUnlockPrompt();
-        });
-      } else {
-        this.checkSimUnlockPrompt();
-      }
+      // Check if we should show SIM unlock prompt (only once per session)
+      this.checkSimUnlockPrompt();
 
       return;
       }
@@ -451,19 +414,11 @@ function processAllInfos() {
         "AT+QRSRP",
         "AT+QGDNRCNT?",
         "AT+QGDCNT?",
+        "AT+ICCID",
+        "AT+CGMI",
+        "AT+CGMM",
+        "AT+CGSN",
       ];
-
-      if (shouldFetchDeviceInfo) {
-        commandBatch.push(
-          "AT+ICCID",
-          "AT+CIMI",
-          "AT+CGMI",
-          "AT+CGMM",
-          "ATI",
-          "AT+CGSN",
-          "AT+CNUM"
-        );
-      }
 
       this.atcmd = commandBatch.join(";");
 
@@ -556,34 +511,16 @@ function processAllInfos() {
             const manufacturerValue = findValueAfterCommand("AT+CGMI") || "-";
             const modelValue = findValueAfterCommand("AT+CGMM") || "-";
             const imeiValue = findValueAfterCommand("AT+CGSN") || "-";
-            const imsiCandidate = findValueAfterCommand("AT+CIMI");
-            const imsiValue = /^\d{15}$/.test(imsiCandidate || "")
-              ? imsiCandidate
-              : (this.imsi || "Unknown");
-            const firmwareLine = lines.find((line) =>
-              /Revision\s*:/i.test(normalize(line))
-            );
-            const firmwareValue = firmwareLine
-              ? normalize(firmwareLine.split(":").slice(1).join(":"))
-              : "-";
-
-            const resolvedIccid = iccidValue && iccidValue !== "-" ? iccidValue : (this.iccid || "-");
-            const resolvedManufacturer = manufacturerValue && manufacturerValue !== "-" ? manufacturerValue : (this.manufacturer || "-");
-            const resolvedModel = modelValue && modelValue !== "-" ? modelValue : (this.modelName || "-");
-            const resolvedFirmware = firmwareValue && firmwareValue !== "-" ? firmwareValue : (this.firmwareVersion || "-");
-            const resolvedImei = imeiValue && imeiValue !== "-" ? imeiValue : (this.imei || "-");
 
             this.resetData({
               simStatus: this.simStatus,
               activeSim: this.simStatus === "Active" ? "SIM" : "No SIM",
               networkProvider: operatorName,
               csq: csqValue || "-",
-              iccid: resolvedIccid,
-              imsi: imsiValue,
-              manufacturer: resolvedManufacturer,
-              modelName: resolvedModel,
-              firmwareVersion: resolvedFirmware,
-              imei: resolvedImei,
+              iccid: iccidValue,
+              manufacturer: manufacturerValue,
+              modelName: modelValue,
+              imei: imeiValue,
             });
 
             if (hasLegacyStats) {
@@ -591,20 +528,6 @@ function processAllInfos() {
                 simStatusText,
                 operatorName,
               });
-            }
-
-            if (shouldFetchDeviceInfo) {
-              this.deviceInfoLoaded = true;
-            }
-
-            if (shouldFetchLanIp) {
-              this.fetchLanIp().finally(() => {
-                // Check if we should show SIM unlock prompt (only once per session)
-                // Must be here after simStatus is set
-                this.checkSimUnlockPrompt();
-              });
-            } else {
-              this.checkSimUnlockPrompt();
             }
 
             return;
@@ -1923,11 +1846,6 @@ function processAllInfos() {
                 }
               }
             }
-            // Parse firmware version (ATI "Revision:")
-            const revisionMatch = trimmed.match(/^Revision\s*:\s*(.+)$/i);
-            if (revisionMatch && revisionMatch[1]) {
-              this.firmwareVersion = revisionMatch[1].trim();
-            }
 
             // Parse manufacturer (+CGMI)
             if (ctx?.startsWith("AT+CGMI")) {
@@ -1946,18 +1864,7 @@ function processAllInfos() {
               ctx = null;
               continue;
             }
-
-            // Parse firmware version (+CGMR)
-            if (ctx?.startsWith("AT+CGMR")) {
-              this.firmwareVersion = trimmed;
-              ctx = null;
-              continue;
-            }
           }
-
-        if (shouldFetchDeviceInfo) {
-          this.deviceInfoLoaded = true;
-        }
 
         this.lastUpdate = new Date().toLocaleString();
       } catch (parseError) {
@@ -1972,15 +1879,25 @@ function processAllInfos() {
     }
 
     // Fetch LAN IP (optional on this modem; fallback to Unknown)
-    if (shouldFetchLanIp) {
-      this.fetchLanIp().finally(() => {
+    fetch("/cgi-bin/get_lanip")
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        this.lanIp = data && data.lanip ? data.lanip : "Unknown";
+      })
+      .catch((error) => {
+        console.warn("LAN IP not available, using fallback:", error);
+        this.lanIp = "Unknown";
+      })
+      .finally(() => {
         // Check if we should show SIM unlock prompt (only once per session)
         // Must be here after simStatus is set
         this.checkSimUnlockPrompt();
       });
-    } else {
-      this.checkSimUnlockPrompt();
-    }
     } finally {
       this.isFetching = false;
     }

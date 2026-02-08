@@ -217,8 +217,10 @@ return {
     }
 
     this.isLoading = true;
+    // Note: our backend splits on ';' and executes each segment independently.
+    // Use full "AT+" prefix for each command (don't rely on compound AT syntax).
     const atcmd =
-      'AT+CSMS=1;+CSDH=0;+CNMI=2,1,0,0,0;+CMGF=1;+CSCA?;+CSMP=17,167,0,8;+CMGL="ALL"';
+      'AT+CSMS=1;AT+CSDH=0;AT+CNMI=2,1,0,0,0;AT+CMGF=1;AT+CSCA?;AT+CSMP=17,167,0,8;AT+CMGL="ALL"';
 
     try {
       // Query storage info separately (unless already done)

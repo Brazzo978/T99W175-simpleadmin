@@ -1,234 +1,31 @@
 #!/bin/bash
-set -eu
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=/dev/null
-. "$SCRIPT_DIR/session_utils.sh"
-
-if ! session_load; then
-    send_json_response 401 '{"success":false,"message":"Authentication required"}'
-    exit 0
-fi
-
-if ! session_require_role "admin"; then
-    send_json_response 403 '{"success":false,"message":"Admin privileges required"}'
-    exit 0
-fi
-
-# JSON escape helper
-json_escape() {
-    local str="$1"
-    str="${str//\\/\\\\}"
-    str="${str//\"/\\\"}"
-    str="${str//$'\n'/\\n}"
-    str="${str//$'\r'/\\r}"
-    str="${str//$'\t'/\\t}"
-    printf '%s' "$str"
-}
-
-# Read POST data if available
-if [ "$REQUEST_METHOD" = "POST" ]; then
-    CONTENT_LENGTH="${CONTENT_LENGTH:-0}"
-    if [ "$CONTENT_LENGTH" -gt 0 ]; then
-        POST_DATA=$(cat -)
-    else
-        POST_DATA=""
-    fi
-else
-    # For backwards compatibility, parse query string
-    POST_DATA="${QUERY_STRING:-}"
-fi
-
-# URL decode helper
+QUERY_STRING=$(echo "${QUERY_STRING}" | sed 's/;//g')
 urldecode() {
-    local data="${1//+/ }"
-    printf '%b' "${data//%/\\x}"
+    local data
+    data="${*//+/ }"
+    echo -e "${data//%/\\x}"
 }
 
-# Parse parameters (both POST JSON and query string)
-phone_number=""
-message_encoded=""
-command_param=""
-
-# Try to parse as JSON first
-if echo "$POST_DATA" | grep -qE '^\{'; then
-    # JSON input
-    phone_number=$(echo "$POST_DATA" | grep -o '"number":[[:space:]]*"[^"]*"' | sed 's/.*"number"[[:space:]]*:"\([^"]*\)".*/\1/')
-    message_encoded=$(echo "$POST_DATA" | grep -o '"message":[[:space:]]*"[^"]*"' | sed 's/.*"message"[[:space:]]*:"\([^"]*\)".*/\1/')
-    command_param=$(echo "$POST_DATA" | grep -o '"command":[[:space:]]*"[^"]*"' | sed 's/.*"command"[[:space:]]*:"\([^"]*\)".*/\1/')
-else
-    # Query string format
-    IFS='&' read -r -a pairs <<< "$POST_DATA"
-    for pair in "${pairs[@]}"; do
-        key="${pair%%=*}"
-        value="${pair#*=}"
-        case "$key" in
-            number)
-                phone_number="$(urldecode "$value")"
-                ;;
-            msg|message)
-                message_encoded="$(urldecode "$value")"
-                ;;
-            Command|command)
-                command_param="$(urldecode "$value")"
-                ;;
-        esac
+if [ "${QUERY_STRING}" ]; then
+    export IFS="&"
+    for cmd in ${QUERY_STRING}; do
+        if [[ "$cmd" == *=* ]]; then
+            key=$(echo "$cmd" | awk -F '=' '{print $1}')
+            value=$(echo "$cmd" | awk -F '=' '{print $2}')
+            eval "$key"="$(urldecode "$value")"
+        fi
     done
 fi
 
-# Validate input
-if [ -z "$phone_number" ] || [ -z "$message_encoded" ]; then
-    send_json_response 400 '{"success":false,"message":"Missing phone number or message"}'
-    exit 0
-fi
+phone_number="$number"
+message_encoded="$msg"
 
-# Check if serial device exists
-if [ ! -e "/dev/smd8" ]; then
-    send_json_response 500 '{"success":false,"message":"Serial device /dev/smd8 not found"}'
-    exit 0
-fi
 
-# Send SMS using direct serial communication
-send_sms() {
-    local phone="$1"
-    local msg="$2"
-    local device="/dev/smd8"
-
-    # Configure serial port
-    stty -F "$device" 115200 cs8 -cstopb -parenb -echo raw 2>/dev/null
-
-    # Clear any pending data
-    cat "$device" > /dev/null 2>&1 &
-    sleep 0.5
-    kill $! 2>/dev/null
-
-    # Initialize modem for text mode SMS with UCS2
-    echo -e "AT+CMGF=1\r" > "$device"
-    sleep 0.5
-
-    echo -e "AT+CSCS=\"UCS2\"\r" > "$device"
-    sleep 0.5
-
-    # Set SMS parameters for UCS2
-    echo -e "AT+CSMP=17,167,0,8\r" > "$device"
-    sleep 0.5
-
-    # Send CMGS command with phone number in UCS2
-    echo -e "AT+CMGS=\"${phone}\"\r" > "$device"
-    sleep 1
-
-    # Send message in UCS2 hex format followed by Ctrl+Z
-    echo -en "${msg}\x1A" > "$device"
-
-    # Wait for transmission and capture response using background cat
-    local tmpfile=$(mktemp)
-    cat "$device" > "$tmpfile" &
-    local cat_pid=$!
-
-    # Wait for response
-    sleep 5
-
-    # Kill the background cat
-    kill $cat_pid 2>/dev/null
-    wait $cat_pid 2>/dev/null
-
-    # Read the response
-    local response=$(cat "$tmpfile" 2>/dev/null || echo "")
-    rm -f "$tmpfile"
-
-    # Log what we received for debugging
-    echo "DEBUG_RESPONSE_START" >&2
-    echo "$response" >&2
-    echo "DEBUG_RESPONSE_END" >&2
-
-    echo "$response"
-
-    # Return success if we found +CMGS or OK (case insensitive)
-    if echo "$response" | grep -qiE "CMGS:|OK"; then
-        return 0
-    else
-        return 1
-    fi
+send_at_command() {
+    local cmd=$1
+    echo -en "$cmd\r" | microcom -t 100 /dev/ttyOUT2
 }
 
-# Execute with retry logic
-max_attempts=3
-attempt=1
-result=""
-exit_code=1
-success=false
-cms_error=""
-
-while [ $attempt -le $max_attempts ]; do
-    result=$(send_sms "$phone_number" "$message_encoded" 2>&1)
-    exit_code=$?
-
-    # Check for CMS ERROR
-    if echo "$result" | grep -q "+CMS ERROR"; then
-        cms_error=$(echo "$result" | grep "+CMS ERROR" | sed 's/.*+CMS ERROR: *\([0-9]*\).*/\1/')
-        # CMS ERROR means permanent failure, don't retry
-        break
-    fi
-
-    # Check for OK or CMGS (message sent)
-    if echo "$result" | grep -qE "(OK|>|\+CMGS:)"; then
-        success=true
-        exit_code=0
-        break
-    fi
-
-    # If not success and not last attempt, retry
-    if [ $attempt -lt $max_attempts ]; then
-        sleep 1
-    fi
-
-    attempt=$((attempt + 1))
-done
-
-# Prepare response
-escaped_output=$(json_escape "$result")
-
-if [ -n "$cms_error" ]; then
-    # CMS error occurred
-    payload=$(cat <<EOF
-{
-  "success":false,
-  "message":"SMS sending failed",
-  "error_code":"$cms_error",
-  "output":"$escaped_output",
-  "attempts":$attempt
-}
-EOF
-)
-    send_json_response 200 "$payload"
-    exit 0
-fi
-
-if [ "$success" = true ]; then
-    # Success
-    payload=$(cat <<EOF
-{
-  "success":true,
-  "message":"SMS sent successfully",
-  "output":"$escaped_output",
-  "attempts":$attempt
-}
-EOF
-)
-    send_json_response 200 "$payload"
-    exit 0
-else
-    # Failed after all attempts
-    payload=$(cat <<EOF
-{
-  "success":false,
-  "message":"Failed to send SMS after $attempt attempts",
-  "output":"$escaped_output",
-  "exit_code":$exit_code,
-  "attempts":$attempt
-}
-EOF
-)
-    send_json_response 500 "$payload"
-    exit 0
-fi
+send_at_command "AT+CMGS=\"$phone_number\","$Command""
+runcmd=$((echo -en "$message_encoded"; echo -en "\x1A") | microcom -t 500 /dev/ttyOUT2)
+echo "$runcmd"

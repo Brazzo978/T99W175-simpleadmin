@@ -27,17 +27,6 @@ strip_ansi() {
     sed -E 's/\x1B\[[0-9;]*[mG]//g'
 }
 
-# JSON escape helper
-json_escape() {
-    local str="$1"
-    str="${str//\\/\\\\}"
-    str="${str//\"/\\\"}"
-    str="${str//$'\n'/\\n}"
-    str="${str//$'\r'/\\r}"
-    str="${str//$'\t'/\\t}"
-    printf '%s' "$str"
-}
-
 # Parse query string
 raw_query="${QUERY_STRING:-}"
 clean_query="${raw_query//;/}"
@@ -72,16 +61,27 @@ if [ -z "$decoded_atcmd" ]; then
     exit 0
 fi
 
-# Check if atcli_smd8 command exists
-if ! command -v atcli_smd8 >/dev/null 2>&1; then
-    send_json_response 500 '{"success":false,"message":"atcli_smd8 command not found"}'
+# Resolve AT CLI binary (prefer smd11-specific if present)
+ATCLI_BIN=""
+if [ -x /usrdata/simpleadmin/atcli ]; then
+    ATCLI_BIN="/usrdata/simpleadmin/atcli"
+elif command -v atcli >/dev/null 2>&1; then
+    ATCLI_BIN="$(command -v atcli)"
+elif [ -x /usrdata/simpleadmin/atcli_smd11 ]; then
+    ATCLI_BIN="/usrdata/simpleadmin/atcli_smd11"
+elif command -v atcli_smd11 >/dev/null 2>&1; then
+    ATCLI_BIN="$(command -v atcli_smd11)"
+fi
+
+if [ -z "$ATCLI_BIN" ]; then
+    send_json_response 500 '{"success":false,"message":"atcli command not found"}'
     exit 0
 fi
 
 # Execute the AT command
 command_output=""
 exit_code=0
-if ! command_output=$(atcli_smd8 "$decoded_atcmd" 2>&1); then
+if ! command_output=$("$ATCLI_BIN" "$decoded_atcmd" 2>&1); then
     exit_code=$?
 fi
 
@@ -91,7 +91,7 @@ clean_output=$(printf '%s' "$command_output" | strip_ansi)
 # Prepare response
 if [ -z "$clean_output" ]; then
     if [ $exit_code -ne 0 ]; then
-        error_msg="atcli_smd8 exited with code $exit_code"
+        error_msg="atcli exited with code $exit_code"
     else
         error_msg="Empty response from modem"
     fi

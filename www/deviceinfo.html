@@ -60,14 +60,16 @@
     <script src="js/login-config.js" defer></script>
     <script src="js/index-login.js" defer></script>
     <script src="js/device-info.js"></script>
+    <script src="js/modem-logic.js"></script>
     <script src="js/atcommand-utils.js"></script>
     <script src="js/reboot-utils.js" defer></script>
     <script src="js/dark-mode.js" defer></script>
     <script src="js/app-version.js" defer></script>
+    <script src="js/compat-nav.js" defer></script>
   </head>
   <body data-require-auth="true">
     <main>
-      <div class="container my-4" x-data="fetchDeviceInfo()">
+      <div class="container my-4" x-data="fetchDeviceInfo()" x-init="fetchATCommand(); fetchlanIp()">
       <nav class="navbar navbar-expand-lg mt-2">
         <div class="container-fluid">
           <a class="navbar-brand" href="/">

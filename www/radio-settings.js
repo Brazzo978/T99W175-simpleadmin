@@ -99,14 +99,6 @@ function cellLocking() {
     prefNetwork: "-",
     // Preferred network mode value
     prefNetworkValue: null,
-    // RAT acquisition order (Quectel)
-    ratAcqOrder: ["NR5G", "LTE", "WCDMA"],
-    // Which RAT toggles should be shown/enabled in the UI
-    prefNetworkSupports: {
-      threeG: true,
-      fourG: true,
-      fiveG: true,
-    },
     // 5G NR mode display
     nr5gMode: "Unknown",
     // 5G mode update in progress
@@ -425,7 +417,7 @@ function cellLocking() {
       };
     },
 
-    async init() {
+    init() {
       console.log("=== init() called ===");
       const self = this;
 
@@ -616,253 +608,11 @@ function cellLocking() {
         console.log("Provider bands listener attached");
       };
 
+      showPopulateCheckboxes();
       addNetworkModeListener();
       addProviderBandsListener();
-      // Load in a user-visible order to reduce perceived latency.
-      // AT command access is serialized server-side; parallel calls just queue and feel slow.
-      try {
-        await this.refreshSimSlot();
-        const simReady = await this.isSimReady();
-
-        // 1) APN
-        if (simReady) {
-          await this.fetchApnInfo();
-        }
-
-        // 2) Bands
-        await showPopulateCheckboxes();
-
-        // 3) Preferred network (RAT enable/disable)
-        await this.loadPreferredNetwork();
-
-        // 4) Cell lock status
-        if (simReady) {
-          await this.fetchCellLockStatus();
-        } else {
-          this.cellLockStatus = "Not Available";
-        }
-
-        // 5) Device info (deferred; triggered after radio settings are loaded)
-        setTimeout(() => {
-          try {
-            window.dispatchEvent(new Event("simpleadmin:deviceinfo:autofetch"));
-          } catch (error) {
-            console.debug("Unable to dispatch deviceinfo autofetch event", error);
-          }
-        }, 0);
-      } catch (error) {
-        console.warn("Radio settings init sequence failed:", error);
-      }
+      this.fetchApnInfo();
       console.log("=== init() completed ===");
-    },
-
-    async refreshSimSlot() {
-      const basicResult = await this.sendATcommand("AT+QUIMSLOT?");
-      if (basicResult.ok && basicResult.data) {
-        const slotMatch = basicResult.data.match(/\+QUIMSLOT:\s*(\d+)/i);
-        if (slotMatch) {
-          this.sim = slotMatch[1];
-          this.pendingSimSlot = this.sim;
-        }
-      }
-    },
-
-    async isSimReady() {
-      const simCheckResult = await this.sendATcommand("AT+CPIN?");
-      if (!simCheckResult.ok || !simCheckResult.data) {
-        return false;
-      }
-      return String(simCheckResult.data).toUpperCase().includes("READY");
-    },
-
-    parseQnwprefcfgValue(lines, key) {
-      const wanted = String(key || "").toLowerCase();
-      if (!wanted) {
-        return null;
-      }
-
-      const line = (lines || []).find((entry) =>
-        entry.toLowerCase().includes(`+qnwprefcfg: "${wanted}"`)
-      );
-      if (!line) {
-        return null;
-      }
-
-      const parts = line.split(",");
-      if (parts.length < 2) {
-        return null;
-      }
-
-      return parts
-        .slice(1)
-        .join(",")
-        .replace(/"/g, "")
-        .trim();
-    },
-
-    describePrefNetworkMode(modePref) {
-      const value = (modePref || "").toString().trim();
-      if (!value) {
-        return "Unknown";
-      }
-      if (value.toUpperCase() === "AUTO") {
-        return "Auto";
-      }
-
-      const map = { WCDMA: "3G", LTE: "4G", NR5G: "5G" };
-      const tokens = value
-        .split(":")
-        .map((t) => t.trim().toUpperCase())
-        .filter(Boolean);
-
-      const labels = [];
-      if (tokens.includes("WCDMA")) labels.push(map.WCDMA);
-      if (tokens.includes("LTE")) labels.push(map.LTE);
-      if (tokens.includes("NR5G")) labels.push(map.NR5G);
-
-      return labels.length ? labels.join(" + ") : value;
-    },
-
-    updatePreferredNetworkSelectionFromModePref(modePref) {
-      this.preferredNetworkSelection.threeG = false;
-      this.preferredNetworkSelection.fourG = false;
-      this.preferredNetworkSelection.fiveG = false;
-
-      const value = (modePref || "").toString().trim();
-      if (!value) {
-        return;
-      }
-
-      // In the UI, "all unchecked" represents AUTO.
-      if (value.toUpperCase() === "AUTO") {
-        return;
-      }
-
-      const tokens = value
-        .split(":")
-        .map((t) => t.trim().toUpperCase())
-        .filter(Boolean);
-
-      this.preferredNetworkSelection.threeG = tokens.includes("WCDMA");
-      this.preferredNetworkSelection.fourG = tokens.includes("LTE");
-      this.preferredNetworkSelection.fiveG = tokens.includes("NR5G");
-    },
-
-    computePreferredNetworkModeFromSelection() {
-      const selected = [];
-      if (this.preferredNetworkSelection.threeG) selected.push("WCDMA");
-      if (this.preferredNetworkSelection.fourG) selected.push("LTE");
-      if (this.preferredNetworkSelection.fiveG) selected.push("NR5G");
-
-      if (selected.length === 0) {
-        return "AUTO";
-      }
-
-      // If all supported toggles are enabled, keep AUTO for stability.
-      if (
-        this.prefNetworkSupports.threeG &&
-        this.prefNetworkSupports.fourG &&
-        this.prefNetworkSupports.fiveG &&
-        selected.length === 3
-      ) {
-        return "AUTO";
-      }
-
-      const order = Array.isArray(this.ratAcqOrder) && this.ratAcqOrder.length
-        ? this.ratAcqOrder
-        : ["NR5G", "LTE", "WCDMA"];
-
-      return order.filter((rat) => selected.includes(rat)).join(":");
-    },
-
-    async loadPreferredNetwork() {
-      // Read-only fetch of Quectel RAT config.
-      const result = await this.sendATcommand(
-        'AT+QNWPREFCFG="mode_pref";AT+QNWPREFCFG="rat_acq_order"'
-      );
-
-      if (!result.ok || !result.data) {
-        console.warn("Unable to fetch preferred network:", this.lastErrorMessage);
-        this.prefNetworkValue = null;
-        this.prefNetwork = "Not Available";
-        return;
-      }
-
-      const lines = String(result.data || "")
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
-
-      const ratOrderRaw = this.parseQnwprefcfgValue(lines, "rat_acq_order");
-      if (ratOrderRaw) {
-        const order = ratOrderRaw
-          .split(":")
-          .map((t) => t.trim().toUpperCase())
-          .filter(Boolean);
-        if (order.length) {
-          this.ratAcqOrder = order;
-        }
-      }
-
-      // Toggle visibility based on supported RATs.
-      const supported = new Set((this.ratAcqOrder || []).map((v) => v.toUpperCase()));
-      this.prefNetworkSupports.threeG = supported.has("WCDMA");
-      this.prefNetworkSupports.fourG = supported.has("LTE");
-      this.prefNetworkSupports.fiveG = supported.has("NR5G");
-
-      const modePref = this.parseQnwprefcfgValue(lines, "mode_pref");
-      if (!modePref) {
-        this.prefNetworkValue = null;
-        this.prefNetwork = "Not Available";
-        return;
-      }
-
-      this.prefNetworkValue = modePref.toUpperCase();
-      this.prefNetwork = this.describePrefNetworkMode(this.prefNetworkValue);
-      this.updatePreferredNetworkSelectionFromModePref(this.prefNetworkValue);
-    },
-
-    async fetchCellLockStatus() {
-      const result = await this.sendATcommand(
-        'AT+QNWLOCK="common/4g";AT+QNWLOCK="common/5g"'
-      );
-
-      if (!result.ok || !result.data) {
-        console.warn("Unable to fetch cell lock status:", this.lastErrorMessage);
-        this.cellLockStatus = "Unknown";
-        return;
-      }
-
-      const lines = String(result.data || "")
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
-
-      const qnw4g = lines.find((line) => line.includes('+QNWLOCK: "common/4g"')) || "";
-      const qnw5g = lines.find((line) => line.includes('+QNWLOCK: "common/5g"')) || "";
-
-      const lteLocks =
-        typeof parseQnwLock4g === "function" ? parseQnwLock4g(qnw4g) : [];
-      const nrLocks =
-        typeof parseQnwLock5g === "function" ? parseQnwLock5g(qnw5g) : [];
-
-      const statusParts = [];
-      if (typeof describeLteLock === "function") {
-        const desc = describeLteLock(lteLocks);
-        if (desc) statusParts.push(desc);
-      } else if (lteLocks.length > 0) {
-        statusParts.push(`LTE (${lteLocks.length})`);
-      }
-
-      if (typeof describeNrLock === "function") {
-        const desc = describeNrLock(nrLocks);
-        if (desc) statusParts.push(desc);
-      } else if (nrLocks.length > 0) {
-        statusParts.push(`NR5G-SA (${nrLocks.length})`);
-      }
-
-      this.cellLockStatus = statusParts.length > 0 ? statusParts.join(" | ") : "Not Locked";
-      this.networkModeCell = "Cell Lock: " + this.cellLockStatus;
     },
 
     parseApnInfo(rawdata) {
@@ -930,35 +680,124 @@ function cellLocking() {
 
     async getCurrentSettings() {
       console.log("=== getCurrentSettings START ===");
+       
+      // Always get the slot info and network mode, regardless of SIM status
+      const basicCmd = 'AT+QUIMSLOT?;AT^SLMODE?';
+      const basicResult = await this.sendATcommand(basicCmd);
+
+      if (basicResult.ok && basicResult.data) {       
+        // Parse slot: +QUIMSLOT: 1
+        const slotMatch = basicResult.data.match(/\+QUIMSLOT:\s*(\d+)/i);
+        if (slotMatch) {
+          this.sim = slotMatch[1];
+          this.pendingSimSlot = this.sim;
+          // console.log("Parsed SIM slot:", this.sim);
+        }
+        
+        // Parse network mode: "^SLMODE:1,0"
+        const slmodeMatch = basicResult.data.match(/\^SLMODE:\s*\d+\s*,\s*(\d+)/i);
+        if (slmodeMatch) {
+          const modeValue = parseInt(slmodeMatch[1], 10);
+          this.prefNetworkValue = modeValue;
+          this.prefNetwork = this.describePrefNetworkValue(modeValue);
+          this.updatePreferredNetworkSelectionFromValue(modeValue);
+          // console.log("Parsed network mode:", modeValue, "->", this.prefNetwork);
+        }
+      }   
+
+      // Check if SIM is present
+      const simCheckResult = await this.sendATcommand('AT+CPIN?');
+      const simStatus = simCheckResult.data.trim();
+      // console.log("SIM Check Result:", simStatus);   
+      
+      if (!simCheckResult.ok || !simCheckResult.data) {
+        console.warn("Unable to check SIM status:", this.lastErrorMessage);
+        this.apn = "Not Available";
+        this.apnIP = "Not Available";
+        this.prefNetwork = "Not Available";
+        this.bands = "Not Available";
+        this.cellLockStatus = "Not Available";
+        await this.getEsimManagerStatus();
+        return;
+      }
+
+      // If SIM is not ready, don't execute commands that require SIM
+      if (!simStatus.includes('READY')) {
+        console.warn("SIM not ready:", simStatus);
+        this.apn = "Not Available";
+        this.apnIP = "Not Available";
+        this.prefNetwork = "Not Available";
+        this.bands = "Not Available";
+        this.cellLockStatus = "Not Available";
+        
+        await this.getEsimManagerStatus();
+        console.log("=== getCurrentSettings END (No SIM) ===");
+        return;
+      }
+
+      await this.fetchApnInfo();
+
+      // SIM is ready, execute full command set
+      const atcmd =
+        'AT^CA_INFO?;AT^SLMODE?;AT+QNWLOCK="common/4g";AT+QNWLOCK="common/5g"';
+
+      const result = await this.sendATcommand(atcmd);
+
+      if (!result.data) {
+        console.warn("Unable to fetch current settings:", this.lastErrorMessage);
+        return;
+      }
+      if (!result.ok) {
+        console.warn("Partial settings data received:", this.lastErrorMessage);
+      }
 
       try {
-        await this.refreshSimSlot();
-        const simReady = await this.isSimReady();
+        if (typeof parseCurrentSettings === "function") {
+          const settings = parseCurrentSettings(result.data);
 
-        if (simReady) {
-          await this.fetchApnInfo();
-        } else {
-          this.apn = "Not Available";
-          this.apnIP = "Not Available";
+          if (!settings) {
+            throw new Error('Wrong response from modem.');
+          }
+
+          // Don't override sim value - we already got it from SWITCH_SLOT
+          if (settings.apn && settings.apn !== "Failed fetching APN") {
+            this.apn = settings.apn;
+          }
+          if (settings.apnIP && settings.apnIP !== "-") {
+            this.apnIP = settings.apnIP;
+          }
+          this.cellLockStatus = settings.cellLockStatus;
+          this.prefNetwork = settings.prefNetwork;
+          this.prefNetworkValue = settings.prefNetworkValue;
+          this.updatePreferredNetworkSelectionFromValue(settings.prefNetworkValue);
+          this.bands = settings.bands;
+
+          let nr5gModeValue = settings.nr5gModeValue;
+
+          if (nr5gModeValue === null) {
+            const nr5gResult = await this.sendATcommand('AT^NR5G_MODE?');
+
+            if (nr5gResult.ok && nr5gResult.data) {
+              const nr5gSettings = parseCurrentSettings(nr5gResult.data);
+              nr5gModeValue = nr5gSettings?.nr5gModeValue ?? null;
+            }
+          }
+
+          if (typeof describeNr5gMode === "function") {
+            this.nr5gMode = describeNr5gMode(nr5gModeValue);
+          }
         }
-
-        await this.loadPreferredNetwork();
-
-        if (simReady) {
-          await this.fetchCellLockStatus();
-        } else {
-          this.cellLockStatus = "Not Available";
-          this.networkModeCell = "Cell Lock: " + this.cellLockStatus;
-        }
-
+        
         await this.getEsimManagerStatus();
+
       } catch (error) {
-        console.warn("getCurrentSettings failed:", error);
-      } finally {
-        console.log("Final SIM value:", this.sim);
-        console.log("Final pendingSimSlot:", this.pendingSimSlot);
-        console.log("=== getCurrentSettings END ===");
+        this.lastErrorMessage = error.message || 'Error while parsing the current settings.';
+        console.error('Error while parsing the current settings:', error);
       }
+      
+      console.log("Final SIM value:", this.sim);
+      console.log("Final pendingSimSlot:", this.pendingSimSlot);
+      console.log("=== getCurrentSettings END ===");
     },
     
     async getEsimManagerStatus() {
@@ -1046,15 +885,62 @@ function cellLocking() {
       return this.prefNetwork || 'Unknown';
     },
     describePrefNetworkValue(value) {
-      // Backward-compatible wrapper (older code used numeric SLMODE).
-      return this.describePrefNetworkMode(value);
+      if (!Number.isInteger(value) || value < 0) {
+        return 'Unknown';
+      }
+
+      const labels = {
+        0: 'Auto',
+        1: '3G Only',
+        2: '4G Only',
+        3: '3G + 4G',
+        4: '5G Only',
+        5: '3G + 5G',
+        6: '4G + 5G',
+        7: '3G + 4G + 5G',
+      };
+
+      return labels[value] || 'Unknown';
     },
     updatePreferredNetworkSelectionFromValue(value) {
-      // Backward-compatible wrapper (older code used numeric SLMODE).
-      this.updatePreferredNetworkSelectionFromModePref(value);
+      const numericValue = Number.isInteger(value) ? value : null;
+
+      this.preferredNetworkSelection.threeG = false;
+      this.preferredNetworkSelection.fourG = false;
+      this.preferredNetworkSelection.fiveG = false;
+
+      if (numericValue === null) {
+        return;
+      }
+
+      if (numericValue & 1) {
+        this.preferredNetworkSelection.threeG = true;
+      }
+      if (numericValue & 2) {
+        this.preferredNetworkSelection.fourG = true;
+      }
+      if (numericValue & 4) {
+        this.preferredNetworkSelection.fiveG = true;
+      }
     },
     computePreferredNetworkValueFromSelection() {
-      return this.computePreferredNetworkModeFromSelection();
+      if (!this.preferredNetworkSelection) {
+        return null;
+      }
+
+      let value = 0;
+
+      if (this.preferredNetworkSelection.threeG) {
+        value |= 1;
+      }
+      if (this.preferredNetworkSelection.fourG) {
+        value |= 2;
+      }
+      if (this.preferredNetworkSelection.fiveG) {
+        value |= 4;
+      }
+
+      return value;
     },
     async savePreferredNetwork() {
       if (this.isSavingPrefNetwork) {
@@ -1066,14 +952,14 @@ function cellLocking() {
         return;
       }
 
-      const targetMode = this.computePreferredNetworkModeFromSelection();
-      if (!targetMode) {
+      const targetValue = this.computePreferredNetworkValueFromSelection();
+
+      if (targetValue === null) {
         alert('Unable to determine the preferred network selection.');
         return;
       }
 
-      const normalizedTarget = targetMode.toString().trim().toUpperCase();
-      if (normalizedTarget === this.prefNetworkValue) {
+      if (targetValue === this.prefNetworkValue) {
         alert('No changes made');
         return;
       }
@@ -1081,7 +967,7 @@ function cellLocking() {
       this.isSavingPrefNetwork = true;
 
       const result = await this.sendATcommand(
-        `AT+QNWPREFCFG="mode_pref",${normalizedTarget}`
+        `AT^SLMODE=1,${targetValue}`
       );
 
       this.isSavingPrefNetwork = false;
@@ -1094,9 +980,8 @@ function cellLocking() {
         return;
       }
 
-      this.prefNetworkValue = normalizedTarget;
-      this.prefNetwork = this.describePrefNetworkMode(this.prefNetworkValue);
-      this.updatePreferredNetworkSelectionFromModePref(this.prefNetworkValue);
+      this.prefNetworkValue = targetValue;
+      this.prefNetwork = this.describePrefNetworkValue(targetValue);
     },
     showToastNotification(message, type = "info", autoHide = true) {
       this.toastMessage = message;
@@ -1286,6 +1171,9 @@ function cellLocking() {
         return;
       }
 
+      // Save current SLMODE value to restore it after slot switch
+      const savedSlModeValue = this.prefNetworkValue;
+
       // Initialize countdown BEFORE showing modal to avoid flash
       this.countdown = 5;
       this.isApplyingSimChange = true;
@@ -1310,9 +1198,14 @@ function cellLocking() {
         if (this.countdown === 0) {
           clearInterval(interval);
 
+          // Restore SLMODE to the value it had before slot switch
+          if (savedSlModeValue !== null) {
+            this.sendATcommand(`AT^SLMODE=1,${savedSlModeValue}`);
+          }
+
           this.showModalSim = false;
           this.isApplyingSimChange = false;
-          this.init();
+          this.getCurrentSettings();
         }
       }, 1000);
     },
@@ -1552,7 +1445,6 @@ function cellLocking() {
         );
         return;
       }
-
       const interval = setInterval(() => {
         this.countdown--;
         if (this.countdown === 0) {
@@ -1611,7 +1503,6 @@ function cellLocking() {
         );
         return;
       }
-
       const interval = setInterval(() => {
         this.countdown--;
         if (this.countdown === 0) {

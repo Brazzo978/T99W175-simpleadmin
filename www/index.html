@@ -62,11 +62,9 @@
     <script src="js/index-process.js"></script>
     <script src="js/atcommand-utils.js"></script>
     <script src="js/reboot-utils.js" defer></script>
-    <script src="js/monitor.js"></script>
-    <!-- device-info.js no longer needed - all data is now in index-process.js -->
-    <!-- <script src="js/device-info.js"></script> -->
     <script src="js/dark-mode.js" defer></script>
     <script src="js/app-version.js" defer></script>
+    <script src="js/compat-nav.js" defer></script>
   </head>
   <body data-require-auth="true">
     <main x-data="processAllInfos()">
@@ -321,8 +319,8 @@
                         <td x-text="activeSim"></td>
                       </tr>
                       <tr>
-                        <th scope="row">Network Provider</th>
-                        <td x-text="networkProvider"></td>
+                        <th scope="row" class="text-nowrap">Network Provider</th>
+                        <td class="text-nowrap" x-text="networkProvider"></td>
                       </tr>
                       <tr>
                         <th scope="row">MCCMNC</th>
@@ -388,7 +386,7 @@
                           </button>
                         </td>
                       </tr>
-                      <tr x-show="ipv6 && ipv6 !== '0000:0000:0000:0000:0000:0000:0000:0000' && ipv6 !== '-' && ipv6 !== 'Unknown'">
+                      <tr x-show="ipv6 && ipv6 !== '0000:0000:0000:0000:0000:0000:0000:0000' && ipv6 !== '-' && ipv6 !== 'Unknown' && ipv6 !== 'N/A' && ipv6 !== 'Not Available' && ipv6 !== '::' && !/^0(:0){7}$/.test(ipv6)">
                         <th scope="row">IPv6</th>
                         <td>
                           <span x-text="ipv6"></span>
@@ -532,11 +530,6 @@
                         ></td>
                         <td x-show="sccPCI == '-'" x-text="pccPCI"></td>
                       </tr>
-                      <tr x-show="csq != 'NR-SA Mode'">
-                        <th scope="row">CSQ</th>
-                        <td x-show="csq != '-'" x-text="csq"></td>
-                        <td x-show="csq == '-'" class="fst-italic">None</td>
-                      </tr>
                       <tr>
                         <th scope="row">CELL ID</th>
                         <td>
@@ -574,13 +567,13 @@
                               :style="(rssiLTE && rssiLTE != '-') ? ('width: ' + calculateRSSIBar(parseFloat(rssiLTE), 'LTE').percentage + '%; background: ' + calculateRSSIBar(parseFloat(rssiLTE), 'LTE').color + ';') : ('width: ' + calculateRSSIBar(parseFloat(rssiNR), 'NR').percentage + '%; background: ' + calculateRSSIBar(parseFloat(rssiNR), 'NR').color + ';')"
                             >
                               <span
-                                x-text="getOverallRSSI() + ' / ' + getOverallRSSIPercentage() + '%'"
+                                x-text="getOverallRSSI() + ' dBm / ' + getOverallRSSIPercentage() + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
                             x-show="getOverallRSSIPercentage() == 0 && getOverallRSSI() != '-'"
-                            x-text="getOverallRSSI()"
+                            x-text="getOverallRSSI() + ' dBm'"
                           ></span>
                           <span x-show="getOverallRSSI() == '-'" class="fst-italic">
                             None
@@ -633,13 +626,13 @@
                               :style="'width: ' + calculateRSRPBar(parseFloat(rsrpLTE)).percentage + '%; background: ' + calculateRSRPBar(parseFloat(rsrpLTE)).color + ';'"
                             >
                               <span
-                                x-text="rsrpLTE + ' / ' + rsrpLTEPercentage + '%'"
+                                x-text="rsrpLTE + ' dBm / ' + rsrpLTEPercentage + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
                             x-show="rsrpLTEPercentage == '0'"
-                            x-text="rsrpLTE"
+                            x-text="rsrpLTE + ' dBm'"
                           ></span>
                           <span x-show="rsrpLTE == '-'" class="fst-italic">
                             None
@@ -664,12 +657,12 @@
                               :style="'width: ' + calculateSINRBar(parseFloat(sinrLTE), 'LTE').percentage + '%; background: ' + calculateSINRBar(parseFloat(sinrLTE), 'LTE').color + ';'"
                             >
                               <span
-                                x-text="sinrLTE + ' / ' + sinrLTEPercentage +'%'"
+                                x-text="sinrLTE + ' dB / ' + sinrLTEPercentage +'%'"
                               ></span>
                             </div>
                           </div>
                           <span
-                            x-text="sinrLTE"
+                            x-text="sinrLTE + ' dB'"
                             x-show="sinrLTEPercentage == '0'"
                           ></span>
                           <span x-show="sinrLTE == '-'" class="fst-italic">
@@ -698,13 +691,13 @@
                               :style="'width: ' + calculateRSRQBar(parseFloat(rsrqLTE)).percentage + '%; background: ' + calculateRSRQBar(parseFloat(rsrqLTE)).color + ';'"
                             >
                               <span
-                                x-text="rsrqLTE + ' / ' +  rsrqLTEPercentage + '%'"
+                                x-text="rsrqLTE + ' dB / ' +  rsrqLTEPercentage + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
                             x-show="rsrqLTEPercentage == '0'"
-                            x-text="rsrqLTE"
+                            x-text="rsrqLTE + ' dB'"
                           ></span>
                           <span x-show="rsrqLTE == '-'" class="fst-italic">
                             None
@@ -757,13 +750,13 @@
                               :style="'width: ' + calculateRSRPBar(parseFloat(rsrpNR), 'NR').percentage + '%; background: ' + calculateRSRPBar(parseFloat(rsrpNR), 'NR').color + ';'"
                             >
                               <span
-                                x-text="rsrpNR + ' / ' + rsrpNRPercentage + '%'"
+                                x-text="rsrpNR + ' dBm / ' + rsrpNRPercentage + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
                             x-show="rsrpNRPercentage == '0'"
-                            x-text="rsrpNR"
+                            x-text="rsrpNR + ' dBm'"
                           ></span>
                           <span x-show="rsrpNR == '-'" class="fst-italic">
                             None
@@ -788,12 +781,12 @@
                               :style="'width: ' + calculateSINRBar(parseFloat(sinrNR), 'NR').percentage + '%; background: ' + calculateSINRBar(parseFloat(sinrNR), 'NR').color + ';'"
                             >
                               <span
-                                x-text="sinrNR + ' / ' + sinrNRPercentage +'%'"
+                                x-text="sinrNR + ' dB / ' + sinrNRPercentage +'%'"
                               ></span>
                             </div>
                           </div>
                           <span
-                            x-text="sinrNR"
+                            x-text="sinrNR + ' dB'"
                             x-show="sinrNRPercentage == '0'"
                           ></span>
                           <span x-show="sinrNR == '-'" class="fst-italic">
@@ -822,13 +815,13 @@
                               :style="'width: ' + calculateRSRQBar(parseFloat(rsrqNR), 'NR').percentage + '%; background: ' + calculateRSRQBar(parseFloat(rsrqNR), 'NR').color + ';'"
                             >
                               <span
-                                x-text="rsrqNR + ' / ' + rsrqNRPercentage + '%'"
+                                x-text="rsrqNR + ' dB / ' + rsrqNRPercentage + '%'"
                               ></span>
                             </div>
                           </div>
                           <span
                             x-show="rsrqNRPercentage == '0'"
-                            x-text="rsrqNR"
+                            x-text="rsrqNR + ' dB'"
                           ></span>
                           <span x-show="rsrqNR == '-'" class="fst-italic">
                             None
@@ -853,22 +846,36 @@
               </div>
               <div class="modal-body">
                 <div class="card-text table-responsive-sm">
-                  <table class="table">
-                    <tbody>
-                      <tr>
-                        <th scope="row">Baseband/Chipset</th>
-                        <td x-text="formatTempWithFahrenheit(temperature)"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Power amplifier</th>
-                        <td x-text="formatTempWithFahrenheit(paTemperature)"></td>
-                      </tr>
-                      <tr>
-                        <th scope="row">External/Board</th>
-                        <td x-text="formatTempWithFahrenheit(skinTemperature)"></td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <template x-if="temperatureSensors && temperatureSensors.length > 0">
+                    <table class="table">
+                      <tbody>
+                        <template x-for="(sensor, index) in temperatureSensors" :key="sensor.name ?? index">
+                          <tr>
+                            <th scope="row" x-text="sensor.label"></th>
+                            <td x-text="formatTempWithFahrenheit(sensor.value)"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                  <template x-if="!temperatureSensors || temperatureSensors.length === 0">
+                    <table class="table">
+                      <tbody>
+                        <tr>
+                          <th scope="row">Baseband/Chipset</th>
+                          <td x-text="formatTempWithFahrenheit(temperature)"></td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Power amplifier</th>
+                          <td x-text="formatTempWithFahrenheit(paTemperature)"></td>
+                        </tr>
+                        <tr>
+                          <th scope="row">External/Board</th>
+                          <td x-text="formatTempWithFahrenheit(skinTemperature)"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </template>
                 </div>
               </div>
             </div>
@@ -1337,91 +1344,6 @@
           </div>
         </div>
 
-        <!-- Monitoring Configuration Modal -->
-        <div class="modal fade" id="monitoringConfigModal" tabindex="-1" aria-labelledby="monitoringConfigModalLabel" aria-hidden="true" x-data="monitorPage()">
-          <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-              <div class="modal-header d-flex justify-content-between align-items-center">
-                <h5 class="modal-title" id="monitoringConfigModalLabel">Connection Monitoring Configuration</h5>
-                <button
-                  type="button"
-                  class="btn-close"
-                  @click="closeAndOpenConnection()"
-                  aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <template x-if="connectionConfigSuccessMessage">
-                  <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
-                    <span x-text="connectionConfigSuccessMessage"></span>
-                    <button type="button" class="btn-close" @click="connectionConfigSuccessMessage = ''"></button>
-                  </div>
-                </template>
-
-                <template x-if="connectionConfigErrorMessage">
-                  <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
-                    <span x-text="connectionConfigErrorMessage"></span>
-                    <button type="button" class="btn-close" @click="connectionConfigErrorMessage = ''"></button>
-                  </div>
-                </template>
-
-                <p class="text-body-secondary mb-3">
-                  Configure ping targets and DNS resolution tests for connection monitoring.
-                </p>
-
-                <div class="mb-4">
-                  <label class="form-label" for="pingTargets">Ping Targets</label>
-                  <input
-                    id="pingTargets"
-                    class="form-control"
-                    type="text"
-                    autocomplete="off"
-                    placeholder="8.8.8.8,1.1.1.1"
-                    x-model="connectionConfigForm.pingTargets"
-                    :disabled="connectionConfigSaving"
-                  />
-                  <div class="form-text">
-                    Enter multiple hosts separated by commas. These hosts will be pinged to test connectivity.
-                  </div>
-                </div>
-
-                <div class="mb-4">
-                  <label class="form-label" for="dnsTests">DNS Resolution Tests</label>
-                  <input
-                    id="dnsTests"
-                    class="form-control"
-                    type="text"
-                    autocomplete="off"
-                    placeholder="8.8.8.8:www.google.com,1.1.1.1:www.google.com"
-                    x-model="connectionConfigForm.dnsTests"
-                    :disabled="connectionConfigSaving"
-                  />
-                  <div class="form-text">
-                    Enter DNS server and domain pairs in the format <code>server:domain</code>, separated by commas. Example: <code>8.8.8.8:www.google.com,1.1.1.1:www.google.com</code>
-                  </div>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button
-                  type="button"
-                  class="btn btn-secondary"
-                  @click="closeAndOpenConnection()">Close</button>
-                <button
-                  type="button"
-                  class="btn btn-primary"
-                  :disabled="connectionConfigSaving"
-                  @click="saveAndReturn()"
-                >
-                  <span x-show="!connectionConfigSaving">Save Configuration</span>
-                  <span x-show="connectionConfigSaving">
-                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                    Saving...
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Device Info Modal -->
         <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
           <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -1547,7 +1469,7 @@
                           </button>
                         </td>
                       </tr>
-                      <tr x-show="wwanIpv6 && wwanIpv6 !== '0000:0000:0000:0000:0000:0000:0000:0000' && wwanIpv6 !== '-' && wwanIpv6 !== 'Unknown'">
+                      <tr x-show="wwanIpv6 && wwanIpv6 !== '0000:0000:0000:0000:0000:0000:0000:0000' && wwanIpv6 !== '-' && wwanIpv6 !== 'Unknown' && wwanIpv6 !== 'N/A' && wwanIpv6 !== 'Not Available' && wwanIpv6 !== '::' && !/^0(:0){7}$/.test(wwanIpv6)">
                         <th scope="row">WAN IPv6</th>
                         <td class="col-md-2" style="white-space: nowrap;">
                           <span x-text="wwanIpv6"></span>

@@ -1,25 +1,13 @@
 #!/bin/bash
-set -eu
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=/dev/null
-. "$SCRIPT_DIR/session_utils.sh"
-
-if ! session_load; then
-    send_json_response 401 '{"status":"error","message":"Authentication required"}'
-    exit 0
-fi
-
-if ! session_require_role "admin"; then
-    send_json_response 403 '{"status":"error","message":"Admin privileges required"}'
-    exit 0
-fi
 
 # Debug log function
-declare -a debug_logs=()
 log_debug() {
-    debug_logs+=("$1")
+    local message="$1"
+    debug_logs+=("$message")
 }
+
+# Initialize debug logs array
+declare -a debug_logs=()
 
 # Get query
 QUERY_STRING=$(echo "${QUERY_STRING}" | sed 's/;//g')
@@ -36,12 +24,9 @@ if [ "${QUERY_STRING}" ]; then
 fi
 
 setTTL=$(printf '%b\n' "${ttlvalue//%/\\x}")
-ttlenabled=false
-ttlvalue_int=0
-
 if [ -n "${setTTL}" ]; then
     log_debug "Stopping service to remove rules"
-    /opt/scripts/ttl/ttl-override stop
+    /usrdata/simplefirewall/ttl-override stop
 
     # Convert ttlvalue to integer
     if [ "${ttlvalue}" ]; then
@@ -52,36 +37,28 @@ if [ -n "${setTTL}" ]; then
     # Call the sh script with the appropriate parameters
     if [ "${ttlvalue_int}" != 0 ]; then
         log_debug "Enabling TTL with value: ${setTTL}"
-        echo "${setTTL}" > /persist/ttlvalue
+        /usrdata/simpleadmin/script/ttl_script.sh enable "${setTTL}"
+        commandRan="/usrdata/simpleadmin/script/ttl_script.sh enable ${setTTL}"
         ttlenabled=true
         ttlvalue=$ttlvalue_int
     elif [ "${ttlvalue_int}" = 0 ]; then
         log_debug "Disabling TTL"
-        echo 0 > /persist/ttlvalue
+        /usrdata/simpleadmin/script/ttl_script.sh disable 0
+        commandRan="/usrdata/simpleadmin/script/ttl_script.sh disable 0"
         ttlenabled=false
         ttlvalue=0
     fi
 
     log_debug "Starting service to apply rules"
-    /opt/scripts/ttl/ttl-override start
+    /usrdata/simplefirewall/ttl-override start
 fi
 
-# Build debug logs JSON array
-debug_json=""
-for log in "${debug_logs[@]}"; do
-    debug_json="${debug_json}\"${log}\","
-done
-debug_json="${debug_json%,}"  # Remove trailing comma
-
-# Build JSON payload
-json_payload=$(cat <<EOF
+echo "Content-type: text/text"
+echo ""
+cat <<EOT
 {
-  "status":"ok",
-  "isEnabled":${ttlenabled},
-  "ttl":${ttlvalue_int},
-  "debug_logs":[${debug_json}]
+    "debug_logs": [
+        $(printf '"%s",' "${debug_logs[@]}")
+    ]
 }
-EOF
-)
-
-send_json_response 200 "$json_payload"
+EOT

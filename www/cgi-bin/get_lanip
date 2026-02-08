@@ -6,8 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/session_utils.sh"
 
 if ! session_load; then
-    send_json_response 401 '{"status":"error","message":"Authentication required"}'
-    exit 0
+    # Allow unauthenticated read for LAN IP (non-sensitive).
+    :
 fi
 
 CONFIG_FILE="/etc/data/mobileap_cfg.xml"

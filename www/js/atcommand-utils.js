@@ -45,6 +45,31 @@
   }
 
   /**
+   * Removes an echoed AT command from the response if present.
+   *
+   * @param {string} text - Raw response text
+   * @param {string} command - AT command that may be echoed
+   * @returns {string} Response without the echoed command line
+   */
+  function stripEchoedCommand(text, command) {
+    if (typeof text !== "string") {
+      return "";
+    }
+    if (typeof command !== "string" || !command.trim()) {
+      return text;
+    }
+    const normalizedCommand = command.trim();
+    const lines = text.split(/\r?\n/);
+    while (lines.length && lines[0].trim() === "") {
+      lines.shift();
+    }
+    if (lines.length && lines[0].trim() === normalizedCommand) {
+      lines.shift();
+    }
+    return lines.join("\n").trim();
+  }
+
+  /**
    * Checks if response text indicates the modem is busy.
    *
    * @param {string} text - The response text to check
@@ -105,12 +130,31 @@
    *   - command: string - The executed command
    */
   async function execute(atcmd, options = {}) {
-    const sanitized = sanitize(atcmd);
+    let adaptedCommand = atcmd;
+    const adapter = global.ModemLogicAdapter;
+
+    if (adapter && typeof adapter.adaptCommand === "function") {
+      const adaptation = adapter.adaptCommand(atcmd);
+      if (adaptation && adaptation.supported === false) {
+        return createResult(false, "", new Error(adaptation.message || "AT command not supported."), {
+          busy: false,
+          attempts: 0,
+          command: atcmd,
+          logic: adapter.logic,
+        });
+      }
+      if (adaptation && typeof adaptation.command === "string") {
+        adaptedCommand = adaptation.command;
+      }
+    }
+
+    const sanitized = sanitize(adaptedCommand);
 
     if (!sanitized) {
       return createResult(false, "", new Error("Empty or invalid AT command."), {
         busy: false,
         attempts: 0,
+        logic: adapter?.logic,
       });
     }
 
@@ -147,13 +191,42 @@
           continue;
         }
 
-        const json = await response.json();
+        const bodyText = await response.text();
+        let json = null;
+        try {
+          json = JSON.parse(bodyText);
+        } catch (error) {
+          json = null;
+        }
+
+        if (!json || typeof json !== "object") {
+          const rawOutput = bodyText || "";
+          const normalizedOutput = adapter?.normalizeResponse
+            ? adapter.normalizeResponse(rawOutput, { command: sanitized, endpoint })
+            : rawOutput;
+
+          const hasErrorToken = /\bERROR\b/i.test(normalizedOutput);
+          return createResult(
+            !hasErrorToken,
+            normalizedOutput,
+            hasErrorToken ? new Error("The modem returned ERROR.") : null,
+            {
+              busy: isBusyResponse(normalizedOutput),
+              attempts: 1,
+              command: sanitized,
+              logic: adapter?.logic,
+            }
+          );
+        }
         
         // The server already handles retries (5 attempts), so we use server's attempt count
         const serverAttempts = json.attempts || 1;
         
         if (json.success) {
-          lastData = json.output || "";
+          const rawOutput = json.output || "";
+          lastData = adapter?.normalizeResponse
+            ? adapter.normalizeResponse(rawOutput, { command: sanitized, endpoint })
+            : rawOutput;
           
           // Check if output contains ERROR token (modem-level error)
           const hasErrorToken = json.has_error || false;
@@ -166,6 +239,7 @@
               busy: false,
               attempts: serverAttempts,
               command: json.command,
+              logic: adapter?.logic,
             }
           );
         } else {

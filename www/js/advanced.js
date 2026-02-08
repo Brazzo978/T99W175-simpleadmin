@@ -66,6 +66,8 @@ return {
     DNSProxyStatus: true,
     // Factory reset confirmation modal visibility
     showFactoryResetModal: false,
+    // Factory reset support flag (not available on current modem backend)
+    factoryResetSupported: false,
     // Factory reset in progress state
     isFactoryResetting: false,
     // Factory reset countdown timer value
@@ -309,6 +311,11 @@ return {
      * Sets showFactoryResetModal flag to display the warning dialog.
      */
     openFactoryResetModal() {
+      if (!this.factoryResetSupported) {
+        this.showError = true;
+        this.errorMessage = "Factory reset non supportato su questo modem.";
+        return;
+      }
       this.showFactoryResetModal = true;
     },
 
@@ -329,6 +336,11 @@ return {
      * The device will automatically reboot after successful reset.
      */
     performFactoryReset() {
+      if (!this.factoryResetSupported) {
+        this.showError = true;
+        this.errorMessage = "Factory reset non supportato su questo modem.";
+        return;
+      }
       this.showFactoryResetModal = false;
       this.isFactoryResetting = true;
       this.resetCountdown = 60;

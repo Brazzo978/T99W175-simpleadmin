@@ -61,7 +61,92 @@ function describeNr5gMode(value) {
  * @returns {string} Human-readable label
  */
 function describeScs(value) {
+  if (Number.isInteger(value) && [15, 30, 60, 120, 240].includes(value)) {
+    return `${value}kHz`;
+  }
   return SCS_LABELS[value] || `SCS ${value}`;
+}
+
+/**
+ * Parse QNWLOCK 4G response line
+ * @param {string} line - AT command line with QNWLOCK 4G data
+ * @returns {Array} Array of {pci, earfcn} objects
+ */
+function parseQnwLock4g(line) {
+  const payload = extractPayload(line);
+
+  if (!payload) {
+    return [];
+  }
+
+  const tokens = payload
+    .split(",")
+    .map((value) => value.replace(/"/g, "").trim())
+    .filter((value) => value.length > 0);
+
+  if (tokens.length === 0) {
+    return [];
+  }
+
+  const count = Number.parseInt(tokens[1] || tokens[0], 10);
+  const startIndex = Number.isNaN(count) ? 1 : 2;
+
+  if (count === 0) {
+    return [];
+  }
+
+  const numbers = tokens
+    .slice(startIndex)
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isInteger(value));
+
+  const pairs = [];
+  for (let i = 0; i + 1 < numbers.length; i += 2) {
+    pairs.push({ earfcn: numbers[i], pci: numbers[i + 1] });
+  }
+
+  return pairs;
+}
+
+/**
+ * Parse QNWLOCK 5G response line
+ * @param {string} line - AT command line with QNWLOCK 5G data
+ * @returns {Array} Array of {band, scs, arfcn, pci} objects
+ */
+function parseQnwLock5g(line) {
+  const payload = extractPayload(line);
+
+  if (!payload) {
+    return [];
+  }
+
+  const tokens = payload
+    .split(",")
+    .map((value) => value.replace(/"/g, "").trim())
+    .filter((value) => value.length > 0);
+
+  if (tokens.length === 0) {
+    return [];
+  }
+
+  const startIndex = 1;
+  const numbers = tokens
+    .slice(startIndex)
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isInteger(value));
+
+  if (numbers.length < 4) {
+    return [];
+  }
+
+  return [
+    {
+      pci: numbers[0],
+      arfcn: numbers[1],
+      scs: numbers[2],
+      band: numbers[3],
+    },
+  ];
 }
 
 /**
@@ -271,13 +356,20 @@ function parseCurrentSettings(rawdata) {
   }
 
   // Parse cell locks
-  const lteLocks = parseLteLocks(
-    lines.find((line) => /LTE_LOCK:/i.test(line)) || ""
+  const qnwLock4gLine = lines.find((line) =>
+    line.includes('+QNWLOCK: "common/4g"')
+  );
+  const qnwLock5gLine = lines.find((line) =>
+    line.includes('+QNWLOCK: "common/5g"')
   );
 
-  const nrLocks = parseNrLocks(
-    lines.find((line) => /NR5G_LOCK:/i.test(line)) || ""
-  );
+  const lteLocks = qnwLock4gLine
+    ? parseQnwLock4g(qnwLock4gLine)
+    : parseLteLocks(lines.find((line) => /LTE_LOCK:/i.test(line)) || "");
+
+  const nrLocks = qnwLock5gLine
+    ? parseQnwLock5g(qnwLock5gLine)
+    : parseNrLocks(lines.find((line) => /NR5G_LOCK:/i.test(line)) || "");
 
   // Format cell lock status
   const statusParts = [describeLteLock(lteLocks), describeNrLock(nrLocks)].filter(

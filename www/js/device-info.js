@@ -4,6 +4,8 @@
  */
 function fetchDeviceInfo() {
   return {
+    _initialized: false,
+    _autoFetched: false,
     manufacturer: "-",
     modelName: "-",
     firmwareVersion: "-",
@@ -28,6 +30,52 @@ function fetchDeviceInfo() {
     countdown: 3,
     imeiValidationError: "",
     isImeiValid: false,
+
+    /**
+     * Initializes device info behavior.
+     *
+     * If autoFetch is false, we wait for either:
+     * - a custom event (simpleadmin:deviceinfo:autofetch), or
+     * - the modal being opened (shown.bs.modal)
+     * before fetching AT/LAN info. This prevents early AT-port contention.
+     */
+    init(autoFetch = true) {
+      if (this._initialized) {
+        return;
+      }
+      this._initialized = true;
+
+      const doFetch = () => {
+        if (this._autoFetched) {
+          return;
+        }
+        this._autoFetched = true;
+        this.fetchATCommand();
+        this.fetchlanIp();
+      };
+
+      // Fetch immediately if requested (legacy behavior).
+      if (autoFetch) {
+        doFetch();
+      }
+
+      // Allow other pages/components to trigger this later.
+      window.addEventListener("simpleadmin:deviceinfo:autofetch", () => {
+        doFetch();
+      });
+
+      // Also fetch when user opens the modal (at most once).
+      const modal = document.getElementById("deviceInfoModal");
+      if (modal) {
+        modal.addEventListener(
+          "shown.bs.modal",
+          () => {
+            doFetch();
+          },
+          { once: true }
+        );
+      }
+    },
 
     /**
      * Handle errors consistently
@@ -84,13 +132,13 @@ function fetchDeviceInfo() {
      */
     async fetchATCommand() {
       this.atcmd =
-        'AT+CGMI;+CGMM;^VERSION?;+CIMI;+ICCID;+CGSN;+CNUM;+CGCONTRDP=1';
+        'ATI;AT+CGMI;AT+CGMM;AT+CIMI;AT+ICCID;AT+CGSN;AT+CNUM;AT+CGCONTRDP=1';
       this.isLoading = true;
 
       try {
         const result = await ATCommandService.execute(this.atcmd, {
           retries: 3,
-          timeout: 15000,
+          timeout: 30000,
         });
 
         if (!result.ok) {
@@ -98,6 +146,10 @@ function fetchDeviceInfo() {
             ? result.error.message
             : "Unable to retrieve modem information.";
           this.handleError(message, result.data);
+          if (result.data) {
+            this.atCommandResponse = result.data;
+            this.parseFetchedData();
+          }
           return;
         }
 
@@ -115,10 +167,18 @@ function fetchDeviceInfo() {
      * Fetch LAN IP from CGI
      */
     fetchlanIp() {
-      fetch("/cgi-bin/get_lanip")
-        .then((res) => res.json())
+      fetch("/cgi-bin/get_lanip", {
+        credentials: "include",
+        cache: "no-store",
+      })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+          return res.json();
+        })
         .then((data) => {
-          this.lanIp = data.lanip;
+          this.lanIp = data && data.lanip ? data.lanip : "-";
         })
         .catch((error) => {
           console.error("Error fetching LAN IP:", error);
@@ -143,6 +203,7 @@ function fetchDeviceInfo() {
       console.log("AT Command Response:", lines);
 
       let ctx = null;
+      let atiStage = 0;
       let manufacturer = this.manufacturer || "-";
       let modelName = this.modelName || "-";
       let firmwareVersion = this.firmwareVersion || "-";
@@ -156,7 +217,10 @@ function fetchDeviceInfo() {
       try {
         for (const line of lines) {
           // Track context for multi-line responses
-          if (line.startsWith("AT+")) { ctx = line; continue; }
+          if (line.startsWith("AT+") || line.startsWith("ATI")) {
+            ctx = line;
+            continue;
+          }
 
           // Parse version info
           if (line.startsWith("^VERSION:")) {
@@ -165,6 +229,13 @@ function fetchDeviceInfo() {
             if (modelName === "-" || !modelName) {
               const m = afterColon.match(/^([A-Za-z0-9_-]+)/);
               if (m) modelName = m[1];
+            }
+            continue;
+          }
+          if (line.startsWith("Revision:")) {
+            const revision = line.split(":")[1]?.trim();
+            if (revision) {
+              firmwareVersion = revision;
             }
             continue;
           }
@@ -229,6 +300,25 @@ function fetchDeviceInfo() {
             ctx = null;
             continue;
           }
+          if (ctx?.startsWith("ATI")) {
+            if (line.startsWith("Revision:")) {
+              const revision = line.split(":")[1]?.trim();
+              if (revision) {
+                firmwareVersion = revision;
+              }
+              continue;
+            }
+            if (!manufacturer || manufacturer === "-") {
+              manufacturer = line;
+              atiStage = Math.max(atiStage, 1);
+              continue;
+            }
+            if ((!modelName || modelName === "-") && atiStage >= 1) {
+              modelName = line;
+              atiStage = Math.max(atiStage, 2);
+              continue;
+            }
+          }
           // Parse model name
           if (ctx?.startsWith("AT+CGMM")) {
             modelName = line;
@@ -239,6 +329,9 @@ function fetchDeviceInfo() {
           // Fallback manufacturer detection
           if (manufacturer === "-" && /QUALCOMM|QUECTEL|HUAWEI|FIBOCOM|Sierra/i.test(line)) {
             manufacturer = line;
+          }
+          if ((modelName === "-" || !modelName) && manufacturer !== "-" && /^[A-Za-z0-9_.-]+$/.test(line)) {
+            modelName = line;
           }
         }
 
@@ -477,8 +570,18 @@ function fetchDeviceInfo() {
      * Initialize module
      */
     init() {
-      this.fetchATCommand();
-      this.fetchlanIp();
+      const modal = document.getElementById("deviceInfoModal");
+      if (!modal) {
+        return;
+      }
+
+      modal.addEventListener("show.bs.modal", () => {
+        if (this.isLoading) {
+          return;
+        }
+        this.fetchATCommand();
+        this.fetchlanIp();
+      });
     },
   };
 }

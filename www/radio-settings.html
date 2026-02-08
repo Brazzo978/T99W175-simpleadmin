@@ -63,11 +63,13 @@
     <script src="js/generate-freq-box.js"></script>
     <script src="js/populate-checkbox.js"></script>
     <script src="js/parse-settings.js"></script>
+    <script src="js/modem-logic.js"></script>
     <script src="js/atcommand-utils.js"></script>
     <script src="js/reboot-utils.js" defer></script>
     <script src="js/device-info.js"></script>
     <script src="js/dark-mode.js" defer></script>
     <script src="js/app-version.js" defer></script>
+    <script src="js/compat-nav.js" defer></script>
   </head>
   <body data-require-auth="true">
     <main>
@@ -445,7 +447,7 @@
                           type="radio"
                           name="simSelection"
                           id="sim1Option"
-                          value="0"
+                          value="1"
                           x-model="pendingSimSlot"
                           data-requires-admin
                         />
@@ -460,7 +462,7 @@
                           type="radio"
                           name="simSelection"
                           id="sim2Option"
-                          value="1"
+                          value="2"
                           x-model="pendingSimSlot"
                           data-requires-admin
                         />
@@ -512,51 +514,51 @@
             </div>
           </div>
 
-          <div class="col-12 col-lg-3">
-            <div class="card h-100">
-              <div class="card-header">Preferred Network</div>
-              <div class="card-body">
+	          <div class="col-12 col-lg-3">
+	            <div class="card h-100">
+	              <div class="card-header">Preferred Network</div>
+	              <div class="card-body">
                 <p class="text-muted">
                   Current selection:
                   <span class="fw-semibold" x-text="formatPreferredNetworkLabel()"></span>
                 </p>
-                <div class="form-check form-switch mb-2">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
+	                <div class="form-check form-switch mb-2" x-show="prefNetworkSupports.threeG">
+	                  <input
+	                    class="form-check-input"
+	                    type="checkbox"
                     role="switch"
                     id="prefNetwork3g"
                     x-model="preferredNetworkSelection.threeG"
                     data-requires-admin
                   />
-                  <label class="form-check-label" for="prefNetwork3g">3G</label>
-                </div>
-                <div class="form-check form-switch mb-2">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
+	                  <label class="form-check-label" for="prefNetwork3g">3G</label>
+	                </div>
+	                <div class="form-check form-switch mb-2" x-show="prefNetworkSupports.fourG">
+	                  <input
+	                    class="form-check-input"
+	                    type="checkbox"
                     role="switch"
                     id="prefNetwork4g"
                     x-model="preferredNetworkSelection.fourG"
                     data-requires-admin
                   />
-                  <label class="form-check-label" for="prefNetwork4g">4G</label>
-                </div>
-                <div class="form-check form-switch mb-3">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
+	                  <label class="form-check-label" for="prefNetwork4g">4G</label>
+	                </div>
+	                <div class="form-check form-switch mb-3" x-show="prefNetworkSupports.fiveG">
+	                  <input
+	                    class="form-check-input"
+	                    type="checkbox"
                     role="switch"
                     id="prefNetwork5g"
                     x-model="preferredNetworkSelection.fiveG"
                     data-requires-admin
                   />
-                  <label class="form-check-label" for="prefNetwork5g">5G</label>
-                </div>
-                <small class="text-body-secondary"
-                  >Leave all options unchecked to enable Auto mode (value 0).</small
-                >
-              </div>
+	                  <label class="form-check-label" for="prefNetwork5g">5G</label>
+	                </div>
+	                <small class="text-body-secondary"
+	                  >Leave all options unchecked to use Auto mode.</small
+	                >
+	              </div>
               <div class="card-footer d-flex justify-content-end">
                 <button
                   type="button"
@@ -709,48 +711,14 @@
                   </div>
                 </div>
 
-                <!-- NR5G Mode Section -->
-                <div class="mt-4 pt-3 border-top">
-                  <div class="d-flex align-items-center justify-content-between mb-3">
-                    <h6 class="mb-0">NR5G Mode</h6>
-                    <span class="text-muted" x-text="`Current: ${nr5gMode}`"></span>
-                  </div>
-                  <div class="d-flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      class="btn btn-primary flex-fill"
-                      @click="setNr5gMode('NSA')"
-                      :disabled="isUpdatingNr5gMode"
-                      data-requires-admin
-                    >
-                      Set NSA
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-primary flex-fill"
-                      @click="setNr5gMode('SA')"
-                      :disabled="isUpdatingNr5gMode"
-                      data-requires-admin
-                    >
-                      Set SA
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-danger flex-fill"
-                      @click="resetNr5gMode()"
-                      :disabled="isUpdatingNr5gMode"
-                      data-requires-admin
-                    >
-                      Set Auto
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
             <div class="card-footer">
               <small class="text-muted">
-                Cell locking is supported only on the primary cell and requires a
-                reboot to take effect. Once applied, the lock persists across reboots.
+                Cell locking only locks the primary cell. You can provide up to 20
+                EARFCN/PCI pairs for failover (if the first set is unavailable, the
+                modem will try the next). After applying the lock, the baseband will
+                cycle and the lock will become active. Rebooting clears the lock.
               </small>
             </div>
           </div>
@@ -866,7 +834,7 @@
     </main>
 
     <!-- Device Info Modal -->
-  <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" x-data="fetchDeviceInfo()">
+	  <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" x-data="fetchDeviceInfo()" x-init="init(false)">
     <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content">
         <div class="modal-header">

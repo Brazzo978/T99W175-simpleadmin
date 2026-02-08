@@ -18,6 +18,7 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 
 SIMPLEADMIN_ENABLE_LOGIN="${SIMPLEADMIN_ENABLE_LOGIN:-1}"
+SIMPLEADMIN_MODEM_LOGIC="${SIMPLEADMIN_MODEM_LOGIC:-default}"
 
 credentials_guide() {
     cat <<'EOF'

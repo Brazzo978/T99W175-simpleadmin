@@ -1967,7 +1967,7 @@ button.btn-close.btn-close-cog svg {
 
 /* x-cloak - hides elements until Alpine is ready */
 [x-cloak] {
-  display: none;
+  display: none !important;
 }
 
 /* Confirm Modal Styles */
@@ -2082,3 +2082,4 @@ html[data-bs-theme="dark"] .modern-confirm-warning {
   font-weight: 500;
   border-radius: 8px;
 }
+/* SMS page enabled */

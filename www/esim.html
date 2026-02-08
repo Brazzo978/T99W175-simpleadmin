@@ -61,11 +61,13 @@
     <script src="js/login-config.js" defer></script>
     <script src="js/index-login.js" defer></script>
     <script src="js/esim.js"></script>
+    <script src="js/modem-logic.js"></script>
     <script src="js/atcommand-utils.js"></script>
     <script src="js/reboot-utils.js" defer></script>
     <script src="js/device-info.js"></script>
     <script src="js/dark-mode.js" defer></script>
     <script src="js/app-version.js" defer></script>
+    <script src="js/compat-nav.js" defer></script>
   </head>
   <body data-require-auth="true">
     <main>
@@ -605,7 +607,7 @@
       </div>
 
     <!-- Device Info Modal -->
-    <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" x-data="fetchDeviceInfo()">
+    <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" x-data="fetchDeviceInfo()" x-init="fetchATCommand(); fetchlanIp()">
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
           <div class="modal-header">

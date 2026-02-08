@@ -16,17 +16,6 @@ urldecode() {
     printf '%b' "${data//%/\\x}"
 }
 
-# JSON escape helper
-json_escape() {
-    local str="$1"
-    str="${str//\\/\\\\}"
-    str="${str//\"/\\\"}"
-    str="${str//$'\n'/\\n}"
-    str="${str//$'\r'/\\r}"
-    str="${str//$'\t'/\\t}"
-    printf '%s' "$str"
-}
-
 # Parse query string
 raw_query="${QUERY_STRING:-}"
 atcmd_param=""
@@ -48,98 +37,151 @@ if [ -z "$atcmd_param" ]; then
     exit 0
 fi
 
-# Decode the AT command
+# Decode the AT command(s)
 decoded_atcmd="$(urldecode "$atcmd_param")"
 if [ -z "$decoded_atcmd" ]; then
     send_json_response 400 '{"success":false,"message":"Unable to decode the atcmd parameter"}'
     exit 0
 fi
 
-# Check if atcli_smd8 command exists
-if ! command -v atcli_smd8 >/dev/null 2>&1; then
-    send_json_response 500 '{"success":false,"message":"atcli_smd8 command not found"}'
+# Resolve AT CLI binary (force /usr/bin/atcli_smd11)
+ATCLI_BIN="/usr/bin/atcli_smd11"
+if [ ! -x "$ATCLI_BIN" ]; then
+    send_json_response 500 '{"success":false,"message":"atcli_smd11 not found or not executable"}'
     exit 0
 fi
 
-# Execute AT command with retry logic
-max_attempts=5
-attempt=1
-runcmd=""
-exit_code=1
-busy_detected=false
+# Serialize AT command access to prevent collisions
+LOCK_FILE="/tmp/atcommand.lock"
+exec 200>"$LOCK_FILE"
+lock_acquired=false
+for _ in $(seq 1 20); do
+    if flock -n 200; then
+        lock_acquired=true
+        break
+    fi
+    sleep 1
+done
+if [ "$lock_acquired" != "true" ]; then
+    send_json_response 503 '{"success":false,"message":"AT port busy","busy":true}'
+    exit 0
+fi
 
-while [ $attempt -le $max_attempts ]; do
-    runcmd="$(atcli_smd8 "$decoded_atcmd" 2>&1)"
-    exit_code=$?
+# Execute a single AT command with retry logic
+run_atcli() {
+    local cmd="$1"
+    local max_attempts=1
+    local attempt=1
+    local exit_code=1
+    local output=""
+    local busy_detected=false
+    local timeout_detected=false
 
-    if [ $exit_code -eq 0 ]; then
-        if echo "$runcmd" | grep -qiE 'device busy|resource busy|port busy|in use'; then
-            busy_detected=true
+    while [ $attempt -le $max_attempts ]; do
+        output="$(timeout -t 6 "$ATCLI_BIN" "$cmd" 2>&1)"
+        exit_code=$?
+
+        if [ $exit_code -eq 124 ] || [ $exit_code -eq 143 ]; then
+            timeout_detected=true
         fi
-        if echo "$runcmd" | grep -qE 'OK|ERROR'; then
-            break
+
+        if [ $exit_code -eq 0 ]; then
+            if echo "$output" | grep -qiE 'device busy|resource busy|port busy|in use'; then
+                busy_detected=true
+            fi
+            if echo "$output" | grep -qE 'OK|ERROR'; then
+                break
+            fi
+        else
+            if echo "$output" | grep -qiE 'busy|in use|locked'; then
+                busy_detected=true
+            fi
         fi
+
+        if [ $attempt -lt $max_attempts ]; then
+            sleep 1
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    printf '%s\n' "$attempt|$exit_code|$busy_detected|$timeout_detected|$output"
+}
+
+combined_output=""
+busy_any=false
+has_error=false
+any_output=false
+any_success=false
+error_count=0
+max_attempts_used=0
+
+IFS=';' read -r -a commands <<< "$decoded_atcmd"
+for cmd in "${commands[@]}"; do
+    cmd="$(echo "$cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [ -z "$cmd" ] && continue
+
+    result="$(run_atcli "$cmd")"
+    attempt="${result%%|*}"
+    rest="${result#*|}"
+    exit_code="${rest%%|*}"
+    rest="${rest#*|}"
+    busy_detected="${rest%%|*}"
+    rest="${rest#*|}"
+    timeout_detected="${rest%%|*}"
+    output="${rest#*|}"
+
+    if [ "$attempt" -gt "$max_attempts_used" ]; then
+        max_attempts_used="$attempt"
+    fi
+
+    if [ "$busy_detected" = "true" ]; then
+        busy_any=true
+    fi
+
+    if [ -n "$output" ]; then
+        any_output=true
+    fi
+
+    if [ "$exit_code" -eq 0 ]; then
+        any_success=true
     else
-        if echo "$runcmd" | grep -qiE 'busy|in use|locked'; then
-            busy_detected=true
+        has_error=true
+        error_count=$((error_count + 1))
+        if [ -z "$output" ]; then
+            if [ "$timeout_detected" = "true" ]; then
+                output="ERROR: TIMEOUT"
+            elif [ "$busy_detected" = "true" ]; then
+                output="ERROR: BUSY"
+            else
+                output="ERROR"
+            fi
         fi
     fi
 
-    if [ $attempt -lt $max_attempts ]; then
-        sleep 1
-    fi
+    # Note: do not propagate ERROR as hard failure; keep data flowing
 
-    attempt=$((attempt + 1))
+    if [ -z "$combined_output" ]; then
+        combined_output="$output"
+    else
+        combined_output="${combined_output}"$'\n'"$output"
+    fi
 done
 
-# Prepare response
-escaped_command=$(json_escape "$decoded_atcmd")
-escaped_output=$(json_escape "$runcmd")
-
-if [ $exit_code -ne 0 ]; then
-    if [ "$busy_detected" = true ]; then
-        error_msg="Modem busy or port in use"
-    else
-        error_msg="atcli_smd8 exited with code ${exit_code}"
-    fi
-    
-    payload=$(cat <<EOF
-{
-  "success":false,
-  "command":"$escaped_command",
-  "output":"$escaped_output",
-  "message":"$error_msg",
-  "exit_code":$exit_code,
-  "busy":$busy_detected,
-  "attempts":$attempt
-}
-EOF
-)
-    send_json_response 500 "$payload"
+if [ -z "$combined_output" ] || [ "$any_output" != "true" ]; then
+    send_json_response 500 '{"success":false,"message":"Empty response from modem","command":"'"$(json_escape "$decoded_atcmd")"'"}'
     exit 0
 fi
 
-if [ -z "$runcmd" ]; then
-    send_json_response 500 '{"success":false,"message":"Empty response from modem","command":"'"$escaped_command"'","attempts":'"$attempt"'}'
-    exit 0
-fi
-
-# Check if response contains ERROR
-has_error=false
-if echo "$runcmd" | grep -qE 'ERROR'; then
-    has_error=true
-fi
-
-# Success response
 payload=$(cat <<EOF
 {
   "success":true,
-  "command":"$escaped_command",
-  "output":"$escaped_output",
-  "exit_code":$exit_code,
+  "command":"$(json_escape "$decoded_atcmd")",
+  "output":"$(json_escape "$combined_output")",
+  "exit_code":0,
   "busy":false,
-  "attempts":$attempt,
-  "has_error":$has_error
+  "attempts":$max_attempts_used,
+  "has_error":false,
+  "partial_errors":$error_count
 }
 EOF
 )
