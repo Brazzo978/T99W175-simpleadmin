@@ -1,0 +1,62 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"ok":false,"message":"Authentication required"}'
+    exit 0
+fi
+
+if ! session_require_role "admin"; then
+    send_json_response 403 '{"ok":false,"message":"Admin privileges required"}'
+    exit 0
+fi
+
+read_body() {
+    local length="${CONTENT_LENGTH:-0}"
+    if [ "$length" -gt 0 ]; then
+        head -c "$length"
+    else
+        cat
+    fi
+}
+
+update_config_value() {
+    local key="$1"
+    local value="$2"
+    local tmp="${CONFIG_FILE}.tmp"
+
+    mkdir -p "$(dirname "$CONFIG_FILE")"
+
+    if [ -f "$CONFIG_FILE" ]; then
+        if grep -q "^${key}=" "$CONFIG_FILE"; then
+            sed "s/^${key}=.*/${key}=${value}/" "$CONFIG_FILE" > "$tmp"
+        else
+            cat "$CONFIG_FILE" > "$tmp"
+            printf '%s=%s\n' "$key" "$value" >> "$tmp"
+        fi
+    else
+        printf '%s=%s\n' "$key" "$value" > "$tmp"
+    fi
+
+    mv "$tmp" "$CONFIG_FILE"
+}
+
+raw_body="$(read_body)"
+enabled="$(printf '%s' "$raw_body" | tr -d '\r\n' | sed -n 's/.*\"enabled\"[[:space:]]*:[[:space:]]*\\([01]\\).*/\\1/p' | head -n 1)"
+
+if [ -z "$enabled" ]; then
+    send_json_response 400 '{"ok":false,"message":"Invalid request body"}'
+    exit 0
+fi
+
+update_config_value "SIMPLEADMIN_ENABLE_ESIM" "$enabled"
+
+if [ "$enabled" = "1" ]; then
+    send_json_response 200 '{"ok":true,"message":"eSIM manager enabled"}'
+else
+    send_json_response 200 '{"ok":true,"message":"eSIM manager disabled"}'
+fi

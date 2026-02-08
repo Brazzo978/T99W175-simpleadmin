@@ -1,0 +1,49 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"status":"error","message":"Authentication required"}'
+    exit 0
+fi
+
+# Get ARP table output
+arp_output=$(arp -a 2>/dev/null || echo "")
+
+# Parse ARP entries
+entries=()
+while IFS= read -r line; do
+    # Parse line format: ? (192.168.11.1) at 0a:00:1c:78:d9:26 [ether]  on bridge0
+    if echo "$line" | grep -qE 'at [0-9a-fA-F:]+ +\[ether\]'; then
+        # Extract IP address (in parentheses)
+        ip=$(echo "$line" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)
+
+        # Extract MAC address
+        mac=$(echo "$line" | grep -oE 'at [0-9a-fA-F:]+' | sed 's/at //' | tr '[:lower:]' '[:upper:]')
+
+        # Extract interface name
+        interface=$(echo "$line" | grep -oE 'on [^[:space:]]+' | sed 's/on //')
+
+        if [ -n "$ip" ] && [ -n "$mac" ]; then
+            entries+=("{\"mac\":\"$mac\",\"ip\":\"$ip\",\"label\":\"$mac ($ip)\"}")
+        fi
+    fi
+done <<< "$arp_output"
+
+# Build JSON array
+if [ ${#entries[@]} -gt 0 ]; then
+    entries_json=$(IFS=,; echo "${entries[*]}")
+else
+    entries_json=""
+fi
+
+# Build response
+response="{
+  \"status\": \"success\",
+  \"entries\": [$entries_json]
+}"
+
+send_json_response 200 "$response"
