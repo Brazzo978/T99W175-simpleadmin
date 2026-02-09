@@ -1074,17 +1074,12 @@
                           <line x1="0" y1="120" x2="1000" y2="120"></line>
                           <line x1="0" y1="220" x2="1000" y2="220"></line>
                         </g>
-                        <template x-for="series in getSignalChartSeries()" :key="series.key">
-                          <polyline
-                            :points="series.points"
-                            :stroke="series.color"
-                            :stroke-dasharray="series.dasharray"
-                            fill="none"
-                            stroke-width="3"
-                            stroke-linejoin="round"
-                            stroke-linecap="round"
-                          ></polyline>
-                        </template>
+                        <!--
+                          Alpine's x-for requires an HTMLTemplateElement. Inside <svg>, <template> is an SVG element,
+                          so Alpine's clone/import logic throws (importNode parameter 1 is not a Node).
+                          Render series using DOM APIs in the correct SVG namespace.
+                        -->
+                        <g x-effect="renderSignalChart($el)"></g>
                       </svg>
                     </template>
                   </div>
