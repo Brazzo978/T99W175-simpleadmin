@@ -3486,33 +3486,54 @@ function processAllInfos() {
     const innerHeight = height - paddingY * 2;
     const scale = this.getSignalChartScale();
     const range = scale.max - scale.min || 1;
+    const history = Array.isArray(this.signalHistory) ? this.signalHistory : [];
+    const visibility = this.signalChartSeriesVisibility || {};
 
-    return seriesConfig
-      .filter((series) => this.signalChartSeriesVisibility[series.key])
-      .map((series) => {
-        const points = this.signalHistory
-          .filter((point) => point.timestamp >= start)
-          .map((point) => {
-            const source = series.technology === "LTE" ? point.lte : point.nr;
-            const value = source ? source[series.metric] : null;
-            if (typeof value !== "number") {
-              return null;
-            }
-            const x = ((point.timestamp - start) / this.signalChartDurationMs) * width;
-            const y = paddingY + ((scale.max - value) / range) * innerHeight;
-            return `${Math.max(0, Math.min(width, x)).toFixed(2)},${Math.max(
-              paddingY,
-              Math.min(height - paddingY, y)
-            ).toFixed(2)}`;
-          })
-          .filter(Boolean)
-          .join(" ");
+    return seriesConfig.reduce((acc, series) => {
+      if (!visibility[series.key]) {
+        return acc;
+      }
 
-        return {
-          ...series,
-          points,
-        };
+      const points = history
+        .filter((point) => point.timestamp >= start)
+        .map((point) => {
+          const source = series.technology === "LTE" ? point.lte : point.nr;
+          const value = source ? source[series.metric] : null;
+          if (typeof value !== "number") {
+            return null;
+          }
+          const x = ((point.timestamp - start) / this.signalChartDurationMs) * width;
+          const y = paddingY + ((scale.max - value) / range) * innerHeight;
+          return {
+            x: Math.max(0, Math.min(width, x)),
+            y: Math.max(paddingY, Math.min(height - paddingY, y)),
+          };
+        })
+        .filter((point) => point && typeof point.x === "number" && typeof point.y === "number");
+
+      if (points.length === 0) {
+        return acc;
+      }
+
+      if (points.length === 1) {
+        const lonePoint = points[0];
+        points.push({
+          x: Math.min(width, lonePoint.x + 1),
+          y: lonePoint.y,
+        });
+      }
+
+      const pointsString = points
+        .map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`)
+        .join(" ");
+
+      acc.push({
+        ...series,
+        points: pointsString,
       });
+
+      return acc;
+    }, []);
   },
 
   formatSignalChartValue(value) {
