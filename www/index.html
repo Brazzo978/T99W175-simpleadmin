@@ -59,6 +59,7 @@
     <script src="js/index-esim.js" defer></script>
     <script src="js/login-config.js" defer></script>
     <script src="js/index-login.js" defer></script>
+    <script src="js/chart.umd.min.js"></script>
     <script src="js/index-process.js"></script>
     <script src="js/atcommand-utils.js"></script>
     <script src="js/reboot-utils.js" defer></script>
@@ -1017,10 +1018,60 @@
           <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title" id="advancedSignalModalLabel">Advanced Signal Details</h5>
+                <div class="d-flex align-items-center gap-2">
+                  <h5 class="modal-title" id="advancedSignalModalLabel">Advanced Signal Details</h5>
+                  <button
+                    type="button"
+                    class="btn btn-link signal-chart-toggle"
+                    :class="{ 'is-active': showSignalChart }"
+                    @click="toggleSignalChart()"
+                    aria-label="Toggle signal chart"
+                    title="Signal chart">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 3v18h18"/>
+                      <path d="M7 14l3-3 3 2 5-6"/>
+                    </svg>
+                  </button>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
-              <div class="modal-body">
+              <div class="modal-body advanced-signal-modal-body">
+                <div
+                  class="signal-chart-panel"
+                  x-show="showSignalChart"
+                  x-transition.opacity.duration.200ms
+                  x-cloak
+                >
+                  <div class="signal-chart-card">
+                    <div class="signal-chart-controls">
+                      <span class="text-uppercase small fw-semibold">Signal Metrics</span>
+                      <div class="signal-chart-checkboxes">
+                        <label class="form-check signal-chart-check">
+                          <input class="form-check-input" type="checkbox" x-model="signalChartSeries.rssi" @change="updateSignalChart()" />
+                          <span class="form-check-label">RSSI</span>
+                        </label>
+                        <label class="form-check signal-chart-check">
+                          <input class="form-check-input" type="checkbox" x-model="signalChartSeries.rsrp" @change="updateSignalChart()" />
+                          <span class="form-check-label">RSRP</span>
+                        </label>
+                        <label class="form-check signal-chart-check">
+                          <input class="form-check-input" type="checkbox" x-model="signalChartSeries.rsrq" @change="updateSignalChart()" />
+                          <span class="form-check-label">RSRQ</span>
+                        </label>
+                        <label class="form-check signal-chart-check">
+                          <input class="form-check-input" type="checkbox" x-model="signalChartSeries.sinr" @change="updateSignalChart()" />
+                          <span class="form-check-label">SINR</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="signal-chart-canvas">
+                      <canvas id="advancedSignalChart" x-ref="advancedSignalChart"></canvas>
+                    </div>
+                    <div class="signal-chart-legend small text-muted">
+                      Solid line = Primary LTE • Dashed line = Primary 5G
+                    </div>
+                  </div>
+                </div>
                 <template x-if="detailedSignals.length === 0">
                   <p class="mb-0 text-muted">
                     No advanced details available.

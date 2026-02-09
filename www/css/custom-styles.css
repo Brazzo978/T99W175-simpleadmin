@@ -1726,6 +1726,78 @@ html[data-bs-theme="dark"] .loader {
   overflow-y: auto;
 }
 
+.advanced-signal-modal-body {
+  position: relative;
+}
+
+.signal-chart-toggle {
+  padding: 0.2rem;
+  border-radius: 0.5rem;
+  color: var(--text-muted);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.signal-chart-toggle svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.signal-chart-toggle:hover,
+.signal-chart-toggle.is-active {
+  color: var(--primary-color);
+  background: rgba(13, 110, 253, 0.12);
+}
+
+.signal-chart-panel {
+  position: absolute;
+  top: 0.75rem;
+  left: 1.5rem;
+  right: 1.5rem;
+  z-index: 10;
+}
+
+.signal-chart-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.signal-chart-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.signal-chart-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.signal-chart-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.signal-chart-canvas {
+  position: relative;
+  height: 240px;
+  width: 100%;
+}
+
+.signal-chart-legend {
+  margin-top: 0.5rem;
+  text-align: right;
+}
+
 .modal-footer {
   border-top: 1px solid var(--border-color);
   border-bottom-left-radius: calc(var(--border-radius) - 1px);

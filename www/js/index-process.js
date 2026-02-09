@@ -152,6 +152,37 @@ function processAllInfos() {
     detailedSignals: [],
     // Network analysis advisor output
     networkAnalysis: null,
+    // Signal chart visibility
+    showSignalChart: false,
+    // Signal chart instance
+    signalChart: null,
+    // Signal chart series toggles
+    signalChartSeries: {
+      rssi: true,
+      rsrp: true,
+      rsrq: true,
+      sinr: true,
+    },
+    // Signal chart history data
+    signalHistory: {
+      labels: [],
+      lte: {
+        rssi: [],
+        rsrp: [],
+        rsrq: [],
+        sinr: [],
+      },
+      nr: {
+        rssi: [],
+        rsrp: [],
+        rsrq: [],
+        sinr: [],
+      },
+    },
+    // Signal chart duration in seconds (3 minutes)
+    signalChartDurationSeconds: 180,
+    // Signal chart modal listener flag
+    signalModalListenerAttached: false,
     // Auto-refresh interval ID
     intervalId: null,
     // Phone number
@@ -1959,6 +1990,7 @@ function processAllInfos() {
           this.deviceInfoLoaded = true;
         }
 
+        this.recordSignalHistory();
         this.lastUpdate = new Date().toLocaleString();
       } catch (parseError) {
         console.error("Error while parsing the AT response", parseError);
@@ -4638,10 +4670,223 @@ function processAllInfos() {
     return 0;
   },
 
+  toggleSignalChart() {
+    this.showSignalChart = !this.showSignalChart;
+    if (this.showSignalChart) {
+      this.$nextTick(() => {
+        this.ensureSignalChart();
+        this.updateSignalChart();
+      });
+    }
+  },
+
+  getSignalHistoryLimit() {
+    const refreshRate = Math.max(1, parseInt(this.refreshRate) || 10);
+    return Math.max(2, Math.floor(this.signalChartDurationSeconds / refreshRate) + 1);
+  },
+
+  recordSignalHistory() {
+    const parseMetric = (value) => {
+      const num = parseFloat(value);
+      return Number.isFinite(num) ? num : null;
+    };
+    const timestamp = new Date();
+    const label = timestamp.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const limit = this.getSignalHistoryLimit();
+
+    this.signalHistory.labels.push(label);
+    this.signalHistory.lte.rssi.push(parseMetric(this.rssiLTE));
+    this.signalHistory.lte.rsrp.push(parseMetric(this.rsrpLTE));
+    this.signalHistory.lte.rsrq.push(parseMetric(this.rsrqLTE));
+    this.signalHistory.lte.sinr.push(parseMetric(this.sinrLTE));
+    this.signalHistory.nr.rssi.push(parseMetric(this.rssiNR));
+    this.signalHistory.nr.rsrp.push(parseMetric(this.rsrpNR));
+    this.signalHistory.nr.rsrq.push(parseMetric(this.rsrqNR));
+    this.signalHistory.nr.sinr.push(parseMetric(this.sinrNR));
+
+    while (this.signalHistory.labels.length > limit) {
+      this.signalHistory.labels.shift();
+      this.signalHistory.lte.rssi.shift();
+      this.signalHistory.lte.rsrp.shift();
+      this.signalHistory.lte.rsrq.shift();
+      this.signalHistory.lte.sinr.shift();
+      this.signalHistory.nr.rssi.shift();
+      this.signalHistory.nr.rsrp.shift();
+      this.signalHistory.nr.rsrq.shift();
+      this.signalHistory.nr.sinr.shift();
+    }
+
+    this.updateSignalChart();
+  },
+
+  ensureSignalChart() {
+    if (!this.showSignalChart || this.signalChart) {
+      return;
+    }
+    if (!window.Chart) {
+      console.warn("Chart.js is not available.");
+      return;
+    }
+    const canvas = this.$refs?.advancedSignalChart;
+    if (!canvas) {
+      return;
+    }
+    this.initSignalChart(canvas);
+  },
+
+  initSignalChart(canvas) {
+    const getCssVar = (name, fallback) => {
+      const value = getComputedStyle(document.documentElement)
+        .getPropertyValue(name)
+        .trim();
+      return value || fallback;
+    };
+    const colors = {
+      rssi: getCssVar("--primary-color", "#4e79ff"),
+      rsrp: "#f1c40f",
+      rsrq: "#f39c12",
+      sinr: "#2ecc71",
+    };
+    const datasets = [
+      {
+        label: "RSSI (LTE)",
+        signalKey: "rssi",
+        signalTech: "lte",
+        borderColor: colors.rssi,
+      },
+      {
+        label: "RSSI (5G)",
+        signalKey: "rssi",
+        signalTech: "nr",
+        borderColor: colors.rssi,
+        borderDash: [6, 4],
+      },
+      {
+        label: "RSRP (LTE)",
+        signalKey: "rsrp",
+        signalTech: "lte",
+        borderColor: colors.rsrp,
+      },
+      {
+        label: "RSRP (5G)",
+        signalKey: "rsrp",
+        signalTech: "nr",
+        borderColor: colors.rsrp,
+        borderDash: [6, 4],
+      },
+      {
+        label: "RSRQ (LTE)",
+        signalKey: "rsrq",
+        signalTech: "lte",
+        borderColor: colors.rsrq,
+      },
+      {
+        label: "RSRQ (5G)",
+        signalKey: "rsrq",
+        signalTech: "nr",
+        borderColor: colors.rsrq,
+        borderDash: [6, 4],
+      },
+      {
+        label: "SINR (LTE)",
+        signalKey: "sinr",
+        signalTech: "lte",
+        borderColor: colors.sinr,
+      },
+      {
+        label: "SINR (5G)",
+        signalKey: "sinr",
+        signalTech: "nr",
+        borderColor: colors.sinr,
+        borderDash: [6, 4],
+      },
+    ].map((dataset) => ({
+      ...dataset,
+      data: [],
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.35,
+    }));
+
+    this.signalChart = new Chart(canvas, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+          tooltip: {
+            mode: "index",
+            intersect: false,
+          },
+        },
+        interaction: {
+          mode: "index",
+          intersect: false,
+        },
+        scales: {
+          x: {
+            grid: {
+              color: "rgba(255, 255, 255, 0.08)",
+            },
+            ticks: {
+              color: getCssVar("--text-muted", "#9aa5b1"),
+              maxTicksLimit: 6,
+            },
+          },
+          y: {
+            grid: {
+              color: "rgba(255, 255, 255, 0.08)",
+            },
+            ticks: {
+              color: getCssVar("--text-muted", "#9aa5b1"),
+            },
+          },
+        },
+      },
+    });
+  },
+
+  updateSignalChart() {
+    if (!this.signalChart) {
+      return;
+    }
+    this.signalChart.data.labels = [...this.signalHistory.labels];
+    this.signalChart.data.datasets.forEach((dataset) => {
+      const key = dataset.signalKey;
+      const tech = dataset.signalTech;
+      if (key && tech && this.signalHistory[tech]) {
+        dataset.data = [...this.signalHistory[tech][key]];
+      }
+      dataset.hidden = !this.signalChartSeries[key];
+    });
+    this.signalChart.update("none");
+  },
+
   init(skipLocalStorage = false) {
     // Clear any existing interval before creating a new one
     if (this.intervalId) {
       clearInterval(this.intervalId);
+    }
+    const advancedSignalModal = document.getElementById("advancedSignalModal");
+    if (advancedSignalModal && !this.signalModalListenerAttached) {
+      advancedSignalModal.addEventListener("shown.bs.modal", () => {
+        if (this.showSignalChart) {
+          this.ensureSignalChart();
+          this.updateSignalChart();
+        }
+      });
+      this.signalModalListenerAttached = true;
     }
     // Fetch system information (uptime, load, network speed)
     this.fetchSysInfo();
