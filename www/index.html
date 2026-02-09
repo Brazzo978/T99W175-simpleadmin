@@ -1010,10 +1010,90 @@
           <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title" id="advancedSignalModalLabel">Advanced Signal Details</h5>
+                <div class="d-flex align-items-center gap-2">
+                  <h5 class="modal-title" id="advancedSignalModalLabel">Advanced Signal Details</h5>
+                  <button
+                    type="button"
+                    class="btn btn-link p-0 signal-chart-toggle"
+                    :class="{ 'is-active': signalChartVisible }"
+                    @click="toggleSignalChart()"
+                    title="Toggle signal chart"
+                    aria-label="Toggle signal chart">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <line x1="3" y1="3" x2="3" y2="21"></line>
+                      <line x1="3" y1="21" x2="21" y2="21"></line>
+                      <polyline points="6 16 10 12 14 14 19 7"></polyline>
+                    </svg>
+                  </button>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
-              <div class="modal-body">
+              <div class="modal-body position-relative">
+                <div
+                  class="signal-chart-panel"
+                  x-show="signalChartVisible"
+                  x-transition
+                  x-cloak
+                >
+                  <div class="signal-chart-panel-header">
+                    <div>
+                      <div class="signal-chart-title">Primary Signal Trends</div>
+                      <div class="signal-chart-subtitle">
+                        Last 3 minutes • Updates with refresh
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-light signal-chart-hide"
+                      @click="toggleSignalChart()">
+                      Hide
+                    </button>
+                  </div>
+                  <div class="signal-chart-controls">
+                    <template x-for="series in getSignalChartSeriesConfig()" :key="series.key">
+                      <label class="form-check form-check-inline signal-chart-check">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          x-model="signalChartSeriesVisibility[series.key]">
+                        <span class="signal-chart-label">
+                          <span class="signal-chart-swatch" :style="'background:' + series.color"></span>
+                          <span x-text="series.label"></span>
+                        </span>
+                      </label>
+                    </template>
+                  </div>
+                  <div class="signal-chart-canvas">
+                    <template x-if="getSignalChartSeries().length === 0">
+                      <div class="text-muted small">Waiting for signal samples...</div>
+                    </template>
+                    <template x-if="getSignalChartSeries().length > 0">
+                      <svg viewBox="0 0 1000 240" preserveAspectRatio="none">
+                        <g class="signal-chart-grid">
+                          <line x1="0" y1="20" x2="1000" y2="20"></line>
+                          <line x1="0" y1="120" x2="1000" y2="120"></line>
+                          <line x1="0" y1="220" x2="1000" y2="220"></line>
+                        </g>
+                        <template x-for="series in getSignalChartSeries()" :key="series.key">
+                          <polyline
+                            :points="series.points"
+                            :stroke="series.color"
+                            :stroke-dasharray="series.dasharray"
+                            fill="none"
+                            stroke-width="3"
+                            stroke-linejoin="round"
+                            stroke-linecap="round"
+                          ></polyline>
+                        </template>
+                      </svg>
+                    </template>
+                  </div>
+                  <div class="signal-chart-scale small text-muted">
+                    <span x-text="'Max: ' + formatSignalChartValue(getSignalChartScale().max)"></span>
+                    <span class="mx-2">|</span>
+                    <span x-text="'Min: ' + formatSignalChartValue(getSignalChartScale().min)"></span>
+                  </div>
+                </div>
                 <template x-if="detailedSignals.length === 0">
                   <p class="mb-0 text-muted">
                     No advanced details available.
