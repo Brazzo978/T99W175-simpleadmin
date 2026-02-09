@@ -1,0 +1,15 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+ensure_credentials_file
+ensure_session_store
+
+if session_load; then
+    send_json_response 200 "{\"authenticated\":true,\"username\":\"$(json_escape "$SESSION_USERNAME")\",\"role\":\"$(json_escape "$SESSION_ROLE")\"}"
+else
+    send_json_response 401 '{"authenticated":false}'
+fi
