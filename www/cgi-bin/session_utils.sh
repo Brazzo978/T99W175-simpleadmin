@@ -18,6 +18,16 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 
 SIMPLEADMIN_ENABLE_LOGIN="${SIMPLEADMIN_ENABLE_LOGIN:-1}"
+SIMPLEADMIN_GUI_LOCKED="${SIMPLEADMIN_GUI_LOCKED:-0}"
+SIMPLEADMIN_GUI_TOGGLE_KEY="${SIMPLEADMIN_GUI_TOGGLE_KEY:-}"
+SIMPLEADMIN_GUI_LOCK_PAGE="${SIMPLEADMIN_GUI_LOCK_PAGE:-/webguioff.html}"
+
+is_truthy() {
+    case "${1:-}" in
+        1|true|TRUE|yes|YES|on|ON) return 0 ;;
+        *) return 1 ;;
+    esac
+}
 
 credentials_guide() {
     cat <<'EOF'
@@ -35,6 +45,10 @@ SESSION_TTL="${SIMPLEADMIN_SESSION_TTL:-43200}"
 
 login_is_disabled() {
     [ "$SIMPLEADMIN_ENABLE_LOGIN" = "0" ]
+}
+
+gui_is_locked() {
+    is_truthy "${SIMPLEADMIN_GUI_LOCKED:-0}"
 }
 
 status_text() {
@@ -63,6 +77,59 @@ send_json_response() {
     echo "Cache-Control: no-store"
     echo
     printf '%s\n' "$payload"
+}
+
+config_set_var_locked() {
+    local key="$1"
+    local value="$2"
+
+    mkdir -p "$(dirname "$CONFIG_FILE")"
+    if [ ! -f "$CONFIG_FILE" ]; then
+        : > "$CONFIG_FILE"
+    fi
+
+    local tmp
+    tmp="${CONFIG_FILE}.tmp"
+
+    if grep -q -E "^${key}=" "$CONFIG_FILE"; then
+        # Replace existing value.
+        sed -E "s|^${key}=.*$|${key}=${value}|" "$CONFIG_FILE" > "$tmp"
+    else
+        # Append at end.
+        cat "$CONFIG_FILE" > "$tmp"
+        printf '\n%s=%s\n' "$key" "$value" >> "$tmp"
+    fi
+
+    mv "$tmp" "$CONFIG_FILE"
+}
+
+config_set_var() {
+    local key="$1"
+    local value="$2"
+    local lock="${CONFIG_FILE}.lock"
+    {
+        flock -x 200
+        config_set_var_locked "$key" "$value"
+    } 200>"$lock"
+}
+
+gui_set_locked() {
+    local locked="$1"
+    if is_truthy "$locked"; then
+        SIMPLEADMIN_GUI_LOCKED=1
+        config_set_var "SIMPLEADMIN_GUI_LOCKED" "1"
+    else
+        SIMPLEADMIN_GUI_LOCKED=0
+        config_set_var "SIMPLEADMIN_GUI_LOCKED" "0"
+    fi
+}
+
+gui_toggle_locked() {
+    if gui_is_locked; then
+        gui_set_locked 0
+    else
+        gui_set_locked 1
+    fi
 }
 
 json_escape() {
@@ -265,6 +332,12 @@ extract_token_from_cookie() {
 }
 
 session_load() {
+    # GUI lock blocks all authenticated operations (including "login disabled" mode),
+    # unless explicitly allowed by the caller.
+    if gui_is_locked && [ "${SIMPLEADMIN_GUI_ALLOW_LOCKED:-0}" != "1" ]; then
+        return 1
+    fi
+
     if login_is_disabled; then
         SESSION_TOKEN=""
         SESSION_USERNAME="admin"

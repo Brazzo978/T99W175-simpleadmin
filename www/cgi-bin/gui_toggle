@@ -1,0 +1,144 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+html_escape() {
+    local s="${1:-}"
+    s=${s//&/&amp;}
+    s=${s//</&lt;}
+    s=${s//>/&gt;}
+    s=${s//\"/&quot;}
+    s=${s//\'/&#39;}
+    printf '%s' "$s"
+}
+
+urldecode() {
+    local data="${1//+/ }"
+    printf '%b' "${data//%/\\x}"
+}
+
+get_qs_param() {
+    local key="$1"
+    local qs="${QUERY_STRING:-}"
+    local pair k v
+    IFS='&' read -r -a parts <<< "$qs"
+    for pair in "${parts[@]}"; do
+        k="${pair%%=*}"
+        v="${pair#*=}"
+        if [ "$k" = "$key" ]; then
+            urldecode "$v"
+            return 0
+        fi
+    done
+    return 1
+}
+
+key="$(get_qs_param "key" 2>/dev/null || true)"
+if [ -z "$key" ]; then
+    key="$(get_qs_param "k" 2>/dev/null || true)"
+fi
+
+mode="$(get_qs_param "mode" 2>/dev/null || true)"
+mode="${mode:-toggle}"
+
+if [ -z "${SIMPLEADMIN_GUI_TOGGLE_KEY:-}" ]; then
+    echo "Status: 500 Internal Server Error"
+    echo "Content-type: text/plain"
+    echo "Cache-Control: no-store"
+    echo
+    echo "GUI toggle key is not configured (SIMPLEADMIN_GUI_TOGGLE_KEY)."
+    exit 0
+fi
+
+if [ -z "$key" ] || [ "$key" != "$SIMPLEADMIN_GUI_TOGGLE_KEY" ]; then
+    echo "Status: 403 Forbidden"
+    echo "Content-type: text/plain"
+    echo "Cache-Control: no-store"
+    echo
+    echo "Forbidden"
+    exit 0
+fi
+
+new_state=""
+case "$mode" in
+    toggle|"")
+        if gui_is_locked; then
+            new_state="0"
+        else
+            new_state="1"
+        fi
+        ;;
+    lock)
+        new_state="1"
+        ;;
+    unlock)
+        new_state="0"
+        ;;
+    *)
+        echo "Status: 400 Bad Request"
+        echo "Content-type: text/plain"
+        echo "Cache-Control: no-store"
+        echo
+        echo "Invalid mode. Use mode=toggle|lock|unlock."
+        exit 0
+        ;;
+esac
+
+gui_set_locked "$new_state"
+
+# Best effort: drop sessions when locking so active users get kicked out quickly.
+if gui_is_locked; then
+    if [ -n "${SESSION_STORE:-}" ]; then
+        : > "$SESSION_STORE" 2>/dev/null || true
+    fi
+fi
+
+locked_label="UNLOCKED"
+if gui_is_locked; then
+    locked_label="LOCKED"
+fi
+
+echo "Status: 200 OK"
+echo "Content-type: text/html"
+echo "Cache-Control: no-store"
+echo
+cat <<EOF
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple T99</title>
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <link rel="stylesheet" href="/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="/css/custom-styles.css" />
+  </head>
+  <body data-require-auth="false">
+    <main class="container py-5">
+      <div class="row justify-content-center">
+        <div class="col-lg-7 col-md-9">
+          <div class="card shadow-sm">
+            <div class="card-header">
+              <strong>GUI Toggle</strong>
+            </div>
+            <div class="card-body">
+              <p class="mb-2">Current state: <strong>$(html_escape "$locked_label")</strong></p>
+              <p class="mb-0">
+                <a class="btn btn-primary btn-sm" href="/">Go to home</a>
+                <a class="btn btn-outline-secondary btn-sm" href="/webguioff.html">Locked page</a>
+              </p>
+            </div>
+            <div class="card-footer text-body-secondary">
+              <small>Tip: use <code>?mode=lock</code> or <code>?mode=unlock</code> for explicit behavior.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
+EOF
+

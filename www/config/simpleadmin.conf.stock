@@ -3,6 +3,17 @@
 # Set to 1 (default) to require user login.
 SIMPLEADMIN_ENABLE_LOGIN=1
 
+# GUI lock: when set, the web interface redirects to SIMPLEADMIN_GUI_LOCK_PAGE and
+# CGI endpoints will behave as unauthenticated.
+SIMPLEADMIN_GUI_LOCKED=0
+
+# Pre-shared key to toggle GUI lock via /cgi-bin/gui_toggle?key=... (or ?k=...).
+# Example: /cgi-bin/gui_toggle?key=YOUR_KEY&mode=toggle|lock|unlock
+SIMPLEADMIN_GUI_TOGGLE_KEY=""
+
+# Page shown while locked.
+SIMPLEADMIN_GUI_LOCK_PAGE="/webguioff.html"
+
 # eSIM management page (requires the intermediate euicc-client server)
 # Set to 1 to show and enable the eSIM management UI, 0 to hide it.
 SIMPLEADMIN_ENABLE_ESIM=0

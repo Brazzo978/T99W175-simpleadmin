@@ -3,6 +3,8 @@
     session: null,
     promise: null,
     loaded: false,
+    guiLocked: false,
+    guiLockPage: "/webguioff.html",
   };
 
   const callbacks = [];
@@ -26,16 +28,22 @@
         cache: "no-store",
       });
 
-      if (response.status === 401) {
-        return null;
-      }
-
       if (!response.ok) {
         console.error("Unable to retrieve session status", response.status);
         return null;
       }
 
       const payload = await response.json();
+      const guiLocked = payload && payload.gui_locked === true;
+      state.guiLocked = guiLocked;
+      state.guiLockPage =
+        (payload && typeof payload.gui_lock_page === "string" && payload.gui_lock_page) ||
+        "/webguioff.html";
+
+      if (guiLocked) {
+        return null;
+      }
+
       if (!payload || payload.authenticated !== true) {
         return null;
       }
@@ -321,6 +329,14 @@
     ensureSession();
 
     onReady((session) => {
+      if (state.guiLocked) {
+        const lockPage = state.guiLockPage || "/webguioff.html";
+        if (!window.location.pathname.endsWith(lockPage)) {
+          window.location.replace(lockPage);
+        }
+        return;
+      }
+
       applyPermissions(session);
       if (requiresAuth() && !session) {
         redirectToLogin();
@@ -333,6 +349,9 @@
     onReady,
     getSession() {
       return state.session;
+    },
+    isGuiLocked() {
+      return state.guiLocked === true;
     },
     hasWriteAccess() {
       return state.session && state.session.role === "admin";
