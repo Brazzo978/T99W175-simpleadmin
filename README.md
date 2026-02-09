@@ -19,6 +19,17 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 # Set to 1 (default) to require user login.
 SIMPLEADMIN_ENABLE_LOGIN=1
 
+# GUI lock (maintenance mode)
+# When locked, the UI redirects to SIMPLEADMIN_GUI_LOCK_PAGE and CGI endpoints
+# behave as unauthenticated.
+SIMPLEADMIN_GUI_LOCKED=0
+
+# Pre-shared key required by /cgi-bin/gui_toggle?key=... (or ?k=...).
+SIMPLEADMIN_GUI_TOGGLE_KEY=""
+
+# Page shown while locked.
+SIMPLEADMIN_GUI_LOCK_PAGE="/webguioff.html"
+
 # eSIM management page (requires the intermediate euicc-client server)
 # Set to 1 to show and enable the eSIM management UI, 0 to hide it.
 SIMPLEADMIN_ENABLE_ESIM=0
@@ -27,6 +38,32 @@ SIMPLEADMIN_ENABLE_ESIM=0
 SIMPLEADMIN_ESIM_BASE_URL="http://localhost:8080/api/v1"
 ```
 Check [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md) for file-by-file behavior, request flows, and how each page uses the CGI helpers.
+
+## GUI lock (maintenance mode)
+
+Goal: allow installers to open a "special link" from a browser to unlock the GUI, perform the work, then lock it again and show a static instruction page.
+
+How it works:
+- When `SIMPLEADMIN_GUI_LOCKED=1`, the frontend redirects to `SIMPLEADMIN_GUI_LOCK_PAGE` (default: `/webguioff.html`).
+- Server-side, `session_load` is blocked, so all CGI endpoints that require a session behave as unauthenticated while locked.
+- No extra "delay": the lock status is returned by the existing `/cgi-bin/session_status` request the UI already performs.
+
+### Enable it
+1. Set a strong key in `www/config/simpleadmin.conf`:
+   - `SIMPLEADMIN_GUI_TOGGLE_KEY="use_a_long_random_string_here"`
+2. Deploy files to the modem (see Installation).
+
+### Use it (the "special link")
+- Lock:
+  - `/cgi-bin/gui_toggle?key=YOUR_KEY&mode=lock`
+- Unlock:
+  - `/cgi-bin/gui_toggle?key=YOUR_KEY&mode=unlock`
+- Toggle (flips state):
+  - `/cgi-bin/gui_toggle?key=YOUR_KEY&mode=toggle`
+
+Notes:
+- The key is in the URL: it can end up in browser history, screenshots, and (depending on server setup) logs. Use a long random key and only on trusted networks.
+- If you lose the key, you can unlock by setting `SIMPLEADMIN_GUI_LOCKED=0` in `www/config/simpleadmin.conf` (or redeploying the stock config).
 
 ## 🛠 Installation
 
@@ -70,4 +107,3 @@ For any questions, feature requests or support, feel free to reach out on Telegr
 
 ## Troubleshooting
 Ssh password not known : connect the modem via usb and install needed driver if windows doesnt automatically , then connect to adb using adb shell and run passwd , then you can change root password , and you can use that to access ssh.
-
