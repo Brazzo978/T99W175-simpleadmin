@@ -189,20 +189,6 @@ function processAllInfos() {
     // SIM unlock prompt modal (first time only)
     showSimUnlockPrompt: false,
     simUnlockPromptDismissed: false,
-    // Signal chart overlay state
-    signalChartVisible: false,
-    signalChartDurationMs: 3 * 60 * 1000,
-    signalChartSeriesVisibility: {
-      "lte-rssi": true,
-      "lte-rsrp": true,
-      "lte-rsrq": true,
-      "lte-sinr": true,
-      "nr-rssi": true,
-      "nr-rsrp": true,
-      "nr-rsrq": true,
-      "nr-sinr": true,
-    },
-    signalHistory: [],
   };
 
   return {
@@ -517,7 +503,6 @@ function processAllInfos() {
                 id: currentEntry.id,
                 title,
                 technology: currentEntry.technology,
-                role: currentEntry.role,
                 band: currentEntry.band,
                 bandDisplay,
                 bandwidthDisplay: currentEntry.bandwidth || "N/A",
@@ -908,7 +893,6 @@ function processAllInfos() {
 
           this.detailedSignals = buildDetailedSignals();
           this.networkAnalysis = this.buildNetworkAnalysis(this.detailedSignals);
-          this.updateSignalHistory();
 
           // --- Temperature ---
           try {
@@ -3315,232 +3299,6 @@ function processAllInfos() {
       return parseInt(this.rssiNRPercentage) || 0;
     }
     return 0;
-  },
-
-  toggleSignalChart() {
-    this.signalChartVisible = !this.signalChartVisible;
-  },
-
-  getSignalChartSeriesConfig() {
-    return [
-      {
-        key: "lte-rssi",
-        label: "Primary 4G RSSI",
-        metric: "rssi",
-        technology: "LTE",
-        color: "#3dd5f3",
-        dasharray: "",
-      },
-      {
-        key: "lte-rsrp",
-        label: "Primary 4G RSRP",
-        metric: "rsrp",
-        technology: "LTE",
-        color: "#f7c948",
-        dasharray: "",
-      },
-      {
-        key: "lte-rsrq",
-        label: "Primary 4G RSRQ",
-        metric: "rsrq",
-        technology: "LTE",
-        color: "#f59f00",
-        dasharray: "",
-      },
-      {
-        key: "lte-sinr",
-        label: "Primary 4G SINR",
-        metric: "sinr",
-        technology: "LTE",
-        color: "#51cf66",
-        dasharray: "",
-      },
-      {
-        key: "nr-rssi",
-        label: "Primary 5G RSSI",
-        metric: "rssi",
-        technology: "NR",
-        color: "#74c0fc",
-        dasharray: "6 4",
-      },
-      {
-        key: "nr-rsrp",
-        label: "Primary 5G RSRP",
-        metric: "rsrp",
-        technology: "NR",
-        color: "#ffd43b",
-        dasharray: "6 4",
-      },
-      {
-        key: "nr-rsrq",
-        label: "Primary 5G RSRQ",
-        metric: "rsrq",
-        technology: "NR",
-        color: "#ffa94d",
-        dasharray: "6 4",
-      },
-      {
-        key: "nr-sinr",
-        label: "Primary 5G SINR",
-        metric: "sinr",
-        technology: "NR",
-        color: "#69db7c",
-        dasharray: "6 4",
-      },
-    ];
-  },
-
-  getPrimarySignalEntry(technology) {
-    if (!Array.isArray(this.detailedSignals)) {
-      return null;
-    }
-    return this.detailedSignals.find(
-      (entry) => entry.technology === technology && entry.role === "primary"
-    );
-  },
-
-  getSignalMetricValue(entry, metricKey) {
-    if (!entry || !Array.isArray(entry.metrics)) {
-      return null;
-    }
-    const metric = entry.metrics.find((item) => item.key === metricKey);
-    return typeof metric?.value === "number" ? metric.value : null;
-  },
-
-  updateSignalHistory() {
-    const primaryLte = this.getPrimarySignalEntry("LTE");
-    const primaryNr = this.getPrimarySignalEntry("NR");
-
-    if (!primaryLte && !primaryNr) {
-      return;
-    }
-
-    const now = Date.now();
-    const point = {
-      timestamp: now,
-      lte: {
-        rssi: this.getSignalMetricValue(primaryLte, "rssi"),
-        rsrp: this.getSignalMetricValue(primaryLte, "rsrp"),
-        rsrq: this.getSignalMetricValue(primaryLte, "rsrq"),
-        sinr: this.getSignalMetricValue(primaryLte, "sinr"),
-      },
-      nr: {
-        rssi: this.getSignalMetricValue(primaryNr, "rssi"),
-        rsrp: this.getSignalMetricValue(primaryNr, "rsrp"),
-        rsrq: this.getSignalMetricValue(primaryNr, "rsrq"),
-        sinr: this.getSignalMetricValue(primaryNr, "sinr"),
-      },
-    };
-
-    this.signalHistory = [...this.signalHistory, point];
-    this.trimSignalHistory();
-  },
-
-  trimSignalHistory() {
-    const cutoff = Date.now() - this.signalChartDurationMs;
-    this.signalHistory = this.signalHistory.filter(
-      (point) => point.timestamp >= cutoff
-    );
-  },
-
-  getSignalChartScale() {
-    const seriesConfig = this.getSignalChartSeriesConfig();
-    const cutoff = Date.now() - this.signalChartDurationMs;
-    const values = [];
-
-    this.signalHistory
-      .filter((point) => point.timestamp >= cutoff)
-      .forEach((point) => {
-        seriesConfig.forEach((series) => {
-          if (!this.signalChartSeriesVisibility[series.key]) {
-            return;
-          }
-          const source = series.technology === "LTE" ? point.lte : point.nr;
-          const value = source ? source[series.metric] : null;
-          if (typeof value === "number") {
-            values.push(value);
-          }
-        });
-      });
-
-    if (values.length === 0) {
-      return { hasData: false, min: 0, max: 1 };
-    }
-
-    let min = Math.min(...values);
-    let max = Math.max(...values);
-    if (min === max) {
-      min -= 1;
-      max += 1;
-    }
-    return { hasData: true, min, max };
-  },
-
-  getSignalChartSeries() {
-    const seriesConfig = this.getSignalChartSeriesConfig();
-    const now = Date.now();
-    const start = now - this.signalChartDurationMs;
-    const width = 1000;
-    const height = 240;
-    const paddingY = 20;
-    const innerHeight = height - paddingY * 2;
-    const scale = this.getSignalChartScale();
-    const range = scale.max - scale.min || 1;
-    const history = Array.isArray(this.signalHistory) ? this.signalHistory : [];
-    const visibility = this.signalChartSeriesVisibility || {};
-
-    return seriesConfig.reduce((acc, series) => {
-      if (!visibility[series.key]) {
-        return acc;
-      }
-
-      const points = history
-        .filter((point) => point.timestamp >= start)
-        .map((point) => {
-          const source = series.technology === "LTE" ? point.lte : point.nr;
-          const value = source ? source[series.metric] : null;
-          if (typeof value !== "number") {
-            return null;
-          }
-          const x = ((point.timestamp - start) / this.signalChartDurationMs) * width;
-          const y = paddingY + ((scale.max - value) / range) * innerHeight;
-          return {
-            x: Math.max(0, Math.min(width, x)),
-            y: Math.max(paddingY, Math.min(height - paddingY, y)),
-          };
-        })
-        .filter((point) => point && typeof point.x === "number" && typeof point.y === "number");
-
-      if (points.length === 0) {
-        return acc;
-      }
-
-      if (points.length === 1) {
-        const lonePoint = points[0];
-        points.push({
-          x: Math.min(width, lonePoint.x + 1),
-          y: lonePoint.y,
-        });
-      }
-
-      const pointsString = points
-        .map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`)
-        .join(" ");
-
-      acc.push({
-        ...series,
-        points: pointsString,
-      });
-
-      return acc;
-    }, []);
-  },
-
-  formatSignalChartValue(value) {
-    if (typeof value !== "number") {
-      return "N/A";
-    }
-    return `${Math.round(value * 10) / 10}`;
   },
 
   init(skipLocalStorage = false) {
