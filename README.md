@@ -66,6 +66,41 @@ Notes:
 - The key is in the URL: it can end up in browser history, screenshots, and (depending on server setup) logs. Use a long random key and only on trusted networks.
 - If you lose the key, you can unlock by setting `SIMPLEADMIN_GUI_LOCKED=0` in `www/config/simpleadmin.conf` (or redeploying the stock config).
 
+---
+
+## 📸 Screenshots
+
+### Home
+![Home](Doc/MEDIA/Home.jpg)
+
+<details>
+<summary><b>More screenshots</b></summary>
+
+### Device info
+![Device info](Doc/MEDIA/Device%20info.jpg)
+
+### Advanced / CA
+![Advanced](Doc/MEDIA/Advanced.jpg)
+![CA](Doc/MEDIA/CA.jpg)
+
+### Network
+![Network settings](Doc/MEDIA/Network%20settings.jpg)
+![Network Advisor](Doc/MEDIA/Network%20Advisor.jpg)
+
+### System / User / Login
+![System Settings](Doc/MEDIA/System%20Settings.jpg)
+![User](Doc/MEDIA/User.jpg)
+![Login](Doc/MEDIA/Login.jpg)
+
+### Tools
+![Ping](Doc/MEDIA/Ping.jpg)
+![Temp](Doc/MEDIA/Temp.jpg)
+![SMS](Doc/MEDIA/Sms.jpg)
+
+</details>
+
+
+
 ## 🛠 Installation
 
 Simpleadmin is designed to run directly on the Foxconn T99W175 inside the modem’s web partition.
