@@ -7,6 +7,7 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 - Core contributors for scripts, testing, and troubleshooting:
   - [1alessandro1](https://github.com/1alessandro1)
   - [stich86](https://github.com/stich86)
+  - [gionag](https://github.com/gionag)
 
 
 ## Quick overview
