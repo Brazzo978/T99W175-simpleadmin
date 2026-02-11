@@ -2,7 +2,7 @@
 
 Static web interface (HTML/JS + Bash CGI helpers) to administer **Quectel RM/RG502** modems.
 
-> **WIP WIP WIP** — this is an Alpha 
+> **WIP WIP WIP** — this is now beta most of the stuff is working good now
 
 ---
 
@@ -44,7 +44,7 @@ Static web interface (HTML/JS + Bash CGI helpers) to administer **Quectel RM/RG5
 * **Cell scanner is not implemented yet**.
 
   * This modem has more AT commands to scan nearby cells and will later get a dedicated page to scan nearby cells with the possibility to lock on those.
-
+* **Esim is not there not tested etc.
 ---
 
 
