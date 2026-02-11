@@ -1,0 +1,87 @@
+#!/bin/bash
+set -eu
+
+TTL_FILE="/usrdata/simplefirewall/ttlvalue"
+IPTABLES_BIN="/usr/sbin/iptables"
+IP6TABLES_BIN="/usr/sbin/ip6tables"
+
+ensure_ttl_file() {
+    if [ ! -f "$TTL_FILE" ]; then
+        mkdir -p "$(dirname "$TTL_FILE")"
+        printf '0\n' > "$TTL_FILE"
+    fi
+}
+
+read_ttl_value() {
+    ensure_ttl_file
+    ttlfile=$(cat "$TTL_FILE")
+    TTLVALUE=$(echo "$ttlfile" | grep -o "[0-9]\{1,3\}" | head -n1 || true)
+    if [ -z "${TTLVALUE:-}" ]; then
+        echo "Could not parse TTL value from $TTL_FILE" >&2
+        return 1
+    fi
+    if [ "$TTLVALUE" -lt 0 ] || [ "$TTLVALUE" -gt 255 ]; then
+        echo "TTL value out of range (0-255): $TTLVALUE" >&2
+        return 1
+    fi
+    return 0
+}
+
+remove_all_ttl_rules() {
+    if [ -x "$IPTABLES_BIN" ]; then
+        vals=$(
+            "$IPTABLES_BIN" -w 5 -t mangle -S POSTROUTING 2>/dev/null \
+              | sed -n 's/^-A POSTROUTING -o rmnet+ -j TTL --ttl-set \([0-9]\{1,3\}\)$/\1/p' \
+              | sort -u
+        )
+        for val in $vals; do
+            while "$IPTABLES_BIN" -w 5 -t mangle -D POSTROUTING -o rmnet+ -j TTL --ttl-set "$val" >/dev/null 2>&1; do :; done
+        done
+    fi
+
+    if [ -x "$IP6TABLES_BIN" ]; then
+        vals6=$(
+            "$IP6TABLES_BIN" -w 5 -t mangle -S POSTROUTING 2>/dev/null \
+              | sed -n 's/^-A POSTROUTING -o rmnet+ -j HL --hl-set \([0-9]\{1,3\}\)$/\1/p' \
+              | sort -u
+        )
+        for val6 in $vals6; do
+            while "$IP6TABLES_BIN" -w 5 -t mangle -D POSTROUTING -o rmnet+ -j HL --hl-set "$val6" >/dev/null 2>&1; do :; done
+        done
+    fi
+}
+
+apply_ttl_rules() {
+    if [ "$TTLVALUE" -eq 0 ]; then
+        echo "TTLVALUE=0, no rules added"
+        return 0
+    fi
+
+    if [ -x "$IPTABLES_BIN" ]; then
+        "$IPTABLES_BIN" -w 5 -t mangle -I POSTROUTING -o rmnet+ -j TTL --ttl-set "$TTLVALUE"
+    fi
+    if [ -x "$IP6TABLES_BIN" ]; then
+        "$IP6TABLES_BIN" -w 5 -t mangle -I POSTROUTING -o rmnet+ -j HL --hl-set "$TTLVALUE"
+    fi
+}
+
+case "${1:-}" in
+    start)
+        read_ttl_value
+        remove_all_ttl_rules
+        apply_ttl_rules
+        ;;
+    stop)
+        remove_all_ttl_rules
+        ;;
+    restart)
+        "$0" stop
+        "$0" start
+        ;;
+    *)
+        echo "Usage: ttl-override { start | stop | restart }" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
