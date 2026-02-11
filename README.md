@@ -23,15 +23,14 @@ Static web interface (HTML/JS + Bash CGI helpers) to administer **Quectel RM/RG5
 * **Preferred network** works *(I think)*
 * **Cell locking** works as intended ✅ *(4G and 5G SA)*
 * **System settings** work as intended ✅
-* **Advanced page** works *(mostly)*
+* **Advanced page** works ✅
 * **SMS page** works *(at least I think)*
-
+* **TTL patch** and **auto-reboot** (now work but need additional configuration to work see guide on doc folder, need to make guide better and to prepare payload for autoinstall)
 ---
 
 ## ❌ What is not working / not present / not working as intended
 
 * All the **beta features from T99 beta** are **not ported** and will not be until stable release for T99.
-* **TTL patch** and **auto-reboot** are on the way, but for now are **disabled**.
 * This module **at-chat is slower**: filling in complex areas of the GUI might require more time.
 
   * Example: radio settings populates differently from T99 version; here there is priority since it’s really slower:
@@ -105,10 +104,11 @@ chmod -R 777 /www
 ```
 
 8. Either reboot the modem or restart the webserver
-9. Switch the AT method: follow [`atcmd_to_atcli.md`](atcmd_to_atcli.md) to switch from iamromulan method to the faster atcli
+9. Switch the AT method: follow [`atcmd_to_atcli.md`](Doc/atcmd_to_atcli.md) to switch from iamromulan method to the faster atcli
+10. If you want to enable additional feature follow guide on the doc folder (ENABLE_AUTO_REBOOT_CRON.md , ENABLE_TTL_CLEAN_502.md and ENABLE_ROOTFS_RW_ON_BOOT.md to make root RW automatically on boot) 
 
 ```bash
-systemctl restart idktheservicenameyet
+systemctl restart lighttpd.service
 ```
 
 Browse to the GUI and use Simpleadmin.
@@ -127,7 +127,7 @@ On stock iamromulan firmware it uses:
 * `atcmd` talks to `socat` on the corresponding tty port
 * and some systemd service talks with `cat` to the smdX
 
-Since we found a faster method, I made detailed instructions to switch from its method to ours in [`atcmd_to_atcli.md`](atcmd_to_atcli.md)
+Since we found a faster method, I made detailed instructions to switch from its method to ours in [`atcmd_to_atcli.md`](Doc/atcmd_to_atcli.md)
 
 We use a binary pulled from an x55 modem that talks directly to the smdX device with no overhead:
 
