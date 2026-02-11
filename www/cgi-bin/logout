@@ -1,0 +1,26 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+ensure_session_store
+
+token="$(extract_token_from_cookie)"
+if [ -n "$token" ]; then
+    invalidate_session "$token"
+fi
+
+expired_cookie="simpleadmin_session=deleted; HttpOnly; SameSite=Lax; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+
+echo "Status: 200 OK"
+if [ -n "$token" ]; then
+    echo "Set-Cookie: $expired_cookie"
+else
+    echo "Set-Cookie: $expired_cookie"
+fi
+echo "Content-type: application/json"
+echo "Cache-Control: no-store"
+echo
+echo '{"success":true}'
