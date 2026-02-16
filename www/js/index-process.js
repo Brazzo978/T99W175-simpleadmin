@@ -4813,27 +4813,6 @@ function processAllInfos() {
   },
 
   /**
-   * Process IMEI for AT command format
-   * @param {string} imei - 15-digit IMEI
-   * @returns {string} Formatted IMEI string
-   */
-  processImei(imei) {
-    const withPrefix = "80A" + imei;
-
-    const pairs = [];
-    for (let i = 0; i < withPrefix.length; i += 2) {
-      pairs.push(withPrefix.substring(i, i + 2));
-    }
-
-    const swappedPairs = pairs.map(pair => {
-      if (pair.length === 1) return pair;
-      return pair[1] + pair[0];
-    });
-
-    return swappedPairs.join(',').toLowerCase();
-  },
-
-  /**
    * Update IMEI via AT commands
    */
   async updateIMEI() {
@@ -4842,26 +4821,7 @@ function processAllInfos() {
       return false;
     }
 
-    const formatted = this.processImei(this.newImei);
-    const byteCount = formatted.split(',').length;
-
-    if (!formatted || byteCount !== 9) {
-      console.error("Invalid IMEI formatting. Please re-enter and try again.");
-      return false;
-    }
-
-    // Clear existing IMEI
-    const clearCmd = `AT^NV=550,0`;
-    const clearResult = await ATCommandService.execute(clearCmd, { retries: 1, timeout: 5000 });
-    if (!clearResult.ok) {
-      console.error("Failed to clear IMEI:", clearResult.error?.message || "Unknown error");
-      return false;
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    // Set new IMEI
-    const setCmd = `AT^NV=550,${byteCount},"${formatted}"`;
+    const setCmd = `AT+EGMR=1,7,"${this.newImei}"`;
     const setResult = await ATCommandService.execute(setCmd, { retries: 1, timeout: 5000 });
     if (!setResult.ok) {
       console.error("Failed to set IMEI:", setResult.error?.message || "Unknown error");
