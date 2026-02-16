@@ -448,27 +448,6 @@ function fetchDeviceInfo() {
     },
 
     /**
-     * Process IMEI for AT command format
-     * @param {string} imei - 15-digit IMEI
-     * @returns {string} Formatted IMEI string
-     */
-    processImei(imei) {
-      const withPrefix = "80A" + imei;
-
-      const pairs = [];
-      for (let i = 0; i < withPrefix.length; i += 2) {
-        pairs.push(withPrefix.substring(i, i + 2));
-      }
-
-      const swappedPairs = pairs.map(pair => {
-        if (pair.length === 1) return pair;
-        return pair[1] + pair[0];
-      });
-
-      return swappedPairs.join(',').toLowerCase();
-    },
-
-    /**
      * Update IMEI via AT commands
      */
     async updateIMEI() {
@@ -477,24 +456,7 @@ function fetchDeviceInfo() {
         return false;
       }
 
-      const formatted = this.processImei(this.newImei);
-      const byteCount = formatted.split(',').length;
-
-      if (!formatted || byteCount !== 9) {
-        this.handleError("Invalid IMEI formatting. Please re-enter and try again.");
-        return false;
-      }
-
-      this.atcmd = `AT^NV=550,0`;
-      console.log("Sending IMEI clear command:", this.atcmd);
-      const clearResult = await this.sendATCommand();
-      if (!clearResult?.ok) {
-        return false;
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      this.atcmd = `AT^NV=550,${byteCount},"${formatted}"`;
+      this.atcmd = `AT+EGMR=1,7,"${this.newImei}"`;
       console.log("Sending IMEI update command:", this.atcmd);
       const setResult = await this.sendATCommand();
       if (!setResult?.ok) {
