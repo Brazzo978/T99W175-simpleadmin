@@ -376,7 +376,7 @@ function processAllInfos() {
       }
       // SIM is ready, execute full command set
       this.atcmd =
-        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+CSQ;+COPS?;+CIMI;+ICCID;+CNUM;+CSCS=\"GSM\";+CGMI;+CGMM;^VERSION?;+CGSN';
+        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+COPS?;+CIMI;+ICCID;+CNUM;+CSCS=\"GSM\";+CGMI;+CGMM;^VERSION?;+CGSN';
 
       const result = await ATCommandService.execute(this.atcmd, {
         retries: 3,
@@ -1537,12 +1537,7 @@ function processAllInfos() {
               "(" +
               this.decimalCellId +
               ")";
-            // CSQ
-            this.csq = lines
-              .find((line) => line.includes("+CSQ:"))
-              .split(" ")[1]
-              .replace("+CSQ: ", "")
-              .replace(/"/g, "");
+            this.csq = "LTE+NR Mode";
             // RSRP LTE
             this.rsrpLTE = lines
               .find((line) => line.includes('+QENG: "LTE"'))
