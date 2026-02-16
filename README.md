@@ -102,8 +102,26 @@ chmod -R 777 /www
 ```
 
 8. Either reboot the modem or restart the webserver
-9. Switch the AT method: follow [`atcmd_to_atcli.md`](Doc/atcmd_to_atcli.md) to switch from iamromulan method to the faster atcli
-10. If you want to enable additional feature follow guide on the doc folder (ENABLE_AUTO_REBOOT_CRON.md , ENABLE_TTL_CLEAN_502.md and ENABLE_ROOTFS_RW_ON_BOOT.md to make root RW automatically on boot) 
+9. Install all modem-side tweaks using the unified payload (AT backend switch to `atcli`, disable SSH auto-menu, auto reboot cron, clean TTL flow, rootfs RW at boot): [`PAYLOAD_ALL_IN_ONE.md`](../PAYLOAD_ALL_IN_ONE.md)
+10. Quick install directly from modem shell (recommended):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Brazzo978/T99W175-simpleadmin/Quectel-Test/payload/bootstrap_install.sh | sh -s -- --repo Brazzo978/T99W175-simpleadmin --ref Quectel-Test
+```
+
+11. Alternative install via ADB (PC):
+
+Linux/macOS/Git Bash:
+
+```bash
+bash payload/deploy_via_adb.sh
+```
+
+Windows PowerShell:
+
+```powershell
+bash .\payload\deploy_via_adb.sh
+```
 
 ```bash
 systemctl restart lighttpd.service
