@@ -83,48 +83,30 @@ Check `DOCUMENTAZIONE.md` for file-by-file behavior, request flows, and how each
 
 ## 🛠 Installation
 
-Simpleadmin is designed to run directly on the modem inside the modem’s web partition.
+Simpleadmin is installed and configured through the unified payload.
 
-### Steps
+This is the recommended flow because it applies all required modem-side changes in one shot:
 
-1. Download or clone the repository
-2. Extract the ZIP and locate the `www` folder
-3. Connect via SSH to the modem (default IP: `192.168.225.1`, default user: `root`)
-4. Locate the webserver folder and find the current `www` directory
+- AT backend switch to `atcli`
+- disable SSH auto console menu
+- auto reboot cron support
+- clean TTL backend/CGI
+- rootfs RW at boot
 
-   * In iamromulan firmware: `/usrdata/simpleadmin/` contains the `www` folder
-5. Delete or rename the existing `www` folder
-6. Upload the freshly downloaded `www` folder from the repository
-7. Give the `www` folder recursive 777 permissions:
+Detailed guide: [`PAYLOAD_ALL_IN_ONE.md`](../PAYLOAD_ALL_IN_ONE.md)
 
-```bash
-chmod -R 777 /www
-```
-
-8. Either reboot the modem or restart the webserver
-9. Install all modem-side tweaks using the unified payload (AT backend switch to `atcli`, disable SSH auto-menu, auto reboot cron, clean TTL flow, rootfs RW at boot): [`PAYLOAD_ALL_IN_ONE.md`](../PAYLOAD_ALL_IN_ONE.md)
-10. Quick install directly from modem shell (recommended):
+### 1) Quick install directly from modem shell (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Brazzo978/T99W175-simpleadmin/Quectel-Test/payload/bootstrap_install.sh | sh -s -- --repo Brazzo978/T99W175-simpleadmin --ref Quectel-Test
 ```
 
-11. Alternative install via ADB (PC):
+### 2) Alternative install via ADB (PC)
 
 Linux/macOS/Git Bash:
 
 ```bash
 bash payload/deploy_via_adb.sh
-```
-
-Windows PowerShell:
-
-```powershell
-bash .\payload\deploy_via_adb.sh
-```
-
-```bash
-systemctl restart lighttpd.service
 ```
 
 Browse to the GUI and use Simpleadmin.
