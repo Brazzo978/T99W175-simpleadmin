@@ -26,6 +26,7 @@ Static web interface (HTML/JS + Bash CGI helpers) to administer **Quectel RM/RG5
 * **Advanced page** works ✅
 * **SMS page** works *(at least I think)*
 * **TTL patch** and **auto-reboot** (now work but need additional configuration to work see guide on doc folder, need to make guide better and to prepare payload for autoinstall)
+* **IMEI repair should now work** 
 ---
 
 ## ❌ What is not working / not present / not working as intended
@@ -37,10 +38,7 @@ Static web interface (HTML/JS + Bash CGI helpers) to administer **Quectel RM/RG5
 
     * **Band > APN > preferred network > cell locking**
   * As a result, sometimes cell lock could stay as **unknown** for some seconds after the first load of the page.
-    Don’t worry, it will eventually populate the data.
-* **IMEI repair is not working** right now (even if enabled because I am too lazy to disable it).
 
-  * ⚠️ **DO NOT TRY IT** — it could do damage to **EFS**.
 * **Cell scanner is not implemented yet**.
 
   * This modem has more AT commands to scan nearby cells and will later get a dedicated page to scan nearby cells with the possibility to lock on those.
