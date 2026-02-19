@@ -1,0 +1,14 @@
+[Unit]
+Description=Connection Watchdog
+After=network-online.target ql-netd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/scripts/watchdog/connection-watchdog
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

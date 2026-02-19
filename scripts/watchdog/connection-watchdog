@@ -1,0 +1,87 @@
+#!/bin/sh
+# Lightweight connection watchdog for embedded systems.
+
+CONFIG_FILE="/opt/scripts/Watchdog"
+FAIL_STREAK=0
+
+load_config() {
+    WD_ENABLED=0
+    WD_TARGETS="1.1.1.1,8.8.8.8"
+    WD_FAIL_COUNT=3
+    WD_CHECK_INTERVAL=10
+    WD_ACTION="cfun"
+    WD_CFUN_DELAY=5
+
+    if [ -f "$CONFIG_FILE" ]; then
+        # shellcheck disable=SC1090
+        . "$CONFIG_FILE"
+    fi
+}
+
+log_msg() {
+    logger -t connection-watchdog "$1" 2>/dev/null || echo "connection-watchdog: $1"
+}
+
+is_any_target_up() {
+    local target
+    local IFS=','
+
+    for target in $WD_TARGETS; do
+        target="$(echo "$target" | xargs)"
+        [ -n "$target" ] || continue
+        if ping -c 1 -W 2 "$target" >/dev/null 2>&1; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+do_cfun_cycle() {
+    if command -v atcli_smd8 >/dev/null 2>&1; then
+        atcli_smd8 'AT+CFUN=0' >/dev/null 2>&1 || true
+        sleep "$WD_CFUN_DELAY"
+        atcli_smd8 'AT+CFUN=1' >/dev/null 2>&1 || true
+        log_msg "CFUN cycle executed after connectivity loss"
+    else
+        log_msg "atcli_smd8 not available, CFUN cycle skipped"
+    fi
+}
+
+take_recovery_action() {
+    case "$WD_ACTION" in
+        cfun)
+            do_cfun_cycle
+            ;;
+        reboot)
+            log_msg "Reboot action triggered after connectivity loss"
+            reboot
+            ;;
+        *)
+            log_msg "Unknown action '$WD_ACTION', skipping"
+            ;;
+    esac
+}
+
+while true; do
+    load_config
+
+    if [ "$WD_ENABLED" != "1" ]; then
+        sleep 15
+        continue
+    fi
+
+    if is_any_target_up; then
+        FAIL_STREAK=0
+    else
+        FAIL_STREAK=$((FAIL_STREAK + 1))
+        log_msg "Connectivity check failed (${FAIL_STREAK}/${WD_FAIL_COUNT})"
+        if [ "$FAIL_STREAK" -ge "$WD_FAIL_COUNT" ]; then
+            take_recovery_action
+            FAIL_STREAK=0
+            sleep 10
+        fi
+    fi
+
+    sleep "$WD_CHECK_INTERVAL"
+done

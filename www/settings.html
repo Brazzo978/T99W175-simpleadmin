@@ -823,6 +823,132 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- Connection watchdog -->
+                  <div class="card mt-4">
+                    <div class="card-header">Connection watchdog</div>
+                    <div class="card-body">
+
+                      <template x-if="watchdogSuccessMessage">
+                        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                          <span x-text="watchdogSuccessMessage"></span>
+                          <button type="button" class="btn-close" @click="watchdogSuccessMessage = ''"></button>
+                        </div>
+                      </template>
+
+                      <template x-if="watchdogErrorMessage">
+                        <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                          <span x-text="watchdogErrorMessage"></span>
+                          <button type="button" class="btn-close" @click="watchdogErrorMessage = ''"></button>
+                        </div>
+                      </template>
+
+                      <p class="text-body-secondary mb-3">
+                        Monitor connectivity by pinging one or more IP targets. If all targets fail for N attempts, the watchdog can run a CFUN cycle or reboot the modem.
+                      </p>
+
+                      <div class="form-check form-switch mb-3 d-inline-flex align-items-center gap-2">
+                        <input
+                          id="watchdogEnabled"
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          :disabled="watchdogSaving"
+                          x-model="watchdogForm.enabled"
+                        />
+                        <label class="form-check-label mb-0" for="watchdogEnabled">
+                          Enable Connection watchdog
+                          <span x-show="watchdogSaving" class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                        </label>
+                      </div>
+
+                      <div class="row g-3">
+                        <div class="col-md-8">
+                          <label class="form-label" for="watchdogTargets">IP targets</label>
+                          <input
+                            id="watchdogTargets"
+                            class="form-control"
+                            type="text"
+                            placeholder="1.1.1.1,8.8.8.8"
+                            :disabled="watchdogSaving"
+                            x-model="watchdogForm.targets"
+                          />
+                          <div class="form-text">Comma-separated IPv4 addresses. If at least one host is reachable, the line is considered up.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                          <label class="form-label" for="watchdogFailCount">Failure attempts</label>
+                          <div class="input-group">
+                            <input
+                              id="watchdogFailCount"
+                              class="form-control"
+                              type="number"
+                              min="1"
+                              max="60"
+                              :disabled="watchdogSaving"
+                              x-model.number="watchdogForm.failCount"
+                            />
+                            <span class="input-group-text">times</span>
+                          </div>
+                        </div>
+
+                        <div class="col-md-4">
+                          <label class="form-label" for="watchdogInterval">Check interval</label>
+                          <div class="input-group">
+                            <input
+                              id="watchdogInterval"
+                              class="form-control"
+                              type="number"
+                              min="5"
+                              max="3600"
+                              :disabled="watchdogSaving"
+                              x-model.number="watchdogForm.checkInterval"
+                            />
+                            <span class="input-group-text">sec</span>
+                          </div>
+                        </div>
+
+                        <div class="col-md-4">
+                          <label class="form-label" for="watchdogAction">Action when offline</label>
+                          <select
+                            id="watchdogAction"
+                            class="form-select"
+                            :disabled="watchdogSaving"
+                            x-model="watchdogForm.action"
+                          >
+                            <option value="cfun">CFUN cycle (0 then 1)</option>
+                            <option value="reboot">Full modem reboot</option>
+                          </select>
+                        </div>
+
+                        <div class="col-md-4" x-show="watchdogForm.action === 'cfun'">
+                          <label class="form-label" for="watchdogCfunDelay">CFUN restore delay</label>
+                          <div class="input-group">
+                            <input
+                              id="watchdogCfunDelay"
+                              class="form-control"
+                              type="number"
+                              min="1"
+                              max="120"
+                              :disabled="watchdogSaving"
+                              x-model.number="watchdogForm.cfunDelay"
+                            />
+                            <span class="input-group-text">sec</span>
+                          </div>
+                        </div>
+
+                        <div class="col-md-4 d-flex align-items-end">
+                          <button type="button" class="btn btn-primary w-100" :disabled="watchdogSaving" @click="saveWatchdogConfig()">
+                            <span x-show="!watchdogSaving">Apply</span>
+                            <span x-show="watchdogSaving">
+                              <span class="spinner-border spinner-border-sm" role="status"></span>
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
                   
                 </div>
               </div>
