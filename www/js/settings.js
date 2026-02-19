@@ -85,6 +85,17 @@ function registerNetworkSettings() {
       dayOfMonth: 1,
       time: "00:00",
     },
+    watchdogSaving: false,
+    watchdogSuccessMessage: "",
+    watchdogErrorMessage: "",
+    watchdogForm: {
+      enabled: false,
+      targets: "1.1.1.1,8.8.8.8",
+      failCount: 3,
+      checkInterval: 10,
+      action: "cfun",
+      cfunDelay: 5,
+    },
     // Current TTL settings from server
     currentTtlSettings: {
       enabled: false,
@@ -152,6 +163,7 @@ function registerNetworkSettings() {
       await this.fetchConfiguration();
       await this.fetchTtlSettings();
       await this.loadRebootSchedule();
+      await this.loadWatchdogConfig();
       await this.fetchArpEntries();
 
       // Watch for changes to form fields that require restart
@@ -819,6 +831,105 @@ function registerNetworkSettings() {
           "Unable to remove the schedule. Please try again.";
       } finally {
         this.rebootSaving = false;
+      }
+    },
+    normalizeWatchdogTargets() {
+      return this.watchdogForm.targets
+        .split(",")
+        .map((target) => target.trim())
+        .filter((target) => this.isValidIp(target));
+    },
+    validateWatchdogForm() {
+      const targets = this.normalizeWatchdogTargets();
+      if (!targets.length) {
+        return "Enter at least one valid IPv4 address to monitor.";
+      }
+
+      if (!Number.isInteger(this.watchdogForm.failCount) || this.watchdogForm.failCount < 1 || this.watchdogForm.failCount > 60) {
+        return "Failure attempts must be between 1 and 60.";
+      }
+
+      if (!Number.isInteger(this.watchdogForm.checkInterval) || this.watchdogForm.checkInterval < 5 || this.watchdogForm.checkInterval > 3600) {
+        return "Check interval must be between 5 and 3600 seconds.";
+      }
+
+      if (this.watchdogForm.action === "cfun") {
+        if (!Number.isInteger(this.watchdogForm.cfunDelay) || this.watchdogForm.cfunDelay < 1 || this.watchdogForm.cfunDelay > 120) {
+          return "CFUN delay must be between 1 and 120 seconds.";
+        }
+      }
+
+      return "";
+    },
+    async loadWatchdogConfig() {
+      this.watchdogErrorMessage = "";
+      try {
+        const response = await fetch("/cgi-bin/connection_watchdog", {
+          headers: { Accept: "application/json" },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load watchdog config");
+        }
+
+        const payload = await response.json();
+        this.watchdogForm.enabled = Boolean(payload.enabled);
+        this.watchdogForm.targets = payload.targets || "1.1.1.1,8.8.8.8";
+        this.watchdogForm.failCount = Number(payload.failCount || 3);
+        this.watchdogForm.checkInterval = Number(payload.checkInterval || 10);
+        this.watchdogForm.action = payload.action === "reboot" ? "reboot" : "cfun";
+        this.watchdogForm.cfunDelay = Number(payload.cfunDelay || 5);
+      } catch (error) {
+        console.error("Error loading watchdog config", error);
+        this.watchdogErrorMessage = "Unable to read Connection watchdog configuration.";
+      }
+    },
+    async saveWatchdogConfig() {
+      this.watchdogSuccessMessage = "";
+      this.watchdogErrorMessage = "";
+
+      const validationError = this.validateWatchdogForm();
+      if (validationError) {
+        this.watchdogErrorMessage = validationError;
+        return;
+      }
+
+      this.watchdogSaving = true;
+      try {
+        const response = await fetch("/cgi-bin/connection_watchdog", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            enabled: this.watchdogForm.enabled,
+            targets: this.normalizeWatchdogTargets().join(","),
+            failCount: this.watchdogForm.failCount,
+            checkInterval: this.watchdogForm.checkInterval,
+            action: this.watchdogForm.action,
+            cfunDelay: this.watchdogForm.cfunDelay,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        this.watchdogForm.enabled = Boolean(payload.enabled);
+        this.watchdogForm.targets = payload.targets || this.watchdogForm.targets;
+        this.watchdogSuccessMessage = this.watchdogForm.enabled
+          ? "Connection watchdog saved and enabled."
+          : "Connection watchdog disabled.";
+
+        setTimeout(() => {
+          this.watchdogSuccessMessage = "";
+        }, 5000);
+      } catch (error) {
+        console.error("Error saving watchdog config", error);
+        this.watchdogErrorMessage = "Unable to save Connection watchdog configuration.";
+      } finally {
+        this.watchdogSaving = false;
       }
     },
     async fetchConfiguration(shouldResetMessages = true) {
