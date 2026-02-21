@@ -252,7 +252,7 @@ Apri dal browser:
 
 A questo punto il modem è **preparato**, ma per ottenere il progetto funzionante al 100% devi ancora seguire la guida dedicata:
 
-* **`atcmd -> atcli`**[`atcmd_to_atcli.md`](Doc/atcmd_to_atcli.md)
+* **`atcmd -> atcli`**[`atcmd_to_atcli.md`](atcmd_to_atcli.md)
 
 ### In questa guida devi fare (parte di switch)
 
