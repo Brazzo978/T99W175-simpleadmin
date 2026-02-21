@@ -1,0 +1,45 @@
+ADB Commands – RM502Q-AE simplet99porrt
+
+Da eseguire in CMD dentro: Payload
+
+adb devices
+
+adb push bin\wget /usr/bin/wget
+adb push bin\atcli /usr/bin/atcli
+adb push bin\atcli_smd11 /usr/bin/atcli_smd11
+
+adb push etc-init.d\crontab /etc/init.d/crontab
+
+adb push systemd\crontab.service /lib/systemd/system/crontab.service
+adb push systemd\ttl-override.service /lib/systemd/system/ttl-override.service
+
+adb push udev\99-smd-perms.rules /etc/udev/rules.d/99-smd-perms.rules
+
+adb push simpleadmin\lighttpd.conf /usrdata/simpleadmin/lighttpd.conf
+
+adb shell "mount -o remount,rw / && cd /usrdata/simpleadmin && [ -d www ] && mv www www.old || true"
+adb push simpleadmin\www /usrdata/simpleadmin/
+
+adb shell "mount -o remount,rw / && chmod 755 /usr/bin/wget /usr/bin/atcli /usr/bin/atcli_smd11 && chown root:root /usr/bin/wget /usr/bin/atcli /usr/bin/atcli_smd11"
+adb shell "chmod 755 /etc/init.d/crontab && chown root:root /etc/init.d/crontab"
+adb shell "chmod 644 /lib/systemd/system/crontab.service /lib/systemd/system/ttl-override.service && chown root:root /lib/systemd/system/crontab.service /lib/systemd/system/ttl-override.service"
+adb shell "chmod 644 /etc/udev/rules.d/99-smd-perms.rules && chown root:root /etc/udev/rules.d/99-smd-perms.rules"
+adb shell "chown root:root /usrdata/simpleadmin/lighttpd.conf"
+
+adb shell "chmod -R 777 /usrdata/simpleadmin/www"
+
+adb shell "systemctl daemon-reload"
+adb shell "systemctl start crontab"
+
+adb shell "mkdir -p /lib/systemd/system/multi-user.target.wants && ln -sfn /lib/systemd/system/crontab.service /lib/systemd/system/multi-user.target.wants/crontab.service"
+adb shell "ln -sfn /lib/systemd/system/ttl-override.service /lib/systemd/system/multi-user.target.wants/ttl-override.service"
+
+adb shell "systemctl restart lighttpd.service"
+
+adb shell "systemctl status lighttpd.service --no-pager | sed -n '1,20p'"
+adb shell "systemctl status crontab --no-pager | sed -n '1,40p'"
+adb shell "ps w | grep -E '[c]rond'"
+adb shell "ls -l /usr/bin/wget /usr/bin/atcli /usr/bin/atcli_smd11"
+adb shell "ls -l /etc/init.d/crontab /lib/systemd/system/crontab.service /lib/systemd/system/ttl-override.service /etc/udev/rules.d/99-smd-perms.rules"
+adb shell "mount | grep ' on / '"
+

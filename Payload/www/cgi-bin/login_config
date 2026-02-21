@@ -1,0 +1,29 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"success":false,"message":"Authentication required"}'
+    exit 0
+fi
+
+if [ "${SIMPLEADMIN_ENABLE_LOGIN:-0}" = "1" ] || [ "${SIMPLEADMIN_ENABLE_LOGIN:-0}" = "true" ]; then
+    LOGIN_ENABLED=1
+else
+    LOGIN_ENABLED=0
+fi
+
+payload=$(cat <<JSON
+{
+  "success": true,
+  "data": {
+    "enabled": ${LOGIN_ENABLED:-0}
+  }
+}
+JSON
+)
+
+send_json_response 200 "$payload"

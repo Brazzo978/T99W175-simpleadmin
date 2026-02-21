@@ -1,0 +1,78 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:        crond
+# Required-Start:    $remote_fs $syslog $networking
+# Required-Stop:    $remote_fs $syslog
+# Default-Start:    2 3 4 5
+# Default-Stop:        1
+# Short-Description:    Crontab Scheduler
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/sbin/crond
+EXTRARGS="-L /var/log/crontab.log -c /persist/cron"
+NAME=crond
+DESC="Crontab Scheduler"
+PIDFILE=/var/run/crond.pid
+
+NO_START=0
+
+set -e
+
+test "$NO_START" = "0" || exit 0
+test -x "$DAEMON" || exit 0
+
+ensure_cron_dir() {
+    local web_user="www-data"
+    local web_group="dialout"
+
+    if [ -f /usrdata/simpleadmin/lighttpd.conf ]; then
+        web_user=$(sed -n 's/^[[:space:]]*server\.username[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' /usrdata/simpleadmin/lighttpd.conf | head -n 1)
+        web_group=$(sed -n 's/^[[:space:]]*server\.groupname[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' /usrdata/simpleadmin/lighttpd.conf | head -n 1)
+        [ -n "$web_user" ] || web_user="www-data"
+        [ -n "$web_group" ] || web_group="dialout"
+    fi
+
+    if [ ! -d /persist/cron ]; then
+        mkdir -p /persist/cron
+    fi
+    chmod 755 /persist/cron
+    chown root:root /persist/cron 2>/dev/null || true
+
+    if [ ! -f /persist/cron/root ]; then
+        : > /persist/cron/root
+    fi
+    chown "$web_user:$web_group" /persist/cron/root 2>/dev/null || true
+    chmod 664 /persist/cron/root
+}
+
+case "$1" in
+  start)
+    ensure_cron_dir
+    echo -n "Starting $DESC: "
+    start-stop-daemon -S -p $PIDFILE \
+      -x "$DAEMON" -- $EXTRARGS
+    echo "$NAME."
+    ;;
+  stop)
+    echo -n "Stopping $DESC: "
+    start-stop-daemon -K -x /bin/busybox.nosuid -p $PIDFILE
+    echo "$NAME."
+    ;;
+  restart|force-reload)
+    ensure_cron_dir  
+    echo -n "Restarting $DESC: "
+    start-stop-daemon -K -x /bin/busybox.nosuid -p $PIDFILE
+    sleep 1
+    start-stop-daemon -S -p $PIDFILE \
+      -x "$DAEMON" -- $EXTRARGS
+    echo "$NAME."
+    ;;
+  *)
+    N=/etc/init.d/$NAME
+    echo "Usage: $N {start|stop|restart|force-reload}" >&2
+    exit 1
+    ;;
+esac
+
+exit 0
