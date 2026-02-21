@@ -1,25 +1,6 @@
-# Enable RootFS RW at Boot (502) - Reference from T99
+## Obiettivo 
 
-Questa guida spiega come abilitare il remount della root (`/`) in `rw` ad ogni boot sul 502.
-Include anche cosa fa il T99, per confronto.
-
-## Cosa fa il T99 (verificato)
-
-Sul T99 non emerge un servizio custom che esegue esplicitamente `mount -o remount,rw /`.
-
-Meccanismo osservato:
-
-- root gia' montata `rw` al boot (`ubi0:rootfs on / ... (rw,...)`)
-- presenza di mount unit systemd:
-  - `/lib/systemd/system/systemrw.mount`
-  - `/lib/systemd/system/systemrw-ubi.mount`
-- varie unit `systemrw-*.service` che bind-mountano file/dir da `/systemrw` verso `/etc/...`
-
-Quindi: sul T99 la persistenza RW viene gestita da systemd + layout UBI, non da uno script init.d singolo.
-
-## Obiettivo sul 502
-
-Sul 502 la root puo' tornare `ro` al boot. Per allineare il comportamento operativo, creiamo una unit systemd che forza:
+Sul 502 la root tornara `ro` al boot. Per forzare rw, creiamo una unit systemd che forza:
 
 ```bash
 mount -o remount,rw /
@@ -29,24 +10,6 @@ mount -o remount,rw /
 
 Nota: su questi modem le modifiche in `/etc/systemd/system` possono non essere affidabili al boot molto early.
 Usare `/lib/systemd/system` e symlink in `multi-user.target.wants` e' il metodo piu' stabile.
-
-File: `/lib/systemd/system/rootfs-rw.service`
-
-```ini
-[Unit]
-Description=Remount root filesystem as read-write
-DefaultDependencies=no
-After=local-fs.target
-Before=multi-user.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/mount -o remount,rw /
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-```
 
 ## 2) Installazione e attivazione
 
