@@ -83,35 +83,13 @@ Check `DOCUMENTAZIONE.md` for file-by-file behavior, request flows, and how each
 
 ## 🛠 Installation
 
-Simpleadmin is installed and configured through the unified payload.
-
+Follow Installguide [`Installguide`](Doc/Installguide.md)
 This is the recommended flow because it applies all required modem-side changes in one shot:
 
 - AT backend switch to `atcli`
-- disable SSH auto console menu
 - auto reboot cron support
-- clean TTL backend/CGI
 - rootfs RW at boot
 
-Detailed guide: [`PAYLOAD_ALL_IN_ONE.md`](../PAYLOAD_ALL_IN_ONE.md)
-
-### 1) Quick install directly from modem shell (recommended)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Brazzo978/T99W175-simpleadmin/Quectel-Test/payload/bootstrap_install.sh | sh -s -- --repo Brazzo978/T99W175-simpleadmin --ref Quectel-Test
-```
-
-### 2) Alternative install via ADB (PC)
-
-Linux/macOS/Git Bash:
-
-```bash
-bash payload/deploy_via_adb.sh
-```
-
-Browse to the GUI and use Simpleadmin.
-
----
 
 ## AT backend change (important)
 
