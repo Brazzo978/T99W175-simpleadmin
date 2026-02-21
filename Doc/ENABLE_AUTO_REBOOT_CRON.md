@@ -1,5 +1,4 @@
-# Enable Auto Reboot (Cron) on QCPort Modem (crontab only)
-
+# Enable Auto Reboot (Cron)
 
 ---
 
