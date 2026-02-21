@@ -1,80 +1,109 @@
-# Enable Auto Reboot (Cron) on Quectel rm502q  WIP WIP WIP 
+# Enable Auto Reboot (Cron) on QCPort Modem (crontab only)
 
 
+---
 
-## 1) Copia file sul modem
-T99W175-simpleadmin-Quectel-Test/scripts/init.d/crontab 
-T99W175-simpleadmin-Quectel-Test/scripts/systemd/crontab.service \
+## File necessari
 
+- `scripts/init.d/crontab`
+- `scripts/systemd/crontab.service`
 
+---
 
+## 1) Push file via ADB (dal PC)
 
-
-## 2) Rimonta root in RW (come guida atcmd -> atcli)
-
+### Init script
 ```bash
-mount -o remount,rw /
-verifica: 
-mount | grep " on / "
-'
+adb push scripts/init.d/crontab /etc/init.d/crontab
 ```
 
-## 3) Installa script init + unit systemd (path T99)
+### systemd unit
+```bash
+adb push scripts/systemd/crontab.service /lib/systemd/system/crontab.service
+```
 
 
-mkdir -p /lib/systemd/system/multi-user.target.wants
-ln -sfn /lib/systemd/system/crontab.service /lib/systemd/system/multi-user.target.wants/crontab.service
+---
 
+## 2) Permessi (da shell sul modem)
+
+### Init script (`/etc/init.d/crontab`) -> eseguibile
+```sh
+chmod 755 /etc/init.d/crontab
+chown root:root /etc/init.d/crontab
+ls -l /etc/init.d/crontab
+```
+
+Atteso:
+- `-rwxr-xr-x`
+- `root root`
+
+### systemd unit (`/lib/systemd/system/crontab.service`) -> non eseguibile
+```sh
+chmod 644 /lib/systemd/system/crontab.service
+chown root:root /lib/systemd/system/crontab.service
+ls -l /lib/systemd/system/crontab.service
+```
+
+Atteso:
+- `-rw-r--r--`
+- `root root`
+
+
+---
+
+## 3) Ricarica systemd e avvia `crontab`
+
+```sh
 systemctl daemon-reload
 systemctl start crontab
-
-
-'
 ```
 
-## 4) Verifica funzionamento
+---
 
-## 5) Cleanup file temporanei
+## 4) Abilitazione al boot (symlink manuale)
+
+> In questo setup embedded si usa il symlink manuale invece di `systemctl enable`.
+
+```sh
+mkdir -p /lib/systemd/system/multi-user.target.wants
+ln -sfn /lib/systemd/system/crontab.service /lib/systemd/system/multi-user.target.wants/crontab.service
+```
+
+---
+
+## 5) Verifica runtime (fondamentale)
+
+```sh
+systemctl status crontab --no-pager | sed -n '1,40p'
+ps w | grep -E '[c]rond'
+ls -ld /persist/cron
+ls -l /persist/cron
+```
+
+### Atteso
+- `crontab.service` in stato `active (exited)`
+- `ExecStart=/etc/init.d/crontab start` con `status=0/SUCCESS`
+- `crond` in esecuzione con:
+  - `-L /var/log/crontab.log`
+  - `-c /persist/cron`
+
+Esempio:
+```txt
+● crontab.service - Crond wrapper
+   Loaded: loaded (/lib/systemd/system/crontab.service; disabled; vendor preset: enabled)
+   Active: active (exited)
+  Process: ... ExecStart=/etc/init.d/crontab start (code=exited, status=0/SUCCESS)
+
+... /bin/busybox.nosuid /usr/sbin/crond -L /var/log/crontab.log -c /persist/cron
+```
+
+---
+## 6) Reboot + Verify everything
+
+Check service status:
 
 ```bash
-sshpass -p "$MODEM_PASS" ssh -o StrictHostKeyChecking=accept-new "$MODEM_USER@$MODEM_IP" '
-rm -f /tmp/crontab.init.new /tmp/crontab.service.new
-'
+systemctl status crontab 
+crontab -c /persist/cron -l
 ```
-
-## 6) Test feature Auto Reboot da GUI
-
-Prerequisiti GUI:
-
-- `settings.html` con card "Automatic reboot" visibile (non `d-none`)
-- endpoint `/cgi-bin/reboot_schedule` presente
-
-Flusso:
-
-1. Apri `System Settings`
-2. Abilita `Automatic reboot`
-3. Salva una schedule (es. ogni 24h)
-4. Verifica che `/persist/cron/root` venga creato con riga cron
-
-Verifica rapida:
-
-```bash
-sshpass -p "$MODEM_PASS" ssh -o StrictHostKeyChecking=accept-new "$MODEM_USER@$MODEM_IP" '
-[ -f /persist/cron/root ] && sed -n "1,20p" /persist/cron/root || echo "Nessuna schedule salvata"
-'
-```
-
-## Rollback
-
-```bash
-sshpass -p "$MODEM_PASS" ssh -o StrictHostKeyChecking=accept-new "$MODEM_USER@$MODEM_IP" '
-systemctl stop crontab || true
-rm -f /lib/systemd/system/multi-user.target.wants/crontab.service
-rm -f /lib/systemd/system/crontab.service
-rm -f /etc/init.d/crontab
-systemctl daemon-reload
-rm -rf /persist/cron
-'
-```
-
-Se vuoi ripristinare versioni precedenti, usa i backup creati in `/tmp/simpleadmin_backup_<timestamp>/`.
