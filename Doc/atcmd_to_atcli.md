@@ -47,7 +47,7 @@ ps | grep -E "socat|ttyIN|ttyOUT" | grep -v grep
 
 Atteso: `inactive`, file con suffisso `.disabled`, nessun processo socat.
 
-## 2) Installare `atcli` e `atcli_smd11` in `/usr/bin`
+## 2) Installare `atcli` e `atcli_smd11` in `/usr/bin` ( solo se non hai pushato i file e i permessi via payload sennò skip a 3) 
 
 Puoi caricare `atcli` con `scp`, `sftp` oppure `adb` (se disponibile).
 
