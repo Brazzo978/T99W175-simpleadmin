@@ -1,2 +1,0 @@
-KERNEL=="smd7",  GROUP="radio", MODE="0660"
-KERNEL=="smd11", GROUP="radio", MODE="0660"
