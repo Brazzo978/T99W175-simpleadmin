@@ -47,42 +47,24 @@ ps | grep -E "socat|ttyIN|ttyOUT" | grep -v grep
 
 Atteso: `inactive`, file con suffisso `.disabled`, nessun processo socat.
 
-## 2) Installare `atcli` in `/usr/bin`
+## 2) Installare `atcli` e `atcli_smd11` in `/usr/bin`
 
 Puoi caricare `atcli` con `scp`, `sftp` oppure `adb` (se disponibile).
 
-```bash
-scp ./atcli root@<modem>:/usr/bin/atcli
-ssh root@<modem> "chmod 755 /usr/bin/atcli"
-```
-
-Esempio con `sftp`:
-
-```bash
-sftp root@<modem>
-put ./atcli /usr/bin/atcli
-chmod 755 /usr/bin/atcli
-bye
-```
 
 Esempio con `adb`:
 
 ```bash
 adb push ./atcli /usr/bin/atcli
+adb push ./atcli_smd11 /usr/bin/atcli
 adb shell chmod 755 /usr/bin/atcli
+adb shell chmod 755 /usr/bin/atcli_smd11
 ```
 
-Se `/usr/bin` fosse in sola lettura, rimonta prima la root in RW:
+Se `/usr/bin` fosse in sola lettura, bisogna prima rimontarla RW:
 
 ```bash
-mount -o remount,rw /
-```
-
-## 2b) Installare `atcli_smd11` (GUI principale su /dev/smd11)
-
-```bash
-scp ./atcli_smd11 root@<modem>:/usrdata/simpleadmin/atcli_smd11
-ssh root@<modem> "chmod 755 /usrdata/simpleadmin/atcli_smd11"
+adb shell mount -o remount,rw /
 ```
 
 ## 3) Permessi persistenti su /dev/smd7 e /dev/smd11 (udev)
@@ -106,32 +88,42 @@ Verifica:
 ```bash
 ls -l /dev/smd7 /dev/smd11
 ```
-
 Atteso: `crw-rw----` con gruppo `radio`.
 
-## 4) Configurazione uso porte (consigliata)
+## 4) Aggiungiamo www-data al gruppo radio 
+```bash
+sed -i 's/^radio:x:1001:mcm$/radio:x:1001:mcm,www-data/' /etc/group
+```
+ Controlliamo
+```bash
+grep '^radio:' /etc/group
+```
+ risultato atteso:
+```bash
+root@sdxprairie:~# grep '^radio:' /etc/group
+radio:x:1001:mcm,www-data
+```
 
-Per evitare contesa:
 
-- **GUI (get_atcommand)** → `smd11` usando `/usrdata/simpleadmin/atcli_smd11`
-- **Terminale GUI (user_atcommand)** → `smd7` usando `/usr/bin/atcli`
 
 ## 5) Uso `atcli` (test rapido)
 
 ```bash
-/usr/bin/atcli ATI
-/usr/bin/atcli 'AT+QENG="servingcell"'
-/usr/bin/atcli AT+QCAINFO
+atcli ATI
 ```
-
-## 5b) Verifica rapida da CGI (GUI)
-
-Serve una sessione valida (login fatto in GUI).
-
+E 
 ```bash
-sess=$(tail -n 1 /tmp/simpleadmin_sessions.txt | cut -d: -f1)
-HTTP_COOKIE="simpleadmin_session=$sess" QUERY_STRING="atcmd=ATI" /usrdata/simpleadmin/www/cgi-bin/get_atcommand
+atcli_smd11 ATI
 ```
+Se ritornano i comandi tutto dovrebbe andare bene 
+
+## FATTO GLI STEP SUCCESSIVI SONO PER IL RITORNO A SIMPLEADMIN NON FARE
+
+
+
+
+
+
 
 ## 6) (Opzionale) Ripristino bridge
 
