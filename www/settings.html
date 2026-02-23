@@ -937,6 +937,23 @@
                           </div>
                         </div>
 
+                        <div class="col-md-4">
+                          <label class="form-label" for="watchdogBootGrace">Boot grace window</label>
+                          <div class="input-group">
+                            <input
+                              id="watchdogBootGrace"
+                              class="form-control"
+                              type="number"
+                              min="0"
+                              max="3600"
+                              :disabled="watchdogSaving"
+                              x-model.number="watchdogForm.bootGrace"
+                            />
+                            <span class="input-group-text">sec</span>
+                          </div>
+                          <div class="form-text">Suppresses CFUN/reboot actions while uptime is below this threshold (e.g. 600s = 10m).</div>
+                        </div>
+
                         <div class="col-md-4 d-flex align-items-end">
                           <button type="button" class="btn btn-primary w-100" :disabled="watchdogSaving" @click="saveWatchdogConfig()">
                             <span x-show="!watchdogSaving">Apply</span>

@@ -95,6 +95,7 @@ function registerNetworkSettings() {
       checkInterval: 10,
       action: "cfun",
       cfunDelay: 5,
+      bootGrace: 600,
     },
     // Current TTL settings from server
     currentTtlSettings: {
@@ -859,6 +860,10 @@ function registerNetworkSettings() {
         }
       }
 
+      if (!Number.isInteger(this.watchdogForm.bootGrace) || this.watchdogForm.bootGrace < 0 || this.watchdogForm.bootGrace > 3600) {
+        return "Boot grace window must be between 0 and 3600 seconds.";
+      }
+
       return "";
     },
     async loadWatchdogConfig() {
@@ -879,6 +884,7 @@ function registerNetworkSettings() {
         this.watchdogForm.checkInterval = Number(payload.checkInterval || 10);
         this.watchdogForm.action = payload.action === "reboot" ? "reboot" : "cfun";
         this.watchdogForm.cfunDelay = Number(payload.cfunDelay || 5);
+        this.watchdogForm.bootGrace = Number(payload.bootGrace ?? 600);
       } catch (error) {
         console.error("Error loading watchdog config", error);
         this.watchdogErrorMessage = "Unable to read Connection watchdog configuration.";
@@ -908,6 +914,7 @@ function registerNetworkSettings() {
             checkInterval: this.watchdogForm.checkInterval,
             action: this.watchdogForm.action,
             cfunDelay: this.watchdogForm.cfunDelay,
+            bootGrace: this.watchdogForm.bootGrace,
           }),
         });
 

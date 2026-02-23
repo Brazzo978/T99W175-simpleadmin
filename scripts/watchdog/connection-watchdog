@@ -11,11 +11,27 @@ load_config() {
     WD_CHECK_INTERVAL=10
     WD_ACTION="cfun"
     WD_CFUN_DELAY=5
+    WD_BOOT_GRACE=600
 
     if [ -f "$CONFIG_FILE" ]; then
         # shellcheck disable=SC1090
         . "$CONFIG_FILE"
     fi
+}
+
+get_uptime_seconds() {
+    if [ -r /proc/uptime ]; then
+        awk '{print int($1)}' /proc/uptime 2>/dev/null || echo 0
+    else
+        echo 0
+    fi
+}
+
+is_boot_grace_elapsed() {
+    local uptime
+    uptime="$(get_uptime_seconds)"
+
+    [ "$uptime" -ge "$WD_BOOT_GRACE" ]
 }
 
 log_msg() {
@@ -77,7 +93,11 @@ while true; do
         FAIL_STREAK=$((FAIL_STREAK + 1))
         log_msg "Connectivity check failed (${FAIL_STREAK}/${WD_FAIL_COUNT})"
         if [ "$FAIL_STREAK" -ge "$WD_FAIL_COUNT" ]; then
-            take_recovery_action
+            if is_boot_grace_elapsed; then
+                take_recovery_action
+            else
+                log_msg "Recovery suppressed during boot grace window (${WD_BOOT_GRACE}s)"
+            fi
             FAIL_STREAK=0
             sleep 10
         fi
