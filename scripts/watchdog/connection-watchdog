@@ -9,6 +9,7 @@ load_config() {
     WD_TARGETS="1.1.1.1,8.8.8.8"
     WD_FAIL_COUNT=3
     WD_CHECK_INTERVAL=10
+    WD_PING_TIMEOUT_MS=5000
     WD_ACTION="cfun"
     WD_CFUN_DELAY=5
     WD_BOOT_GRACE=600
@@ -17,6 +18,17 @@ load_config() {
         # shellcheck disable=SC1090
         . "$CONFIG_FILE"
     fi
+
+    # Backward compatibility: old config may still use WD_PING_TIMEOUT (seconds).
+    if [ -z "${WD_PING_TIMEOUT_MS:-}" ] && [ -n "${WD_PING_TIMEOUT:-}" ]; then
+        WD_PING_TIMEOUT_MS=$((WD_PING_TIMEOUT * 1000))
+    fi
+
+    case "${WD_PING_TIMEOUT_MS:-}" in
+        *[!0-9]*|"") WD_PING_TIMEOUT_MS=5000 ;;
+    esac
+
+    [ "$WD_PING_TIMEOUT_MS" -ge 100 ] || WD_PING_TIMEOUT_MS=100
 }
 
 get_uptime_seconds() {
@@ -41,12 +53,22 @@ log_msg() {
 is_any_target_up() {
     local target
     local IFS=','
+    local timeout_seconds
 
     for target in $WD_TARGETS; do
         target="$(echo "$target" | xargs)"
         [ -n "$target" ] || continue
-        if ping -c 1 -W 2 "$target" >/dev/null 2>&1; then
-            return 0
+
+        if command -v timeout >/dev/null 2>&1; then
+            if timeout "${WD_PING_TIMEOUT_MS}ms" ping -c 1 "$target" >/dev/null 2>&1; then
+                return 0
+            fi
+        else
+            timeout_seconds=$(((WD_PING_TIMEOUT_MS + 999) / 1000))
+            [ "$timeout_seconds" -ge 1 ] || timeout_seconds=1
+            if ping -c 1 -W "$timeout_seconds" "$target" >/dev/null 2>&1; then
+                return 0
+            fi
         fi
     done
 

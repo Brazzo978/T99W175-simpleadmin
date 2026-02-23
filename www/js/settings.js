@@ -93,6 +93,7 @@ function registerNetworkSettings() {
       targets: "1.1.1.1,8.8.8.8",
       failCount: 3,
       checkInterval: 10,
+      pingTimeoutMs: 5000,
       action: "cfun",
       bootGrace: 600,
     },
@@ -853,6 +854,10 @@ function registerNetworkSettings() {
         return "Check interval must be between 5 and 3600 seconds.";
       }
 
+      if (!Number.isInteger(this.watchdogForm.pingTimeoutMs) || this.watchdogForm.pingTimeoutMs < 100 || this.watchdogForm.pingTimeoutMs > 30000) {
+        return "Ping timeout must be between 100 and 30000 milliseconds.";
+      }
+
       if (!Number.isInteger(this.watchdogForm.bootGrace) || this.watchdogForm.bootGrace < 0 || this.watchdogForm.bootGrace > 3600) {
         return "Boot grace window must be between 0 and 3600 seconds.";
       }
@@ -875,6 +880,7 @@ function registerNetworkSettings() {
         this.watchdogForm.targets = payload.targets || "1.1.1.1,8.8.8.8";
         this.watchdogForm.failCount = Number(payload.failCount || 3);
         this.watchdogForm.checkInterval = Number(payload.checkInterval || 10);
+        this.watchdogForm.pingTimeoutMs = Number(payload.pingTimeoutMs || 5000);
         this.watchdogForm.action = payload.action === "reboot" ? "reboot" : "cfun";
         this.watchdogForm.bootGrace = Number(payload.bootGrace ?? 600);
       } catch (error) {
@@ -904,6 +910,7 @@ function registerNetworkSettings() {
             targets: this.normalizeWatchdogTargets().join(","),
             failCount: this.watchdogForm.failCount,
             checkInterval: this.watchdogForm.checkInterval,
+            pingTimeoutMs: this.watchdogForm.pingTimeoutMs,
             action: this.watchdogForm.action,
             bootGrace: this.watchdogForm.bootGrace,
           }),
