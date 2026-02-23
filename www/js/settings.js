@@ -88,14 +88,19 @@ function registerNetworkSettings() {
     watchdogSaving: false,
     watchdogSuccessMessage: "",
     watchdogErrorMessage: "",
+    watchdogLogText: "Loading watchdog log...",
+    watchdogLogFile: "/tmp/connection-watchdog.log",
+    watchdogLogLoading: false,
+    watchdogLogAutoRefresh: null,
     watchdogForm: {
       enabled: false,
       targets: "1.1.1.1,8.8.8.8",
       failCount: 3,
       checkInterval: 10,
-      pingTimeoutMs: 5000,
+      pingTimeoutSec: 5,
       action: "cfun",
       bootGrace: 600,
+      cfunMaxAttempts: 10,
     },
     // Current TTL settings from server
     currentTtlSettings: {
@@ -166,6 +171,18 @@ function registerNetworkSettings() {
       await this.loadRebootSchedule();
       await this.loadWatchdogConfig();
       await this.fetchArpEntries();
+
+      const watchdogLogModalEl = document.getElementById("watchdogLogModal");
+      if (watchdogLogModalEl) {
+        watchdogLogModalEl.addEventListener("show.bs.modal", () => {
+          this.fetchWatchdogLog();
+          this.startWatchdogLogAutoRefresh();
+        });
+
+        watchdogLogModalEl.addEventListener("hidden.bs.modal", () => {
+          this.stopWatchdogLogAutoRefresh();
+        });
+      }
 
       // Watch for changes to form fields that require restart
       this.$watch('form', () => this.checkPendingRestart(), { deep: true });
@@ -846,16 +863,20 @@ function registerNetworkSettings() {
         return "Enter at least one valid IPv4 address to monitor.";
       }
 
-      if (!Number.isInteger(this.watchdogForm.failCount) || this.watchdogForm.failCount < 1 || this.watchdogForm.failCount > 60) {
-        return "Failure attempts must be between 1 and 60.";
+      if (!Number.isInteger(this.watchdogForm.failCount) || this.watchdogForm.failCount < 1 || this.watchdogForm.failCount > 120) {
+        return "Failure attempts must be between 1 and 120.";
       }
 
-      if (!Number.isInteger(this.watchdogForm.checkInterval) || this.watchdogForm.checkInterval < 5 || this.watchdogForm.checkInterval > 3600) {
-        return "Check interval must be between 5 and 3600 seconds.";
+      if (!Number.isInteger(this.watchdogForm.checkInterval) || this.watchdogForm.checkInterval < 1 || this.watchdogForm.checkInterval > 60) {
+        return "Check interval must be between 1 and 60 seconds.";
       }
 
-      if (!Number.isInteger(this.watchdogForm.pingTimeoutMs) || this.watchdogForm.pingTimeoutMs < 100 || this.watchdogForm.pingTimeoutMs > 30000) {
-        return "Ping timeout must be between 100 and 30000 milliseconds.";
+      if (!Number.isInteger(this.watchdogForm.pingTimeoutSec) || this.watchdogForm.pingTimeoutSec < 1 || this.watchdogForm.pingTimeoutSec > 60) {
+        return "Ping timeout must be between 1 and 60 seconds.";
+      }
+
+      if (this.watchdogForm.action === "cfun" && (!Number.isInteger(this.watchdogForm.cfunMaxAttempts) || this.watchdogForm.cfunMaxAttempts < 1 || this.watchdogForm.cfunMaxAttempts > 120)) {
+        return "Try CFUN for must be between 1 and 120.";
       }
 
       if (!Number.isInteger(this.watchdogForm.bootGrace) || this.watchdogForm.bootGrace < 0 || this.watchdogForm.bootGrace > 3600) {
@@ -880,9 +901,10 @@ function registerNetworkSettings() {
         this.watchdogForm.targets = payload.targets || "1.1.1.1,8.8.8.8";
         this.watchdogForm.failCount = Number(payload.failCount || 3);
         this.watchdogForm.checkInterval = Number(payload.checkInterval || 10);
-        this.watchdogForm.pingTimeoutMs = Number(payload.pingTimeoutMs || 5000);
+        this.watchdogForm.pingTimeoutSec = Number(payload.pingTimeoutSec || 5);
         this.watchdogForm.action = payload.action === "reboot" ? "reboot" : "cfun";
         this.watchdogForm.bootGrace = Number(payload.bootGrace ?? 600);
+        this.watchdogForm.cfunMaxAttempts = Number(payload.cfunMaxAttempts || 10);
       } catch (error) {
         console.error("Error loading watchdog config", error);
         this.watchdogErrorMessage = "Unable to read Connection watchdog configuration.";
@@ -910,9 +932,10 @@ function registerNetworkSettings() {
             targets: this.normalizeWatchdogTargets().join(","),
             failCount: this.watchdogForm.failCount,
             checkInterval: this.watchdogForm.checkInterval,
-            pingTimeoutMs: this.watchdogForm.pingTimeoutMs,
+            pingTimeoutSec: this.watchdogForm.pingTimeoutSec,
             action: this.watchdogForm.action,
             bootGrace: this.watchdogForm.bootGrace,
+            cfunMaxAttempts: this.watchdogForm.cfunMaxAttempts,
           }),
         });
 
@@ -923,6 +946,7 @@ function registerNetworkSettings() {
         const payload = await response.json();
         this.watchdogForm.enabled = Boolean(payload.enabled);
         this.watchdogForm.targets = payload.targets || this.watchdogForm.targets;
+        this.watchdogLogFile = payload.logFile || this.watchdogLogFile;
         this.watchdogSuccessMessage = this.watchdogForm.enabled
           ? "Connection watchdog saved and enabled."
           : "Connection watchdog disabled.";
@@ -936,6 +960,48 @@ function registerNetworkSettings() {
       } finally {
         this.watchdogSaving = false;
       }
+    },
+    async fetchWatchdogLog() {
+      this.watchdogLogLoading = true;
+      try {
+        const response = await fetch("/cgi-bin/get_watchdog_log?lines=160");
+        if (!response.ok) {
+          throw new Error("Failed to fetch watchdog log");
+        }
+
+        const payload = await response.json();
+        if (!payload.success) {
+          throw new Error(payload.message || "Failed to fetch watchdog log");
+        }
+
+        this.watchdogLogText = payload.content || "Log is currently empty.";
+        this.watchdogLogFile = payload.logFile || this.watchdogLogFile;
+      } catch (error) {
+        console.error("Error loading watchdog log", error);
+        this.watchdogLogText = `Unable to load watchdog log: ${error.message}`;
+      } finally {
+        this.watchdogLogLoading = false;
+      }
+    },
+    startWatchdogLogAutoRefresh() {
+      this.stopWatchdogLogAutoRefresh();
+      this.watchdogLogAutoRefresh = setInterval(() => {
+        this.fetchWatchdogLog();
+      }, 3000);
+    },
+    stopWatchdogLogAutoRefresh() {
+      if (this.watchdogLogAutoRefresh) {
+        clearInterval(this.watchdogLogAutoRefresh);
+        this.watchdogLogAutoRefresh = null;
+      }
+    },
+    openWatchdogLogModal() {
+      const modalEl = document.getElementById("watchdogLogModal");
+      if (!modalEl) {
+        return;
+      }
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
     },
     async fetchConfiguration(shouldResetMessages = true) {
       this.isLoading = true;
