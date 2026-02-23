@@ -2,8 +2,6 @@
 # Lightweight connection watchdog for embedded systems.
 
 CONFIG_FILE="/opt/scripts/Watchdog"
-LOG_FILE="/tmp/connection-watchdog.log"
-MAX_LOG_LINES=800
 FAIL_STREAK=0
 
 load_config() {
@@ -49,22 +47,7 @@ is_boot_grace_elapsed() {
 }
 
 log_msg() {
-    local message="$1"
-    local timestamp
-
-    timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
-    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
-    printf '%s %s\n' "$timestamp" "$message" >> "$LOG_FILE" 2>/dev/null || true
-
-    if [ -f "$LOG_FILE" ]; then
-        local line_count
-        line_count="$(wc -l < "$LOG_FILE" 2>/dev/null || echo 0)"
-        if [ "$line_count" -gt "$MAX_LOG_LINES" ]; then
-            tail -n "$MAX_LOG_LINES" "$LOG_FILE" > "${LOG_FILE}.tmp" 2>/dev/null && mv "${LOG_FILE}.tmp" "$LOG_FILE"
-        fi
-    fi
-
-    logger -t connection-watchdog "$message" 2>/dev/null || echo "connection-watchdog: $message"
+    logger -t connection-watchdog "$1" 2>/dev/null || echo "connection-watchdog: $1"
 }
 
 is_any_target_up() {
@@ -78,19 +61,15 @@ is_any_target_up() {
 
         if command -v timeout >/dev/null 2>&1; then
             if timeout "${WD_PING_TIMEOUT_MS}ms" ping -c 1 "$target" >/dev/null 2>&1; then
-                log_msg "Ping target ${target} reachable (timeout ${WD_PING_TIMEOUT_MS}ms)"
                 return 0
             fi
         else
             timeout_seconds=$(((WD_PING_TIMEOUT_MS + 999) / 1000))
             [ "$timeout_seconds" -ge 1 ] || timeout_seconds=1
             if ping -c 1 -W "$timeout_seconds" "$target" >/dev/null 2>&1; then
-                log_msg "Ping target ${target} reachable (timeout ${timeout_seconds}s fallback)"
                 return 0
             fi
         fi
-
-        log_msg "Ping target ${target} failed"
     done
 
     return 1
@@ -126,25 +105,17 @@ while true; do
     load_config
 
     if [ "$WD_ENABLED" != "1" ]; then
-        log_msg "Watchdog disabled, waiting before next configuration reload"
         sleep 15
         continue
     fi
 
-    log_msg "Watchdog tick: fail_streak=${FAIL_STREAK}, fail_threshold=${WD_FAIL_COUNT}, action=${WD_ACTION}, check_interval=${WD_CHECK_INTERVAL}s"
-
     if is_any_target_up; then
-        if [ "$FAIL_STREAK" -gt 0 ]; then
-            log_msg "Connectivity restored, resetting failure counter (${FAIL_STREAK} -> 0)"
-        fi
         FAIL_STREAK=0
     else
         FAIL_STREAK=$((FAIL_STREAK + 1))
-        log_msg "Last ping failed, increasing counter (${FAIL_STREAK}/${WD_FAIL_COUNT})"
+        log_msg "Connectivity check failed (${FAIL_STREAK}/${WD_FAIL_COUNT})"
         if [ "$FAIL_STREAK" -ge "$WD_FAIL_COUNT" ]; then
-            log_msg "Failure threshold reached, device considered offline"
             if is_boot_grace_elapsed; then
-                log_msg "Boot grace elapsed, attempting recovery action (${WD_ACTION})"
                 take_recovery_action
             else
                 log_msg "Recovery suppressed during boot grace window (${WD_BOOT_GRACE}s)"
