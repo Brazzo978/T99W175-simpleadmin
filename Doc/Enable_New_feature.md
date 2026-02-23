@@ -1,6 +1,6 @@
 # Installing Init Scripts + systemd Services (Auto-Reboot, TTL Fix, eSIM Server, Connection Watchdog)
 
-Beta: there is a cmd file to run in the same folder as the script folder , that tryes to deploy everything via adb autoomatically use it with care : deploy-new-feauture-adb.cmd
+Beta: there is a cmd file to run in the same folder as the script folder , that tryes to deploy everything via adb autoomatically **use it with care** : deploy-new-feauture-adb.cmd
 
 This repository provides the scripts and service units required to enable:
 
