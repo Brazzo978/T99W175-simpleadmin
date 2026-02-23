@@ -25,6 +25,7 @@ load_defaults() {
     WD_CHECK_INTERVAL="10"
     WD_ACTION="cfun"
     WD_CFUN_DELAY="5"
+    WD_BOOT_GRACE="600"
 }
 
 load_config() {
@@ -46,6 +47,7 @@ WD_FAIL_COUNT="$WD_FAIL_COUNT"
 WD_CHECK_INTERVAL="$WD_CHECK_INTERVAL"
 WD_ACTION="$WD_ACTION"
 WD_CFUN_DELAY="$WD_CFUN_DELAY"
+WD_BOOT_GRACE="$WD_BOOT_GRACE"
 CFG
 }
 
@@ -112,7 +114,8 @@ case "$REQUEST_METHOD" in
   "failCount":$WD_FAIL_COUNT,
   "checkInterval":$WD_CHECK_INTERVAL,
   "action":"$(json_escape "$WD_ACTION")",
-  "cfunDelay":$WD_CFUN_DELAY
+  "cfunDelay":$WD_CFUN_DELAY,
+  "bootGrace":$WD_BOOT_GRACE
 }
 JSON
 )
@@ -131,6 +134,7 @@ JSON
         check_interval=$(echo "$POST_DATA" | sed -n 's/.*"checkInterval":\([0-9]\+\).*/\1/p')
         action=$(echo "$POST_DATA" | sed -n 's/.*"action":"\([^"]*\)".*/\1/p')
         cfun_delay=$(echo "$POST_DATA" | sed -n 's/.*"cfunDelay":\([0-9]\+\).*/\1/p')
+        boot_grace=$(echo "$POST_DATA" | sed -n 's/.*"bootGrace":\([0-9]\+\).*/\1/p')
 
         [ "$enabled" = "true" ] || [ "$enabled" = "false" ] || { send_json_response 400 '{"success":false,"message":"Invalid enabled value"}'; exit 0; }
         validate_ipv4_csv "$targets" || { send_json_response 400 '{"success":false,"message":"Invalid targets list"}'; exit 0; }
@@ -138,6 +142,7 @@ JSON
         [ -n "$check_interval" ] && [ "$check_interval" -ge 5 ] && [ "$check_interval" -le 3600 ] || { send_json_response 400 '{"success":false,"message":"Invalid checkInterval"}'; exit 0; }
         [ "$action" = "cfun" ] || [ "$action" = "reboot" ] || { send_json_response 400 '{"success":false,"message":"Invalid action"}'; exit 0; }
         [ -n "$cfun_delay" ] && [ "$cfun_delay" -ge 1 ] && [ "$cfun_delay" -le 120 ] || { send_json_response 400 '{"success":false,"message":"Invalid cfunDelay"}'; exit 0; }
+        [ -n "$boot_grace" ] && [ "$boot_grace" -ge 0 ] && [ "$boot_grace" -le 3600 ] || { send_json_response 400 '{"success":false,"message":"Invalid bootGrace"}'; exit 0; }
 
         WD_ENABLED=$([ "$enabled" = "true" ] && echo "1" || echo "0")
         WD_TARGETS="$targets"
@@ -145,6 +150,7 @@ JSON
         WD_CHECK_INTERVAL="$check_interval"
         WD_ACTION="$action"
         WD_CFUN_DELAY="$cfun_delay"
+        WD_BOOT_GRACE="$boot_grace"
 
         save_config
         service_control "$WD_ENABLED"
@@ -157,7 +163,8 @@ JSON
   "failCount":$WD_FAIL_COUNT,
   "checkInterval":$WD_CHECK_INTERVAL,
   "action":"$(json_escape "$WD_ACTION")",
-  "cfunDelay":$WD_CFUN_DELAY
+  "cfunDelay":$WD_CFUN_DELAY,
+  "bootGrace":$WD_BOOT_GRACE
 }
 JSON
 )
