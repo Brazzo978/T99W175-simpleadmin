@@ -1,0 +1,56 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+LOG_FILE="/tmp/connection-watchdog.log"
+DEFAULT_LINES=80
+MAX_LINES=300
+
+json_escape() {
+    local str="$1"
+    str="${str//\\/\\\\}"
+    str="${str//\"/\\\"}"
+    str="${str//$'\n'/\\n}"
+    str="${str//$'\r'/\\r}"
+    str="${str//$'\t'/\\t}"
+    printf '%s' "$str"
+}
+
+if ! session_load; then
+    send_json_response 401 '{"success":false,"message":"Authentication required"}'
+    exit 0
+fi
+
+lines="${QUERY_STRING:-}"
+lines="$(printf '%s' "$lines" | sed -n 's/.*\blines=\([0-9]\+\).*/\1/p')"
+if [ -z "$lines" ]; then
+    lines="$DEFAULT_LINES"
+fi
+
+if ! [ "$lines" -ge 1 ] 2>/dev/null; then
+    lines="$DEFAULT_LINES"
+fi
+if [ "$lines" -gt "$MAX_LINES" ]; then
+    lines="$MAX_LINES"
+fi
+
+if [ -f "$LOG_FILE" ]; then
+    content="$(tail -n "$lines" "$LOG_FILE" 2>/dev/null || true)"
+else
+    content="Log file not found yet. The watchdog will write here once it starts running."
+fi
+
+payload=$(cat <<JSON
+{
+  "success":true,
+  "logFile":"$(json_escape "$LOG_FILE")",
+  "lines":$lines,
+  "content":"$(json_escape "$content")"
+}
+JSON
+)
+
+send_json_response 200 "$payload"
