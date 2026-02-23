@@ -23,10 +23,12 @@ load_defaults() {
     WD_TARGETS="1.1.1.1,8.8.8.8"
     WD_FAIL_COUNT="3"
     WD_CHECK_INTERVAL="10"
-    WD_PING_TIMEOUT_MS="5000"
+    WD_PING_TIMEOUT_SEC="5"
     WD_ACTION="cfun"
     WD_CFUN_DELAY="5"
+    WD_CFUN_MAX_ATTEMPTS="10"
     WD_BOOT_GRACE="600"
+    WD_RECOVERY_COOLDOWN="120"
 }
 
 load_config() {
@@ -36,10 +38,24 @@ load_config() {
         . "$WATCHDOG_FILE"
     fi
 
-    # Backward compatibility with WD_PING_TIMEOUT in seconds.
-    if [ -z "${WD_PING_TIMEOUT_MS:-}" ] && [ -n "${WD_PING_TIMEOUT:-}" ]; then
-        WD_PING_TIMEOUT_MS=$((WD_PING_TIMEOUT * 1000))
+    if [ -z "${WD_PING_TIMEOUT_SEC:-}" ] && [ -n "${WD_PING_TIMEOUT_MS:-}" ]; then
+        WD_PING_TIMEOUT_SEC=$(((WD_PING_TIMEOUT_MS + 999) / 1000))
     fi
+    if [ -z "${WD_PING_TIMEOUT_SEC:-}" ] && [ -n "${WD_PING_TIMEOUT:-}" ]; then
+        WD_PING_TIMEOUT_SEC="$WD_PING_TIMEOUT"
+    fi
+
+    case "${WD_PING_TIMEOUT_SEC:-}" in
+        *[!0-9]*|"") WD_PING_TIMEOUT_SEC="5" ;;
+    esac
+    case "${WD_CFUN_MAX_ATTEMPTS:-}" in
+        *[!0-9]*|"") WD_CFUN_MAX_ATTEMPTS="10" ;;
+    esac
+
+    [ "$WD_PING_TIMEOUT_SEC" -ge 1 ] || WD_PING_TIMEOUT_SEC=1
+    [ "$WD_PING_TIMEOUT_SEC" -le 60 ] || WD_PING_TIMEOUT_SEC=60
+    [ "$WD_CFUN_MAX_ATTEMPTS" -ge 1 ] || WD_CFUN_MAX_ATTEMPTS=1
+    [ "$WD_CFUN_MAX_ATTEMPTS" -le 120 ] || WD_CFUN_MAX_ATTEMPTS=120
 }
 
 save_config() {
@@ -51,10 +67,12 @@ WD_ENABLED="$WD_ENABLED"
 WD_TARGETS="$WD_TARGETS"
 WD_FAIL_COUNT="$WD_FAIL_COUNT"
 WD_CHECK_INTERVAL="$WD_CHECK_INTERVAL"
-WD_PING_TIMEOUT_MS="$WD_PING_TIMEOUT_MS"
+WD_PING_TIMEOUT_SEC="$WD_PING_TIMEOUT_SEC"
 WD_ACTION="$WD_ACTION"
 WD_CFUN_DELAY="$WD_CFUN_DELAY"
+WD_CFUN_MAX_ATTEMPTS="$WD_CFUN_MAX_ATTEMPTS"
 WD_BOOT_GRACE="$WD_BOOT_GRACE"
+WD_RECOVERY_COOLDOWN="$WD_RECOVERY_COOLDOWN"
 CFG
 }
 
@@ -120,10 +138,13 @@ case "$REQUEST_METHOD" in
   "targets":"$(json_escape "$WD_TARGETS")",
   "failCount":$WD_FAIL_COUNT,
   "checkInterval":$WD_CHECK_INTERVAL,
-  "pingTimeoutMs":$WD_PING_TIMEOUT_MS,
+  "pingTimeoutSec":$WD_PING_TIMEOUT_SEC,
+  "pingTimeoutMs":$((WD_PING_TIMEOUT_SEC * 1000)),
   "action":"$(json_escape "$WD_ACTION")",
   "cfunDelay":$WD_CFUN_DELAY,
-  "bootGrace":$WD_BOOT_GRACE
+  "cfunMaxAttempts":$WD_CFUN_MAX_ATTEMPTS,
+  "bootGrace":$WD_BOOT_GRACE,
+  "recoveryCooldown":$WD_RECOVERY_COOLDOWN
 }
 JSON
 )
@@ -141,22 +162,35 @@ JSON
         fail_count=$(echo "$POST_DATA" | sed -n 's/.*"failCount":\([0-9]\+\).*/\1/p')
         check_interval=$(echo "$POST_DATA" | sed -n 's/.*"checkInterval":\([0-9]\+\).*/\1/p')
         action=$(echo "$POST_DATA" | sed -n 's/.*"action":"\([^"]*\)".*/\1/p')
+        ping_timeout_sec=$(echo "$POST_DATA" | sed -n 's/.*"pingTimeoutSec":\([0-9]\+\).*/\1/p')
         ping_timeout_ms=$(echo "$POST_DATA" | sed -n 's/.*"pingTimeoutMs":\([0-9]\+\).*/\1/p')
         cfun_delay=$(echo "$POST_DATA" | sed -n 's/.*"cfunDelay":\([0-9]\+\).*/\1/p')
+        cfun_max_attempts=$(echo "$POST_DATA" | sed -n 's/.*"cfunMaxAttempts":\([0-9]\+\).*/\1/p')
         boot_grace=$(echo "$POST_DATA" | sed -n 's/.*"bootGrace":\([0-9]\+\).*/\1/p')
 
         load_config
 
+        if [ -z "$ping_timeout_sec" ] && [ -n "$ping_timeout_ms" ]; then
+            ping_timeout_sec=$(((ping_timeout_ms + 999) / 1000))
+        fi
+
         [ "$enabled" = "true" ] || [ "$enabled" = "false" ] || { send_json_response 400 '{"success":false,"message":"Invalid enabled value"}'; exit 0; }
         validate_ipv4_csv "$targets" || { send_json_response 400 '{"success":false,"message":"Invalid targets list"}'; exit 0; }
-        [ -n "$fail_count" ] && [ "$fail_count" -ge 1 ] && [ "$fail_count" -le 60 ] || { send_json_response 400 '{"success":false,"message":"Invalid failCount"}'; exit 0; }
-        [ -n "$check_interval" ] && [ "$check_interval" -ge 5 ] && [ "$check_interval" -le 3600 ] || { send_json_response 400 '{"success":false,"message":"Invalid checkInterval"}'; exit 0; }
-        [ -n "$ping_timeout_ms" ] && [ "$ping_timeout_ms" -ge 100 ] && [ "$ping_timeout_ms" -le 30000 ] || { send_json_response 400 '{"success":false,"message":"Invalid pingTimeoutMs"}'; exit 0; }
+        [ -n "$fail_count" ] && [ "$fail_count" -ge 1 ] && [ "$fail_count" -le 120 ] || { send_json_response 400 '{"success":false,"message":"Invalid failCount"}'; exit 0; }
+        [ -n "$check_interval" ] && [ "$check_interval" -ge 1 ] && [ "$check_interval" -le 60 ] || { send_json_response 400 '{"success":false,"message":"Invalid checkInterval"}'; exit 0; }
+        [ -n "$ping_timeout_sec" ] && [ "$ping_timeout_sec" -ge 1 ] && [ "$ping_timeout_sec" -le 60 ] || { send_json_response 400 '{"success":false,"message":"Invalid pingTimeoutSec"}'; exit 0; }
         [ "$action" = "cfun" ] || [ "$action" = "reboot" ] || { send_json_response 400 '{"success":false,"message":"Invalid action"}'; exit 0; }
+
         if [ -n "$cfun_delay" ]; then
             [ "$cfun_delay" -ge 1 ] && [ "$cfun_delay" -le 120 ] || { send_json_response 400 '{"success":false,"message":"Invalid cfunDelay"}'; exit 0; }
             WD_CFUN_DELAY="$cfun_delay"
         fi
+
+        if [ -n "$cfun_max_attempts" ]; then
+            [ "$cfun_max_attempts" -ge 1 ] && [ "$cfun_max_attempts" -le 120 ] || { send_json_response 400 '{"success":false,"message":"Invalid cfunMaxAttempts"}'; exit 0; }
+            WD_CFUN_MAX_ATTEMPTS="$cfun_max_attempts"
+        fi
+
         [ -n "$boot_grace" ] && [ "$boot_grace" -ge 0 ] && [ "$boot_grace" -le 3600 ] || { send_json_response 400 '{"success":false,"message":"Invalid bootGrace"}'; exit 0; }
 
         WD_ENABLED=$([ "$enabled" = "true" ] && echo "1" || echo "0")
@@ -164,7 +198,7 @@ JSON
         WD_FAIL_COUNT="$fail_count"
         WD_CHECK_INTERVAL="$check_interval"
         WD_ACTION="$action"
-        WD_PING_TIMEOUT_MS="$ping_timeout_ms"
+        WD_PING_TIMEOUT_SEC="$ping_timeout_sec"
         WD_BOOT_GRACE="$boot_grace"
 
         save_config
@@ -177,10 +211,13 @@ JSON
   "targets":"$(json_escape "$WD_TARGETS")",
   "failCount":$WD_FAIL_COUNT,
   "checkInterval":$WD_CHECK_INTERVAL,
-  "pingTimeoutMs":$WD_PING_TIMEOUT_MS,
+  "pingTimeoutSec":$WD_PING_TIMEOUT_SEC,
+  "pingTimeoutMs":$((WD_PING_TIMEOUT_SEC * 1000)),
   "action":"$(json_escape "$WD_ACTION")",
   "cfunDelay":$WD_CFUN_DELAY,
-  "bootGrace":$WD_BOOT_GRACE
+  "cfunMaxAttempts":$WD_CFUN_MAX_ATTEMPTS,
+  "bootGrace":$WD_BOOT_GRACE,
+  "recoveryCooldown":$WD_RECOVERY_COOLDOWN
 }
 JSON
 )
