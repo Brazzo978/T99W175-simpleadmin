@@ -9,6 +9,7 @@ load_config() {
     WD_TARGETS="1.1.1.1,8.8.8.8"
     WD_FAIL_COUNT=3
     WD_CHECK_INTERVAL=10
+    WD_PING_TIMEOUT=5
     WD_ACTION="cfun"
     WD_CFUN_DELAY=5
     WD_BOOT_GRACE=600
@@ -45,7 +46,7 @@ is_any_target_up() {
     for target in $WD_TARGETS; do
         target="$(echo "$target" | xargs)"
         [ -n "$target" ] || continue
-        if ping -c 1 -W 2 "$target" >/dev/null 2>&1; then
+        if ping -c 1 -W "$WD_PING_TIMEOUT" "$target" >/dev/null 2>&1; then
             return 0
         fi
     done

@@ -115,12 +115,15 @@ WD_ENABLED="1"
 WD_TARGETS="1.1.1.1,8.8.8.8"
 WD_FAIL_COUNT="3"
 WD_CHECK_INTERVAL="10"
+WD_PING_TIMEOUT="5"
 WD_ACTION="cfun"
 WD_CFUN_DELAY="5"
 WD_BOOT_GRACE="600"
 EOF
 chmod 600 /opt/scripts/Watchdog
 ```
+
+`WD_PING_TIMEOUT=5` sets the per-target ping probe timeout (seconds), useful on congested LTE links.
 
 `WD_BOOT_GRACE=600` means no CFUN/reboot action is executed while uptime is lower than 10 minutes.
 
