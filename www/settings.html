@@ -909,6 +909,24 @@
                         </div>
 
                         <div class="col-md-4">
+                          <label class="form-label" for="watchdogPingTimeout">Ping probe timeout</label>
+                          <div class="input-group">
+                            <input
+                              id="watchdogPingTimeout"
+                              class="form-control"
+                              type="number"
+                              min="100"
+                              max="30000"
+                              step="100"
+                              :disabled="watchdogSaving"
+                              x-model.number="watchdogForm.pingTimeoutMs"
+                            />
+                            <span class="input-group-text">ms</span>
+                          </div>
+                          <div class="form-text">Example: 1500 ms for congested LTE links.</div>
+                        </div>
+
+                        <div class="col-md-4">
                           <label class="form-label" for="watchdogAction">Action when offline</label>
                           <select
                             id="watchdogAction"

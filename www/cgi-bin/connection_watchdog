@@ -23,6 +23,7 @@ load_defaults() {
     WD_TARGETS="1.1.1.1,8.8.8.8"
     WD_FAIL_COUNT="3"
     WD_CHECK_INTERVAL="10"
+    WD_PING_TIMEOUT_MS="5000"
     WD_ACTION="cfun"
     WD_CFUN_DELAY="5"
     WD_BOOT_GRACE="600"
@@ -33,6 +34,11 @@ load_config() {
     if [ -f "$WATCHDOG_FILE" ]; then
         # shellcheck disable=SC1090
         . "$WATCHDOG_FILE"
+    fi
+
+    # Backward compatibility with WD_PING_TIMEOUT in seconds.
+    if [ -z "${WD_PING_TIMEOUT_MS:-}" ] && [ -n "${WD_PING_TIMEOUT:-}" ]; then
+        WD_PING_TIMEOUT_MS=$((WD_PING_TIMEOUT * 1000))
     fi
 }
 
@@ -45,6 +51,7 @@ WD_ENABLED="$WD_ENABLED"
 WD_TARGETS="$WD_TARGETS"
 WD_FAIL_COUNT="$WD_FAIL_COUNT"
 WD_CHECK_INTERVAL="$WD_CHECK_INTERVAL"
+WD_PING_TIMEOUT_MS="$WD_PING_TIMEOUT_MS"
 WD_ACTION="$WD_ACTION"
 WD_CFUN_DELAY="$WD_CFUN_DELAY"
 WD_BOOT_GRACE="$WD_BOOT_GRACE"
@@ -113,6 +120,7 @@ case "$REQUEST_METHOD" in
   "targets":"$(json_escape "$WD_TARGETS")",
   "failCount":$WD_FAIL_COUNT,
   "checkInterval":$WD_CHECK_INTERVAL,
+  "pingTimeoutMs":$WD_PING_TIMEOUT_MS,
   "action":"$(json_escape "$WD_ACTION")",
   "cfunDelay":$WD_CFUN_DELAY,
   "bootGrace":$WD_BOOT_GRACE
@@ -133,6 +141,7 @@ JSON
         fail_count=$(echo "$POST_DATA" | sed -n 's/.*"failCount":\([0-9]\+\).*/\1/p')
         check_interval=$(echo "$POST_DATA" | sed -n 's/.*"checkInterval":\([0-9]\+\).*/\1/p')
         action=$(echo "$POST_DATA" | sed -n 's/.*"action":"\([^"]*\)".*/\1/p')
+        ping_timeout_ms=$(echo "$POST_DATA" | sed -n 's/.*"pingTimeoutMs":\([0-9]\+\).*/\1/p')
         cfun_delay=$(echo "$POST_DATA" | sed -n 's/.*"cfunDelay":\([0-9]\+\).*/\1/p')
         boot_grace=$(echo "$POST_DATA" | sed -n 's/.*"bootGrace":\([0-9]\+\).*/\1/p')
 
@@ -142,6 +151,7 @@ JSON
         validate_ipv4_csv "$targets" || { send_json_response 400 '{"success":false,"message":"Invalid targets list"}'; exit 0; }
         [ -n "$fail_count" ] && [ "$fail_count" -ge 1 ] && [ "$fail_count" -le 60 ] || { send_json_response 400 '{"success":false,"message":"Invalid failCount"}'; exit 0; }
         [ -n "$check_interval" ] && [ "$check_interval" -ge 5 ] && [ "$check_interval" -le 3600 ] || { send_json_response 400 '{"success":false,"message":"Invalid checkInterval"}'; exit 0; }
+        [ -n "$ping_timeout_ms" ] && [ "$ping_timeout_ms" -ge 100 ] && [ "$ping_timeout_ms" -le 30000 ] || { send_json_response 400 '{"success":false,"message":"Invalid pingTimeoutMs"}'; exit 0; }
         [ "$action" = "cfun" ] || [ "$action" = "reboot" ] || { send_json_response 400 '{"success":false,"message":"Invalid action"}'; exit 0; }
         if [ -n "$cfun_delay" ]; then
             [ "$cfun_delay" -ge 1 ] && [ "$cfun_delay" -le 120 ] || { send_json_response 400 '{"success":false,"message":"Invalid cfunDelay"}'; exit 0; }
@@ -154,6 +164,7 @@ JSON
         WD_FAIL_COUNT="$fail_count"
         WD_CHECK_INTERVAL="$check_interval"
         WD_ACTION="$action"
+        WD_PING_TIMEOUT_MS="$ping_timeout_ms"
         WD_BOOT_GRACE="$boot_grace"
 
         save_config
@@ -166,6 +177,7 @@ JSON
   "targets":"$(json_escape "$WD_TARGETS")",
   "failCount":$WD_FAIL_COUNT,
   "checkInterval":$WD_CHECK_INTERVAL,
+  "pingTimeoutMs":$WD_PING_TIMEOUT_MS,
   "action":"$(json_escape "$WD_ACTION")",
   "cfunDelay":$WD_CFUN_DELAY,
   "bootGrace":$WD_BOOT_GRACE
