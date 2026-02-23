@@ -844,7 +844,7 @@
                       </template>
 
                       <p class="text-body-secondary mb-3">
-                        Monitor connectivity by pinging one or more IP targets. If all targets fail for N attempts, the watchdog can run a CFUN cycle or reboot the modem.
+                        Monitor connectivity by pinging one or more IP targets. If all targets fail for N attempts, the watchdog can run a baseband powercycle or reboot the modem.
                       </p>
 
                       <div class="form-check form-switch mb-3 d-inline-flex align-items-center gap-2">
@@ -916,25 +916,9 @@
                             :disabled="watchdogSaving"
                             x-model="watchdogForm.action"
                           >
-                            <option value="cfun">CFUN cycle (0 then 1)</option>
+                            <option value="cfun">Baseband powercycle</option>
                             <option value="reboot">Full modem reboot</option>
                           </select>
-                        </div>
-
-                        <div class="col-md-4" x-show="watchdogForm.action === 'cfun'">
-                          <label class="form-label" for="watchdogCfunDelay">CFUN restore delay</label>
-                          <div class="input-group">
-                            <input
-                              id="watchdogCfunDelay"
-                              class="form-control"
-                              type="number"
-                              min="1"
-                              max="120"
-                              :disabled="watchdogSaving"
-                              x-model.number="watchdogForm.cfunDelay"
-                            />
-                            <span class="input-group-text">sec</span>
-                          </div>
                         </div>
 
                         <div class="col-md-4">

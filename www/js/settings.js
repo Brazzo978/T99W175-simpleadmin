@@ -94,7 +94,6 @@ function registerNetworkSettings() {
       failCount: 3,
       checkInterval: 10,
       action: "cfun",
-      cfunDelay: 5,
       bootGrace: 600,
     },
     // Current TTL settings from server
@@ -854,12 +853,6 @@ function registerNetworkSettings() {
         return "Check interval must be between 5 and 3600 seconds.";
       }
 
-      if (this.watchdogForm.action === "cfun") {
-        if (!Number.isInteger(this.watchdogForm.cfunDelay) || this.watchdogForm.cfunDelay < 1 || this.watchdogForm.cfunDelay > 120) {
-          return "CFUN delay must be between 1 and 120 seconds.";
-        }
-      }
-
       if (!Number.isInteger(this.watchdogForm.bootGrace) || this.watchdogForm.bootGrace < 0 || this.watchdogForm.bootGrace > 3600) {
         return "Boot grace window must be between 0 and 3600 seconds.";
       }
@@ -883,7 +876,6 @@ function registerNetworkSettings() {
         this.watchdogForm.failCount = Number(payload.failCount || 3);
         this.watchdogForm.checkInterval = Number(payload.checkInterval || 10);
         this.watchdogForm.action = payload.action === "reboot" ? "reboot" : "cfun";
-        this.watchdogForm.cfunDelay = Number(payload.cfunDelay || 5);
         this.watchdogForm.bootGrace = Number(payload.bootGrace ?? 600);
       } catch (error) {
         console.error("Error loading watchdog config", error);
@@ -913,7 +905,6 @@ function registerNetworkSettings() {
             failCount: this.watchdogForm.failCount,
             checkInterval: this.watchdogForm.checkInterval,
             action: this.watchdogForm.action,
-            cfunDelay: this.watchdogForm.cfunDelay,
             bootGrace: this.watchdogForm.bootGrace,
           }),
         });
