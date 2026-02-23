@@ -136,12 +136,17 @@ JSON
         cfun_delay=$(echo "$POST_DATA" | sed -n 's/.*"cfunDelay":\([0-9]\+\).*/\1/p')
         boot_grace=$(echo "$POST_DATA" | sed -n 's/.*"bootGrace":\([0-9]\+\).*/\1/p')
 
+        load_config
+
         [ "$enabled" = "true" ] || [ "$enabled" = "false" ] || { send_json_response 400 '{"success":false,"message":"Invalid enabled value"}'; exit 0; }
         validate_ipv4_csv "$targets" || { send_json_response 400 '{"success":false,"message":"Invalid targets list"}'; exit 0; }
         [ -n "$fail_count" ] && [ "$fail_count" -ge 1 ] && [ "$fail_count" -le 60 ] || { send_json_response 400 '{"success":false,"message":"Invalid failCount"}'; exit 0; }
         [ -n "$check_interval" ] && [ "$check_interval" -ge 5 ] && [ "$check_interval" -le 3600 ] || { send_json_response 400 '{"success":false,"message":"Invalid checkInterval"}'; exit 0; }
         [ "$action" = "cfun" ] || [ "$action" = "reboot" ] || { send_json_response 400 '{"success":false,"message":"Invalid action"}'; exit 0; }
-        [ -n "$cfun_delay" ] && [ "$cfun_delay" -ge 1 ] && [ "$cfun_delay" -le 120 ] || { send_json_response 400 '{"success":false,"message":"Invalid cfunDelay"}'; exit 0; }
+        if [ -n "$cfun_delay" ]; then
+            [ "$cfun_delay" -ge 1 ] && [ "$cfun_delay" -le 120 ] || { send_json_response 400 '{"success":false,"message":"Invalid cfunDelay"}'; exit 0; }
+            WD_CFUN_DELAY="$cfun_delay"
+        fi
         [ -n "$boot_grace" ] && [ "$boot_grace" -ge 0 ] && [ "$boot_grace" -le 3600 ] || { send_json_response 400 '{"success":false,"message":"Invalid bootGrace"}'; exit 0; }
 
         WD_ENABLED=$([ "$enabled" = "true" ] && echo "1" || echo "0")
@@ -149,7 +154,6 @@ JSON
         WD_FAIL_COUNT="$fail_count"
         WD_CHECK_INTERVAL="$check_interval"
         WD_ACTION="$action"
-        WD_CFUN_DELAY="$cfun_delay"
         WD_BOOT_GRACE="$boot_grace"
 
         save_config
