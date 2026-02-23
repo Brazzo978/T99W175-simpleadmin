@@ -3680,6 +3680,24 @@ function processAllInfos() {
     }
   },
 
+  openWatchdogLogFromConnection() {
+    const connectionModalEl = document.getElementById('connectionModal');
+    const connectionModal = bootstrap.Modal.getInstance(connectionModalEl);
+    if (connectionModal) {
+      connectionModal.hide();
+      setTimeout(() => {
+        const logModalEl = document.getElementById('watchdogLogModal');
+        const logModal = new bootstrap.Modal(logModalEl);
+        logModal.show();
+      }, 300);
+      return;
+    }
+
+    const logModalEl = document.getElementById('watchdogLogModal');
+    const logModal = new bootstrap.Modal(logModalEl);
+    logModal.show();
+  },
+
   /**
    * Validate IMEI input
    */

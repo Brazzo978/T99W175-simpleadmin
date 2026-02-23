@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/session_utils.sh"
 
 WATCHDOG_FILE="/opt/scripts/Watchdog"
+WATCHDOG_LOG_FILE="/tmp/connection-watchdog.log"
 SERVICE_NAME="connection-watchdog.service"
 
 json_escape() {
@@ -123,7 +124,8 @@ case "$REQUEST_METHOD" in
   "pingTimeoutMs":$WD_PING_TIMEOUT_MS,
   "action":"$(json_escape "$WD_ACTION")",
   "cfunDelay":$WD_CFUN_DELAY,
-  "bootGrace":$WD_BOOT_GRACE
+  "bootGrace":$WD_BOOT_GRACE,
+  "logFile":"$(json_escape "$WATCHDOG_LOG_FILE")"
 }
 JSON
 )
@@ -180,7 +182,8 @@ JSON
   "pingTimeoutMs":$WD_PING_TIMEOUT_MS,
   "action":"$(json_escape "$WD_ACTION")",
   "cfunDelay":$WD_CFUN_DELAY,
-  "bootGrace":$WD_BOOT_GRACE
+  "bootGrace":$WD_BOOT_GRACE,
+  "logFile":"$(json_escape "$WATCHDOG_LOG_FILE")"
 }
 JSON
 )
