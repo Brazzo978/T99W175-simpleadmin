@@ -2,33 +2,51 @@
 # Lightweight connection watchdog for embedded systems.
 
 CONFIG_FILE="/opt/scripts/Watchdog"
+LOG_FILE="/tmp/connection-watchdog.log"
+MAX_LOG_LINES=800
 FAIL_STREAK=0
+LAST_RECOVERY_TS=0
+CFUN_RECOVERY_COUNT=0
 
 load_config() {
     WD_ENABLED=0
     WD_TARGETS="1.1.1.1,8.8.8.8"
     WD_FAIL_COUNT=3
     WD_CHECK_INTERVAL=10
-    WD_PING_TIMEOUT_MS=5000
+    WD_PING_TIMEOUT_SEC=5
     WD_ACTION="cfun"
     WD_CFUN_DELAY=5
+    WD_CFUN_MAX_ATTEMPTS=10
     WD_BOOT_GRACE=600
+    WD_RECOVERY_COOLDOWN=120
 
     if [ -f "$CONFIG_FILE" ]; then
         # shellcheck disable=SC1090
         . "$CONFIG_FILE"
     fi
 
-    # Backward compatibility: old config may still use WD_PING_TIMEOUT (seconds).
-    if [ -z "${WD_PING_TIMEOUT_MS:-}" ] && [ -n "${WD_PING_TIMEOUT:-}" ]; then
-        WD_PING_TIMEOUT_MS=$((WD_PING_TIMEOUT * 1000))
+    if [ -z "${WD_PING_TIMEOUT_SEC:-}" ] && [ -n "${WD_PING_TIMEOUT_MS:-}" ]; then
+        WD_PING_TIMEOUT_SEC=$(((WD_PING_TIMEOUT_MS + 999) / 1000))
+    fi
+    if [ -z "${WD_PING_TIMEOUT_SEC:-}" ] && [ -n "${WD_PING_TIMEOUT:-}" ]; then
+        WD_PING_TIMEOUT_SEC="$WD_PING_TIMEOUT"
     fi
 
-    case "${WD_PING_TIMEOUT_MS:-}" in
-        *[!0-9]*|"") WD_PING_TIMEOUT_MS=5000 ;;
+    case "${WD_PING_TIMEOUT_SEC:-}" in
+        *[!0-9]*|"") WD_PING_TIMEOUT_SEC=5 ;;
+    esac
+    case "${WD_RECOVERY_COOLDOWN:-}" in
+        *[!0-9]*|"") WD_RECOVERY_COOLDOWN=120 ;;
+    esac
+    case "${WD_CFUN_MAX_ATTEMPTS:-}" in
+        *[!0-9]*|"") WD_CFUN_MAX_ATTEMPTS=10 ;;
     esac
 
-    [ "$WD_PING_TIMEOUT_MS" -ge 100 ] || WD_PING_TIMEOUT_MS=100
+    [ "$WD_PING_TIMEOUT_SEC" -ge 1 ] || WD_PING_TIMEOUT_SEC=1
+    [ "$WD_PING_TIMEOUT_SEC" -le 60 ] || WD_PING_TIMEOUT_SEC=60
+    [ "$WD_RECOVERY_COOLDOWN" -ge 0 ] || WD_RECOVERY_COOLDOWN=0
+    [ "$WD_CFUN_MAX_ATTEMPTS" -ge 1 ] || WD_CFUN_MAX_ATTEMPTS=1
+    [ "$WD_CFUN_MAX_ATTEMPTS" -le 120 ] || WD_CFUN_MAX_ATTEMPTS=120
 }
 
 get_uptime_seconds() {
@@ -39,37 +57,49 @@ get_uptime_seconds() {
     fi
 }
 
+now_ts() {
+    date +%s 2>/dev/null || echo 0
+}
+
 is_boot_grace_elapsed() {
     local uptime
     uptime="$(get_uptime_seconds)"
-
     [ "$uptime" -ge "$WD_BOOT_GRACE" ]
 }
 
 log_msg() {
-    logger -t connection-watchdog "$1" 2>/dev/null || echo "connection-watchdog: $1"
+    local message="$1"
+    local timestamp
+
+    timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+    printf '%s %s\n' "$timestamp" "$message" >> "$LOG_FILE" 2>/dev/null || true
+
+    if [ -f "$LOG_FILE" ]; then
+        local line_count
+        line_count="$(wc -l < "$LOG_FILE" 2>/dev/null || echo 0)"
+        if [ "$line_count" -gt "$MAX_LOG_LINES" ]; then
+            tail -n "$MAX_LOG_LINES" "$LOG_FILE" > "${LOG_FILE}.tmp" 2>/dev/null && mv "${LOG_FILE}.tmp" "$LOG_FILE"
+        fi
+    fi
+
+    logger -t connection-watchdog "$message" 2>/dev/null || echo "connection-watchdog: $message"
 }
 
 is_any_target_up() {
     local target
     local IFS=','
-    local timeout_seconds
 
     for target in $WD_TARGETS; do
         target="$(echo "$target" | xargs)"
         [ -n "$target" ] || continue
 
-        if command -v timeout >/dev/null 2>&1; then
-            if timeout "${WD_PING_TIMEOUT_MS}ms" ping -c 1 "$target" >/dev/null 2>&1; then
-                return 0
-            fi
-        else
-            timeout_seconds=$(((WD_PING_TIMEOUT_MS + 999) / 1000))
-            [ "$timeout_seconds" -ge 1 ] || timeout_seconds=1
-            if ping -c 1 -W "$timeout_seconds" "$target" >/dev/null 2>&1; then
-                return 0
-            fi
+        if ping -c 1 -W "$WD_PING_TIMEOUT_SEC" "$target" >/dev/null 2>&1; then
+            log_msg "Ping target ${target} reachable (timeout ${WD_PING_TIMEOUT_SEC}s)"
+            return 0
         fi
+
+        log_msg "Ping target ${target} failed"
     done
 
     return 1
@@ -89,7 +119,15 @@ do_cfun_cycle() {
 take_recovery_action() {
     case "$WD_ACTION" in
         cfun)
+            if [ "$CFUN_RECOVERY_COUNT" -ge "$WD_CFUN_MAX_ATTEMPTS" ]; then
+                log_msg "CFUN attempts limit reached (${CFUN_RECOVERY_COUNT}/${WD_CFUN_MAX_ATTEMPTS}), escalating to full reboot"
+                reboot
+                return
+            fi
+
             do_cfun_cycle
+            CFUN_RECOVERY_COUNT=$((CFUN_RECOVERY_COUNT + 1))
+            log_msg "CFUN attempts used: ${CFUN_RECOVERY_COUNT}/${WD_CFUN_MAX_ATTEMPTS} before reboot escalation"
             ;;
         reboot)
             log_msg "Reboot action triggered after connectivity loss"
@@ -101,27 +139,68 @@ take_recovery_action() {
     esac
 }
 
+can_run_recovery() {
+    local now
+    local elapsed
+
+    now="$(now_ts)"
+    [ "$now" -gt 0 ] || return 0
+
+    if [ "$LAST_RECOVERY_TS" -eq 0 ]; then
+        return 0
+    fi
+
+    elapsed=$((now - LAST_RECOVERY_TS))
+    if [ "$elapsed" -lt "$WD_RECOVERY_COOLDOWN" ]; then
+        log_msg "Recovery skipped due to cooldown (${elapsed}s/${WD_RECOVERY_COOLDOWN}s)"
+        return 1
+    fi
+
+    return 0
+}
+
+mark_recovery_ts() {
+    LAST_RECOVERY_TS="$(now_ts)"
+}
+
+log_msg "Connection watchdog service started"
+
 while true; do
     load_config
 
     if [ "$WD_ENABLED" != "1" ]; then
+        log_msg "Watchdog disabled, waiting before next configuration reload"
         sleep 15
         continue
     fi
 
+    log_msg "Watchdog tick: fail_streak=${FAIL_STREAK}, fail_threshold=${WD_FAIL_COUNT}, action=${WD_ACTION}, check_interval=${WD_CHECK_INTERVAL}s"
+
     if is_any_target_up; then
+        if [ "$FAIL_STREAK" -gt 0 ]; then
+            log_msg "Connectivity restored, resetting failure counter (${FAIL_STREAK} -> 0)"
+        fi
+        if [ "$CFUN_RECOVERY_COUNT" -gt 0 ]; then
+            log_msg "Connectivity stable again, resetting CFUN attempts counter (${CFUN_RECOVERY_COUNT} -> 0)"
+        fi
         FAIL_STREAK=0
+        CFUN_RECOVERY_COUNT=0
     else
         FAIL_STREAK=$((FAIL_STREAK + 1))
-        log_msg "Connectivity check failed (${FAIL_STREAK}/${WD_FAIL_COUNT})"
+        log_msg "Last ping failed, increasing counter (${FAIL_STREAK}/${WD_FAIL_COUNT})"
         if [ "$FAIL_STREAK" -ge "$WD_FAIL_COUNT" ]; then
+            log_msg "Failure threshold reached, device considered offline"
             if is_boot_grace_elapsed; then
-                take_recovery_action
+                if can_run_recovery; then
+                    log_msg "Boot grace elapsed, attempting recovery action (${WD_ACTION})"
+                    take_recovery_action
+                    mark_recovery_ts
+                fi
             else
                 log_msg "Recovery suppressed during boot grace window (${WD_BOOT_GRACE}s)"
             fi
             FAIL_STREAK=0
-            sleep 10
+            sleep 2
         fi
     fi
 
