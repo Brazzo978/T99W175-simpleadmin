@@ -5,7 +5,7 @@ This repository provides the scripts and service units required to enable:
 * **Auto-reboot service** (via cron / crontab)
 * **TTL override / TTL fix**
 * **eSIM (euicc) server**
-* **Connection watchdog** (ICMP checks + CFUN/reboot recovery)
+* **Connection watchdog** 
 
 All required files are inside the repository `scripts/` directory.
 
@@ -43,10 +43,6 @@ chmod 755 /etc/init.d/crontab
 Copy the `.service` files into `/lib/systemd/system/`:
 
 ```bash
-cp scripts/systemd/crontab.service /lib/systemd/system/
-cp scripts/systemd/euicc.service /lib/systemd/system/
-cp scripts/systemd/ttl-override.service /lib/systemd/system/
-cp scripts/systemd/connection-watchdog.service /lib/systemd/system/
 
 # Set permissions
 chmod 755 /lib/systemd/system/crontab.service
@@ -68,13 +64,7 @@ Create the target directory if needed:
 ```bash
 mkdir -p /opt/scripts/ttl
 ```
-
-Copy the TTL scripts:
-
-```bash
-cp scripts/ttl/ttl-override /opt/scripts/ttl/
-cp scripts/ttl/ttlvalue /opt/scripts/ttl/
-```
+Copy the files
 
 Set permissions:
 
@@ -91,45 +81,22 @@ The watchdog service executes this file:
 
 * `/opt/scripts/watchdog/connection-watchdog`
 
-Create the target directory and copy the script:
+Create the target directory:
 
 ```bash
 mkdir -p /opt/scripts/watchdog
-cp scripts/watchdog/connection-watchdog /opt/scripts/watchdog/
+```
+Copy the file
+Set permissions:
+```bash
 chmod 755 /opt/scripts/watchdog/connection-watchdog
 ```
 
 ---
 
-## 5) OPTIONAL: pre-create watchdog config file
 
-The GUI endpoint `/cgi-bin/connection_watchdog` creates and updates:
 
-* `/opt/scripts/Watchdog`
-
-You can pre-create it manually (optional):
-
-```bash
-cat > /opt/scripts/Watchdog <<'EOF'
-WD_ENABLED="1"
-WD_TARGETS="1.1.1.1,8.8.8.8"
-WD_FAIL_COUNT="3"
-WD_CHECK_INTERVAL="10"
-WD_PING_TIMEOUT_MS="5000"
-WD_ACTION="cfun"
-WD_CFUN_DELAY="5"
-WD_BOOT_GRACE="600"
-EOF
-chmod 600 /opt/scripts/Watchdog
-```
-
-`WD_PING_TIMEOUT_MS=5000` sets the per-target ping probe timeout in milliseconds (example: `1500`).
-
-`WD_BOOT_GRACE=600` means no CFUN/reboot action is executed while uptime is lower than 10 minutes.
-
----
-
-## 6) REQUIRED: create multi-user.target symlinks
+## 5) REQUIRED: create multi-user.target symlinks
 
 This step is **required** in this setup.
 
@@ -143,7 +110,7 @@ ln -s /lib/systemd/system/connection-watchdog.service /lib/systemd/system/multi-
 
 ---
 
-## 7) Enable and start services
+## 6) Enable and start services
 
 Start services now:
 
@@ -156,7 +123,7 @@ systemctl start crontab
 
 ---
 
-## 8) Reboot + Verify everything
+## 7) Reboot + Verify everything
 
 Check service status:
 
