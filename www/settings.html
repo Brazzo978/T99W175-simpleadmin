@@ -516,13 +516,10 @@
 
                     </div>
                   </div>
-                </div>
 
-                <!-- Right Column: TTL & Reboot -->
-                <div class="col-lg-6">
                   
                   <!-- WAN Connection -->
-                  <div class="card">
+                  <div class="card mt-4">
                     <div class="card-header">WAN Connection</div>
                     <div class="card-body">
 
@@ -567,8 +564,13 @@
                     </div>
                   </div>
 
+                </div>
+
+                <!-- Right Column: TTL & Reboot -->
+                <div class="col-lg-6">
+
                   <!-- Custom TTL -->
-                  <div class="card mt-4">
+                  <div class="card">
                     <div class="card-header">Custom TTL</div>
                     <div class="card-body">
 
@@ -844,7 +846,7 @@
                       </template>
 
                       <p class="text-body-secondary mb-3">
-                        Monitor connectivity by pinging one or more IP targets. If all targets fail for N attempts, the watchdog can run a baseband powercycle or reboot the modem.
+                        Monitor connectivity by pinging one or more IP targets. If all targets fail for N attempts, runs an action.
                       </p>
 
                       <div class="form-check form-switch mb-3 d-inline-flex align-items-center gap-2">
@@ -884,7 +886,7 @@
                               class="form-control"
                               type="number"
                               min="1"
-                              max="60"
+                              max="120"
                               :disabled="watchdogSaving"
                               x-model.number="watchdogForm.failCount"
                             />
@@ -899,8 +901,8 @@
                               id="watchdogInterval"
                               class="form-control"
                               type="number"
-                              min="5"
-                              max="3600"
+                              min="1"
+                              max="60"
                               :disabled="watchdogSaving"
                               x-model.number="watchdogForm.checkInterval"
                             />
@@ -915,30 +917,16 @@
                               id="watchdogPingTimeout"
                               class="form-control"
                               type="number"
-                              min="100"
-                              max="30000"
-                              step="100"
+                              min="1"
+                              max="60"
+                              step="1"
                               :disabled="watchdogSaving"
-                              x-model.number="watchdogForm.pingTimeoutMs"
+                              x-model.number="watchdogForm.pingTimeoutSec"
                             />
-                            <span class="input-group-text">ms</span>
+                            <span class="input-group-text">sec</span>
                           </div>
-                          <div class="form-text">Example: 1500 ms for congested LTE links.</div>
+                          <div class="form-text">Example: 5s for congested LTE links.</div>
                         </div>
-
-                        <div class="col-md-4">
-                          <label class="form-label" for="watchdogAction">Action when offline</label>
-                          <select
-                            id="watchdogAction"
-                            class="form-select"
-                            :disabled="watchdogSaving"
-                            x-model="watchdogForm.action"
-                          >
-                            <option value="cfun">Baseband powercycle</option>
-                            <option value="reboot">Full modem reboot</option>
-                          </select>
-                        </div>
-
                         <div class="col-md-4">
                           <label class="form-label" for="watchdogBootGrace">Boot grace window</label>
                           <div class="input-group">
@@ -953,15 +941,50 @@
                             />
                             <span class="input-group-text">sec</span>
                           </div>
-                          <div class="form-text">Suppresses CFUN/reboot actions while uptime is below this threshold (e.g. 600s = 10m).</div>
+                          <div class="form-text">Suppresses action during boot.</div>
                         </div>
 
-                        <div class="col-md-4 d-flex align-items-end">
-                          <button type="button" class="btn btn-primary w-100" :disabled="watchdogSaving" @click="saveWatchdogConfig()">
+                        <div class="col-md-8">
+                          <label class="form-label" for="watchdogAction">Action when offline</label>
+                          <select
+                            id="watchdogAction"
+                            class="form-select"
+                            :disabled="watchdogSaving"
+                            x-model="watchdogForm.action"
+                          >
+                            <option value="cfun">Baseband powercycle</option>
+                            <option value="reboot">Full modem reboot</option>
+                          </select>
+                        </div>
+
+                        <div class="col-md-4">
+                          <label class="form-label" for="watchdogCfunMax">Try cfun for X</label>
+                          <div class="input-group">
+                            <input
+                              id="watchdogCfunMax"
+                              class="form-control"
+                              type="number"
+                              min="1"
+                              max="120"
+                              :disabled="watchdogSaving || watchdogForm.action !== 'cfun'"
+                              x-model.number="watchdogForm.cfunMaxAttempts"
+                            />
+                            <span class="input-group-text">times</span>
+                          </div>
+                          <div class="form-text" :class="{ 'text-muted': watchdogForm.action !== 'cfun' }">
+                            Number of CFUN recoveries before full reboot.
+                          </div>
+                        </div>
+
+                        <div class="col-md-8 d-flex align-items-end gap-2">
+                          <button type="button" class="btn btn-primary flex-fill" :disabled="watchdogSaving" @click="saveWatchdogConfig()">
                             <span x-show="!watchdogSaving">Apply</span>
                             <span x-show="watchdogSaving">
                               <span class="spinner-border spinner-border-sm" role="status"></span>
                             </span>
+                          </button>
+                          <button type="button" class="btn btn-outline-secondary flex-fill" :disabled="watchdogSaving" @click="openWatchdogLogModal()">
+                            View log
                           </button>
                         </div>
                       </div>
@@ -971,6 +994,28 @@
                   
                 </div>
               </div>
+
+                  <div class="modal fade" id="watchdogLogModal" tabindex="-1" aria-labelledby="watchdogLogModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                      <div class="modal-content">
+                        <div class="modal-header">
+                          <h5 class="modal-title" id="watchdogLogModalLabel">Connection watchdog log</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                          <div class="d-flex justify-content-between align-items-center mb-2">
+                            <small class="text-body-secondary">File: <code x-text="watchdogLogFile"></code></small>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="watchdogLogLoading" @click="fetchWatchdogLog()">Refresh</button>
+                          </div>
+                          <pre class="bg-body-tertiary border rounded p-3 mb-0" style="min-height: 320px; max-height: 60vh; white-space: pre-wrap; word-break: break-word;" x-text="watchdogLogText"></pre>
+                        </div>
+                        <div class="modal-footer">
+                          <span class="text-body-secondary me-auto" x-show="watchdogLogLoading">Loading...</span>
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
               <!-- Validation and Action Buttons -->
               <div class="row mt-4">
