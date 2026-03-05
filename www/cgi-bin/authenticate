@@ -5,6 +5,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/session_utils.sh"
 
+if gui_is_locked; then
+    send_json_response 423 '{"success":false,"message":"GUI locked"}'
+    exit 0
+fi
+
 ensure_credentials_file
 ensure_session_store
 
