@@ -96,6 +96,7 @@
    * @param {number} [options.retries] - Number of client-side retries (default: 2)
    * @param {number} [options.timeout] - Request timeout in milliseconds (default: 10000)
    * @param {string} [options.endpoint] - CGI endpoint path (default: "/cgi-bin/get_atcommand")
+   * @param {boolean} [options.tolerateModemError=false] - When true, treat modem ERROR tokens as non-fatal
    * @returns {Promise<Object>} Result object with:
    *   - ok: boolean - True if command succeeded
    *   - data: string - Command output
@@ -123,6 +124,7 @@
     const endpoint = typeof options.endpoint === "string" && options.endpoint.trim() !== ""
       ? options.endpoint.trim()
       : "/cgi-bin/get_atcommand";
+    const tolerateModemError = options.tolerateModemError === true;
 
     let clientAttempt = 0;
     let lastError = null;
@@ -159,13 +161,16 @@
           const hasErrorToken = json.has_error || false;
           
           return createResult(
-            !hasErrorToken, 
-            lastData, 
-            hasErrorToken ? new Error("The modem returned ERROR.") : null, 
+            !hasErrorToken || tolerateModemError,
+            lastData,
+            hasErrorToken && !tolerateModemError
+              ? new Error("The modem returned ERROR.")
+              : null,
             {
               busy: false,
               attempts: serverAttempts,
               command: json.command,
+              hasErrorToken,
             }
           );
         } else {

@@ -314,6 +314,7 @@ function processAllInfos() {
           const basicResult = await ATCommandService.execute(basicCmd, {
             retries: 2,
             timeout: 10000,
+            tolerateModemError: true,
           });
           
           if (basicResult.ok && basicResult.data) {
@@ -381,6 +382,7 @@ function processAllInfos() {
       const result = await ATCommandService.execute(this.atcmd, {
         retries: 3,
         timeout: 15000,
+        tolerateModemError: true,
       });
 
       if (!result.ok) {
@@ -396,11 +398,6 @@ function processAllInfos() {
 
       if (!rawdata || !rawdata.trim()) {
         this.applyFallback('Emtpy AT Response from Modem.');
-        return;
-      }
-
-      if (rawdata.includes('ERROR')) {
-        this.applyFallback('Modem is in error state.');
         return;
       }
 
@@ -911,16 +908,14 @@ function processAllInfos() {
           this.updateSignalHistory();
 
           // --- Temperature ---
-          try {
-            this.temperature = lines
-              .find((line) => line.includes('TSENS:'))
-              .split(":")[1]
-              .replace(/"/g, "");
-          } catch (error) {
-            this.temperature = lines
-              .find((line) => line.includes('TSENS:'))
-              .split(",")[1]
-              .replace(/"/g, "");
+          const tsensLine = lines.find((line) => line.includes('TSENS:'));
+          if (tsensLine) {
+            const normalizedTemp = tsensLine.includes(':')
+              ? tsensLine.split(':')[1]
+              : tsensLine.split(',')[1];
+            this.temperature = (normalizedTemp || "0").replace(/"/g, "").trim() || "0";
+          } else {
+            this.temperature = "0";
           }
 
           // --- PA Temperature ---
