@@ -310,36 +310,6 @@
             </div>
           </div>
         </div>
-        <div class="row">
-          <div class="col">
-            <div class="card" data-requires-admin>
-              <div class="card-header">One Click Utilities</div>
-              <div class="card-body">
-                <div class="card-text">
-                  <div class="table-responsive">
-                    <table class="table">
-                      <tbody>
-                        <tr>
-                          <th scope="row">Reset to Factory Defaults</th>
-                          <td class="text-end">
-                            <button
-                              type="submit"
-                              class="btn btn-danger"
-                              @click="openFactoryResetModal()"
-                              :disabled="isLoading"
-                            >
-                              Factory Reset
-                            </button>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
         <div class="row mt-4">
           <div class="col">
             <div class="card" data-requires-admin>
@@ -444,6 +414,36 @@
                         Remove
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row mt-4">
+          <div class="col">
+            <div class="card" data-requires-admin>
+              <div class="card-header">One Click Utilities</div>
+              <div class="card-body">
+                <div class="card-text">
+                  <div class="table-responsive">
+                    <table class="table">
+                      <tbody>
+                        <tr>
+                          <th scope="row">Reset to Factory Defaults</th>
+                          <td class="text-end">
+                            <button
+                              type="submit"
+                              class="btn btn-danger"
+                              @click="openFactoryResetModal()"
+                              :disabled="isLoading"
+                            >
+                              Factory Reset
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
