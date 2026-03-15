@@ -19,6 +19,7 @@ The current Tailscale integration is built from these repository files:
 - `Tailscale/tailscaled-armv7-sdxprairie-latest.upx`
 - `Tailscale/VERSION.md`
 - `Tailscale/install_tailscale_modem.sh`
+- `Tailscale/build_tailscale_modem.sh`
 - `www/cgi-bin/tailscale`
 - `www/cgi-bin/tailscale-helper`
 - `www/advanced.html`
@@ -69,6 +70,17 @@ Supported modes:
 - install: default mode
 - update: `-U`
 - remove: `-R`
+
+### `Tailscale/build_tailscale_modem.sh`
+
+Build helper that:
+
+- discovers the latest stable upstream version
+- clones the official Tailscale source
+- applies the modem local API patch
+- builds the ARMv7 modem binary
+- compresses it with UPX
+- writes `Tailscale/VERSION.md`
 
 ### `www/cgi-bin/tailscale`
 
@@ -180,6 +192,29 @@ Remove:
 sh install_tailscale_modem.sh -R
 ```
 
+## Building a new modem binary
+
+To build a fresh modem-compatible Tailscale binary from upstream source:
+
+```sh
+cd Tailscale
+./build_tailscale_modem.sh
+```
+
+To build a specific upstream release:
+
+```sh
+./build_tailscale_modem.sh --version 1.94.2 --revision 2
+```
+
+To print the latest stable version detected from upstream:
+
+```sh
+./build_tailscale_modem.sh --print-latest
+```
+
+Detailed build notes are in `Tailscale/BUILD.md`.
+
 ## Web UI usage
 
 From the Advanced page Tailscale card:
@@ -229,4 +264,3 @@ The following has been tested successfully on the target modem:
 - Reinstalling multiple times may result in Tailscale assigning a suffixed hostname such as `sdxprairie-1`.
 - Auth keys used for testing should be treated as exposed and rotated afterwards.
 - The implementation is intentionally minimal and focused on remote modem access, not on advanced Tailscale features.
-

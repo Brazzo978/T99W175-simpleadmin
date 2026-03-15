@@ -3,6 +3,7 @@
 For a full repository-level explanation of the modem Tailscale integration, see:
 
 - `Doc/Tailscale.md`
+- `Tailscale/BUILD.md`
 
 ## Binary to publish
 
@@ -68,3 +69,18 @@ Current known behavior:
 - the daemon authenticates and reaches `Running`
 - config-file boot with auth key works
 - local CLI `tailscale status` now works with the patched modem build
+
+## Build script
+
+To build a fresh modem-compatible binary from upstream source, use:
+
+```sh
+cd Tailscale
+./build_tailscale_modem.sh
+```
+
+To print the latest stable version detected from upstream without building:
+
+```sh
+./build_tailscale_modem.sh --print-latest
+```
