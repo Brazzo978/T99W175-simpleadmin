@@ -70,6 +70,114 @@ return {
     isFactoryResetting: false,
     // Factory reset countdown timer value
     resetCountdown: 60,
+    // Tailscale section state
+    tailscaleBusy: false,
+    tailscaleInstalled: false,
+    tailscaleConnected: false,
+    tailscaleStatusLine: "",
+    tailscaleStatusSummary: "Checking status...",
+    tailscaleAuthKey: "",
+    tailscaleError: "",
+
+    async tailscaleRequest(action, extraParams = {}) {
+      const params = new URLSearchParams({ action, ...extraParams });
+      const response = await fetch(`/cgi-bin/tailscale?${params.toString()}`);
+      const data = await response.json();
+      if (!response.ok || data.status !== "ok") {
+        throw new Error(data.message || `Request failed (${response.status})`);
+      }
+      return data;
+    },
+
+    async fetchTailscaleStatus() {
+      this.tailscaleBusy = true;
+      this.tailscaleError = "";
+      try {
+        const data = await this.tailscaleRequest("status");
+        this.tailscaleInstalled = Boolean(data.installed);
+        this.tailscaleConnected = Boolean(data.connected);
+        this.tailscaleStatusLine = data.statusLine || "";
+
+        if (!this.tailscaleInstalled) {
+          this.tailscaleStatusSummary = "Not installed";
+        } else if (this.tailscaleConnected) {
+          this.tailscaleStatusSummary = "Installed • Connected";
+        } else {
+          this.tailscaleStatusSummary = "Installed • Not connected";
+        }
+      } catch (error) {
+        this.tailscaleError = error.message || "Unable to read Tailscale status";
+        this.tailscaleStatusSummary = "Status unavailable";
+      } finally {
+        this.tailscaleBusy = false;
+      }
+    },
+
+    async installTailscale() {
+      this.tailscaleBusy = true;
+      this.tailscaleError = "";
+      try {
+        await this.tailscaleRequest("install");
+      } catch (error) {
+        this.tailscaleError = error.message || "Install failed";
+      } finally {
+        await this.fetchTailscaleStatus();
+      }
+    },
+
+    async removeTailscale() {
+      this.tailscaleBusy = true;
+      this.tailscaleError = "";
+      try {
+        await this.tailscaleRequest("remove");
+        this.tailscaleAuthKey = "";
+      } catch (error) {
+        this.tailscaleError = error.message || "Remove failed";
+      } finally {
+        await this.fetchTailscaleStatus();
+      }
+    },
+
+    async connectTailscale() {
+      if (!this.tailscaleAuthKey) {
+        this.tailscaleError = "Auth key is required";
+        return;
+      }
+
+      this.tailscaleBusy = true;
+      this.tailscaleError = "";
+      try {
+        await this.tailscaleRequest("login", { authkey: this.tailscaleAuthKey });
+      } catch (error) {
+        this.tailscaleError = error.message || "Login failed";
+      } finally {
+        await this.fetchTailscaleStatus();
+      }
+    },
+
+    async upTailscale() {
+      this.tailscaleBusy = true;
+      this.tailscaleError = "";
+      try {
+        await this.tailscaleRequest("up");
+      } catch (error) {
+        this.tailscaleError = error.message || "Unable to start Tailscale";
+      } finally {
+        await this.fetchTailscaleStatus();
+      }
+    },
+
+    async downTailscale() {
+      this.tailscaleBusy = true;
+      this.tailscaleError = "";
+      try {
+        await this.tailscaleRequest("down");
+      } catch (error) {
+        this.tailscaleError = error.message || "Unable to stop Tailscale";
+      } finally {
+        await this.fetchTailscaleStatus();
+      }
+    },
 
     /**
      * Closes the reboot confirmation modal.
@@ -374,6 +482,7 @@ return {
     init() {
     //this.fetchCurrentSettings();
     this.fetchTTL();
+    this.fetchTailscaleStatus();
     },
 };
 }

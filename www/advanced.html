@@ -332,6 +332,77 @@
                             </button>
                           </td>
                         </tr>
+                        <tr>
+                          <th scope="row">
+                            <div class="fw-semibold">Tailscale</div>
+                            <div class="small text-muted" x-text="tailscaleStatusSummary"></div>
+                          </th>
+                          <td class="text-end">
+                            <div class="d-inline-flex flex-wrap gap-2 justify-content-end">
+                              <button
+                                type="button"
+                                class="btn btn-outline-primary btn-sm"
+                                @click="fetchTailscaleStatus()"
+                                :disabled="tailscaleBusy"
+                              >
+                                Refresh
+                              </button>
+                              <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                @click="installTailscale()"
+                                :disabled="tailscaleBusy || tailscaleInstalled"
+                              >
+                                Install
+                              </button>
+                              <button
+                                type="button"
+                                class="btn btn-outline-danger btn-sm"
+                                @click="removeTailscale()"
+                                :disabled="tailscaleBusy || !tailscaleInstalled"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            <div class="input-group input-group-sm mt-2" x-show="tailscaleInstalled && !tailscaleConnected" x-cloak>
+                              <input
+                                type="text"
+                                class="form-control"
+                                placeholder="tskey-auth-..."
+                                x-model="tailscaleAuthKey"
+                                :disabled="tailscaleBusy"
+                              />
+                              <button
+                                class="btn btn-success"
+                                type="button"
+                                @click="connectTailscale()"
+                                :disabled="tailscaleBusy || !tailscaleAuthKey"
+                              >
+                                Login
+                              </button>
+                            </div>
+                            <div class="d-inline-flex flex-wrap gap-2 justify-content-end mt-2" x-show="tailscaleInstalled" x-cloak>
+                              <button
+                                type="button"
+                                class="btn btn-success btn-sm"
+                                @click="upTailscale()"
+                                :disabled="tailscaleBusy || tailscaleConnected"
+                              >
+                                Start
+                              </button>
+                              <button
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                @click="downTailscale()"
+                                :disabled="tailscaleBusy || !tailscaleConnected"
+                              >
+                                Stop
+                              </button>
+                            </div>
+                            <div class="small text-muted mt-2 text-start" x-show="tailscaleStatusLine" x-text="tailscaleStatusLine"></div>
+                            <div class="small text-danger mt-1 text-start" x-show="tailscaleError" x-text="tailscaleError"></div>
+                          </td>
+                        </tr>
 
                       </tbody>
                     </table>

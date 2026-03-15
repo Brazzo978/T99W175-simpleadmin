@@ -1,0 +1,143 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"status":"error","message":"Authentication required"}'
+    exit 0
+fi
+
+if [ "$SESSION_ROLE" != "admin" ]; then
+    send_json_response 403 '{"status":"error","message":"Administrator access required"}'
+    exit 0
+fi
+
+TAILSCALE_BIN="${SIMPLEADMIN_TAILSCALE_BIN:-tailscale}"
+HELPER_SCRIPT="${SIMPLEADMIN_TAILSCALE_HELPER:-/usr/bin/tailscale-helper}"
+ACTION="${QUERY_STRING:-}"
+ACTION="${ACTION#action=}"
+AUTHKEY=""
+
+if printf '%s' "${QUERY_STRING:-}" | grep -q '&authkey='; then
+    AUTHKEY="$(printf '%s' "$QUERY_STRING" | sed -n 's/.*[?&]authkey=\([^&]*\).*/\1/p' | sed 's/%20/ /g; s/%2B/+/g; s/%2F/\//g; s/%3D/=/' )"
+fi
+
+json_bool() {
+    if [ "$1" = "true" ]; then
+        printf 'true'
+    else
+        printf 'false'
+    fi
+}
+
+is_installed() {
+    if command -v "$TAILSCALE_BIN" >/dev/null 2>&1; then
+        printf 'true'
+    else
+        printf 'false'
+    fi
+}
+
+is_connected() {
+    if command -v "$TAILSCALE_BIN" >/dev/null 2>&1 && "$TAILSCALE_BIN" status >/dev/null 2>&1; then
+        printf 'true'
+    else
+        printf 'false'
+    fi
+}
+
+status_text() {
+    if ! command -v "$TAILSCALE_BIN" >/dev/null 2>&1; then
+        printf 'Not installed'
+        return
+    fi
+
+    if "$TAILSCALE_BIN" status >/dev/null 2>&1; then
+        local line
+        line="$($TAILSCALE_BIN status 2>/dev/null | head -n1 || true)"
+        if [ -n "$line" ]; then
+            printf '%s' "$line"
+        else
+            printf 'Connected'
+        fi
+    else
+        printf 'Installed but not connected'
+    fi
+}
+
+respond_status() {
+    local installed connected line
+    installed="$(is_installed)"
+    connected="$(is_connected)"
+    line="$(status_text)"
+    line="$(json_escape "$line")"
+
+    send_json_response 200 "{\"status\":\"ok\",\"installed\":$(json_bool "$installed"),\"connected\":$(json_bool "$connected"),\"statusLine\":\"$line\"}"
+}
+
+run_helper() {
+    local op="$1"
+    if [ ! -x "$HELPER_SCRIPT" ]; then
+        send_json_response 404 '{"status":"error","message":"Tailscale helper script not found"}'
+        exit 0
+    fi
+
+    if "$HELPER_SCRIPT" "$op" >/tmp/simpleadmin-tailscale-helper.log 2>&1; then
+        send_json_response 200 "{\"status\":\"ok\",\"message\":\"Helper executed: $op\"}"
+    else
+        local out
+        out="$(tail -n 20 /tmp/simpleadmin-tailscale-helper.log | tr '\n' ' ' | sed 's/  */ /g')"
+        out="$(json_escape "$out")"
+        send_json_response 500 "{\"status\":\"error\",\"message\":\"$out\"}"
+    fi
+}
+
+run_tailscale() {
+    if ! command -v "$TAILSCALE_BIN" >/dev/null 2>&1; then
+        send_json_response 404 '{"status":"error","message":"Tailscale is not installed"}'
+        exit 0
+    fi
+
+    local cmd="$1"
+    shift
+
+    if "$TAILSCALE_BIN" "$cmd" "$@" >/tmp/simpleadmin-tailscale.log 2>&1; then
+        send_json_response 200 "{\"status\":\"ok\",\"message\":\"Tailscale $cmd successful\"}"
+    else
+        local out
+        out="$(tail -n 20 /tmp/simpleadmin-tailscale.log | tr '\n' ' ' | sed 's/  */ /g')"
+        out="$(json_escape "$out")"
+        send_json_response 500 "{\"status\":\"error\",\"message\":\"$out\"}"
+    fi
+}
+
+case "$ACTION" in
+    status|"")
+        respond_status
+        ;;
+    install)
+        run_helper install
+        ;;
+    remove)
+        run_helper remove
+        ;;
+    up)
+        run_tailscale up
+        ;;
+    down)
+        run_tailscale down
+        ;;
+    login)
+        if [ -z "$AUTHKEY" ]; then
+            send_json_response 400 '{"status":"error","message":"Missing authkey"}'
+            exit 0
+        fi
+        run_tailscale up --authkey "$AUTHKEY"
+        ;;
+    *)
+        send_json_response 400 '{"status":"error","message":"Invalid action"}'
+        ;;
+esac
