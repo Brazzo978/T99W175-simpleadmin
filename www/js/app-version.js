@@ -1,7 +1,7 @@
 (function() {
   const APP_VERSION = "Simple T99-1.0.5Beta";
   const VERSION_CHECK_URL = "https://raw.githubusercontent.com/Brazzo978/T99W175-simpleadmin/Beta/VERSION.md";
-  const UPDATE_TARGET_URL = "https://github.com/Brazzo978/T99W175-simpleadmin/archive/refs/heads/Beta.zip";
+  const UPDATE_TARGET_URL = "https://github.com/Brazzo978/T99W175-simpleadmin/blob/Beta/README.md";
 
   function createUpToDateBadge() {
     const badge = document.createElement("span");
@@ -22,7 +22,7 @@
     link.href = UPDATE_TARGET_URL;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.title = `Update available: ${remoteVersion}. Open download URL.`;
+    link.title = `Update available: ${remoteVersion}. Open update page.`;
     link.setAttribute("aria-label", link.title);
     link.innerHTML = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
