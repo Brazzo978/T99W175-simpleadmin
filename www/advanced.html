@@ -65,7 +65,7 @@
     <script src="js/device-info.js"></script>
     <script src="js/dark-mode.js" defer></script>
     <script src="js/app-version.js" defer></script>
-    <script src="js/fota.js"></script>
+    <!-- <script src="js/fota.js"></script> -->
   </head>
   <body data-require-auth="true">
     <main>
@@ -413,7 +413,9 @@
           </div>
         </div>
 
-        <!-- Web UI Update Section -->
+        <!--
+        Web UI Update Section
+        Temporarily disabled until the dedicated update flow is restored.
         <div class="row mt-4">
           <div class="col">
             <div class="card" data-requires-admin x-data="fotaManager()">
@@ -428,7 +430,6 @@
               </div>
               <div class="card-body py-2">
 
-                <!-- Versions Row -->
                 <div class="row g-2 mb-2">
                   <div class="col-6">
                     <small class="text-muted d-block" style="font-size: 0.7rem;">Current</small>
@@ -440,22 +441,17 @@
                   </div>
                 </div>
 
-                <!-- Changelog -->
                 <div class="mb-2" x-show="changelog && changelog !== ''" x-cloak>
                   <div class="card bg-light" style="max-height: 80px; overflow-y: auto;">
                     <div class="card-body small p-2" style="white-space: pre-wrap; font-size: 0.75rem;" x-text="changelog"></div>
                   </div>
                 </div>
 
-                <!-- Actions Row -->
                 <div class="row g-2 align-items-center border-top pt-2 mt-2">
-
-                  <!-- Status -->
                   <div class="col-auto">
                     <small class="text-muted" x-show="statusMessage && !isLoading" x-text="statusMessage"></small>
                   </div>
 
-                  <!-- Rollback Button (when backup available) -->
                   <div class="col-auto" x-show="hasBackup">
                     <button class="btn btn-outline-danger btn-sm" type="button" @click="rollbackUpdate()" :disabled="isLoading">
                       <span x-show="!isLoading">Rollback</span>
@@ -463,15 +459,12 @@
                     </button>
                   </div>
 
-                  <!-- Check/Download/Install Button -->
                   <div class="col-auto ms-auto d-flex gap-2">
-                    <!-- Clear Cache button (always shown when downloaded) -->
                     <button x-show="updateDownloaded" class="btn btn-outline-secondary btn-sm" type="button" @click="clearCache()" :disabled="isLoading" title="Clear cached update and re-check" x-cloak>
                       <span x-show="!isLoading">Clear & Re-check</span>
                       <span x-show="isLoading">Clearing...</span>
                     </button>
 
-                    <!-- Main action button: changes based on state -->
                     <button x-show="!updateDownloaded && !updateAvailable" class="btn btn-primary" type="button" @click="checkUpdates()" :disabled="isLoading" x-cloak>
                       <span x-show="!isLoading">Check for Update</span>
                       <span x-show="isLoading">Checking...</span>
@@ -486,36 +479,32 @@
                       Install Update
                     </button>
                   </div>
-
-                </div>
-
-              </div>
-
-            <!-- FOTA Update Modal (inside card, like reboot modal) -->
-            <div class="modal-overlay" x-show="showFotaModal" x-cloak>
-              <div class="loading-modal">
-                <div class="loader" x-show="fotaModalCountdown > 0"></div>
-                <div class="loading-text" style="display: flex; flex-direction: column">
-                  <h3 x-text="fotaModalTitle">Update Web UI</h3>
-                  <p style="margin-top: 0.5rem" x-text="fotaModalMessage">
-                    This will update to version X.X.X. The interface will refresh automatically.
-                  </p>
-                </div>
-                <!-- Confirmation buttons (only show when countdown is 0) -->
-                <div class="d-grid gap-2 d-md-block" x-show="fotaModalCountdown === 0">
-                  <button class="btn btn-primary" type="button" @click="confirmFotaAction()">
-                    Continue
-                  </button>
-                  <button class="btn btn-danger" type="button" @click="closeFotaModal()">
-                    Cancel
-                  </button>
                 </div>
               </div>
-            </div>
 
+              <div class="modal-overlay" x-show="showFotaModal" x-cloak>
+                <div class="loading-modal">
+                  <div class="loader" x-show="fotaModalCountdown > 0"></div>
+                  <div class="loading-text" style="display: flex; flex-direction: column">
+                    <h3 x-text="fotaModalTitle">Update Web UI</h3>
+                    <p style="margin-top: 0.5rem" x-text="fotaModalMessage">
+                      This will update to version X.X.X. The interface will refresh automatically.
+                    </p>
+                  </div>
+                  <div class="d-grid gap-2 d-md-block" x-show="fotaModalCountdown === 0">
+                    <button class="btn btn-primary" type="button" @click="confirmFotaAction()">
+                      Continue
+                    </button>
+                    <button class="btn btn-danger" type="button" @click="closeFotaModal()">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+        -->
 
         <!-- Loading Modal for Reboot -->
         <div class="modal-overlay" x-show="showModal" x-cloak>
