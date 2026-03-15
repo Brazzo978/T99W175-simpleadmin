@@ -30,6 +30,13 @@ json_bool() {
     fi
 }
 
+status_json() {
+    if ! command -v "$TAILSCALE_BIN" >/dev/null 2>&1; then
+        return 1
+    fi
+    "$TAILSCALE_BIN" status --json 2>/dev/null
+}
+
 is_installed() {
     if command -v "$TAILSCALE_BIN" >/dev/null 2>&1; then
         printf 'true'
@@ -44,14 +51,14 @@ is_connected() {
         return
     fi
 
-    local line
-    line="$($TAILSCALE_BIN status 2>/dev/null | head -n1 || true)"
-    if [ -z "$line" ]; then
+    local json
+    json="$(status_json || true)"
+    if [ -z "$json" ]; then
         printf 'false'
-    elif printf '%s' "$line" | grep -q 'offline'; then
-        printf 'false'
-    else
+    elif printf '%s' "$json" | jq -e '.BackendState == "Running" and .HaveNodeKey == true and (.Self.InNetworkMap == true or (.TailscaleIPs | length) > 0)' >/dev/null 2>&1; then
         printf 'true'
+    else
+        printf 'false'
     fi
 }
 
@@ -61,14 +68,27 @@ status_text() {
         return
     fi
 
-    if "$TAILSCALE_BIN" status >/dev/null 2>&1; then
-        local line
-        line="$($TAILSCALE_BIN status 2>/dev/null | head -n1 || true)"
-        if [ -n "$line" ]; then
-            printf '%s' "$line"
+    local json
+    json="$(status_json || true)"
+    if [ -z "$json" ]; then
+        printf 'Installed but not connected'
+        return
+    fi
+
+    if printf '%s' "$json" | jq -e '.BackendState == "Running"' >/dev/null 2>&1; then
+        local host ip relay
+        host="$(printf '%s' "$json" | jq -r '.Self.HostName // "tailscale-node"')"
+        ip="$(printf '%s' "$json" | jq -r '.TailscaleIPs[0] // .Self.TailscaleIPs[0] // ""')"
+        relay="$(printf '%s' "$json" | jq -r '.Self.Relay // ""')"
+        if [ -n "$ip" ] && [ -n "$relay" ] && [ "$relay" != "null" ]; then
+            printf '%s • %s • relay %s' "$host" "$ip" "$relay"
+        elif [ -n "$ip" ]; then
+            printf '%s • %s' "$host" "$ip"
         else
-            printf 'Connected'
+            printf '%s • Running' "$host"
         fi
+    elif printf '%s' "$json" | jq -e '.AuthURL != ""' >/dev/null 2>&1; then
+        printf 'Login required'
     else
         printf 'Installed but not connected'
     fi
