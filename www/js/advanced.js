@@ -75,6 +75,7 @@ return {
     tailscaleInstalled: false,
     tailscaleConnected: false,
     tailscaleStatusLine: "",
+    tailscaleRawStatus: "",
     tailscaleStatusSummary: "Checking status...",
     tailscaleAuthKey: "",
     tailscaleError: "",
@@ -97,6 +98,7 @@ return {
         this.tailscaleInstalled = Boolean(data.installed);
         this.tailscaleConnected = Boolean(data.connected);
         this.tailscaleStatusLine = data.statusLine || "";
+        this.tailscaleRawStatus = data.rawStatus || "";
 
         if (!this.tailscaleInstalled) {
           this.tailscaleStatusSummary = "Not installed";
@@ -108,6 +110,7 @@ return {
       } catch (error) {
         this.tailscaleError = error.message || "Unable to read Tailscale status";
         this.tailscaleStatusSummary = "Status unavailable";
+        this.tailscaleRawStatus = "";
       } finally {
         this.tailscaleBusy = false;
       }

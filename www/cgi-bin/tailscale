@@ -116,13 +116,19 @@ status_text() {
 }
 
 respond_status() {
-    local installed connected line
+    local installed connected line raw
     installed="$(is_installed)"
     connected="$(is_connected)"
     line="$(status_text)"
     line="$(json_escape "$line")"
+    if command -v "$TAILSCALE_BIN" >/dev/null 2>&1; then
+        raw="$($TAILSCALE_BIN status 2>/dev/null || true)"
+    else
+        raw="Not installed"
+    fi
+    raw="$(json_escape "$raw")"
 
-    send_json_response 200 "{\"status\":\"ok\",\"installed\":$(json_bool "$installed"),\"connected\":$(json_bool "$connected"),\"statusLine\":\"$line\"}"
+    send_json_response 200 "{\"status\":\"ok\",\"installed\":$(json_bool "$installed"),\"connected\":$(json_bool "$connected"),\"statusLine\":\"$line\",\"rawStatus\":\"$raw\"}"
 }
 
 run_helper() {
