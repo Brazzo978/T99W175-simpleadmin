@@ -1,0 +1,74 @@
+#!/bin/sh
+set -eu
+
+REPO_OWNER="${REPO_OWNER:-Brazzo978}"
+REPO_NAME="${REPO_NAME:-T99W175-simpleadmin}"
+REPO_BRANCH="${REPO_BRANCH:-Beta}"
+REPO_TAILSCALE_DIR="${REPO_TAILSCALE_DIR:-Tailscale}"
+INSTALLER_URL="${INSTALLER_URL:-https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/${REPO_TAILSCALE_DIR}/install_tailscale_modem.sh}"
+CONFIG_PATH="/data/tailscale/config.json"
+TAILSCALE_SERVICE="tailscaled.service"
+TAILSCALE_BIN="/usr/bin/tailscale"
+
+download_installer() {
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$INSTALLER_URL"
+        return
+    fi
+    if command -v wget >/dev/null 2>&1; then
+        wget -O - "$INSTALLER_URL"
+        return
+    fi
+    echo "Neither curl nor wget is available."
+    exit 1
+}
+
+write_config() {
+    authkey="$1"
+    mkdir -p /data/tailscale
+    chmod 700 /data/tailscale
+    cat > "$CONFIG_PATH" <<EOF
+{
+  "Version": "alpha0",
+  "AuthKey": "$authkey",
+  "Enabled": true,
+  "AcceptDNS": false,
+  "AcceptRoutes": false,
+  "RunSSHServer": false,
+  "RunWebClient": false
+}
+EOF
+    chmod 600 "$CONFIG_PATH"
+}
+
+action="${1:-}"
+
+case "$action" in
+    install)
+        authkey="${2:-}"
+        [ -n "$authkey" ] || { echo "Missing auth key"; exit 1; }
+        download_installer | sh -s -- -k "$authkey"
+        ;;
+    remove)
+        download_installer | sh -s -- -R
+        ;;
+    update)
+        download_installer | sh -s -- -U
+        ;;
+    login)
+        authkey="${2:-}"
+        [ -n "$authkey" ] || { echo "Missing auth key"; exit 1; }
+        write_config "$authkey"
+        systemctl restart "$TAILSCALE_SERVICE"
+        ;;
+    up)
+        systemctl start "$TAILSCALE_SERVICE"
+        ;;
+    down)
+        systemctl stop "$TAILSCALE_SERVICE"
+        ;;
+    *)
+        echo "Usage: $0 {install|remove|update|login|up|down} [authkey]"
+        exit 1
+        ;;
+esac

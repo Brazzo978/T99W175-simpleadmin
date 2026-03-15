@@ -101,9 +101,9 @@ return {
         if (!this.tailscaleInstalled) {
           this.tailscaleStatusSummary = "Not installed";
         } else if (this.tailscaleConnected) {
-          this.tailscaleStatusSummary = "Installed • Connected";
+          this.tailscaleStatusSummary = "Installed • Online";
         } else {
-          this.tailscaleStatusSummary = "Installed • Not connected";
+          this.tailscaleStatusSummary = "Installed • Offline";
         }
       } catch (error) {
         this.tailscaleError = error.message || "Unable to read Tailscale status";
@@ -114,10 +114,15 @@ return {
     },
 
     async installTailscale() {
+      if (!this.tailscaleAuthKey) {
+        this.tailscaleError = "Auth key is required";
+        return;
+      }
+
       this.tailscaleBusy = true;
       this.tailscaleError = "";
       try {
-        await this.tailscaleRequest("install");
+        await this.tailscaleRequest("install", { authkey: this.tailscaleAuthKey });
       } catch (error) {
         this.tailscaleError = error.message || "Install failed";
       } finally {
@@ -150,6 +155,18 @@ return {
         await this.tailscaleRequest("login", { authkey: this.tailscaleAuthKey });
       } catch (error) {
         this.tailscaleError = error.message || "Login failed";
+      } finally {
+        await this.fetchTailscaleStatus();
+      }
+    },
+
+    async updateTailscale() {
+      this.tailscaleBusy = true;
+      this.tailscaleError = "";
+      try {
+        await this.tailscaleRequest("update");
+      } catch (error) {
+        this.tailscaleError = error.message || "Update failed";
       } finally {
         await this.fetchTailscaleStatus();
       }

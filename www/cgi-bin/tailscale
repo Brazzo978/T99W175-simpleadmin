@@ -16,14 +16,11 @@ if [ "$SESSION_ROLE" != "admin" ]; then
 fi
 
 TAILSCALE_BIN="${SIMPLEADMIN_TAILSCALE_BIN:-tailscale}"
-HELPER_SCRIPT="${SIMPLEADMIN_TAILSCALE_HELPER:-/usr/bin/tailscale-helper}"
-ACTION="${QUERY_STRING:-}"
-ACTION="${ACTION#action=}"
-AUTHKEY=""
+HELPER_SCRIPT="${SIMPLEADMIN_TAILSCALE_HELPER:-$SCRIPT_DIR/tailscale-helper}"
+ACTION="$(printf '%s' "${QUERY_STRING:-}" | sed -n 's/.*[?&]\{0,1\}action=\([^&]*\).*/\1/p')"
+AUTHKEY="$(printf '%s' "${QUERY_STRING:-}" | sed -n 's/.*[?&]authkey=\([^&]*\).*/\1/p' | sed 's/%20/ /g; s/%2B/+/g; s/%2F/\//g; s/%3D/=/g')"
 
-if printf '%s' "${QUERY_STRING:-}" | grep -q '&authkey='; then
-    AUTHKEY="$(printf '%s' "$QUERY_STRING" | sed -n 's/.*[?&]authkey=\([^&]*\).*/\1/p' | sed 's/%20/ /g; s/%2B/+/g; s/%2F/\//g; s/%3D/=/' )"
-fi
+[ -n "$ACTION" ] || ACTION="status"
 
 json_bool() {
     if [ "$1" = "true" ]; then
@@ -42,10 +39,19 @@ is_installed() {
 }
 
 is_connected() {
-    if command -v "$TAILSCALE_BIN" >/dev/null 2>&1 && "$TAILSCALE_BIN" status >/dev/null 2>&1; then
-        printf 'true'
-    else
+    if ! command -v "$TAILSCALE_BIN" >/dev/null 2>&1; then
         printf 'false'
+        return
+    fi
+
+    local line
+    line="$($TAILSCALE_BIN status 2>/dev/null | head -n1 || true)"
+    if [ -z "$line" ]; then
+        printf 'false'
+    elif printf '%s' "$line" | grep -q 'offline'; then
+        printf 'false'
+    else
+        printf 'true'
     fi
 }
 
@@ -80,12 +86,13 @@ respond_status() {
 
 run_helper() {
     local op="$1"
+    shift || true
     if [ ! -x "$HELPER_SCRIPT" ]; then
         send_json_response 404 '{"status":"error","message":"Tailscale helper script not found"}'
         exit 0
     fi
 
-    if "$HELPER_SCRIPT" "$op" >/tmp/simpleadmin-tailscale-helper.log 2>&1; then
+    if "$HELPER_SCRIPT" "$op" "$@" >/tmp/simpleadmin-tailscale-helper.log 2>&1; then
         send_json_response 200 "{\"status\":\"ok\",\"message\":\"Helper executed: $op\"}"
     else
         local out
@@ -119,23 +126,30 @@ case "$ACTION" in
         respond_status
         ;;
     install)
-        run_helper install
+        if [ -z "$AUTHKEY" ]; then
+            send_json_response 400 '{"status":"error","message":"Auth key is required for install"}'
+            exit 0
+        fi
+        run_helper install "$AUTHKEY"
         ;;
     remove)
         run_helper remove
         ;;
+    update)
+        run_helper update
+        ;;
     up)
-        run_tailscale up
+        run_helper up
         ;;
     down)
-        run_tailscale down
+        run_helper down
         ;;
     login)
         if [ -z "$AUTHKEY" ]; then
             send_json_response 400 '{"status":"error","message":"Missing authkey"}'
             exit 0
         fi
-        run_tailscale up --authkey "$AUTHKEY"
+        run_helper login "$AUTHKEY"
         ;;
     *)
         send_json_response 400 '{"status":"error","message":"Invalid action"}'
