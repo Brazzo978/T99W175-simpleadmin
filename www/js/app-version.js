@@ -1,5 +1,5 @@
 (function() {
-  const APP_VERSION = "Simple T99-1.0.4";
+  const APP_VERSION = "Simple T99-1.0.5Beta";
 
   function applyVersion() {
     document.querySelectorAll('[data-app-version]').forEach((el) => {
