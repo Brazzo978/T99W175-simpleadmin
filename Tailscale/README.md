@@ -1,5 +1,9 @@
 # Modem Tailscale Deploy
 
+For a full repository-level explanation of the modem Tailscale integration, see:
+
+- `Doc/Tailscale.md`
+
 ## Binary to publish
 
 Upload this file into the repo `tailscale/` directory or as a GitHub Release asset:

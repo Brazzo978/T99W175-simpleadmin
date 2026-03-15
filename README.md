@@ -39,6 +39,7 @@ SIMPLEADMIN_ENABLE_ESIM=0
 SIMPLEADMIN_ESIM_BASE_URL="http://localhost:8080/api/v1"
 ```
 Check [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md) for file-by-file behavior, request flows, and how each page uses the CGI helpers.
+For the dedicated Tailscale integration documentation, see [Doc/Tailscale.md](Doc/Tailscale.md).
 
 ## GUI lock (maintenance mode)
 
