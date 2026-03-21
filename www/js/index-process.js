@@ -314,6 +314,7 @@ function processAllInfos() {
           const basicResult = await ATCommandService.execute(basicCmd, {
             retries: 2,
             timeout: 10000,
+            tolerateModemError: true,
           });
           
           if (basicResult.ok && basicResult.data) {
@@ -381,6 +382,7 @@ function processAllInfos() {
       const result = await ATCommandService.execute(this.atcmd, {
         retries: 3,
         timeout: 15000,
+        tolerateModemError: true,
       });
 
       if (!result.ok) {
@@ -392,15 +394,24 @@ function processAllInfos() {
         return;
       }
 
-      const rawdata = result.data;
+      let rawdata = result.data;
+
+      if (result.hasErrorToken && (!rawdata || !rawdata.trim() || !rawdata.includes("+CPIN:"))) {
+        const atcmdWithoutTemp =
+          'AT^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+COPS?;+CIMI;+ICCID;+CNUM;+CSCS="GSM";+CGMI;+CGMM;^VERSION?;+CGSN';
+        const fallbackResult = await ATCommandService.execute(atcmdWithoutTemp, {
+          retries: 2,
+          timeout: 15000,
+          tolerateModemError: true,
+        });
+
+        if (fallbackResult.ok && fallbackResult.data) {
+          rawdata = fallbackResult.data;
+        }
+      }
 
       if (!rawdata || !rawdata.trim()) {
         this.applyFallback('Emtpy AT Response from Modem.');
-        return;
-      }
-
-      if (rawdata.includes('ERROR')) {
-        this.applyFallback('Modem is in error state.');
         return;
       }
 
@@ -911,16 +922,14 @@ function processAllInfos() {
           this.updateSignalHistory();
 
           // --- Temperature ---
-          try {
-            this.temperature = lines
-              .find((line) => line.includes('TSENS:'))
-              .split(":")[1]
-              .replace(/"/g, "");
-          } catch (error) {
-            this.temperature = lines
-              .find((line) => line.includes('TSENS:'))
-              .split(",")[1]
-              .replace(/"/g, "");
+          const tsensLine = lines.find((line) => line.includes('TSENS:'));
+          if (tsensLine) {
+            const normalizedTemp = tsensLine.includes(':')
+              ? tsensLine.split(':')[1]
+              : tsensLine.split(',')[1];
+            this.temperature = (normalizedTemp || "0").replace(/"/g, "").trim() || "0";
+          } else {
+            this.temperature = "0";
           }
 
           // --- PA Temperature ---
@@ -943,13 +952,11 @@ function processAllInfos() {
             this.skinTemperature = 'Unknown';
           }
           // --- SIM Status ---
-          const sim_status = lines
-            .find((line) => line.includes("+CPIN:"))
-            .split(":")[1]
-            .replace(/"/g, "")
-            .trim();
+          const simLine = lines.find((line) => line.includes("+CPIN:"));
+          const sim_status = simLine && simLine.includes(":")
+            ? simLine.split(":")[1].replace(/"/g, "").trim()
+            : "Unknown";
 
-          // console.log(sim_status)
           if (sim_status == "READY") {
             this.simStatus = "Active";
           } else if (sim_status.includes("SIM PIN") || sim_status.includes("PIN")) {
@@ -959,17 +966,20 @@ function processAllInfos() {
           } else {
             this.simStatus = sim_status;
           }
+
           // --- Active SIM ---
-          const current_sim = lines
-            .find((line) => line.includes("ENABLE"))
-            .split(" ")[0]
-            .replace(/\D/g, "");
+          const simEnableLine = lines.find((line) => line.includes("ENABLE"));
+          const current_sim = simEnableLine
+            ? simEnableLine.split(" ")[0].replace(/\D/g, "")
+            : "";
           if (current_sim == 1) {
             this.activeSim = "SIM 1";
           } else if (current_sim == 2) {
             this.activeSim = "SIM 2";
-          } else {
+          } else if (current_sim) {
             this.activeSim = "No SIM";
+          } else {
+            this.activeSim = "Unknown";
           }
           // --- Network Provider & MCCMNC ---
           // Helper function to remove consecutive duplicate words
