@@ -89,6 +89,10 @@ AT+QCFG="usbcfg",0x2C7C,0x0801,1,1,1,1,1,1,0
 
 ✅ A questo punto **ADB è presente** .
 
+```txt
+AT+QETH="eth_driver","r8125",1;+QCFG="pcie/mode",1;+QCFG="usbnet",1;+QMAP="MPDN_rule",0,1,0,1,1,"FF:FF:FF:FF:FF:FF";+QMAP="DHCPV4DNS","disable";+CFUN=1,1
+```
+
 ---
 
 ## Step 4 – Carica `wget` in `/usr/bin`
