@@ -6,7 +6,6 @@ PAYLOAD_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_SRC="$PAYLOAD_DIR/www"
 SCRIPTS_SRC="$PAYLOAD_DIR/scripts"
 TAILSCALE_SRC="$PAYLOAD_DIR/Tailscale"
-USR_SRC="$PAYLOAD_DIR/usr"
 WEB_ROOT="/WEBSERVER"
 WEB_DIR="$WEB_ROOT/www"
 OPT_SCRIPTS="/opt/scripts"
@@ -159,28 +158,6 @@ install_tailscale_payload() {
     chmod -R 755 /opt/simpleadmin/Tailscale
 }
 
-install_userland_tools() {
-    [ -d "$USR_SRC" ] || return 0
-
-    log "Installing bundled curl/jq userland tools"
-    mkdir -p /usr/bin /usr/lib
-
-    if [ -f "$USR_SRC/bin/curl" ]; then
-        copy_file "$USR_SRC/bin/curl" /usr/bin/curl 755
-    fi
-    if [ -f "$USR_SRC/bin/jq" ]; then
-        copy_file "$USR_SRC/bin/jq" /usr/bin/jq 755
-    fi
-    if [ -f "$USR_SRC/lib/libcurl.so.4.7.0" ]; then
-        copy_file "$USR_SRC/lib/libcurl.so.4.7.0" /usr/lib/libcurl.so.4.7.0 644
-        ln -sf /usr/lib/libcurl.so.4.7.0 /usr/lib/libcurl.so.4
-    fi
-    if [ -f "$USR_SRC/lib/libjq.so.1.0.4" ]; then
-        copy_file "$USR_SRC/lib/libjq.so.1.0.4" /usr/lib/libjq.so.1.0.4 644
-        ln -sf /usr/lib/libjq.so.1.0.4 /usr/lib/libjq.so.1
-    fi
-}
-
 enable_services() {
     log "Enabling services"
     mkdir -p "$SYSTEMD_WANTS" "$ETC_SYSTEMD_WANTS"
@@ -240,7 +217,6 @@ main() {
     install_web_ui
     install_runtime_scripts
     install_tailscale_payload
-    install_userland_tools
     enable_services
     verify_install
     log "Upgrade completed successfully"
