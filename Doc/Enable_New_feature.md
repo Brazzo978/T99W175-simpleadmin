@@ -19,7 +19,33 @@ All required files are inside the repository `scripts/` directory.
 
 ---
 
-## Recommended: upgrade with the 1.0.5 payload
+## Recommended: upgrade with the ready-made 1.0.5 payload
+
+If the modem has internet access, connect to the modem shell with ADB or SSH and
+run only these two commands **inside the modem**:
+
+```bash
+cd /tmp && rm -rf simpleadmin-1.0.5-payload && wget -qO- https://github.com/Brazzo978/T99W175-simpleadmin/releases/download/1.0.5/simpleadmin-1.0.5-payload.tar.gz | tar -xz
+sh /tmp/simpleadmin-1.0.5-payload/upgrade-to-1.0.5.sh
+```
+
+From the host PC, that means either:
+
+```bash
+adb shell
+```
+
+or:
+
+```bash
+ssh root@192.168.225.1
+```
+
+Then run the two modem-side commands above.
+
+---
+
+## Build the 1.0.5 payload locally
 
 Build the payload on the host PC:
 
@@ -31,6 +57,7 @@ This creates:
 
 ```text
 dist/simpleadmin-1.0.5-payload
+dist/simpleadmin-1.0.5-payload.tar.gz
 ```
 
 ### ADB deploy
