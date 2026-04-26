@@ -11,12 +11,12 @@ TAILSCALE_SERVICE="tailscaled.service"
 TAILSCALE_BIN="/usr/bin/tailscale"
 
 download_installer() {
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$INSTALLER_URL"
-        return
-    fi
     if command -v wget >/dev/null 2>&1; then
         wget -O - "$INSTALLER_URL"
+        return
+    fi
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$INSTALLER_URL"
         return
     fi
     echo "Neither curl nor wget is available."
