@@ -21,36 +21,55 @@ All required files are inside the repository `scripts/` directory.
 
 ## Recommended: upgrade with the ready-made 1.0.5 payload
 
-If the modem has internet access and working DNS, connect to the modem shell
-with ADB or SSH and run only these two commands **inside the modem**:
+Download these release assets into the same folder on the host PC:
+
+* `simpleadmin-1.0.5-payload.tar.gz`
+* `deploy-1.0.5-adb.sh` for Linux/macOS
+* `deploy-1.0.5-adb.bat` for Windows
+
+Then run the helper script from that folder.
+
+Linux/macOS:
+
+```bash
+chmod +x deploy-1.0.5-adb.sh
+./deploy-1.0.5-adb.sh
+```
+
+Windows:
+
+```bat
+deploy-1.0.5-adb.bat
+```
+
+The helper script will:
+
+* wait for the ADB modem
+* push `simpleadmin-1.0.5-payload.tar.gz` to `/tmp`
+* extract it inside the modem
+* run `/tmp/simpleadmin-1.0.5-payload/upgrade-to-1.0.5.sh`
+
+### Manual ADB fallback
+
+If you do not want to use the helper script, run:
+
+```bash
+adb push simpleadmin-1.0.5-payload.tar.gz /tmp/simpleadmin-1.0.5-payload.tar.gz
+adb shell 'cd /tmp && rm -rf simpleadmin-1.0.5-payload && tar -xzf simpleadmin-1.0.5-payload.tar.gz && sh /tmp/simpleadmin-1.0.5-payload/upgrade-to-1.0.5.sh'
+```
+
+### Direct modem download fallback
+
+If the modem has internet access, working DNS and a HTTPS-capable downloader,
+you can also download directly from the modem shell:
 
 ```bash
 cd /tmp && rm -rf simpleadmin-1.0.5-payload && wget -qO- https://github.com/Brazzo978/T99W175-simpleadmin/releases/download/1.0.5/simpleadmin-1.0.5-payload.tar.gz | tar -xz
 sh /tmp/simpleadmin-1.0.5-payload/upgrade-to-1.0.5.sh
 ```
 
-From the host PC, that means either:
-
-```bash
-adb shell
-```
-
-or:
-
-```bash
-ssh root@192.168.225.1
-```
-
-Then run the two modem-side commands above.
-
-If the modem cannot resolve or reach GitHub yet, download/push the release asset
-from the host PC instead:
-
-```bash
-curl -fL -o simpleadmin-1.0.5-payload.tar.gz https://github.com/Brazzo978/T99W175-simpleadmin/releases/download/1.0.5/simpleadmin-1.0.5-payload.tar.gz
-adb push simpleadmin-1.0.5-payload.tar.gz /tmp/simpleadmin-1.0.5-payload.tar.gz
-adb shell 'cd /tmp && rm -rf simpleadmin-1.0.5-payload && tar -xzf simpleadmin-1.0.5-payload.tar.gz && sh /tmp/simpleadmin-1.0.5-payload/upgrade-to-1.0.5.sh'
-```
+On stock modems, prefer the ADB helper because BusyBox `wget` may fail with
+GitHub HTTPS/TLS.
 
 ---
 
@@ -67,6 +86,8 @@ This creates:
 ```text
 dist/simpleadmin-1.0.5-payload
 dist/simpleadmin-1.0.5-payload.tar.gz
+dist/deploy-1.0.5-adb.sh
+dist/deploy-1.0.5-adb.bat
 ```
 
 ### ADB deploy
