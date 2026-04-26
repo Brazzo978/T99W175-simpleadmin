@@ -10,13 +10,14 @@ then
     TTLVALUE=$(echo $ttlfile | grep -o "[0-9]\{1,3\}")
     
     if [ -z "${TTLVALUE}" ]; then
-        echo "Couldnt get proper ttl value from file" >&2
-        exit 1
+        echo "Couldnt get proper ttl value from file, disabling TTL override" >&2
+        TTLVALUE=0
+        echo '0' > /persist/ttlvalue
     fi
 else
     # Couldnt find ttlvalue file, lets generate one with 0 ttlvalue (0 = disabled)
     touch /persist/ttlvalue && echo '0' > /persist/ttlvalue
-    exit 1
+    TTLVALUE=0
 fi
 
 case "$1" in
