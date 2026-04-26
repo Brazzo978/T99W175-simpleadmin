@@ -1,6 +1,11 @@
 # Installing Init Scripts + systemd Services (Auto-Reboot, TTL Fix, eSIM Server, Connection Watchdog)
 
-Beta: there is a cmd file to run in the same folder as the script folder , that tryes to deploy everything via adb autoomatically **use it with care** : deploy-new-feauture-adb.cmd
+Starting from **Simple T99-1.0.5**, the recommended upgrade path is the
+modem-side payload updater. The host PC only copies the payload and starts the
+upgrade script; all checks, file installs, permissions, service symlinks and
+service restarts are handled inside the modem.
+
+The older manual steps are still documented below as a fallback/reference.
 
 This repository provides the scripts and service units required to enable:
 
@@ -13,6 +18,91 @@ This repository provides the scripts and service units required to enable:
 All required files are inside the repository `scripts/` directory.
 
 ---
+
+## Recommended: upgrade with the 1.0.5 payload
+
+Build the payload on the host PC:
+
+```bash
+./tools/build-upgrade-payload.sh
+```
+
+This creates:
+
+```text
+dist/simpleadmin-1.0.5-payload
+```
+
+### ADB deploy
+
+Run only these commands from the host PC:
+
+```bash
+adb push dist/simpleadmin-1.0.5-payload /tmp/simpleadmin-1.0.5-payload
+adb shell sh /tmp/simpleadmin-1.0.5-payload/upgrade-to-1.0.5.sh
+```
+
+If a previous payload copy exists on the modem, clean it first:
+
+```bash
+adb shell rm -rf /tmp/simpleadmin-1.0.5-payload
+adb push dist/simpleadmin-1.0.5-payload /tmp/simpleadmin-1.0.5-payload
+adb shell sh /tmp/simpleadmin-1.0.5-payload/upgrade-to-1.0.5.sh
+```
+
+### SSH deploy
+
+Run only these commands from the host PC:
+
+```bash
+scp -r dist/simpleadmin-1.0.5-payload root@192.168.225.1:/tmp/simpleadmin-1.0.5-payload
+ssh root@192.168.225.1 'sh /tmp/simpleadmin-1.0.5-payload/upgrade-to-1.0.5.sh'
+```
+
+If a previous payload copy exists on the modem, clean it first:
+
+```bash
+ssh root@192.168.225.1 'rm -rf /tmp/simpleadmin-1.0.5-payload'
+scp -r dist/simpleadmin-1.0.5-payload root@192.168.225.1:/tmp/simpleadmin-1.0.5-payload
+ssh root@192.168.225.1 'sh /tmp/simpleadmin-1.0.5-payload/upgrade-to-1.0.5.sh'
+```
+
+### What the updater does inside the modem
+
+The updater:
+
+* updates `/WEBSERVER/www`
+* preserves existing `www/config/simpleadmin.conf`
+* preserves existing `www/cgi-bin/credentials.txt`
+* installs/repairs watchdog files in `/opt/scripts`
+* installs/repairs TTL override files and resets invalid `/persist/ttlvalue` to `0`
+* installs/repairs crontab init script
+* installs/repairs systemd service files
+* creates required `multi-user.target.wants` symlinks
+* runs `systemctl daemon-reload`
+* enables and starts required services
+* restarts `qcmap_httpd.service`
+* verifies that `Simple T99-1.0.5` is installed
+
+### Verify after upgrade
+
+```bash
+adb shell 'grep "Simple T99-1.0.5" /WEBSERVER/www/js/app-version.js'
+adb shell 'systemctl status crontab.service ttl-override.service connection-watchdog.service qcmap_httpd.service --no-pager'
+adb shell 'tail -n 30 /tmp/connection-watchdog.log'
+```
+
+Or with SSH:
+
+```bash
+ssh root@192.168.225.1 'grep "Simple T99-1.0.5" /WEBSERVER/www/js/app-version.js'
+ssh root@192.168.225.1 'systemctl status crontab.service ttl-override.service connection-watchdog.service qcmap_httpd.service --no-pager'
+ssh root@192.168.225.1 'tail -n 30 /tmp/connection-watchdog.log'
+```
+
+---
+
+## Manual install fallback
 
 ## Files included in `scripts/`
 
