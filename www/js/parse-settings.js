@@ -253,8 +253,10 @@ function parseCurrentSettings(rawdata) {
   // Parse APN
   let apn = "Failed fetching APN";
   const apnLine = findFirstProfileLine(lines, "CGCONTRDP");
-  if (apnLine) {
-    const parts = apnLine.split(",");
+  const apnFallbackLine = findFirstProfileLine(lines, "CGDCONT");
+  const activeApnLine = apnLine || apnFallbackLine;
+  if (activeApnLine) {
+    const parts = activeApnLine.split(",");
     if (parts.length >= 3) {
       apn = parts[2].replace(/"/g, "").trim();
     }
@@ -289,7 +291,7 @@ function parseCurrentSettings(rawdata) {
   // Parse preferred network mode
   let prefNetwork = "-";
   let prefNetworkValue = null;
-  const prefNetworkLine = lines.find((line) => line.includes("^SLMODE:"));
+  const prefNetworkLine = lines.find((line) => line.includes("^SLMODE:") || line.includes("+SLMODE:"));
   if (prefNetworkLine) {
     const parsedValue = Number.parseInt(
       prefNetworkLine
@@ -308,7 +310,7 @@ function parseCurrentSettings(rawdata) {
 
   // Parse NR5G mode
   let nr5gModeValue = null;
-  const nr5gModeLine = lines.find((line) => line.includes("^NR5G_MODE:"));
+  const nr5gModeLine = lines.find((line) => line.includes("^NR5G_MODE:") || line.includes("+NR5G_MODE:"));
   if (nr5gModeLine) {
     const parsedValue = Number.parseInt(
       nr5gModeLine.split(":")[1].replace(/"/g, "").trim(),

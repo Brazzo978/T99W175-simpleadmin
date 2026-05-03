@@ -304,8 +304,8 @@ function processAllInfos() {
       // If SIM is not ready, get basic info only
       if (!simReady) {
         console.warn("SIM not ready:", simStatusText);
-        // Get basic info that doesn't require SIM (temperature + slot)
-        const basicCmd = 'AT^TEMP?;^SWITCH_SLOT?';
+        // Get only temperature here. SIM slot probing is unstable on newer firmware.
+        const basicCmd = 'AT^TEMP?';
         
         let tempValue = "0";
         let simSlot = "No SIM Detected";
@@ -374,28 +374,64 @@ function processAllInfos() {
 
       return;
       }
-      // SIM is ready, execute full command set
-      this.atcmd =
-        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+COPS?;+CIMI;+ICCID;+CNUM;+CSCS=\"GSM\";+CGMI;+CGMM;^VERSION?;+CGSN';
+      // SIM is ready, but the newer firmware is unreliable with long AT batches.
+      // Collect only the commands that work and merge the successful responses.
+      const commandPlan = [
+        {
+          atcmd: 'AT+CGMI;+CGMM;^VERSION?;+CIMI;+ICCID;+CGSN;+CNUM;+CGCONTRDP=1',
+          timeout: 12000,
+        },
+        {
+          atcmd: 'AT+CPIN?',
+          timeout: 8000,
+        },
+        {
+          atcmd: 'AT+COPS?',
+          timeout: 8000,
+        },
+        {
+          atcmd: 'AT^SWITCH_SLOT?',
+          timeout: 8000,
+        },
+        {
+          atcmd: 'AT^DEBUG?',
+          timeout: 9000,
+        },
+        {
+          atcmd: 'AT+CGDCONT?',
+          timeout: 8000,
+        },
+        {
+          atcmd: 'AT+CSQ',
+          timeout: 8000,
+        },
+        {
+          atcmd: 'AT^TEMP?',
+          timeout: 8000,
+        },
+      ];
 
-      const result = await ATCommandService.execute(this.atcmd, {
-        retries: 3,
-        timeout: 15000,
-      });
+      const responseChunks = [];
+      let lastCommandError = null;
 
-      if (!result.ok) {
-        const fallbackMessage = result.error
-          ? result.error.message
-          : 'Invalid AT Response.';
+      for (const step of commandPlan) {
+        const stepResult = await ATCommandService.execute(step.atcmd, {
+          retries: 1,
+          timeout: step.timeout,
+        });
 
-        this.applyFallback(fallbackMessage);
-        return;
+        if (stepResult.ok && stepResult.data) {
+          responseChunks.push(stepResult.data);
+        } else if (stepResult.error) {
+          lastCommandError = stepResult.error;
+          console.warn(`AT step failed: ${step.atcmd}`, stepResult.error.message);
+        }
       }
 
-      const rawdata = result.data;
+      const rawdata = responseChunks.join("\n");
 
       if (!rawdata || !rawdata.trim()) {
-        this.applyFallback('Emtpy AT Response from Modem.');
+        this.applyFallback(lastCommandError?.message || 'Empty AT Response from Modem.');
         return;
       }
 
@@ -406,6 +442,12 @@ function processAllInfos() {
 
       try {
           const lines = rawdata.split("\n");
+          const findLine = (needle) =>
+            lines.find((line) => line.includes(needle)) || null;
+          const valueAfterColon = (line) => {
+            if (!line || !line.includes(":")) return null;
+            return line.split(":").slice(1).join(":").trim().replace(/"/g, "");
+          };
 
           console.log(lines);
 
@@ -911,16 +953,17 @@ function processAllInfos() {
           this.updateSignalHistory();
 
           // --- Temperature ---
-          try {
-            this.temperature = lines
-              .find((line) => line.includes('TSENS:'))
-              .split(":")[1]
-              .replace(/"/g, "");
-          } catch (error) {
-            this.temperature = lines
-              .find((line) => line.includes('TSENS:'))
-              .split(",")[1]
-              .replace(/"/g, "");
+          const tempLine = findLine('TSENS:');
+          if (tempLine) {
+            try {
+              this.temperature = tempLine.split(":")[1].replace(/"/g, "").trim();
+            } catch (error) {
+              try {
+                this.temperature = tempLine.split(",")[1].replace(/"/g, "").trim();
+              } catch (fallbackError) {
+                this.temperature = "Unknown";
+              }
+            }
           }
 
           // --- PA Temperature ---
@@ -943,11 +986,10 @@ function processAllInfos() {
             this.skinTemperature = 'Unknown';
           }
           // --- SIM Status ---
-          const sim_status = lines
-            .find((line) => line.includes("+CPIN:"))
-            .split(":")[1]
-            .replace(/"/g, "")
-            .trim();
+          const simStatusLine = findLine("+CPIN:");
+          const sim_status = simStatusLine
+            ? valueAfterColon(simStatusLine)
+            : "Unknown";
 
           // console.log(sim_status)
           if (sim_status == "READY") {
@@ -960,16 +1002,16 @@ function processAllInfos() {
             this.simStatus = sim_status;
           }
           // --- Active SIM ---
-          const current_sim = lines
-            .find((line) => line.includes("ENABLE"))
-            .split(" ")[0]
-            .replace(/\D/g, "");
+          const simEnableLine = findLine("ENABLE");
+          const current_sim = simEnableLine
+            ? simEnableLine.split(" ")[0].replace(/\D/g, "")
+            : "";
           if (current_sim == 1) {
             this.activeSim = "SIM 1";
           } else if (current_sim == 2) {
             this.activeSim = "SIM 2";
           } else {
-            this.activeSim = "No SIM";
+            this.activeSim = "Unknown";
           }
           // --- Network Provider & MCCMNC ---
           // Helper function to remove consecutive duplicate words
@@ -1008,10 +1050,11 @@ function processAllInfos() {
           }
           // --- APN ---
           // find this example value from lines "+CGCONTRDP: 1,0,\"internet.dito.ph\",\"100.65.141.236\",\"36.5.141.64.76.204.39.68.23.210.251.16.49.239.42.149\", \"254.128.0.0.0.0.0.0.0.0.0.0.0.0.0.1\",\"131.226.72.19\",\"131.226.73.19\"\r"
-          this.apn = lines
-            .find((line) => line.includes("+CGCONTRDP:"))
-            .split(",")[2]
-            .replace(/"/g, "");
+          const cgcontrdpLine = findLine("+CGCONTRDP:");
+          const cgdccontLine = findLine("+CGDCONT:");
+          this.apn = cgcontrdpLine
+            ? (cgcontrdpLine.split(",")[2] || "").replace(/"/g, "") || "Unknown"
+            : (cgdccontLine ? (cgdccontLine.split(",")[2] || "").replace(/"/g, "") || "Unknown" : "Unknown");
           // --- Network Mode ---
           // Parse RAT field and create badges for display
           const ratLine = lines.find((line) => line.includes('RAT:'));
@@ -1152,15 +1195,13 @@ function processAllInfos() {
           }
           // --- IPv4 and IPv6 ---
           // find the value from line "IPV4"
-          this.ipv4 = lines
-            .find((line) => line.includes("+CGCONTRDP:"))
-            .split(",")[3]
-            .replace(/"/g, "");
+          this.ipv4 = cgcontrdpLine
+            ? (cgcontrdpLine.split(",")[3] || "").replace(/"/g, "") || defaultDataState.ipv4
+            : defaultDataState.ipv4;
           // find the value from line "IPV6"
-          this.ipv6 = lines
-            .find((line) => line.includes("+CGCONTRDP:"))
-            .split(",")[4]
-            .replace(/"/g, "");
+          this.ipv6 = cgcontrdpLine
+            ? (cgcontrdpLine.split(",")[4] || "").replace(/"/g, "") || defaultDataState.ipv6
+            : defaultDataState.ipv6;
 
           // Also store in wwanIpv4/wwanIpv6 for device info modal
           this.wwanIpv4 = this.ipv4;
@@ -1700,8 +1741,8 @@ function processAllInfos() {
               continue;
             }
 
-            // Parse firmware version (^VERSION?)
-            if (trimmed.startsWith('^VERSION:')) {
+            // Parse firmware version from legacy ^VERSION or standard +CGMR.
+            if (trimmed.startsWith('^VERSION:') || trimmed.startsWith('+CGMR:')) {
               this.firmwareVersion = trimmed.split(':')[1]?.trim() || trimmed;
               // Extract model name from version if not yet set
               if (this.modelName === "-") {
@@ -1710,6 +1751,13 @@ function processAllInfos() {
                   this.modelName = modelMatch[1];
                 }
               }
+              ctx = null;
+              continue;
+            }
+            if (ctx?.startsWith("AT+CGMR") && !/^AT[+^]/.test(trimmed) && trimmed !== "OK") {
+              this.firmwareVersion = trimmed;
+              ctx = null;
+              continue;
             }
 
             // Parse manufacturer (+CGMI)
@@ -1727,6 +1775,14 @@ function processAllInfos() {
             if (ctx?.startsWith("AT+CGMM")) {
               this.modelName = trimmed;
               ctx = null;
+              continue;
+            }
+            // Fallback model detection for firmware that omits AT echo/context lines.
+            if (
+              (this.modelName === "-" || !this.modelName || this.modelName === "FDE") &&
+              /^T99W\d+/i.test(trimmed)
+            ) {
+              this.modelName = trimmed;
               continue;
             }
           }

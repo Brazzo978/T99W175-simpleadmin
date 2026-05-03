@@ -11,7 +11,7 @@ if ! session_load; then
 fi
 
 # Execute the uptime command for raw display
-uptime_output=$(uptime)
+uptime_output="$(uptime 2>/dev/null || cat /proc/uptime 2>/dev/null || echo "uptime unavailable")"
 
 # Calculate uptime from /proc/uptime (much more reliable than parsing)
 # /proc/uptime contains seconds.idle since boot
@@ -55,53 +55,37 @@ fi
 # Save current stats for next time
 echo "$idle $total" > "$STATE_FILE"
 
-# Get Memory usage from top
-# Output format: "Mem: 215536K used, 13916K free, 10128K shrd, 0K buff, 79800K cached"
-# Note: cached memory is reclaimable, so actual used = used - cached
-mem_output=$(top -b -n 1 | grep "^Mem")
-
-mem_used=0
+# Read memory usage from /proc/meminfo instead of `top`, which is not stable
+# across modem firmware builds and can terminate the CGI under `set -e`.
 mem_total=0
+mem_used=0
 mem_percent=0
 
-if [ -n "$mem_output" ]; then
-    # Extract used memory (in KB)
-    mem_used_str=$(echo "$mem_output" | sed 's/Mem: \([0-9]*\)K.*/\1/')
-    mem_used=${mem_used_str:-0}
+mem_total_kb="$(awk '/^MemTotal:/ { print $2; exit }' /proc/meminfo 2>/dev/null || echo 0)"
+mem_available_kb="$(awk '/^MemAvailable:/ { print $2; exit }' /proc/meminfo 2>/dev/null || echo 0)"
+mem_free_kb="$(awk '/^MemFree:/ { print $2; exit }' /proc/meminfo 2>/dev/null || echo 0)"
 
-    # Extract free memory (in KB)
-    mem_free_str=$(echo "$mem_output" | sed 's/.* \([0-9]*\)K free.*/\1/')
-    mem_free=${mem_free_str:-0}
-
-    # Extract cached memory (in KB) - this is reclaimable!
-    mem_cached_str=$(echo "$mem_output" | sed 's/.* \([0-9]*\)K cached.*/\1/')
-    mem_cached=${mem_cached_str:-0}
-
-    # Calculate total memory
-    mem_total=$((mem_used + mem_free))
-
-    # Calculate actual used memory (excluding cache)
-    # used_actual = used - cached
-    mem_used_actual=$((mem_used - mem_cached))
-
-    # Ensure we don't go negative
-    if [ $mem_used_actual -lt 0 ]; then
-        mem_used_actual=0
+mem_total=${mem_total_kb:-0}
+if [ "$mem_total" -gt 0 ]; then
+    if [ "${mem_available_kb:-0}" -gt 0 ]; then
+        mem_used=$((mem_total - mem_available_kb))
+    else
+        mem_used=$((mem_total - mem_free_kb))
     fi
 
-    # Calculate percentage of actual used memory
-    if [ $mem_total -gt 0 ]; then
-        mem_percent=$((mem_used_actual * 100 / mem_total))
+    if [ "$mem_used" -lt 0 ]; then
+        mem_used=0
     fi
 
-    # Update mem_used to actual value for JSON output
-    mem_used=$mem_used_actual
+    mem_percent=$((mem_used * 100 / mem_total))
 fi
 
 # Extract ethernet link speed and duplex
-eth_info=$(ethtool eth0 2>/dev/null)
-eth_speed=$(echo "$eth_info" | grep Speed | awk '{print $2}' || echo "Unknown")
-eth_duplex=$(echo "$eth_info" | grep Duplex | awk '{print $2}' || echo "Unknown")
+eth_info="$(ethtool eth0 2>/dev/null || true)"
+eth_speed="$(printf '%s\n' "$eth_info" | awk '/Speed:/ { print $2; exit }')"
+eth_duplex="$(printf '%s\n' "$eth_info" | awk '/Duplex:/ { print $2; exit }')"
+eth_speed="${eth_speed:-Unknown}"
+eth_duplex="${eth_duplex:-Unknown}"
 
 # Build JSON payload
 json_payload=$(cat <<EOF

@@ -109,6 +109,8 @@ function registerNetworkSettings() {
     },
     // Subnet mask dropdown options
     maskOptions: [
+      { value: "255.255.252.0", label: "/22 (255.255.252.0)" },
+      { value: "255.255.254.0", label: "/23 (255.255.254.0)" },
       { value: "255.255.255.0", label: "/24 (255.255.255.0)" },
       { value: "255.255.255.128", label: "/25 (255.255.255.128)" },
       { value: "255.255.255.192", label: "/26 (255.255.255.192)" },
@@ -1045,7 +1047,7 @@ function registerNetworkSettings() {
       }
 
       if (!this.isValidNetmask(this.form.subnetMask)) {
-        errors.push("Select a subnet mask between /24 and /30.");
+        errors.push("Select a subnet mask between /22 and /30.");
       }
 
       if (this.form.dhcpEnabled) {

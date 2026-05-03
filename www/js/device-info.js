@@ -83,25 +83,45 @@ function fetchDeviceInfo() {
      * Fetch all device information
      */
     async fetchATCommand() {
-      this.atcmd =
-        'AT+CGMI;+CGMM;^VERSION?;+CIMI;+ICCID;+CGSN;+CNUM;+CGCONTRDP=1';
       this.isLoading = true;
 
       try {
-        const result = await ATCommandService.execute(this.atcmd, {
-          retries: 3,
-          timeout: 15000,
-        });
+        const commandPlan = [
+          {
+            atcmd: 'AT+CGMI;+CGMM;^VERSION?;+CIMI;+ICCID;+CGSN;+CNUM',
+            timeout: 12000,
+          },
+          {
+            atcmd: 'AT+CGDCONT?',
+            timeout: 8000,
+          },
+        ];
 
-        if (!result.ok) {
-          const message = result.error
-            ? result.error.message
-            : "Unable to retrieve modem information.";
-          this.handleError(message, result.data);
+        const responseChunks = [];
+        let lastError = null;
+
+        for (const step of commandPlan) {
+          const result = await ATCommandService.execute(step.atcmd, {
+            retries: 1,
+            timeout: step.timeout,
+          });
+
+          if (result.ok && result.data) {
+            responseChunks.push(result.data);
+          } else if (result.error) {
+            lastError = result.error;
+            console.warn(`Device info AT step failed: ${step.atcmd}`, result.error.message);
+          }
+        }
+
+        this.atCommandResponse = responseChunks.join("\n");
+        if (!this.atCommandResponse.trim()) {
+          this.handleError(
+            lastError ? lastError.message : "Unable to retrieve modem information."
+          );
           return;
         }
 
-        this.atCommandResponse = result.data;
         this.showError = false;
         this.parseFetchedData();
       } catch (error) {
@@ -159,7 +179,7 @@ function fetchDeviceInfo() {
           if (line.startsWith("AT+")) { ctx = line; continue; }
 
           // Parse version info
-          if (line.startsWith("^VERSION:")) {
+          if (line.startsWith("^VERSION:") || line.startsWith("+CGMR:")) {
             const afterColon = line.split(":")[1]?.trim() || line;
             firmwareVersion = afterColon;
             if (modelName === "-" || !modelName) {
@@ -168,12 +188,24 @@ function fetchDeviceInfo() {
             }
             continue;
           }
+          if (ctx?.startsWith("AT+CGMR") && !line.startsWith("AT+") && !line.startsWith("AT^")) {
+            firmwareVersion = line;
+            ctx = null;
+            continue;
+          }
 
           // Parse IP addresses
           if (line.startsWith("+CGCONTRDP:")) {
             const parts = line.split(",");
             wwanIpv4 = parts[3]?.replace(/"/g, "") || "-";
             wwanIpv6 = parts[4]?.replace(/"/g, "") || "-";
+            continue;
+          }
+          if (line.startsWith("+CGDCONT:")) {
+            const parts = line.split(",");
+            if (wwanIpv4 === "-" && parts[3]) {
+              wwanIpv4 = parts[3].replace(/"/g, "") || "-";
+            }
             continue;
           }
 
@@ -233,6 +265,11 @@ function fetchDeviceInfo() {
           if (ctx?.startsWith("AT+CGMM")) {
             modelName = line;
             ctx = null;
+            continue;
+          }
+          // Fallback model detection for firmware that omits AT echo/context lines.
+          if ((modelName === "-" || !modelName || modelName === "FDE") && /^T99W\d+/i.test(line)) {
+            modelName = line;
             continue;
           }
 

@@ -67,10 +67,21 @@ attempt=1
 runcmd=""
 exit_code=1
 busy_detected=false
+at_timeout="${SIMPLEADMIN_AT_TIMEOUT:-8}"
+
+run_atcmd() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$at_timeout" atcli_smd8 "$1" 2>&1
+    else
+        atcli_smd8 "$1" 2>&1
+    fi
+}
 
 while [ $attempt -le $max_attempts ]; do
-    runcmd="$(atcli_smd8 "$decoded_atcmd" 2>&1)"
+    set +e
+    runcmd="$(run_atcmd "$decoded_atcmd")"
     exit_code=$?
+    set -e
 
     if [ $exit_code -eq 0 ]; then
         if echo "$runcmd" | grep -qiE 'device busy|resource busy|port busy|in use'; then
@@ -80,6 +91,9 @@ while [ $attempt -le $max_attempts ]; do
             break
         fi
     else
+        if [ $exit_code -eq 124 ]; then
+            break
+        fi
         if echo "$runcmd" | grep -qiE 'busy|in use|locked'; then
             busy_detected=true
         fi
@@ -97,7 +111,9 @@ escaped_command=$(json_escape "$decoded_atcmd")
 escaped_output=$(json_escape "$runcmd")
 
 if [ $exit_code -ne 0 ]; then
-    if [ "$busy_detected" = true ]; then
+    if [ $exit_code -eq 124 ]; then
+        error_msg="AT command timed out after ${at_timeout}s"
+    elif [ "$busy_detected" = true ]; then
         error_msg="Modem busy or port in use"
     else
         error_msg="atcli_smd8 exited with code ${exit_code}"

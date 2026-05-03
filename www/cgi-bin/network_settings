@@ -17,6 +17,11 @@ fi
 
 CONFIG_FILE="${MOBILEAP_CONFIG_PATH:-/etc/data/mobileap_cfg.xml}"
 TMP_FILE="/tmp/mobileap_cfg_tmp.xml"
+PERSIST_CONFIG_FILE="${MOBILEAP_PERSIST_CONFIG_PATH:-/systemrw/data/mobileap_cfg.xml}"
+IPACM_CONFIG_FILE="${IPACM_CONFIG_PATH:-/etc/data/ipa/IPACM_cfg.xml}"
+IPACM_PERSIST_CONFIG_FILE="${IPACM_PERSIST_CONFIG_PATH:-/systemrw/data/ipa/IPACM_cfg.xml}"
+HOSTS_FILE="${QCMAP_HOSTS_PATH:-/etc/data/hosts}"
+HOSTS_PERSIST_FILE="${QCMAP_HOSTS_PERSIST_PATH:-/systemrw/data/hosts}"
 
 print_headers() {
     echo "Content-type: application/json"
@@ -149,6 +154,21 @@ set_xml_value() {
     return 0
 }
 
+set_xml_value_if_present() {
+    local key="$1"
+    local value="$2"
+    local file="$3"
+
+    if [ ! -f "$file" ]; then
+        return 0
+    fi
+    if ! grep -q "<$key>" "$file" && ! grep -Eq "<$key[[:space:]]*/>" "$file"; then
+        return 0
+    fi
+
+    set_xml_value "$key" "$value" "$file"
+}
+
 set_scoped_xml_value() {
     local parent="$1"
     local key="$2"
@@ -209,6 +229,7 @@ is_valid_ip() {
 is_valid_netmask() {
     local value="$1"
     case "$value" in
+        255.255.252.0|255.255.254.0|\
         255.255.255.252|255.255.255.248|255.255.255.240|255.255.255.224|\
 255.255.255.192|255.255.255.128|255.255.255.0)
             return 0
@@ -231,6 +252,24 @@ ip_to_int() {
     echo $(( (10#$o1 << 24) + (10#$o2 << 16) + (10#$o3 << 8) + 10#$o4 ))
 }
 
+int_to_ip() {
+    local value="$1"
+    printf '%d.%d.%d.%d\n' \
+        $(( (value >> 24) & 255 )) \
+        $(( (value >> 16) & 255 )) \
+        $(( (value >> 8) & 255 )) \
+        $(( value & 255 ))
+}
+
+network_address() {
+    local ip="$1"
+    local mask="$2"
+    local i m
+    i=$(ip_to_int "$ip")
+    m=$(ip_to_int "$mask")
+    int_to_ip $((i & m))
+}
+
 same_subnet() {
     local ip1="$1"
     local ip2="$2"
@@ -248,6 +287,118 @@ same_subnet() {
 urldecode() {
     local data="${1//+/ }"
     printf '%b' "${data//%/\\x}"
+}
+
+unique_existing_files() {
+    local seen=""
+    local file
+    for file in "$@"; do
+        [ -f "$file" ] || continue
+        case " $seen " in
+            *" $file "*) continue ;;
+        esac
+        seen="$seen $file"
+        printf '%s\n' "$file"
+    done
+}
+
+copy_if_different() {
+    local src="$1"
+    local dst="$2"
+
+    [ -f "$src" ] || return 0
+    [ "$src" != "$dst" ] || return 0
+
+    mkdir -p "$(dirname "$dst")"
+    if [ -f "$dst" ] && cmp -s "$src" "$dst" 2>/dev/null; then
+        return 0
+    fi
+    cp -fp "$src" "$dst"
+    sync
+}
+
+update_hosts_file() {
+    local file="$1"
+    local ip="$2"
+    local tmp
+
+    mkdir -p "$(dirname "$file")"
+    tmp="/tmp/qcmap_hosts_tmp.$$"
+
+    if [ -f "$file" ]; then
+        awk -v ip="$ip" '
+            BEGIN { done = 0 }
+            /^[[:space:]]*#/ { print; next }
+            $0 ~ /(^|[[:space:]])mobileap\.qualcomm\.com([[:space:]]|$)/ {
+                if (!done) {
+                    print ip " mobileap.qualcomm.com"
+                    done = 1
+                }
+                next
+            }
+            { print }
+            END {
+                if (!done) {
+                    print ip " mobileap.qualcomm.com"
+                }
+            }
+        ' "$file" > "$tmp"
+    else
+        printf '%s mobileap.qualcomm.com\n' "$ip" > "$tmp"
+    fi
+
+    cp "$tmp" "$file"
+    rm -f "$tmp"
+    sync
+}
+
+sync_lan_related_configs() {
+    local ip="$1"
+    local mask="$2"
+    local dhcp_start="$3"
+    local dhcp_end="$4"
+    local subnet
+    subnet=$(network_address "$ip" "$mask")
+
+    local file
+    for file in $(unique_existing_files "$CONFIG_FILE" "$PERSIST_CONFIG_FILE"); do
+        set_xml_value_if_present "APIPAddr" "$ip" "$file" || respond false "Missing XML element: APIPAddr in $file"
+        set_xml_value_if_present "SubNetMask" "$mask" "$file" || respond false "Missing XML element: SubNetMask in $file"
+        set_xml_value_if_present "WebServerSubNetMask" "$mask" "$file" || true
+        if [ -n "$dhcp_start" ]; then
+            set_xml_value_if_present "StartIP" "$dhcp_start" "$file" || true
+        fi
+        if [ -n "$dhcp_end" ]; then
+            set_xml_value_if_present "EndIP" "$dhcp_end" "$file" || true
+        fi
+    done
+
+    for file in $(unique_existing_files "$IPACM_CONFIG_FILE" "$IPACM_PERSIST_CONFIG_FILE"); do
+        set_xml_value_if_present "SubnetAddress" "$subnet" "$file" || respond false "Missing XML element: SubnetAddress in $file"
+        set_xml_value_if_present "SubnetMask" "$mask" "$file" || respond false "Missing XML element: SubnetMask in $file"
+    done
+
+    for file in $(unique_existing_files "$HOSTS_FILE" "$HOSTS_PERSIST_FILE"); do
+        update_hosts_file "$file" "$ip"
+    done
+
+    if [ -f "$CONFIG_FILE" ]; then
+        copy_if_different "$CONFIG_FILE" "$PERSIST_CONFIG_FILE"
+    elif [ -f "$PERSIST_CONFIG_FILE" ]; then
+        copy_if_different "$PERSIST_CONFIG_FILE" "$CONFIG_FILE"
+    fi
+
+    if [ -f "$IPACM_CONFIG_FILE" ]; then
+        copy_if_different "$IPACM_CONFIG_FILE" "$IPACM_PERSIST_CONFIG_FILE"
+    elif [ -f "$IPACM_PERSIST_CONFIG_FILE" ]; then
+        copy_if_different "$IPACM_PERSIST_CONFIG_FILE" "$IPACM_CONFIG_FILE"
+    fi
+
+    if [ -f "$HOSTS_FILE" ]; then
+        copy_if_different "$HOSTS_FILE" "$HOSTS_PERSIST_FILE"
+    elif [ -f "$HOSTS_PERSIST_FILE" ]; then
+        copy_if_different "$HOSTS_PERSIST_FILE" "$HOSTS_FILE"
+    fi
 }
 
 ACTION="get"
@@ -479,7 +630,7 @@ handle_update() {
     fi
 
     if [ -z "$mask" ] || ! is_valid_netmask "$mask"; then
-        add_error "Invalid subnet mask provided (/24 to /30 required)."
+        add_error "Invalid subnet mask provided (/22 to /30 required)."
     fi
 
     if [ "$dhcp_flag" != "0" ] && [ "$dhcp_flag" != "1" ]; then
@@ -571,6 +722,7 @@ handle_update() {
     if ! set_xml_value "SubNetMask" "$mask" "$CONFIG_FILE"; then
         respond false "Missing XML element: SubNetMask"
     fi
+    set_xml_value_if_present "WebServerSubNetMask" "$mask" "$CONFIG_FILE" || true
     if ! set_xml_value "EnableDHCPServer" "$dhcp_flag" "$CONFIG_FILE"; then
         respond false "Missing XML element: EnableDHCPServer"
     fi
@@ -607,6 +759,8 @@ handle_update() {
     if ! set_xml_value "Roaming" "$roaming" "$CONFIG_FILE"; then
         respond false "Missing XML element: Roaming"
     fi
+
+    sync_lan_related_configs "$ip" "$mask" "$dhcp_start" "$dhcp_end"
 
     respond true "Network configuration updated successfully."
 }

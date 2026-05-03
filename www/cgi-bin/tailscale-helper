@@ -3,7 +3,7 @@ set -eu
 
 REPO_OWNER="${REPO_OWNER:-Brazzo978}"
 REPO_NAME="${REPO_NAME:-T99W175-simpleadmin}"
-REPO_BRANCH="${REPO_BRANCH:-main}"
+REPO_BRANCH="${REPO_BRANCH:-Beta}"
 REPO_TAILSCALE_DIR="${REPO_TAILSCALE_DIR:-Tailscale}"
 INSTALLER_URL="${INSTALLER_URL:-https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/${REPO_TAILSCALE_DIR}/install_tailscale_modem.sh}"
 CONFIG_PATH="/data/tailscale/config.json"

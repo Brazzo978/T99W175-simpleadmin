@@ -295,7 +295,7 @@ function cellLocking() {
         providerBands.checked = isChecked;
       }
 
-      const atcmd = 'AT^BAND_PREF_EXT?';
+      const atcmd = 'AT^BAND_PREF?';
       this.isGettingBands = true;
 
       try {
@@ -307,13 +307,36 @@ function cellLocking() {
             this.lastErrorMessage
           );
           this.bands = "Bands not available";
-          return;
+          this.lte_bands = "";
+          this.nsa_bands = "";
+          this.sa_bands = "";
+          this.locked_lte_bands = "";
+          this.locked_nsa_bands = "";
+          this.locked_sa_bands = "";
+          populateCheckboxes("", "", "", "", "", "", this);
+          await this.getCurrentSettings();
+          return false;
+        }
+
+        if (result.data.includes("ERROR")) {
+          console.warn("Band preference query is not supported on this firmware.");
+          this.bands = "Bands not supported on this firmware";
+          this.lte_bands = "";
+          this.nsa_bands = "";
+          this.sa_bands = "";
+          this.locked_lte_bands = "";
+          this.locked_nsa_bands = "";
+          this.locked_sa_bands = "";
+          populateCheckboxes("", "", "", "", "", "", this);
+          await this.getCurrentSettings();
+          return false;
         }
 
         this.rawdata = result.data;
         this.parseSupportedBands(result.data);
 
         await this.getLockedBands();
+        return true;
       } finally {
         this.isGettingBands = false;
       }
@@ -363,7 +386,7 @@ function cellLocking() {
 
     async getLockedBands() {
       const atcmd =
-        'AT^BAND_PREF_EXT?';
+        'AT^BAND_PREF?';
 
       const result = await this.sendATcommand(atcmd);
 
@@ -384,6 +407,7 @@ function cellLocking() {
           this.locked_sa_bands,
           this
         );
+        this.getCurrentSettings();
         return;
       }
 
@@ -613,6 +637,7 @@ function cellLocking() {
         console.log("Provider bands listener attached");
       };
 
+      this.getCurrentSettings();
       showPopulateCheckboxes();
       addNetworkModeListener();
       addProviderBandsListener();
@@ -676,20 +701,33 @@ function cellLocking() {
         return;
       }
 
-      // SIM is ready, execute full command set
-      const atcmd =
-        'AT+CGCONTRDP=1;+CGDCONT?;^BAND_PREF_EXT?;^CA_INFO?;^SLMODE?;^LTE_LOCK?;^NR5G_LOCK?';
+      // SIM is ready, but this firmware is unreliable with large AT batches.
+      const commandPlan = [
+        'AT+CGDCONT?',
+        'AT^CA_INFO?',
+        'AT^SLMODE?',
+        'AT^LTE_LOCK?',
+        'AT^NR5G_LOCK?',
+        'AT^NR5G_MODE?',
+      ];
 
-      const result = await this.sendATcommand(atcmd);
+      const responseChunks = [];
+      for (const command of commandPlan) {
+        const stepResult = await this.sendATcommand(command);
+        if (stepResult.ok && stepResult.data && !stepResult.data.includes('ERROR')) {
+          responseChunks.push(stepResult.data);
+        }
+      }
 
-      if (!result.ok || !result.data) {
+      const mergedData = responseChunks.join("\n");
+      if (!mergedData.trim()) {
         console.warn("Unable to fetch current settings:", this.lastErrorMessage);
         return;
       }
 
       try {
         if (typeof parseCurrentSettings === "function") {
-          const settings = parseCurrentSettings(result.data);
+          const settings = parseCurrentSettings(mergedData);
 
           if (!settings) {
             throw new Error('Wrong response from modem.');
@@ -1002,9 +1040,9 @@ function cellLocking() {
       }
 
       // Always send the complete band list, even if all bands are selected
-      // Only use empty AT^BAND_PREF_EXT for explicit "Reset to Defaults" button
+      // Only use empty AT^BAND_PREF for explicit "Reset to Defaults" button
       const bands = newCheckedValues.join(":");
-      const atcmd = `AT^BAND_PREF_EXT=${atCommandPrefix},2,${bands}`;
+      const atcmd = `AT^BAND_PREF=${atCommandPrefix},2,${bands}`;
 
       console.log(`Sending enable command with ${newCheckedValues.length} bands:`, atcmd);
 
@@ -1534,7 +1572,7 @@ function cellLocking() {
     },    
     async resetBandLocking() {
       console.log("=== resetBandLocking called ===");
-      const atcmd = 'AT^BAND_PREF_EXT';
+      const atcmd = 'AT^BAND_PREF';
 
       // Initialize countdown BEFORE showing modal to avoid flash
       this.countdown = 3;
