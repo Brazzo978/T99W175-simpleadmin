@@ -1,4 +1,6 @@
-# Simpleadmin for Foxconn T99W175
+# Simpleadmin for Foxconn T99W373 (X62 YEYYYYYY)
+
+To know how to make your T99W373 working in pcie-rc mode see [here](https://github.com/Brazzo978/T99w373-Research).
 
 Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W175 modem. This version is heavily inspired by the work at [iamromulan/quectel-rgmii-toolkit](https://github.com/iamromulan/quectel-rgmii-toolkit) has some heavy edits to make it work with the T99W175 and some changes that i thought would make it better for us.
 
@@ -31,7 +33,7 @@ SIMPLEADMIN_GUI_TOGGLE_KEY=""
 # Page shown while locked.
 SIMPLEADMIN_GUI_LOCK_PAGE="/webguioff.html"
 
-# eSIM management page (requires the intermediate euicc-client server)
+# eSIM management page (requires the intermediate euicc-client server)((esim will probably never be there for the public is too bad to work))
 # Set to 1 to show and enable the eSIM management UI, 0 to hide it.
 SIMPLEADMIN_ENABLE_ESIM=0
 
