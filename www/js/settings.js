@@ -99,7 +99,7 @@ function registerNetworkSettings() {
       checkInterval: 10,
       pingTimeoutSec: 5,
       action: "cfun",
-      bootGrace: 600,
+      bootGrace: 1200,
       cfunMaxAttempts: 10,
     },
     // Current TTL settings from server
@@ -903,7 +903,7 @@ function registerNetworkSettings() {
         this.watchdogForm.checkInterval = Number(payload.checkInterval || 10);
         this.watchdogForm.pingTimeoutSec = Number(payload.pingTimeoutSec || 5);
         this.watchdogForm.action = payload.action === "reboot" ? "reboot" : "cfun";
-        this.watchdogForm.bootGrace = Number(payload.bootGrace ?? 600);
+        this.watchdogForm.bootGrace = Number(payload.bootGrace ?? 1200);
         this.watchdogForm.cfunMaxAttempts = Number(payload.cfunMaxAttempts || 10);
       } catch (error) {
         console.error("Error loading watchdog config", error);

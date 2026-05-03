@@ -17,7 +17,7 @@ load_config() {
     WD_ACTION="cfun"
     WD_CFUN_DELAY=5
     WD_CFUN_MAX_ATTEMPTS=10
-    WD_BOOT_GRACE=600
+    WD_BOOT_GRACE=1200
     WD_RECOVERY_COOLDOWN=120
 
     if [ -f "$CONFIG_FILE" ]; then
