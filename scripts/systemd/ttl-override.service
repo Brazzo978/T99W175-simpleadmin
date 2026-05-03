@@ -1,13 +1,13 @@
 [Unit]
-Description=TTL Override
-After=ql-netd.service
-DefaultDependencies=no
+Description=Custom TTL override for modem WAN traffic
+After=QCMAP_ConnectionManagerd.service ipacm.service network.target
 
 [Service]
 Type=oneshot
+RemainAfterExit=yes
 ExecStartPre=/bin/sleep 20
 ExecStart=/opt/scripts/ttl/ttl-override start
-User=root
+ExecStop=/opt/scripts/ttl/ttl-override stop
 
 [Install]
 WantedBy=multi-user.target

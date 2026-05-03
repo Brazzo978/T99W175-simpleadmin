@@ -1,12 +1,15 @@
 [Unit]
-Description=Crond wrapper
-After=network.target
+Description=BusyBox crond for SimpleAdmin scheduled tasks
+After=multi-user.target
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/etc/init.d/crontab start
-ExecStop=/etc/init.d/crontab stop
+Type=simple
+ExecStartPre=/bin/mkdir -p /persist/cron
+ExecStartPre=/bin/touch /persist/cron/root
+ExecStartPre=/bin/chmod 0600 /persist/cron/root
+ExecStart=/usr/sbin/crond -f -L /var/log/crontab.log -c /persist/cron
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

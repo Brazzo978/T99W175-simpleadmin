@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/session_utils.sh"
 
 SCHEDULE_FILE="/persist/cron/root"
+REBOOT_CMD="/sbin/reboot"
 
 # JSON escape helper
 json_escape() {
@@ -86,6 +87,27 @@ validate_schedule() {
         send_json_response 400 '{"success":false,"message":"Invalid cron format. Expect at least 5 fields (minute hour day month weekday)."}'
         exit 1
     fi
+
+    local minute hour day month weekday
+    read -r minute hour day month weekday _ <<EOF
+$line
+EOF
+
+    for field in "$minute" "$hour" "$day" "$month" "$weekday"; do
+        if ! [[ "$field" =~ ^[0-9*/,-]+$ ]]; then
+            send_json_response 400 '{"success":false,"message":"Invalid cron field."}'
+            exit 1
+        fi
+    done
+}
+
+normalize_schedule() {
+    local line="$1"
+    local minute hour day month weekday
+    read -r minute hour day month weekday _ <<EOF
+$line
+EOF
+    printf '%s %s %s %s %s %s\n' "$minute" "$hour" "$day" "$month" "$weekday" "$REBOOT_CMD"
 }
 
 # Handle GET request
@@ -124,6 +146,7 @@ handle_post() {
 
     # Validate and save schedule
     validate_schedule "$schedule"
+    schedule="$(normalize_schedule "$schedule")"
     save_schedule "$schedule"
     
     local schedule_json

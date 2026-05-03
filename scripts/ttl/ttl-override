@@ -1,54 +1,85 @@
-#! /bin/bash
+#!/bin/sh
+set -eu
 
-# Adapted from https://github.com/natecarlson/quectel-rgmii-configuration-notes/blob/main/files/ttl-override
-# Uses ttlvalue file to read what ttl should be set to
+TTL_FILE="${TTL_FILE:-/persist/ttlvalue}"
+IPTABLES="${IPTABLES:-/usr/sbin/iptables}"
+IP6TABLES="${IP6TABLES:-/usr/sbin/ip6tables}"
 
-
-if [ -f /persist/ttlvalue ];
-then
-	ttlfile=$(cat /persist/ttlvalue)
-    TTLVALUE=$(echo $ttlfile | grep -o "[0-9]\{1,3\}")
-    
-    if [ -z "${TTLVALUE}" ]; then
-        echo "Couldnt get proper ttl value from file, disabling TTL override" >&2
-        TTLVALUE=0
-        echo '0' > /persist/ttlvalue
+ensure_ttl_file() {
+    mkdir -p "$(dirname "$TTL_FILE")"
+    if [ ! -f "$TTL_FILE" ]; then
+        printf '0\n' > "$TTL_FILE"
     fi
-else
-    # Couldnt find ttlvalue file, lets generate one with 0 ttlvalue (0 = disabled)
-    touch /persist/ttlvalue && echo '0' > /persist/ttlvalue
-    TTLVALUE=0
-fi
+    chmod 0644 "$TTL_FILE" 2>/dev/null || true
+}
 
-case "$1" in
-start)
-    if (( $TTLVALUE > 0 )); then
-        echo "Adding TTL override rules: "
-        iptables -t mangle -I POSTROUTING -o rmnet+ -j TTL --ttl-set ${TTLVALUE}
-        ip6tables -t mangle -I POSTROUTING -o rmnet+ -j HL --hl-set ${TTLVALUE}
+read_ttl() {
+    ensure_ttl_file
+    ttl="$(sed -n 's/[^0-9]//gp' "$TTL_FILE" | head -n1)"
+    case "$ttl" in
+        ''|*[!0-9]*) ttl=0 ;;
+    esac
+    if [ "$ttl" -gt 255 ] 2>/dev/null; then
+        ttl=0
+    fi
+    printf '%s\n' "$ttl"
+}
+
+delete_ipv4_rules() {
+    command -v "$IPTABLES" >/dev/null 2>&1 || return 0
+    while "$IPTABLES" -w 5 -t mangle -S POSTROUTING 2>/dev/null | grep -q -- '-j TTL --ttl-set'; do
+        rule="$("$IPTABLES" -w 5 -t mangle -S POSTROUTING 2>/dev/null | sed -n '/-j TTL --ttl-set/{s/^-A POSTROUTING //;p;q;}')"
+        [ -n "$rule" ] || break
+        # shellcheck disable=SC2086
+        "$IPTABLES" -w 5 -t mangle -D POSTROUTING $rule 2>/dev/null || break
+    done
+}
+
+delete_ipv6_rules() {
+    command -v "$IP6TABLES" >/dev/null 2>&1 || return 0
+    while "$IP6TABLES" -w 5 -t mangle -S POSTROUTING 2>/dev/null | grep -q -- '-j HL --hl-set'; do
+        rule="$("$IP6TABLES" -w 5 -t mangle -S POSTROUTING 2>/dev/null | sed -n '/-j HL --hl-set/{s/^-A POSTROUTING //;p;q;}')"
+        [ -n "$rule" ] || break
+        # shellcheck disable=SC2086
+        "$IP6TABLES" -w 5 -t mangle -D POSTROUTING $rule 2>/dev/null || break
+    done
+}
+
+start_rules() {
+    ttl="$(read_ttl)"
+    delete_ipv4_rules
+    delete_ipv6_rules
+
+    if [ "$ttl" -gt 0 ]; then
+        "$IPTABLES" -w 5 -t mangle -I POSTROUTING -o rmnet+ -j TTL --ttl-set "$ttl"
+        if command -v "$IP6TABLES" >/dev/null 2>&1; then
+            "$IP6TABLES" -w 5 -t mangle -I POSTROUTING -o rmnet+ -j HL --hl-set "$ttl" 2>/dev/null || true
+        fi
+        echo "TTL override enabled: $ttl"
     else
-        echo "TTLVALUE set to 0, nothing to do..."
+        echo "TTL override disabled"
     fi
-    echo "done"
-    ;;
-  stop)
-    if (( $TTLVALUE > 0 )); then
-        echo "Removing TTL override rules: "
-        iptables -t mangle -D POSTROUTING -o rmnet+ -j TTL --ttl-set ${TTLVALUE} &>/dev/null || true
-        ip6tables -t mangle -D POSTROUTING -o rmnet+ -j HL --hl-set ${TTLVALUE} &>/dev/null || true
-    else   
-        echo "TTLVALUE set to 0, nothing to do..."
-    fi
-    echo "done"
-    ;;
-  restart)
-    $0 stop
-    $0 start
-    ;;
-  *)
-    echo "Usage ttl-override { start | stop | restart }" >&2
-    exit 1
-    ;;
-esac
+}
 
-exit 0
+stop_rules() {
+    delete_ipv4_rules
+    delete_ipv6_rules
+    echo "TTL override rules removed"
+}
+
+case "${1:-}" in
+    start)
+        start_rules
+        ;;
+    stop)
+        stop_rules
+        ;;
+    restart)
+        stop_rules
+        start_rules
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}" >&2
+        exit 1
+        ;;
+esac
