@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+set -f
 
 TTL_FILE="${TTL_FILE:-/persist/ttlvalue}"
 IPTABLES="${IPTABLES:-/usr/sbin/iptables}"
@@ -15,7 +16,7 @@ ensure_ttl_file() {
 
 read_ttl() {
     ensure_ttl_file
-    ttl="$(sed -n 's/[^0-9]//gp' "$TTL_FILE" | head -n1)"
+    ttl="$(tr -cd '0-9' < "$TTL_FILE" | cut -c1-3)"
     case "$ttl" in
         ''|*[!0-9]*) ttl=0 ;;
     esac
