@@ -1,0 +1,7 @@
+# Set deterministic eth0 MAC from /etc/data/mobileap_cfg.xml <EarlyEthMACAddr>
+# at r8125 driver-add time. Works around the RTL8125 inside the T99W175 lacking
+# a factory-programmed MAC, which causes the kernel to fall back to a random
+# MAC every boot.
+#
+# Pairs with /etc/udev/scripts/set-eth0-mac.sh.
+KERNEL=="eth0", SUBSYSTEM=="net", DRIVERS=="r8125", ACTION=="add", RUN+="/etc/udev/scripts/set-eth0-mac.sh"

@@ -135,6 +135,26 @@ systemctl restart qcmap_httpd.service
 Browse to the GUI and use Simpleadmin
 
 
+## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
+
+The Realtek **RTL8125** NIC inside the T99W175 ships **without a factory-programmed MAC**, so every reboot the kernel assigns `eth0` a fresh random MAC. To compound it, `QCMAP_ConnectionManager` then runs `system("ifconfig bridge0 hw ether <random>")` and gives `bridge0` *yet another* random MAC. Upstream routers see the modem as a new device on each boot — breaking DHCP reservations, MAC-based firewall rules, ARP-stable monitoring, etc.
+
+[`scripts/persistent-mac/`](scripts/persistent-mac/) provides an optional two-stage fix that pins both interfaces to the MAC declared in `/etc/data/mobileap_cfg.xml` `<EarlyEthMACAddr>`:
+
+- **Stage 1** — udev rule fires on `r8125` driver-add → sets `eth0`'s MAC from the XML.
+- **Stage 2** — `/sbin/ifconfig` is replaced with a tiny wrapper that intercepts the exact `ifconfig bridge0 hw ether <random>` call QCMAP makes and substitutes the XML value. No QCMAP changes, no binary patches.
+
+```bash
+cd scripts/persistent-mac
+./install.sh                    # default host 192.168.225.1
+# reboot the modem to apply
+ssh root@192.168.225.1 'cat /sys/class/net/eth0/address && cat /sys/class/net/bridge0/address'
+# both should now equal the XML value, and stay equal across reboots
+```
+
+To change the MAC fleet-wide, edit `<EarlyEthMACAddr>` in the XML and reboot — both the udev script and the wrapper re-read it. To remove the fix: `./install.sh --uninstall` (restores the original `/sbin/ifconfig`, removes the udev rule). See [`scripts/persistent-mac/README.md`](scripts/persistent-mac/README.md) for the full RE writeup (strace evidence, why busybox-direct invocation is required, why not flash the EEPROM).
+
+
 ## 💬 Questions, Support & Requests
 
 For any questions, feature requests or support, feel free to reach out on Telegram:
