@@ -6,20 +6,25 @@ REPO_NAME="${REPO_NAME:-T99W175-simpleadmin}"
 REPO_BRANCH="${REPO_BRANCH:-Beta}"
 REPO_TAILSCALE_DIR="${REPO_TAILSCALE_DIR:-Tailscale}"
 INSTALLER_URL="${INSTALLER_URL:-https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/${REPO_TAILSCALE_DIR}/install_tailscale_modem.sh}"
+INSTALLER_TMP="/tmp/install_tailscale_modem.sh"
 CONFIG_PATH="/data/tailscale/config.json"
 TAILSCALE_SERVICE="tailscaled.service"
 TAILSCALE_BIN="/usr/bin/tailscale"
 
 download_installer() {
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$INSTALLER_URL"
-        return
-    fi
     if command -v wget >/dev/null 2>&1; then
-        wget -O - "$INSTALLER_URL"
-        return
+        if wget -O "$INSTALLER_TMP" "$INSTALLER_URL"; then
+            chmod 755 "$INSTALLER_TMP"
+            return
+        fi
     fi
-    echo "Neither curl nor wget is available."
+    if command -v curl >/dev/null 2>&1; then
+        if curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_TMP"; then
+            chmod 755 "$INSTALLER_TMP"
+            return
+        fi
+    fi
+    echo "Unable to download Tailscale installer."
     exit 1
 }
 
@@ -47,13 +52,16 @@ case "$action" in
     install)
         authkey="${2:-}"
         [ -n "$authkey" ] || { echo "Missing auth key"; exit 1; }
-        download_installer | sh -s -- -k "$authkey"
+        download_installer
+        sh "$INSTALLER_TMP" -k "$authkey"
         ;;
     remove)
-        download_installer | sh -s -- -R
+        download_installer
+        sh "$INSTALLER_TMP" -R
         ;;
     update)
-        download_installer | sh -s -- -U
+        download_installer
+        sh "$INSTALLER_TMP" -U
         ;;
     login)
         authkey="${2:-}"

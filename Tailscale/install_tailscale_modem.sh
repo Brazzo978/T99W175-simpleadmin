@@ -20,6 +20,7 @@ STATE_PATH="${BASE_DIR}/tailscaled.state"
 LOG_PATH="${BASE_DIR}/tailscaled.log"
 INSTALLED_VERSION_PATH="${BASE_DIR}/VERSION.md"
 SERVICE_PATH="/lib/systemd/system/tailscaled.service"
+PRESTART_PATH="${BASE_DIR}/tailscale-prestart"
 SOCKET_PATH="/var/run/tailscale/tailscaled.sock"
 AUTH_KEY="${TAILSCALE_AUTH_KEY:-}"
 HOSTNAME_VALUE="${TAILSCALE_HOSTNAME:-}"
@@ -66,15 +67,26 @@ have_cmd() {
 download_file() {
     url="$1"
     dest="$2"
-    if have_cmd curl; then
-        curl -fsSL "$url" -o "$dest"
-        return
-    fi
+
     if have_cmd wget; then
-        wget -O "$dest" "$url"
-        return
+        if wget -O "$dest" "$url"; then
+            return
+        fi
     fi
-    log "Neither curl nor wget is available."
+
+    if have_cmd curl; then
+        if curl -fsSL "$url" -o "$dest"; then
+            return
+        fi
+    fi
+
+    if have_cmd wget; then
+        if wget -O "$dest" "$url"; then
+            return
+        fi
+    fi
+
+    log "Unable to download ${url}."
     exit 1
 }
 
@@ -123,19 +135,96 @@ write_config() {
     chmod 600 "$CONFIG_PATH"
 }
 
+write_prestart() {
+    cat > "$PRESTART_PATH" <<'EOF'
+#!/bin/sh
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LOG=/data/tailscale/tailscaled-prestart.log
+
+log() {
+    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "$*" >> "$LOG" 2>/dev/null || true
+}
+
+clock_is_valid() {
+    year="$(date -u '+%Y' 2>/dev/null || echo 1970)"
+    case "$year" in
+        *[!0-9]*|"") return 1 ;;
+    esac
+    [ "$year" -ge 2024 ]
+}
+
+wait_for_wan() {
+    i=0
+    while [ "$i" -lt 180 ]; do
+        if ip -4 route show default 2>/dev/null | grep -Eq ' dev rmnet_data[0-9]'; then
+            log "WAN default route is ready"
+            return 0
+        fi
+        i=$((i + 1))
+        sleep 2
+    done
+
+    log "WAN default route did not appear before timeout"
+    return 1
+}
+
+sync_clock_from_http() {
+    header="$(
+        wget -S --spider -T 8 http://connectivitycheck.gstatic.com/generate_204 2>&1 \
+            | sed -n 's/^[[:space:]]*Date: //p' \
+            | tail -n 1
+    )"
+    [ -n "$header" ] || return 1
+
+    stamp="$(
+        date -u -D '%a, %d %b %Y %H:%M:%S GMT' -d "$header" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true
+    )"
+    [ -n "$stamp" ] || return 1
+
+    date -u -s "$stamp" >/dev/null 2>&1 || return 1
+    log "clock set from HTTP Date header: $stamp UTC"
+    return 0
+}
+
+sync_clock_from_ntp() {
+    command -v ntpd >/dev/null 2>&1 || return 1
+    timeout 20 ntpd -nq -p pool.ntp.org >/dev/null 2>&1 || return 1
+    log "clock set from NTP"
+    return 0
+}
+
+mkdir -p /data/tailscale
+wait_for_wan || exit 1
+
+if ! clock_is_valid; then
+    sync_clock_from_http || sync_clock_from_ntp || true
+fi
+
+if ! clock_is_valid; then
+    log "clock is still invalid; refusing to start tailscaled"
+    exit 1
+fi
+
+exit 0
+EOF
+    chmod 755 "$PRESTART_PATH"
+}
+
 write_service() {
     mkdir -p /var/run/tailscale
     cat > "$SERVICE_PATH" <<EOF
 [Unit]
 Description=Tailscale node agent (modem custom build)
-After=network-online.target
-Wants=network-online.target
+After=qcmap-radio-on.service QCMAP_ConnectionManagerd.service netmgrd.service network-online.target
+Wants=qcmap-radio-on.service network-online.target
 
 [Service]
 Type=simple
+ExecStartPre=${PRESTART_PATH}
 ExecStart=${BIN_PATH} --config=${CONFIG_PATH} --state=${STATE_PATH} --socket=${SOCKET_PATH} --statedir=${BASE_DIR}
 Restart=on-failure
-RestartSec=5
+RestartSec=15
 
 [Install]
 WantedBy=multi-user.target
@@ -174,6 +263,7 @@ uninstall_all() {
     rm -f "$SERVICE_PATH"
     systemctl daemon-reload || true
     rm -f /usr/bin/tailscale /usr/bin/tailscaled
+    rm -f "$PRESTART_PATH" "${BASE_DIR}/tailscaled-prestart.log"
     rm -rf "$BASE_DIR"
     rm -f "$SOCKET_PATH"
     rmdir /var/run/tailscale >/dev/null 2>&1 || true
@@ -225,6 +315,7 @@ fi
 
 install_binary
 install_symlinks
+write_prestart
 write_service
 copy_version_file "$tmp_remote_version"
 rm -f "$tmp_remote_version"
