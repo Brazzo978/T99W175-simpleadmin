@@ -1,5 +1,5 @@
 (function() {
-  const APP_VERSION = "Simple T99-1.0.5";
+  const APP_VERSION = "Simple T99-1.0.6";
   const VERSION_CHECK_URL = "https://raw.githubusercontent.com/Brazzo978/T99W175-simpleadmin/main/VERSION.md";
   const UPDATE_TARGET_URL = "https://github.com/Brazzo978/T99W175-simpleadmin/blob/main/README.md";
 

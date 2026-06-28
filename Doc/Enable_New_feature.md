@@ -1,5 +1,42 @@
 # Installing Init Scripts + systemd Services (Auto-Reboot, TTL Fix, eSIM Server, Connection Watchdog)
 
+## Simple T99-1.0.6 beta payload
+
+Simple T99-1.0.6 adds the DIAG Signal dashboard:
+
+* `/diag.html` in the Configuration menu.
+* `/cgi-bin/diag_signal` to start/stop/poll `qdiagmon-dci`.
+* `/opt/scripts/diag/qdiagmon-dci` installed from `scripts/diag/qdiagmon-dci`.
+* Live LTE serving/per-RX, LTE MAC DL/UL, NR ML1 layers, CA combo metadata and pending decoder placeholders.
+
+Build the 1.0.6 payload locally:
+
+```bash
+./tools/build-upgrade-payload.sh
+```
+
+This creates:
+
+```text
+dist/simpleadmin-1.0.6-payload
+dist/simpleadmin-1.0.6-payload.tar.gz
+dist/deploy-1.0.6-adb.sh
+dist/deploy-1.0.6-adb.bat
+```
+
+ADB deploy:
+
+```bash
+./dist/deploy-1.0.6-adb.sh
+```
+
+Verify after upgrade:
+
+```bash
+adb shell 'grep "Simple T99-1.0.6" /WEBSERVER/www/js/app-version.js'
+adb shell 'test -x /opt/scripts/diag/qdiagmon-dci && echo qdiagmon-dci-ok'
+```
+
 Starting from **Simple T99-1.0.5**, the recommended upgrade path is the
 modem-side payload updater. The host PC only copies the payload and starts the
 upgrade script; all checks, file installs, permissions, service symlinks and

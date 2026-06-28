@@ -908,6 +908,293 @@ html[data-bs-theme="dark"] .table th {
 }
 
 /* ====================================
+   DIAG Signal Dashboard
+   ==================================== */
+.diag-advanced-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.diag-advanced-card .card-header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 1.25rem 1.5rem;
+}
+
+.diag-advanced-card .card-body {
+  color: var(--text-primary);
+  padding: 1.5rem;
+}
+
+.diag-advanced-card .nav-tabs {
+  border-bottom-color: var(--border-color);
+}
+
+.diag-advanced-card .nav-tabs .nav-link {
+  color: var(--text-secondary);
+  border-top-left-radius: var(--border-radius-sm);
+  border-top-right-radius: var(--border-radius-sm);
+}
+
+.diag-advanced-card .nav-tabs .nav-link:hover {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.diag-advanced-card .nav-tabs .nav-link.active {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  border-bottom-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.diag-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.diag-kv-grid > div,
+.diag-subpanel,
+.diag-rx-card,
+.diag-missing-chip {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+}
+
+.diag-kv-grid > div {
+  min-width: 0;
+  padding: 0.875rem 1rem;
+}
+
+.diag-kv-grid span,
+.diag-kv-list span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.diag-kv-grid strong,
+.diag-kv-list strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.diag-kv-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.diag-kv-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.55rem;
+}
+
+.diag-kv-list > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.diag-subpanel {
+  padding: 1rem;
+}
+
+.diag-fold {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.diag-fold summary {
+  align-items: center;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  font-weight: 700;
+  justify-content: space-between;
+  list-style: none;
+  padding: 0.85rem 1rem;
+  user-select: none;
+}
+
+.diag-fold summary::-webkit-details-marker {
+  display: none;
+}
+
+.diag-fold summary::after {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  content: "";
+  flex: 0 0 auto;
+  height: 0.55rem;
+  margin-left: 1rem;
+  transform: rotate(45deg);
+  transition: transform var(--transition-fast);
+  width: 0.55rem;
+}
+
+.diag-fold[open] summary {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.diag-fold[open] summary::after {
+  transform: rotate(225deg);
+}
+
+.diag-fold > :not(summary) {
+  margin-left: 1rem;
+  margin-right: 1rem;
+}
+
+.diag-fold > :last-child {
+  margin-bottom: 1rem;
+}
+
+.diag-metric-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.diag-metric-row:last-child {
+  margin-bottom: 0;
+}
+
+.diag-metric-label {
+  flex: 0 0 128px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.diag-rx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.diag-rx-card {
+  padding: 0.875rem;
+}
+
+.diag-mini-bar {
+  display: grid;
+  grid-template-columns: 48px minmax(70px, 1fr) minmax(82px, auto);
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.78rem;
+}
+
+.diag-mini-bar:last-child {
+  margin-bottom: 0;
+}
+
+.diag-mini-bar .progress {
+  height: 8px;
+}
+
+.diag-mini-bar strong {
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.diag-combo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.diag-combo-row:first-child {
+  padding-top: 0;
+}
+
+.diag-combo-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.diag-missing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.diag-missing-chip {
+  padding: 0.8rem 0.9rem;
+}
+
+.diag-missing-chip strong,
+.diag-missing-chip span {
+  display: block;
+}
+
+.diag-missing-chip strong {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+
+.diag-missing-chip span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.diag-debug-log {
+  min-height: 220px;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-primary);
+  padding: 1rem;
+}
+
+@media (max-width: 575.98px) {
+  .diag-metric-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .diag-metric-label {
+    flex-basis: auto;
+  }
+
+  .diag-mini-bar {
+    grid-template-columns: 42px minmax(64px, 1fr);
+  }
+
+  .diag-mini-bar strong {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
+/* ====================================
    Input Groups
    ==================================== */
 .input-group-text {

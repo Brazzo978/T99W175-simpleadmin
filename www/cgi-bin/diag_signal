@@ -1,0 +1,267 @@
+#!/bin/bash
+set -eu
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/session_utils.sh"
+
+if ! session_load; then
+    send_json_response 401 '{"status":"error","message":"Authentication required"}'
+    exit 0
+fi
+
+QDIAG_BIN="${SIMPLEADMIN_QDIAG_BIN:-}"
+QDIAG_STATE_FILE="${SIMPLEADMIN_QDIAG_STATE_FILE:-/tmp/qdiag-state.json}"
+QDIAG_ERR_FILE="${SIMPLEADMIN_QDIAG_ERR_FILE:-/tmp/qdiag-state.err}"
+QDIAG_PID_FILE="${SIMPLEADMIN_QDIAG_PID_FILE:-/tmp/qdiag-state.pid}"
+QDIAG_START_FILE="${SIMPLEADMIN_QDIAG_START_FILE:-/tmp/qdiag-state.started}"
+QDIAG_LOCK_DIR="${SIMPLEADMIN_QDIAG_LOCK_DIR:-/tmp/qdiag-state.lock}"
+QDIAG_SNAPSHOT_INTERVAL_MS="${SIMPLEADMIN_QDIAG_SNAPSHOT_INTERVAL_MS:-10000}"
+QDIAG_STALE_AFTER_MS="${SIMPLEADMIN_QDIAG_STALE_AFTER_MS:-30000}"
+QDIAG_SAMPLE_MIN_MS="${SIMPLEADMIN_QDIAG_SAMPLE_MIN_MS:-500}"
+QDIAG_MAX_RUNTIME_SEC="${SIMPLEADMIN_QDIAG_MAX_RUNTIME_SEC:-10}"
+QDIAG_REQUIRE="${SIMPLEADMIN_QDIAG_REQUIRE:-nr}"
+
+case "$QDIAG_SNAPSHOT_INTERVAL_MS" in
+    ''|*[!0-9]*) QDIAG_SNAPSHOT_INTERVAL_MS="10000" ;;
+esac
+
+case "$QDIAG_STALE_AFTER_MS" in
+    ''|*[!0-9]*) QDIAG_STALE_AFTER_MS="30000" ;;
+esac
+
+case "$QDIAG_SAMPLE_MIN_MS" in
+    ''|*[!0-9]*) QDIAG_SAMPLE_MIN_MS="500" ;;
+esac
+
+case "$QDIAG_MAX_RUNTIME_SEC" in
+    ''|*[!0-9]*) QDIAG_MAX_RUNTIME_SEC="10" ;;
+esac
+
+case "$QDIAG_REQUIRE" in
+    signal|signal-mac|mac|any|nr) ;;
+    *) QDIAG_REQUIRE="nr" ;;
+esac
+
+get_param() {
+    local name="$1"
+    printf '%s' "${QUERY_STRING:-}" |
+        tr '&' '\n' |
+        sed -n "s/^${name}=//p" |
+        head -n 1
+}
+
+json_bool() {
+    if [ "${1:-0}" = "1" ]; then
+        printf 'true'
+    else
+        printf 'false'
+    fi
+}
+
+find_qdiag_bin() {
+    if [ -n "$QDIAG_BIN" ] && [ -x "$QDIAG_BIN" ]; then
+        printf '%s\n' "$QDIAG_BIN"
+        return 0
+    fi
+
+    for candidate in \
+        /opt/scripts/diag/qdiagmon-dci \
+        /tmp/qdiagmon-dci \
+        /usr/bin/qdiagmon-dci \
+        "$SCRIPT_DIR/../../scripts/diag/qdiagmon-dci"; do
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+diag_pid() {
+    if [ -f "$QDIAG_PID_FILE" ]; then
+        sed -n '1p' "$QDIAG_PID_FILE" 2>/dev/null | tr -cd '0-9'
+    fi
+}
+
+diag_is_running() {
+    local pid
+    pid="$(diag_pid)"
+    [ -n "$pid" ] || return 1
+    kill -0 "$pid" >/dev/null 2>&1
+}
+
+cleanup_lock() {
+    if ! diag_is_running; then
+        rm -f "$QDIAG_PID_FILE"
+        rm -rf "$QDIAG_LOCK_DIR"
+    fi
+}
+
+stop_diag() {
+    local pid
+    pid="$(diag_pid)"
+    if [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1; then
+        kill "$pid" >/dev/null 2>&1 || true
+        sleep 1
+        if kill -0 "$pid" >/dev/null 2>&1; then
+            kill -9 "$pid" >/dev/null 2>&1 || true
+        fi
+    fi
+    rm -f "$QDIAG_PID_FILE" "$QDIAG_STATE_FILE.tmp"
+    rm -rf "$QDIAG_LOCK_DIR"
+}
+
+run_sample() {
+    cleanup_lock
+    if diag_is_running; then
+        return 0
+    fi
+
+    if ! mkdir "$QDIAG_LOCK_DIR" 2>/dev/null; then
+        return 0
+    fi
+
+    local bin
+    if ! bin="$(find_qdiag_bin)"; then
+        rm -rf "$QDIAG_LOCK_DIR"
+        return 2
+    fi
+
+    mkdir -p "$(dirname "$QDIAG_STATE_FILE")" "$(dirname "$QDIAG_ERR_FILE")"
+    rm -f "$QDIAG_STATE_FILE.tmp"
+    : > "$QDIAG_ERR_FILE"
+    date +%s > "$QDIAG_START_FILE" 2>/dev/null || printf '0\n' > "$QDIAG_START_FILE"
+
+    local rc
+    "$bin" \
+        --snapshot-file "$QDIAG_STATE_FILE" \
+        --snapshot-interval-ms "$QDIAG_SNAPSHOT_INTERVAL_MS" \
+        --stale-after-ms "$QDIAG_STALE_AFTER_MS" \
+        --oneshot \
+        --require "$QDIAG_REQUIRE" \
+        --sample-min-ms "$QDIAG_SAMPLE_MIN_MS" \
+        --max-runtime-sec "$QDIAG_MAX_RUNTIME_SEC" \
+        --mac \
+        --gui-lite \
+        --no-raw-log \
+        >/dev/null 2>"$QDIAG_ERR_FILE" &
+
+    printf '%s\n' "$!" > "$QDIAG_PID_FILE"
+    set +e
+    wait "$!"
+    rc="$?"
+    set -e
+    rm -f "$QDIAG_PID_FILE" "$QDIAG_STATE_FILE.tmp"
+    rm -rf "$QDIAG_LOCK_DIR"
+    return "$rc"
+}
+
+file_mtime() {
+    if [ -f "$1" ]; then
+        stat -c '%Y' "$1" 2>/dev/null || printf '0'
+    else
+        printf '0'
+    fi
+}
+
+file_size() {
+    if [ -f "$1" ]; then
+        wc -c < "$1" 2>/dev/null | tr -d ' '
+    else
+        printf '0'
+    fi
+}
+
+snapshot_json() {
+    if [ -s "$QDIAG_STATE_FILE" ]; then
+        cat "$QDIAG_STATE_FILE"
+    else
+        printf '{}'
+    fi
+}
+
+status_payload() {
+    local sample_exit_code="${1:-0}"
+    local running="0"
+    local pid=""
+    local bin=""
+    local started_at="0"
+    local updated_at="0"
+    local snapshot="{}"
+    local state_size="0"
+    local err_tail=""
+
+    cleanup_lock
+
+    if diag_is_running; then
+        running="1"
+        pid="$(diag_pid)"
+    fi
+
+    bin="$(find_qdiag_bin 2>/dev/null || true)"
+
+    if [ -f "$QDIAG_START_FILE" ]; then
+        started_at="$(sed -n '1p' "$QDIAG_START_FILE" 2>/dev/null | tr -cd '0-9')"
+        [ -n "$started_at" ] || started_at="0"
+    fi
+
+    if [ -f "$QDIAG_STATE_FILE" ]; then
+        updated_at="$(file_mtime "$QDIAG_STATE_FILE")"
+    fi
+
+    snapshot="$(snapshot_json)"
+    state_size="$(file_size "$QDIAG_STATE_FILE")"
+    err_tail="$(tail -n 20 "$QDIAG_ERR_FILE" 2>/dev/null || true)"
+
+    cat <<EOF
+{
+  "status":"ok",
+  "running":$(json_bool "$running"),
+  "pid":"$(json_escape "$pid")",
+  "binary":"$(json_escape "$bin")",
+  "source":"qdiagmon-dci",
+  "parser_version":"SimpleAdmin-1.0.6",
+  "sample_mode":"oneshot",
+  "sample_exit_code":${sample_exit_code},
+  "stale_after_ms":${QDIAG_STALE_AFTER_MS},
+  "snapshot_interval_ms":${QDIAG_SNAPSHOT_INTERVAL_MS},
+  "sample_min_ms":${QDIAG_SAMPLE_MIN_MS},
+  "max_runtime_sec":${QDIAG_MAX_RUNTIME_SEC},
+  "require":"$(json_escape "$QDIAG_REQUIRE")",
+  "started_at":${started_at},
+  "updated_at":${updated_at},
+  "snapshot_path":"$(json_escape "$QDIAG_STATE_FILE")",
+  "state_size_bytes":${state_size},
+  "err_path":"$(json_escape "$QDIAG_ERR_FILE")",
+  "last_error":"$(json_escape "$err_tail")",
+  "snapshot":${snapshot}
+}
+EOF
+}
+
+action="$(get_param action)"
+[ -n "$action" ] || action="state"
+
+case "$action" in
+    start|sample|state)
+        sample_rc="0"
+        run_sample || sample_rc="$?"
+        if [ "$sample_rc" = "2" ] && [ ! -s "$QDIAG_STATE_FILE" ]; then
+            send_json_response 500 "{\"status\":\"error\",\"message\":\"qdiagmon-dci binary not found or not executable\"}"
+        else
+            send_json_response 200 "$(status_payload "$sample_rc")"
+        fi
+        ;;
+    status)
+        send_json_response 200 "$(status_payload 0)"
+        ;;
+    stop)
+        stop_diag
+        send_json_response 200 "$(status_payload 0)"
+        ;;
+    *)
+        send_json_response 400 "{\"status\":\"error\",\"message\":\"Unsupported action\"}"
+        ;;
+esac
