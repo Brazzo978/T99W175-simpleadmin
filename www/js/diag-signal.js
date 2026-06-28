@@ -56,6 +56,10 @@ function diagSignalDashboard() {
     nr: {
       serving_cell_info: null,
       ml1_latest: null,
+      mac: {
+        ul_tb_stats: null,
+        pdsch_stats_by_cc: [],
+      },
     },
     combos: {
       lte: null,
@@ -316,6 +320,14 @@ function diagSignalDashboard() {
         layers: Array.isArray(nr.layers) ? nr.layers : [],
       };
 
+      const nrMac = nr.mac && typeof nr.mac === "object" ? nr.mac : {};
+      nextState.nr.mac.ul_tb_stats = this.hasObjectData(nrMac.ul_tb_stats)
+        ? nrMac.ul_tb_stats
+        : null;
+      nextState.nr.mac.pdsch_stats_by_cc = Array.isArray(nrMac.pdsch_stats_by_cc)
+        ? nrMac.pdsch_stats_by_cc.filter((item) => item && typeof item === "object")
+        : [];
+
       nextState.combos.lte = this.hasObjectData(lte.ca) ? lte.ca : null;
       nextState.combos.nr = this.hasObjectData(nr.ca) ? nr.ca : null;
       if (snapshot.missing_metrics && typeof snapshot.missing_metrics === "object") {
@@ -496,7 +508,7 @@ function diagSignalDashboard() {
     },
 
     hasNrActivity() {
-      return this.nrLogRows().length > 0 || this.hasObjectData(this.state.nr.serving_cell_info);
+      return this.nrLogRows().length > 0 || this.hasObjectData(this.state.nr.serving_cell_info) || this.hasNrMacData();
     },
 
     nrSummaryLabel() {
@@ -541,6 +553,18 @@ function diagSignalDashboard() {
       const version = layer.version ? ` / v${layer.version}` : "";
       const cells = Array.isArray(layer.cells) ? ` / ${layer.cells.length} cells` : "";
       return `CC ${cc} / SSB ${ssb}${version}${cells}`;
+    },
+
+    nrLayerRows(layer) {
+      if (!layer) {
+        return [];
+      }
+      return [
+        ["NR-ARFCN", this.displayOrDash(layer.nr_arfcn, "nr_arfcn")],
+        ["Serving PCI", this.displayOrDash(layer.serving_pci, "pci")],
+        ["Serving SSB", this.displayOrDash(layer.serving_ssb, "ssb")],
+        ["Serving RSRP", this.formatNrArray(layer.serving_rsrp_dbm, "dBm")],
+      ];
     },
 
     headlineCards() {
@@ -744,14 +768,10 @@ function diagSignalDashboard() {
         { label: "RB Start S0", key: "rb_start_slot0", decimals: 0 },
         { label: "RB Start S1", key: "rb_start_slot1", decimals: 0 },
         { label: "RB Count", key: "rb_count", decimals: 0 },
-        { label: "TB Size", key: "tb_size", unit: "bytes", decimals: 0 },
         { label: "Coding Rate", key: "coding_rate", decimals: 3 },
-        { label: "RV", key: "rv", decimals: 0 },
-        { label: "Retx Index", key: "retx_index", decimals: 0 },
-        { label: "Carrier ID", key: "carrier_id", decimals: 0 },
+        { label: "Tx Power", key: "tx_power_dbm_candidate", unit: "dBm" },
         { label: "CQI Flag", key: "cqi_flag", flag: true },
         { label: "RI Flag", key: "ri_flag", flag: true },
-        { label: "Tx Power", key: "tx_power_dbm_candidate", unit: "dBm" },
       ];
 
       return rows
@@ -779,6 +799,87 @@ function diagSignalDashboard() {
       return String(value);
     },
 
+    lteDlPhyRows() {
+      const decoded = this.isLteDlPhyDecoded();
+      const pdsch = this.state.lte.phy && this.state.lte.phy.pdsch_stat_candidate;
+      const rows = [
+        { label: "DL Modulation", keys: ["pdsch_modulation", "dl_modulation", "modulation"] },
+        { label: "DL MCS", keys: ["pdsch_mcs", "dl_mcs", "mcs", "mcs_candidate"], decimals: 0 },
+        { label: "DL RB", keys: ["rb_count", "dl_rb_alloc", "rb_alloc", "num_prb"], decimals: 0 },
+      ];
+
+      return rows.map((row) => {
+        const value = decoded ? this.firstDefined(pdsch, row.keys) : null;
+        return [row.label, value === null ? "Unavailable" : this.formatNumberLike(value, "", row.decimals ?? 2)];
+      });
+    },
+
+    lteDlConfidenceLabel() {
+      const pdsch = this.state.lte.phy && this.state.lte.phy.pdsch_stat_candidate;
+      if (!pdsch || !pdsch.confidence) {
+        return "unavailable";
+      }
+      return pdsch.confidence === "layout_v36_decoded" ? "layout_v36_decoded" : "unavailable";
+    },
+
+    isLteDlPhyDecoded() {
+      const pdsch = this.state.lte.phy && this.state.lte.phy.pdsch_stat_candidate;
+      return !!pdsch && pdsch.confidence === "layout_v36_decoded";
+    },
+
+    hasNrMacData() {
+      return this.hasObjectData(this.state.nr.mac && this.state.nr.mac.ul_tb_stats)
+        || (Array.isArray(this.state.nr.mac && this.state.nr.mac.pdsch_stats_by_cc) && this.state.nr.mac.pdsch_stats_by_cc.length > 0);
+    },
+
+    nrUlMacRows() {
+      const stats = this.state.nr.mac && this.state.nr.mac.ul_tb_stats;
+      if (!stats) {
+        return [];
+      }
+      const rows = [
+        { label: "Avg MCS candidate", key: "avg_mcs_candidate" },
+        { label: "Avg PRB candidate", key: "avg_prb_candidate" },
+        { label: "Retx TB ratio", key: "retx_tb_ratio", ratio: true },
+        { label: "PCMAX candidate", key: "pcmax_dbm_candidate", unit: "dBm" },
+        { label: "ULSCH sched ratio", key: "ulsch_sched_ratio", ratio: true },
+      ];
+      return rows
+        .map((row) => [row.label, row.ratio ? this.formatRatio(stats[row.key]) : this.formatNumberLike(stats[row.key], row.unit || "")])
+        .filter((row) => row[1] !== "Pending");
+    },
+
+    nrPdschRows() {
+      const rows = Array.isArray(this.state.nr.mac && this.state.nr.mac.pdsch_stats_by_cc)
+        ? this.state.nr.mac.pdsch_stats_by_cc
+        : [];
+      return rows.map((row, index) => ({
+        carrier_id: this.formatNumberLike(row.carrier_id ?? index, "", 0),
+        dl_bler: this.formatRatio(row.dl_bler),
+        crc_pass: this.formatNumberLike(row.num_crc_pass_tb, "", 0),
+        crc_fail: this.formatNumberLike(row.num_crc_fail_tb, "", 0),
+        retx_ratio: this.formatRatio(row.retx_ratio),
+        tb_bytes: this.formatNumberLike(row.tb_bytes, "bytes", 0),
+      }));
+    },
+
+    nrBeamRows(cell) {
+      const beams = Array.isArray(cell && cell.beams) ? cell.beams : [];
+      return beams.map((beam, index) => {
+        const ssb = this.displayOrDash(beam.ssb_index, "ssb");
+        const rsrp = this.formatValue(this.firstValidNrNumber([
+          beam.filtered_l2nr_rsrp_dbm,
+          beam.filtered_nr2nr_rsrp_dbm,
+          ...(Array.isArray(beam.rsrp_dbm) ? beam.rsrp_dbm : []),
+        ]), "dBm");
+        const rsrq = this.formatValue(this.firstValidNrNumber([
+          beam.filtered_l2nr_rsrq_db,
+          beam.filtered_nr2nr_rsrq_db,
+        ]), "dB");
+        return `Beam ${beam.index ?? index} / SSB ${ssb}: RSRP ${rsrp} / RSRQ ${rsrq}`;
+      });
+    },
+
     resolvedLteMissingKeys() {
       const pusch = this.state.lte.phy && this.state.lte.phy.pusch_tx_candidate;
       const resolved = new Set();
@@ -803,10 +904,43 @@ function diagSignalDashboard() {
         .filter(([key]) => !resolved.has(key))
         .map(([key, item]) => ({
           key,
-          label: key.replace(/_/g, " ").toUpperCase(),
-          status: item.status || "not_decoded",
+          label: this.metricLabel(rat, key),
+          status: this.metricStatus(rat, key, item),
           candidates: Array.isArray(item.source_candidates) ? item.source_candidates.join(", ") : "",
         }));
+    },
+
+    metricLabel(rat, key) {
+      const labels = {
+        "lte.dl_modulation": "LTE DL modulation",
+        "lte.dl_mcs": "LTE DL MCS",
+        "lte.dl_rb_alloc": "LTE DL RB",
+        "nr.dl_modulation": "NR DL modulation",
+        "nr.dl_mcs": "NR DL MCS",
+        "nr.dl_rb_alloc": "NR DL RB per-slot",
+        "nr.ul_modulation": "NR UL modulation per-slot",
+        "nr.ul_mcs": "NR UL MCS per-slot",
+        "nr.ul_rb_alloc": "NR UL RB per-slot",
+      };
+      return labels[`${rat}.${key}`] || key.replace(/_/g, " ").toUpperCase();
+    },
+
+    metricStatus(rat, key, item) {
+      const unavailable = new Set([
+        "lte.dl_modulation",
+        "lte.dl_mcs",
+        "lte.dl_rb_alloc",
+        "nr.dl_modulation",
+        "nr.dl_mcs",
+        "nr.dl_rb_alloc",
+        "nr.ul_modulation",
+      ]);
+      if (unavailable.has(`${rat}.${key}`)) {
+        if (rat !== "lte" || !key.startsWith("dl_") || !this.isLteDlPhyDecoded()) {
+          return "unavailable";
+        }
+      }
+      return item.status || "not_decoded";
     },
 
     comboCards() {
@@ -1058,6 +1192,49 @@ function diagSignalDashboard() {
     joinDefined(values, separator) {
       const filtered = values.filter((value) => value !== undefined && value !== null && value !== "");
       return filtered.length ? filtered.join(separator) : "Pending";
+    },
+
+    firstDefined(block, keys) {
+      if (!block || typeof block !== "object") {
+        return null;
+      }
+      for (const key of keys) {
+        const value = block[key];
+        if (value !== undefined && value !== null && value !== "" && key !== "mcs_candidate_raw") {
+          return value;
+        }
+      }
+      return null;
+    },
+
+    formatNumberLike(value, unit = "", decimals = 2) {
+      if (value === undefined || value === null || value === "") {
+        return "Pending";
+      }
+      const numeric = this.toNumber(value);
+      if (Number.isFinite(numeric)) {
+        return this.formatValue(numeric, unit, decimals);
+      }
+      return String(value);
+    },
+
+    formatRatio(value) {
+      const numeric = this.toNumber(value);
+      if (!Number.isFinite(numeric)) {
+        return "Pending";
+      }
+      const percent = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+      const fixed = Math.abs(percent) >= 10 ? percent.toFixed(1) : percent.toFixed(2);
+      return `${fixed}%`;
+    },
+
+    formatNrArray(values, unit = "") {
+      const list = Array.isArray(values) ? values : [values];
+      const formatted = list
+        .map((value) => this.firstValidNrNumber([value]))
+        .filter(Number.isFinite)
+        .map((value) => this.formatValue(value, unit));
+      return formatted.length ? formatted.join(" / ") : "Pending";
     },
 
     copyToClipboard(value) {

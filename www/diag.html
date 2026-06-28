@@ -53,7 +53,7 @@
     <script src="js/reboot-utils.js" defer></script>
     <script src="js/device-info.js"></script>
     <script src="js/dark-mode.js" defer></script>
-    <script src="js/diag-signal.js?v=20260628e"></script>
+    <script src="js/diag-signal.js?v=20260628f"></script>
     <script src="js/app-version.js?v=20260628a" defer></script>
   </head>
   <body data-require-auth="true">
@@ -316,6 +316,17 @@
                       </div>
                     </template>
                   </div>
+                  <div class="diag-subpanel mt-3">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                      <div class="fw-semibold">LTE DL PHY</div>
+                      <span class="badge" :class="isLteDlPhyDecoded() ? 'text-bg-success' : 'text-bg-secondary'" x-text="lteDlConfidenceLabel()"></span>
+                    </div>
+                    <div class="diag-kv-list">
+                      <template x-for="row in lteDlPhyRows()" :key="row[0]">
+                        <div><span x-text="row[0]"></span><strong x-text="row[1]"></strong></div>
+                      </template>
+                    </div>
+                  </div>
                   <div class="diag-combo-row mt-3">
                     <div>
                       <div class="fw-semibold">LTE CA Combos</div>
@@ -377,6 +388,11 @@
                           <p class="mb-0 text-muted small" x-text="nrLayerSubheading(layer)"></p>
                         </div>
                       </div>
+                      <div class="diag-kv-list mt-3">
+                        <template x-for="row in nrLayerRows(layer)" :key="row[0]">
+                          <div><span x-text="row[0]"></span><strong x-text="row[1]"></strong></div>
+                        </template>
+                      </div>
                       <div class="diag-rx-grid mt-3">
                         <template x-for="rx in nrLayerMetrics(layer)" :key="rx.label">
                           <div class="diag-rx-card">
@@ -401,6 +417,57 @@
 
                 <details class="diag-fold mb-4">
                   <summary>5G Auxiliary Data</summary>
+                  <div class="row g-3 mt-2">
+                    <div class="col-lg-5">
+                      <div class="diag-subpanel h-100">
+                        <div class="fw-semibold mb-2">NR UL MAC Aggregate</div>
+                        <template x-if="nrUlMacRows().length === 0">
+                          <div class="text-muted small">Pending</div>
+                        </template>
+                        <template x-if="nrUlMacRows().length > 0">
+                          <div class="diag-kv-list">
+                            <template x-for="row in nrUlMacRows()" :key="row[0]">
+                              <div><span x-text="row[0]"></span><strong x-text="row[1]"></strong></div>
+                            </template>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                    <div class="col-lg-7">
+                      <div class="diag-subpanel h-100">
+                        <div class="fw-semibold mb-2">NR DL PDSCH by CC</div>
+                        <template x-if="nrPdschRows().length === 0">
+                          <div class="text-muted small">Pending</div>
+                        </template>
+                        <template x-if="nrPdschRows().length > 0">
+                          <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                              <thead>
+                                <tr>
+                                  <th>CC</th>
+                                  <th>BLER</th>
+                                  <th>CRC</th>
+                                  <th>Retx</th>
+                                  <th>TB</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <template x-for="row in nrPdschRows()" :key="row.carrier_id">
+                                  <tr>
+                                    <td x-text="row.carrier_id"></td>
+                                    <td x-text="row.dl_bler"></td>
+                                    <td x-text="row.crc_pass + ' / ' + row.crc_fail"></td>
+                                    <td x-text="row.retx_ratio"></td>
+                                    <td x-text="row.tb_bytes"></td>
+                                  </tr>
+                                </template>
+                              </tbody>
+                            </table>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
                   <template x-for="(layer, index) in nrLayers()" :key="'cells-' + index + '-' + (layer.nr_arfcn || '')">
                     <div class="mt-3" x-show="nrCells(layer).length > 0">
                       <h6 x-text="'Cells / beams for NR-ARFCN ' + (layer.nr_arfcn ?? '-')"></h6>
@@ -412,6 +479,7 @@
                               <th>PCI</th>
                               <th>SSB</th>
                               <th>Metrics</th>
+                              <th>Beams</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -423,6 +491,14 @@
                                 <td>
                                   <template x-for="metric in nrCellMetrics(cell)" :key="metric.label">
                                     <span class="badge text-bg-light me-1 mb-1" x-text="metric.label + ': ' + metric.display"></span>
+                                  </template>
+                                </td>
+                                <td>
+                                  <template x-if="nrBeamRows(cell).length === 0">
+                                    <span class="text-muted small">-</span>
+                                  </template>
+                                  <template x-for="beam in nrBeamRows(cell)" :key="beam">
+                                    <span class="badge text-bg-light me-1 mb-1" x-text="beam"></span>
                                   </template>
                                 </td>
                               </tr>

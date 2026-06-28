@@ -18,7 +18,7 @@ QDIAG_START_FILE="${SIMPLEADMIN_QDIAG_START_FILE:-/tmp/qdiag-state.started}"
 QDIAG_LOCK_DIR="${SIMPLEADMIN_QDIAG_LOCK_DIR:-/tmp/qdiag-state.lock}"
 QDIAG_SNAPSHOT_INTERVAL_MS="${SIMPLEADMIN_QDIAG_SNAPSHOT_INTERVAL_MS:-10000}"
 QDIAG_STALE_AFTER_MS="${SIMPLEADMIN_QDIAG_STALE_AFTER_MS:-30000}"
-QDIAG_SAMPLE_MIN_MS="${SIMPLEADMIN_QDIAG_SAMPLE_MIN_MS:-500}"
+QDIAG_SAMPLE_MIN_MS="${SIMPLEADMIN_QDIAG_SAMPLE_MIN_MS:-9000}"
 QDIAG_MAX_RUNTIME_SEC="${SIMPLEADMIN_QDIAG_MAX_RUNTIME_SEC:-10}"
 QDIAG_REQUIRE="${SIMPLEADMIN_QDIAG_REQUIRE:-nr}"
 
@@ -66,8 +66,8 @@ find_qdiag_bin() {
     fi
 
     for candidate in \
-        /opt/scripts/diag/qdiagmon-dci \
         /tmp/qdiagmon-dci \
+        /opt/scripts/diag/qdiagmon-dci \
         /usr/bin/qdiagmon-dci \
         "$SCRIPT_DIR/../../scripts/diag/qdiagmon-dci"; do
         if [ -x "$candidate" ]; then
@@ -144,6 +144,7 @@ run_sample() {
         --sample-min-ms "$QDIAG_SAMPLE_MIN_MS" \
         --max-runtime-sec "$QDIAG_MAX_RUNTIME_SEC" \
         --mac \
+        --probe-phy \
         --gui-lite \
         --no-raw-log \
         >/dev/null 2>"$QDIAG_ERR_FILE" &
@@ -174,6 +175,35 @@ file_size() {
     fi
 }
 
+now_epoch() {
+    date +%s 2>/dev/null || printf '0'
+}
+
+snapshot_age_seconds() {
+    local updated now
+    if [ ! -s "$QDIAG_STATE_FILE" ]; then
+        printf '0'
+        return
+    fi
+
+    updated="$(file_mtime "$QDIAG_STATE_FILE")"
+    now="$(now_epoch)"
+    if [ "$updated" -gt 0 ] 2>/dev/null && [ "$now" -ge "$updated" ] 2>/dev/null; then
+        printf '%s' "$((now - updated))"
+    else
+        printf '0'
+    fi
+}
+
+snapshot_is_fresh() {
+    local age max_age
+    [ -s "$QDIAG_STATE_FILE" ] || return 1
+    age="$(snapshot_age_seconds)"
+    max_age="$((QDIAG_STALE_AFTER_MS / 1000))"
+    [ "$max_age" -gt 0 ] || max_age="30"
+    [ "$age" -le "$max_age" ]
+}
+
 snapshot_json() {
     if [ -s "$QDIAG_STATE_FILE" ]; then
         cat "$QDIAG_STATE_FILE"
@@ -192,6 +222,8 @@ status_payload() {
     local snapshot="{}"
     local state_size="0"
     local err_tail=""
+    local snapshot_age="0"
+    local snapshot_fresh="0"
 
     cleanup_lock
 
@@ -213,6 +245,10 @@ status_payload() {
 
     snapshot="$(snapshot_json)"
     state_size="$(file_size "$QDIAG_STATE_FILE")"
+    snapshot_age="$(snapshot_age_seconds)"
+    if snapshot_is_fresh; then
+        snapshot_fresh="1"
+    fi
     err_tail="$(tail -n 20 "$QDIAG_ERR_FILE" 2>/dev/null || true)"
 
     cat <<EOF
@@ -229,6 +265,9 @@ status_payload() {
   "snapshot_interval_ms":${QDIAG_SNAPSHOT_INTERVAL_MS},
   "sample_min_ms":${QDIAG_SAMPLE_MIN_MS},
   "max_runtime_sec":${QDIAG_MAX_RUNTIME_SEC},
+  "poll_interval_ms":${QDIAG_SNAPSHOT_INTERVAL_MS},
+  "snapshot_fresh":$(json_bool "$snapshot_fresh"),
+  "snapshot_age_seconds":${snapshot_age},
   "require":"$(json_escape "$QDIAG_REQUIRE")",
   "started_at":${started_at},
   "updated_at":${updated_at},
@@ -245,9 +284,20 @@ action="$(get_param action)"
 [ -n "$action" ] || action="state"
 
 case "$action" in
-    start|sample|state)
+    start|sample)
         sample_rc="0"
         run_sample || sample_rc="$?"
+        if [ "$sample_rc" = "2" ] && [ ! -s "$QDIAG_STATE_FILE" ]; then
+            send_json_response 500 "{\"status\":\"error\",\"message\":\"qdiagmon-dci binary not found or not executable\"}"
+        else
+            send_json_response 200 "$(status_payload "$sample_rc")"
+        fi
+        ;;
+    state)
+        sample_rc="0"
+        if ! snapshot_is_fresh; then
+            run_sample || sample_rc="$?"
+        fi
         if [ "$sample_rc" = "2" ] && [ ! -s "$QDIAG_STATE_FILE" ]; then
             send_json_response 500 "{\"status\":\"error\",\"message\":\"qdiagmon-dci binary not found or not executable\"}"
         else
