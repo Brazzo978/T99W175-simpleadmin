@@ -48,6 +48,10 @@ function diagSignalDashboard() {
         dl: null,
         ul: null,
       },
+      phy: {
+        pusch_tx_candidate: null,
+        pdsch_stat_candidate: null,
+      },
     },
     nr: {
       serving_cell_info: null,
@@ -296,6 +300,14 @@ function diagSignalDashboard() {
       const lteMac = lte.mac && typeof lte.mac === "object" ? lte.mac : {};
       nextState.lte.mac.dl = this.withDirection(this.firstArrayItem(lteMac.dl_by_cc) || lteMac.dl || null, "DL");
       nextState.lte.mac.ul = this.withDirection(this.firstArrayItem(lteMac.ul_by_cc) || lteMac.ul || null, "UL");
+
+      const ltePhy = lte.phy && typeof lte.phy === "object" ? lte.phy : {};
+      nextState.lte.phy.pusch_tx_candidate = this.hasObjectData(ltePhy.pusch_tx_candidate)
+        ? ltePhy.pusch_tx_candidate
+        : null;
+      nextState.lte.phy.pdsch_stat_candidate = this.hasObjectData(ltePhy.pdsch_stat_candidate)
+        ? ltePhy.pdsch_stat_candidate
+        : null;
 
       nextState.nr.serving_cell_info = this.hasObjectData(nr.serving_cell) ? nr.serving_cell : null;
       nextState.nr.ml1_latest = {
@@ -720,13 +732,81 @@ function diagSignalDashboard() {
         .filter((row) => row[1] !== undefined && row[1] !== null && row[1] !== "");
     },
 
+    ltePuschRows() {
+      const pusch = this.state.lte.phy && this.state.lte.phy.pusch_tx_candidate;
+      if (!pusch) {
+        return [];
+      }
+
+      const rows = [
+        { label: "UL Modulation", key: "pusch_modulation" },
+        { label: "Mod Order", key: "pusch_mod_order", decimals: 0 },
+        { label: "RB Start S0", key: "rb_start_slot0", decimals: 0 },
+        { label: "RB Start S1", key: "rb_start_slot1", decimals: 0 },
+        { label: "RB Count", key: "rb_count", decimals: 0 },
+        { label: "TB Size", key: "tb_size", unit: "bytes", decimals: 0 },
+        { label: "Coding Rate", key: "coding_rate", decimals: 3 },
+        { label: "RV", key: "rv", decimals: 0 },
+        { label: "Retx Index", key: "retx_index", decimals: 0 },
+        { label: "Carrier ID", key: "carrier_id", decimals: 0 },
+        { label: "CQI Flag", key: "cqi_flag", flag: true },
+        { label: "RI Flag", key: "ri_flag", flag: true },
+        { label: "Tx Power", key: "tx_power_dbm_candidate", unit: "dBm" },
+      ];
+
+      return rows
+        .map((row) => [row.label, this.formatPuschValue(pusch[row.key], row)])
+        .filter((row) => row[1] !== null);
+    },
+
+    formatPuschValue(value, row) {
+      if (value === undefined || value === null || value === "") {
+        return null;
+      }
+      if (row.flag) {
+        const numeric = this.toNumber(value);
+        if (Number.isFinite(numeric)) {
+          return numeric ? "Yes" : "No";
+        }
+        return String(value);
+      }
+      if (row.unit || row.decimals !== undefined) {
+        const numeric = this.toNumber(value);
+        if (Number.isFinite(numeric)) {
+          return this.formatValue(numeric, row.unit || "", row.decimals ?? 2);
+        }
+      }
+      return String(value);
+    },
+
+    resolvedLteMissingKeys() {
+      const pusch = this.state.lte.phy && this.state.lte.phy.pusch_tx_candidate;
+      const resolved = new Set();
+      if (!pusch) {
+        return resolved;
+      }
+      if (pusch.pusch_modulation !== undefined && pusch.pusch_modulation !== null && pusch.pusch_modulation !== "") {
+        resolved.add("ul_modulation");
+      }
+      if (pusch.rb_count !== undefined && pusch.rb_count !== null && pusch.rb_count !== "") {
+        resolved.add("ul_rb_alloc");
+      }
+      if (pusch.tx_power_dbm_candidate !== undefined && pusch.tx_power_dbm_candidate !== null && pusch.tx_power_dbm_candidate !== "") {
+        resolved.add("tx_power_dbm");
+      }
+      return resolved;
+    },
+
     missingMetricRows(rat) {
-      return Object.entries(this.state.missing_metrics[rat] || {}).map(([key, item]) => ({
-        key,
-        label: key.replace(/_/g, " ").toUpperCase(),
-        status: item.status || "not_decoded",
-        candidates: Array.isArray(item.source_candidates) ? item.source_candidates.join(", ") : "",
-      }));
+      const resolved = rat === "lte" ? this.resolvedLteMissingKeys() : new Set();
+      return Object.entries(this.state.missing_metrics[rat] || {})
+        .filter(([key]) => !resolved.has(key))
+        .map(([key, item]) => ({
+          key,
+          label: key.replace(/_/g, " ").toUpperCase(),
+          status: item.status || "not_decoded",
+          candidates: Array.isArray(item.source_candidates) ? item.source_candidates.join(", ") : "",
+        }));
     },
 
     comboCards() {
