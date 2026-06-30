@@ -66,12 +66,12 @@ have_cmd() {
 download_file() {
     url="$1"
     dest="$2"
-    if have_cmd curl; then
-        curl -fsSL "$url" -o "$dest"
-        return
-    fi
     if have_cmd wget; then
         wget -O "$dest" "$url"
+        return
+    fi
+    if have_cmd curl; then
+        curl -fsSL "$url" -o "$dest"
         return
     fi
     log "Neither curl nor wget is available."

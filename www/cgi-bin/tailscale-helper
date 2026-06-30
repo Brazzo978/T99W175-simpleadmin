@@ -3,7 +3,7 @@ set -eu
 
 REPO_OWNER="${REPO_OWNER:-Brazzo978}"
 REPO_NAME="${REPO_NAME:-T99W175-simpleadmin}"
-REPO_BRANCH="${REPO_BRANCH:-Beta}"
+REPO_BRANCH="${REPO_BRANCH:-main}"
 REPO_TAILSCALE_DIR="${REPO_TAILSCALE_DIR:-Tailscale}"
 INSTALLER_URL="${INSTALLER_URL:-https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/${REPO_TAILSCALE_DIR}/install_tailscale_modem.sh}"
 CONFIG_PATH="/data/tailscale/config.json"
@@ -11,12 +11,12 @@ TAILSCALE_SERVICE="tailscaled.service"
 TAILSCALE_BIN="/usr/bin/tailscale"
 
 download_installer() {
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$INSTALLER_URL"
-        return
-    fi
     if command -v wget >/dev/null 2>&1; then
         wget -O - "$INSTALLER_URL"
+        return
+    fi
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$INSTALLER_URL"
         return
     fi
     echo "Neither curl nor wget is available."

@@ -1,7 +1,7 @@
 (function() {
   const APP_VERSION = "Simple T99-1.0.5";
-  const VERSION_CHECK_URL = "https://raw.githubusercontent.com/Brazzo978/T99W175-simpleadmin/Beta/VERSION.md";
-  const UPDATE_TARGET_URL = "https://github.com/Brazzo978/T99W175-simpleadmin/blob/Beta/README.md";
+  const VERSION_CHECK_URL = "https://raw.githubusercontent.com/Brazzo978/T99W175-simpleadmin/main/VERSION.md";
+  const UPDATE_TARGET_URL = "https://github.com/Brazzo978/T99W175-simpleadmin/blob/main/README.md";
 
   function createUpToDateBadge() {
     const badge = document.createElement("span");
@@ -58,6 +58,48 @@
     return match ? match[1].trim() : "";
   }
 
+  function parseVersion(version) {
+    const match = String(version).match(/(\d+)\.(\d+)\.(\d+)([A-Za-z][A-Za-z0-9.-]*)?/);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      major: Number(match[1]),
+      minor: Number(match[2]),
+      patch: Number(match[3]),
+      prerelease: match[4] || "",
+    };
+  }
+
+  function compareVersions(left, right) {
+    const a = parseVersion(left);
+    const b = parseVersion(right);
+    if (!a || !b) {
+      return String(left) === String(right) ? 0 : -1;
+    }
+
+    for (const key of ["major", "minor", "patch"]) {
+      if (a[key] !== b[key]) {
+        return a[key] > b[key] ? 1 : -1;
+      }
+    }
+
+    if (a.prerelease === b.prerelease) {
+      return 0;
+    }
+
+    // A stable release is newer than a prerelease with the same numeric version.
+    if (!a.prerelease) {
+      return 1;
+    }
+    if (!b.prerelease) {
+      return -1;
+    }
+
+    return a.prerelease.localeCompare(b.prerelease);
+  }
+
   async function checkRemoteVersion() {
     try {
       const response = await fetch(VERSION_CHECK_URL, { cache: "no-store" });
@@ -72,7 +114,7 @@
       }
 
       renderVersion(
-        remoteVersion === APP_VERSION ? "up-to-date" : "update-available",
+        compareVersions(remoteVersion, APP_VERSION) > 0 ? "update-available" : "up-to-date",
         remoteVersion
       );
     } catch (error) {
