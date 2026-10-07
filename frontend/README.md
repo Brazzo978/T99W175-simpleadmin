@@ -29,7 +29,7 @@ reference for the visual rules (its font is replaced here by Geist).
 ./build.sh
 ```
 
-Publishes the export to `../deploy/www-app/`, which `../install.sh` merges
+Publishes the export to `../deploy/www-nextjs/`, which `../install.sh` merges
 into the web root. There is no dev server setup: the bridges only accept
 WebSockets whose Origin matches the host, so test the build on the modem,
 or serve it locally with `/cgi-bin` proxied to the modem and ports

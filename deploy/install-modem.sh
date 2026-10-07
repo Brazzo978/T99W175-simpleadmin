@@ -6,6 +6,8 @@
 #   SA_LOGIN  0/1 to force SIMPLEADMIN_ENABLE_LOGIN, empty to keep it
 #   SA_ESIM   0/1 to force SIMPLEADMIN_ENABLE_ESIM, empty to keep it
 #   SA_COLOR  1 for ANSI colours (the caller's terminal), 0 for plain text
+#   SA_ONLY_WWW  1 to install the web UI only (the "Web UI" section)
+#   SA_UI     front-end the payload's www carries (nextjs/alpine), for the log
 #
 # Idempotent: every run converges to the same state, whatever an older
 # install (deploy-*.sh, the 1.0.5 payload, the ADB .bat, by hand) left behind.
@@ -25,6 +27,8 @@ set -eu
 SRC="$(cd "$(dirname "$0")" && pwd)"
 SA_LOGIN="${SA_LOGIN:-}"
 SA_ESIM="${SA_ESIM:-}"
+SA_ONLY_WWW="${SA_ONLY_WWW:-0}"
+SA_UI="${SA_UI:-nextjs}"
 WEB=/WEBSERVER/www
 BASE=/data/simpleadmin
 UNIT_DIR=/lib/systemd/system
@@ -184,6 +188,7 @@ restart() {
 say "${C_W}🛠️  SimpleAdmin installer on $(uname -n), payload $SRC${C_0}"
 
 # ---------------------------------------------------------------- legacy
+if [ "$SA_ONLY_WWW" != 1 ]; then
 section "🧹 Leftovers of older installs"
 # Binaries and the Tailscale payload, now in /data or downloaded on demand;
 # qdiagmon-dci from a 1.0.6 beta; the TTL value lives in /persist/ttlvalue;
@@ -203,12 +208,13 @@ fi
 remove /etc/systemd/system/set-bridge0-mac.service \
   /etc/systemd/system/multi-user.target.wants/set-bridge0-mac.service \
   /etc/udev/scripts/set-bridge0-mac.sh
-# A swap interrupted by an earlier run.
-remove "$WEB.new" "$WEB.old"
 [ "$REMOVED" = 0 ] && ok "nothing left behind"
+fi
 
 # ---------------------------------------------------------------- web UI
 section "🌐 Web UI"
+# A swap interrupted by an earlier run.
+remove "$WEB.new" "$WEB.old"
 cp -R "$SRC/www" "$WEB.new"
 info "📦 new tree staged in $WEB.new"
 conf="$WEB.new/config/simpleadmin.conf"
@@ -271,8 +277,22 @@ rm -rf "$WEB.old"
 systemctl is-active qcmap_httpd.service >/dev/null || fail "qcmap_httpd is not running"
 conf="$WEB/config/simpleadmin.conf"
 ok "▶️  qcmap_httpd running"
-ok "🌐 $(cat "$WEB/VERSION" 2>/dev/null) in $WEB" \
+ok "🌐 $(cat "$WEB/VERSION" 2>/dev/null) ($SA_UI front-end) in $WEB" \
   "(login $(conf_value "$conf" SIMPLEADMIN_ENABLE_LOGIN), eSIM $(conf_value "$conf" SIMPLEADMIN_ENABLE_ESIM))"
+
+if [ "$SA_ONLY_WWW" = 1 ]; then
+  section "📋 Summary"
+  sync
+  say "  $(printf '%-22s' "qcmap_httpd") $(systemctl is-active qcmap_httpd 2>/dev/null || true)"
+  say "  $(printf '%-22s' "rootfs free") $(df -k / | awk 'NR==2 {printf "%.1f MB", $4/1024}')"
+  say ""
+  if [ "$WARNINGS" = 0 ]; then
+    say "${C_G}🎉 SimpleAdmin web UI installed (--onlywww)${C_0}"
+  else
+    say "${C_Y}🎉 SimpleAdmin web UI installed with $WARNINGS warning(s): see above${C_0}"
+  fi
+  exit 0
+fi
 
 # ---------------------------------------------------------------- binaries
 section "📦 Tools in $BASE"

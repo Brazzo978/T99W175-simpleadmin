@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds the web UI (Next.js static export) and publishes it to
-# deploy/www-app/, which ./install.sh merges into the modem's web root next
-# to the classic pages and the CGIs in deploy/www/.
+# deploy/www-nextjs/, which ./install.sh installs (the default front-end) on
+# top of the CGIs and configuration in deploy/www/.
 #
 # The output is versioned, like the system_bridge binary, so installing
 # needs no Node.js toolchain.
@@ -10,7 +10,7 @@
 set -eu
 
 cd "$(dirname "$0")"
-DEST=../deploy/www-app
+DEST=../deploy/www-nextjs
 
 if [ "${1:-}" = "--install" ] || [ ! -d node_modules ]; then
   echo "📦 Installing dependencies"
@@ -21,7 +21,7 @@ echo "🏗️  Building the static export"
 rm -rf .next out
 npx next build
 
-echo "📤 Publishing to deploy/www-app"
+echo "📤 Publishing to deploy/www-nextjs"
 rm -rf "$DEST"
 mkdir -p "$DEST"
 cp -R out/. "$DEST/"
@@ -31,4 +31,4 @@ git describe --always --dirty --tags 2>/dev/null > "$DEST/BUILD" ||
 
 files=$(find "$DEST" -type f | wc -l)
 size=$(du -sk "$DEST" | cut -f1)
-echo "✅ $files files, ${size} KB in deploy/www-app ($(cat "$DEST/BUILD"))"
+echo "✅ $files files, ${size} KB in deploy/www-nextjs ($(cat "$DEST/BUILD"))"

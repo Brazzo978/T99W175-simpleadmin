@@ -4,11 +4,17 @@
 # fix, in one go.
 # Safe to run again: every step is idempotent.
 #
-#   ./install.sh [HOST] [--nologin] [--noesim] [--login] [--esim]
+#   ./install.sh [HOST] [--www-alpine|--www-nextjs] [--onlywww]
+#                [--nologin|--login] [--noesim|--esim]
 #
-#   HOST        modem address (default 192.168.225.1), reached as root
-#   --nologin   set SIMPLEADMIN_ENABLE_LOGIN=0   (--login sets it to 1)
-#   --noesim    set SIMPLEADMIN_ENABLE_ESIM=0    (--esim sets it to 1)
+#   HOST          modem address (default 192.168.225.1), reached as root
+#   --www-nextjs  web front-end: deploy/www-nextjs, built by frontend/build.sh
+#                 (the default)
+#   --www-alpine  web front-end: the classic Alpine.js pages of deploy/www-alpine
+#   --onlywww     install the web UI only (front-end, CGIs, configuration):
+#                 no binaries, scripts, units or services
+#   --nologin     set SIMPLEADMIN_ENABLE_LOGIN=0   (--login sets it to 1)
+#   --noesim      set SIMPLEADMIN_ENABLE_ESIM=0    (--esim sets it to 1)
 #
 # Without flags the modem keeps its current simpleadmin.conf values and
 # credentials.txt. The target is checked first, without touching the AT
@@ -43,6 +49,8 @@ die() { echo "  ${C_R}❌ $*${C_0}"; echo "${C_R}💥 Nothing was installed${C_0
 HOST="192.168.225.1"
 SA_LOGIN=""
 SA_ESIM=""
+SA_UI=""
+SA_ONLY_WWW=0
 # Sets a flag once: --login with --nologin (or --esim with --noesim) is an
 # error, not "last one wins".
 set_flag() {
@@ -58,11 +66,19 @@ for arg in "$@"; do
     --login) set_flag SA_LOGIN 1 ;;
     --noesim) set_flag SA_ESIM 0 ;;
     --esim) set_flag SA_ESIM 1 ;;
-    -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --www-nextjs) set_flag SA_UI nextjs ;;
+    --www-alpine) set_flag SA_UI alpine ;;
+    --onlywww) SA_ONLY_WWW=1 ;;
+    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) die "unknown option: $arg (see --help)" ;;
     *) HOST="$arg" ;;
   esac
 done
+SA_UI="${SA_UI:-nextjs}"
+# --esim/--noesim also start or stop the euicc service, outside the web UI.
+if [ "$SA_ONLY_WWW" = 1 ] && [ -n "$SA_ESIM" ]; then
+  die "--esim/--noesim also switch the euicc service: run them without --onlywww"
+fi
 TARGET="root@$HOST"
 REMOTE_DIR="/tmp/simpleadmin-install"
 
@@ -74,28 +90,38 @@ VERSION="$(sed -n 's/^- Current-Version: `\(.*\)`.*/\1/p' VERSION.md)"
 ok "🌐 web UI $VERSION"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-cp -R deploy/. "$STAGE/"
+if [ "$SA_ONLY_WWW" = 1 ]; then
+  mkdir -p "$STAGE"
+  cp -R deploy/www deploy/www-alpine deploy/www-nextjs "$STAGE/"
+  cp deploy/install-modem.sh "$STAGE/"
+  ok "🌐 web UI only (--onlywww)"
+else
+  cp -R deploy/. "$STAGE/"
+  # Documentation stays here; Tailscale is downloaded from GitHub by the UI
+  # (cgi-bin/tailscale-helper), not pushed.
+  rm -rf "$STAGE/tailscale"
+  find "$STAGE" -name '*.md' -delete
+  info "📚 documentation and the Tailscale payload left out"
+fi
 printf '%s\n' "$VERSION" > "$STAGE/www/VERSION"
-# Documentation stays here; Tailscale is downloaded from GitHub by the UI
-# (cgi-bin/tailscale-helper), not pushed.
-rm -rf "$STAGE/tailscale"
-find "$STAGE" -name '*.md' -delete
-info "📚 documentation and the Tailscale payload left out"
-# The web UI is built from frontend/ (frontend/build.sh) into the versioned
-# deploy/www-app; it joins the classic pages and the CGIs of deploy/www.
-if [ -f deploy/www-app/BUILD ]; then
-  cp -R "$STAGE/www-app/." "$STAGE/www/"
+# The web root is deploy/www (CGIs, configuration, GUI lock page) plus one
+# front-end: deploy/www-nextjs, built from frontend/ by frontend/build.sh and
+# versioned, or the classic Alpine.js pages of deploy/www-alpine.
+if [ "$SA_UI" = nextjs ]; then
+  [ -f deploy/www-nextjs/BUILD ] ||
+    die "deploy/www-nextjs is missing: run frontend/build.sh (or use --www-alpine)"
+  cp -R "$STAGE/www-nextjs/." "$STAGE/www/"
   rm -f "$STAGE/www/BUILD"
   if [ -n "$(find frontend/app frontend/components frontend/hooks frontend/lib \
-      frontend/locales frontend/types -newer deploy/www-app/BUILD -type f | head -1)" ]; then
-    warn "🖥️  frontend sources are newer than deploy/www-app: run frontend/build.sh"
-  else
-    ok "🖥️  web app $(cat deploy/www-app/BUILD)"
+      frontend/locales frontend/types -newer deploy/www-nextjs/BUILD -type f | head -1)" ]; then
+    warn "🖥️  frontend sources are newer than deploy/www-nextjs: run frontend/build.sh"
   fi
+  ok "🖥️  front-end: Next.js $(cat deploy/www-nextjs/BUILD)"
 else
-  warn "🖥️  deploy/www-app is missing: run frontend/build.sh (classic pages only)"
+  cp -R "$STAGE/www-alpine/." "$STAGE/www/"
+  ok "🖥️  front-end: classic Alpine.js pages"
 fi
-rm -rf "$STAGE/www-app"
+rm -rf "$STAGE/www-nextjs" "$STAGE/www-alpine"
 # busybox httpd serves file.gz to browsers that accept gzip: a third of the
 # bytes on every page load, less work for the modem's single core.
 gz_before=$(find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/config/*' \
@@ -109,41 +135,43 @@ find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/config/*' \
 gz_after=$(find "$STAGE/www" -type f -name '*.gz' -printf '%s\n' | awk '{s+=$1} END {print s+0}')
 ok "🗜️  text assets precompressed: $((gz_before / 1024)) KB → $((gz_after / 1024)) KB served"
 
-# diag_bridge is a symlink into the T99W175-diag-json-bridge checkout.
-link=deploy/diag_bridge/bin/diag_bridge
-rm -f "$STAGE/diag_bridge/bin/diag_bridge"
-if [ -f "$link" ]; then
-  repo="$(cd "$(dirname "$(readlink -f "$link")")" && git rev-parse --show-toplevel 2>/dev/null || dirname "$(readlink -f "$link")")"
-  version="$(git -C "$repo" describe --always --dirty --tags 2>/dev/null || echo unknown)"
-  cp -L "$link" "$STAGE/diag_bridge/bin/diag_bridge"
-  printf '%s\n' "$version" > "$STAGE/diag_bridge/diag_bridge.version"
-  ok "📡 diag_bridge $version from $repo"
-else
-  warn "📡 $link is missing or a dangling link: no diag_bridge in this install"
-  info "   clone T99W175-diag-json-bridge next to this repository and run its"
-  info "   scripts/publish-to-simpleadmin.sh (deploy/diag_bridge/README.md)"
-fi
-# system_bridge is built here (deploy/system_bridge/build.sh); the binary is
-# versioned, the sources stay on the workstation.
-rm -rf "$STAGE/system_bridge/src" "$STAGE/system_bridge/build.sh"
-sb=deploy/system_bridge/bin/system_bridge
-if [ -f "$sb" ]; then
-  version="$(git describe --always --dirty --tags 2>/dev/null || echo unknown)"
-  printf '%s\n' "$version" > "$STAGE/system_bridge/system_bridge.version"
-  if [ -n "$(find deploy/system_bridge/src -newer "$sb" -type f | head -1)" ]; then
-    warn "📡 system_bridge sources are newer than the binary: run deploy/system_bridge/build.sh"
+if [ "$SA_ONLY_WWW" = 0 ]; then
+  # diag_bridge is a symlink into the T99W175-diag-json-bridge checkout.
+  link=deploy/diag_bridge/bin/diag_bridge
+  rm -f "$STAGE/diag_bridge/bin/diag_bridge"
+  if [ -f "$link" ]; then
+    repo="$(cd "$(dirname "$(readlink -f "$link")")" && git rev-parse --show-toplevel 2>/dev/null || dirname "$(readlink -f "$link")")"
+    version="$(git -C "$repo" describe --always --dirty --tags 2>/dev/null || echo unknown)"
+    cp -L "$link" "$STAGE/diag_bridge/bin/diag_bridge"
+    printf '%s\n' "$version" > "$STAGE/diag_bridge/diag_bridge.version"
+    ok "📡 diag_bridge $version from $repo"
   else
-    ok "📡 system_bridge $version"
+    warn "📡 $link is missing or a dangling link: no diag_bridge in this install"
+    info "   clone T99W175-diag-json-bridge next to this repository and run its"
+    info "   scripts/publish-to-simpleadmin.sh (deploy/diag_bridge/README.md)"
   fi
-else
-  warn "📡 $sb is missing: run deploy/system_bridge/build.sh"
+  # system_bridge is built here (deploy/system_bridge/build.sh); the binary is
+  # versioned, the sources stay on the workstation.
+  rm -rf "$STAGE/system_bridge/src" "$STAGE/system_bridge/build.sh"
+  sb=deploy/system_bridge/bin/system_bridge
+  if [ -f "$sb" ]; then
+    version="$(git describe --always --dirty --tags 2>/dev/null || echo unknown)"
+    printf '%s\n' "$version" > "$STAGE/system_bridge/system_bridge.version"
+    if [ -n "$(find deploy/system_bridge/src -newer "$sb" -type f | head -1)" ]; then
+      warn "📡 system_bridge sources are newer than the binary: run deploy/system_bridge/build.sh"
+    else
+      ok "📡 system_bridge $version"
+    fi
+  else
+    warn "📡 $sb is missing: run deploy/system_bridge/build.sh"
+  fi
+  for t in curl jq modem-config ttl crontab watchdog euicc persistent-mac dhcp-guard; do
+    [ -d "$STAGE/$t" ] || die "module deploy/$t is missing"
+  done
+  ok "🧩 modules: curl jq modem-config ttl crontab watchdog euicc persistent-mac dhcp-guard"
 fi
-for t in curl jq modem-config ttl crontab watchdog euicc persistent-mac dhcp-guard; do
-  [ -d "$STAGE/$t" ] || die "module deploy/$t is missing"
-done
-ok "🧩 modules: curl jq modem-config ttl crontab watchdog euicc persistent-mac dhcp-guard"
 [ -n "$SA_LOGIN" ] && ok "🔐 login will be set to $SA_LOGIN" || info "🔐 login setting kept"
-[ -n "$SA_ESIM" ] && ok "📶 eSIM will be set to $SA_ESIM" || info "📶 eSIM setting kept"
+[ "$SA_ONLY_WWW" = 1 ] || { [ -n "$SA_ESIM" ] && ok "📶 eSIM will be set to $SA_ESIM" || info "📶 eSIM setting kept"; }
 info "📏 $(du -sh "$STAGE" | cut -f1) to transfer"
 
 # ---------------------------------------------------------------- target
@@ -178,6 +206,7 @@ ok "📤 payload in $TARGET:$REMOTE_DIR"
 # ---------------------------------------------------------------- install
 rc=0
 ssh "$TARGET" "SA_LOGIN='$SA_LOGIN' SA_ESIM='$SA_ESIM' SA_COLOR='$SA_COLOR' \
+  SA_ONLY_WWW='$SA_ONLY_WWW' SA_UI='$SA_UI' \
   sh $REMOTE_DIR/install-modem.sh; rc=\$?; rm -rf $REMOTE_DIR; exit \$rc" || rc=$?
 echo
 if [ "$rc" = 0 ]; then

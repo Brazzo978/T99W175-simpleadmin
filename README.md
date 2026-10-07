@@ -12,7 +12,7 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 
 
 ## Quick overview
-- Web interface (Next.js static export, React + shadcn/ui, English and Italian) under `frontend/`, ported from QManager: see [Web interface](#-web-interface). It replaces the former Bootstrap/Alpine.js pages.
+- Two web front-ends on the same CGIs: the default one (Next.js static export, React + shadcn/ui, English and Italian) under `frontend/`, ported from QManager, see [Web interface](#-web-interface); and the classic Bootstrap/Alpine.js pages in `deploy/www-alpine/`, installed with `--www-alpine`.
 - Bash CGI scripts in `deploy/www/cgi-bin/` that drive AT commands, the connection watchdog, TTL override, scheduled reboot and utility actions.
 - Front-end settings via `deploy/www/config/simpleadmin.conf`, here you can enable or disable the login page and the esim configuration page,by default login is on , and esim is off
 ```
@@ -84,8 +84,8 @@ Notes:
 
 ## 📸 Screenshots
 
-These still show the former interface, replaced by the one described in
-[Web interface](#-web-interface).
+These show the classic Alpine.js front-end (`--www-alpine`), not the default
+one described in [Web interface](#-web-interface).
 
 ### Home
 ![Home](docs/media/Home.jpg)
@@ -158,8 +158,9 @@ module, each split by kind (`bin/`, `lib/`, `scripts/`, `systemd/`, ...):
 ```
 deploy/
   install-modem.sh       modem side of install.sh
-  www/                   CGIs, configuration and the GUI lock page
-  www-app/               web interface, built from frontend/
+  www/                   CGIs, configuration and the GUI lock page (both front-ends)
+  www-nextjs/            default front-end, built from frontend/
+  www-alpine/            classic Alpine.js front-end
   diag_bridge/  system_bridge/  curl/  jq/
   ttl/  crontab/  watchdog/  euicc/  persistent-mac/  modem-config/
   dhcp-guard/            keeps stale passthrough leases out of the LAN DHCP
@@ -169,7 +170,7 @@ deploy/
 With SSH key access to the modem as `root`:
 
 ```bash
-./install.sh [HOST] [--nologin|--login] [--noesim|--esim]
+./install.sh [HOST] [--www-alpine|--www-nextjs] [--onlywww] [--nologin|--login] [--noesim|--esim]
 ```
 
 It first checks that `HOST` (default `192.168.225.1`) really is a T99W175
@@ -179,6 +180,12 @@ refuses anything else, then installs everything in one go
 its current `simpleadmin.conf` values and `credentials.txt` (plaintext passwords
 in it are converted to SHA-512 crypt); the flags set
 `SIMPLEADMIN_ENABLE_LOGIN` / `SIMPLEADMIN_ENABLE_ESIM`.
+
+The web root is `deploy/www` plus one front-end: `deploy/www-nextjs` by
+default, the classic pages of `deploy/www-alpine` with `--www-alpine`.
+`--onlywww` installs the web UI only (front-end, CGIs, configuration, login
+flag) and leaves binaries, scripts, units and services alone; it refuses
+`--esim`/`--noesim`, which also start or stop the euicc service.
 
 Text assets (`.html`, `.css`, `.js`, ...) are installed with a gzip copy next to
 them, which busybox httpd serves to browsers that accept it (about a fifth of
@@ -190,7 +197,7 @@ installs are removed.
 
 | What | Source in this repo | On the modem |
 |---|---|---|
-| Web UI | `deploy/www/` plus the built `deploy/www-app/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
+| Web UI | `deploy/www/` plus `deploy/www-nextjs/` (default) or `deploy/www-alpine/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
 | `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled) |
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
@@ -232,10 +239,10 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 Build it with Node.js 20+:
 
 ```bash
-frontend/build.sh            # npm ci on first run, next build, copy to deploy/www-app
+frontend/build.sh            # npm ci on first run, next build, copy to deploy/www-nextjs
 ```
 
-The output in `deploy/www-app/` is versioned (like the system_bridge binary),
+The output in `deploy/www-nextjs/` is versioned (like the system_bridge binary),
 so `./install.sh` needs no Node.js; it warns when the frontend sources are
 newer than the last build. About 0.8 MB gzipped is served; with the gzip
 copies the web root takes about 5 MB of the root filesystem.

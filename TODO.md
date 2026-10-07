@@ -1,6 +1,6 @@
 # TODO
 
-## New web interface (branch `feature/qmanager-ui`)
+## Web interface (Next.js front-end)
 
 Port of the QManager frontend onto the bridges and the SimpleAdmin CGIs
 (README, "Web interface"). Upstream reference: QManager-RM520N `7a7007c`;
@@ -13,7 +13,8 @@ pages removed from `frontend/` are re-imported from there when ported.
   reboot countdown.
 - Every former page rebuilt: Signal Details, Cellular Settings, Band and
   Cell Locking, SMS Center, eSIM, Local Network, Connection Monitoring,
-  Tailscale, AT Terminal, Credentials, System. The classic pages are gone.
+  Tailscale, AT Terminal, Credentials, System. The classic pages stay in
+  `deploy/www-alpine` (`./install.sh --www-alpine`).
 
 ### Next
 - [ ] Page strings are English only: move them to `locales/` (en, it).
