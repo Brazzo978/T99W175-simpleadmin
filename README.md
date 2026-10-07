@@ -20,6 +20,11 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 # Set to 1 (default) to require user login.
 SIMPLEADMIN_ENABLE_LOGIN=1
 
+# Cross-site request protection: authenticated CGI calls must carry a Referer
+# from the same host. Set to 0 only to drive the CGI endpoints from scripts
+# that cannot send a Referer (curl users can pass -e http://<modem-ip>/).
+SIMPLEADMIN_CSRF_CHECK=1
+
 # GUI lock (maintenance mode)
 # When locked, the UI redirects to SIMPLEADMIN_GUI_LOCK_PAGE and CGI endpoints
 # behave as unauthenticated.
@@ -38,6 +43,13 @@ SIMPLEADMIN_ENABLE_ESIM=0
 # Base URL for the eSIM intermediate server (default: local euicc-client API)
 SIMPLEADMIN_ESIM_BASE_URL="http://localhost:8080/api/v1"
 ```
+### Security notes
+
+- The default account is `admin` / `admin`: change its password after the first login. It is recreated only when no administrator account is left, and there is no default read-only account.
+- Passwords in `www/cgi-bin/credentials.txt` are stored as SHA-512 crypt hashes (`$6$salt$hash`, the `/etc/shadow` format, via `openssl passwd -6` or busybox `cryptpw`). A plaintext password left in the file from an older release still works and is replaced by its hash on the next successful login.
+- Accounts with the `user` role can only send read-only AT commands (queries, test commands, identification and the output-format settings the dashboard needs).
+- With `SIMPLEADMIN_ENABLE_LOGIN=0` every CGI endpoint runs with administrator rights for anyone who can reach the modem; `SIMPLEADMIN_CSRF_CHECK=1` keeps other websites from driving it through the browser, but it does not replace a password.
+
 Check [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md) for file-by-file behavior, request flows, and how each page uses the CGI helpers.
 For the dedicated Tailscale integration documentation, see [Doc/Tailscale.md](Doc/Tailscale.md).
 

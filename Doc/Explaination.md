@@ -53,6 +53,7 @@
 - Additional flags:
   - `SIMPLEADMIN_ENABLE_ESIM` shows/hides the eSIM management page powered by the `euicc-client` REST server.
   - `SIMPLEADMIN_ESIM_BASE_URL` sets the base URL for the intermediate eSIM server (default `http://localhost:8080/api/v1`).
+  - `SIMPLEADMIN_CSRF_CHECK` (default `1`) makes `session_load` reject any CGI request whose `Referer` is missing or points to another host. busybox httpd passes neither `Origin` nor `Sec-Fetch-*` to CGI scripts, so the Referer is the only same-origin signal; it is required because a cross-site page can suppress it.
 
 ### `www/esim.html` — eSIM management
 - Purpose: GUI to interact with the intermediate `euicc-client` REST API (EID, profile lifecycle, downloads, notifications).

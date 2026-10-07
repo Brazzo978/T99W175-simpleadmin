@@ -22,6 +22,8 @@ SIMPLEADMIN_GUI_LOCKED="${SIMPLEADMIN_GUI_LOCKED:-0}"
 SIMPLEADMIN_GUI_TOGGLE_KEY="${SIMPLEADMIN_GUI_TOGGLE_KEY:-}"
 SIMPLEADMIN_GUI_LOCK_PAGE="${SIMPLEADMIN_GUI_LOCK_PAGE:-/webguioff.html}"
 
+SIMPLEADMIN_CSRF_CHECK="${SIMPLEADMIN_CSRF_CHECK:-1}"
+
 is_truthy() {
     case "${1:-}" in
         1|true|TRUE|yes|YES|on|ON) return 0 ;;
@@ -29,13 +31,32 @@ is_truthy() {
     esac
 }
 
+# CSRF guard. busybox httpd forwards neither Origin nor Sec-Fetch-* to CGI
+# scripts, so the Referer is the only same-origin signal available. It is
+# required, not just checked when present: a cross-site page can suppress it
+# with referrerpolicy="no-referrer", and with login disabled no cookie stands
+# between that page and the endpoint.
+request_is_same_origin() {
+    local referer="${HTTP_REFERER:-}"
+    local host="${HTTP_HOST:-}"
+    [ -n "$referer" ] && [ -n "$host" ] || return 1
+
+    local rest="${referer#*://}"
+    [ "$rest" != "$referer" ] || return 1
+    local referer_host="${rest%%/*}"
+    # bash 3.2 on the modem: no ${var,,}
+    [ "$(printf '%s' "$referer_host" | tr '[:upper:]' '[:lower:]')" = \
+      "$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')" ]
+}
+
 credentials_guide() {
     cat <<'EOF'
-# Formato credenziali: username:ruolo:password
-# - Ogni riga definisce un account con nome utente, ruolo e password.
-# - Ruoli permessi: "admin" (accesso completo) e "user" (accesso in sola lettura).
-# - La riga "admin:admin:admin" mantiene l'amministratore predefinito.
-# - La riga "guest:user:guest" fornisce l'utente di test in sola lettura.
+# Credentials format: username:role:password
+# Each line defines an account with username, role, and password.
+# Allowed roles: "admin" (full access) and "user" (read-only access).
+# Passwords are stored as SHA-512 crypt hashes ($6$...); a plaintext
+# password still works and is hashed on the next successful login.
+# The line below is the default administrator: change its password.
 EOF
 }
 
@@ -60,6 +81,7 @@ status_text() {
         401) echo "Unauthorized" ;;
         403) echo "Forbidden" ;;
         404) echo "Not Found" ;;
+        405) echo "Method Not Allowed" ;;
         409) echo "Conflict" ;;
         500) echo "Internal Server Error" ;;
         *) echo "OK" ;;
@@ -157,8 +179,7 @@ current_timestamp() {
 write_default_credentials_file() {
     {
         credentials_guide
-        printf 'admin:admin:admin\n'
-        printf 'guest:user:guest\n'
+        printf 'admin:admin:%s\n' "$(hash_password admin || printf 'admin')"
     } > "$CREDENTIALS_FILE"
 }
 
@@ -247,6 +268,67 @@ validate_role() {
     esac
 }
 
+# Passwords are stored as SHA-512 crypt hashes ($6$salt$hash), the
+# /etc/shadow format: its alphabet has no ':' so it fits the
+# username:role:password layout. Lines still holding a plaintext password
+# keep working and are rehashed on the first successful login.
+generate_password_salt() {
+    local salt=""
+    if command -v openssl >/dev/null 2>&1; then
+        salt="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9./' | cut -c1-16)"
+    fi
+    if [ "${#salt}" -lt 16 ]; then
+        salt="$(hexdump -n 8 -v -e '/1 "%02x"' /dev/urandom)"
+    fi
+    printf '%s' "$salt"
+}
+
+hash_password_with_salt() {
+    local password="$1"
+    local salt="$2"
+    if command -v openssl >/dev/null 2>&1; then
+        printf '%s\n' "$password" | openssl passwd -6 -salt "$salt" -stdin
+    elif command -v cryptpw >/dev/null 2>&1; then
+        printf '%s' "$password" | cryptpw -m sha512 -S "$salt"
+    else
+        return 1
+    fi
+}
+
+hash_password() {
+    local hashed
+    hashed="$(hash_password_with_salt "$1" "$(generate_password_salt)")" || return 1
+    case "$hashed" in
+        '$6$'*) printf '%s' "$hashed" ;;
+        *) return 1 ;;
+    esac
+}
+
+password_is_hashed() {
+    case "$1" in
+        '$6$'*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+verify_password() {
+    local password="$1"
+    local stored="$2"
+    if password_is_hashed "$stored"; then
+        local salt="${stored#\$6\$}"
+        salt="${salt%%\$*}"
+        [ "$(hash_password_with_salt "$password" "$salt")" = "$stored" ]
+    else
+        [ -n "$stored" ] && [ "$password" = "$stored" ]
+    fi
+}
+
+# Newlines would split the credentials line; the hash itself has no ':'.
+validate_password() {
+    local password="$1"
+    [ -n "$password" ] && [[ "$password" != *$'\n'* ]] && [[ "$password" != *$'\r'* ]]
+}
+
 authenticate_user() {
     local username="$1"
     local password="$2"
@@ -259,9 +341,12 @@ authenticate_user() {
     if [ "$stored_username" != "$username" ]; then
         return 1
     fi
-    if [ "$password" = "$stored_password" ]; then
+    if verify_password "$password" "$stored_password"; then
         SESSION_USERNAME="$stored_username"
         SESSION_ROLE="$stored_role"
+        if ! password_is_hashed "$stored_password"; then
+            update_password "$stored_username" "$password" || true
+        fi
         return 0
     fi
     return 1
@@ -338,6 +423,11 @@ session_load() {
         return 1
     fi
 
+    if is_truthy "$SIMPLEADMIN_CSRF_CHECK" && ! request_is_same_origin; then
+        send_json_response 403 '{"success":false,"status":"error","message":"Cross-site request blocked"}'
+        exit 0
+    fi
+
     if login_is_disabled; then
         SESSION_TOKEN=""
         SESSION_USERNAME="admin"
@@ -387,15 +477,11 @@ invalidate_session() {
     } 200>"${SESSION_STORE}.lock"
 }
 
+# Recreate the default admin only when no administrator account is left, so
+# renaming or removing "admin" does not silently bring back admin:admin.
 ensure_admin_exists_locked() {
-    if ! awk -F ':' '$1=="admin" {found=1} END{exit found?0:1}' "$CREDENTIALS_FILE"; then
-        printf 'admin:admin:admin\n' >> "$CREDENTIALS_FILE"
-    fi
-}
-
-ensure_guest_exists_locked() {
-    if ! awk -F ':' '$1=="guest" {found=1} END{exit found?0:1}' "$CREDENTIALS_FILE"; then
-        printf 'guest:user:guest\n' >> "$CREDENTIALS_FILE"
+    if ! awk -F ':' '$1 !~ /^#/ && $2=="admin" {found=1} END{exit found?0:1}' "$CREDENTIALS_FILE"; then
+        printf 'admin:admin:%s\n' "$(hash_password admin || printf 'admin')" >> "$CREDENTIALS_FILE"
     fi
 }
 
@@ -441,6 +527,15 @@ add_user() {
         echo "Invalid role" >&2
         return 3
     fi
+    if ! validate_password "$password"; then
+        echo "Invalid password" >&2
+        return 4
+    fi
+    local hashed
+    if ! hashed="$(hash_password "$password")"; then
+        echo "Unable to hash password" >&2
+        return 5
+    fi
     ensure_credentials_file
     local lock="${CREDENTIALS_FILE}.lock"
     {
@@ -448,7 +543,7 @@ add_user() {
         if grep -q -E "^${username}:" "$CREDENTIALS_FILE"; then
             return 1
         fi
-        printf '%s:%s:%s\n' "$username" "$role" "$password" >> "$CREDENTIALS_FILE"
+        printf '%s:%s:%s\n' "$username" "$role" "$hashed" >> "$CREDENTIALS_FILE"
         ensure_defaults_locked
     } 200>"$lock"
     return 0
@@ -457,6 +552,11 @@ add_user() {
 update_password() {
     local username="$1"
     local password="$2"
+    if ! validate_password "$password"; then
+        return 2
+    fi
+    local hashed
+    hashed="$(hash_password "$password")" || return 3
     ensure_credentials_file
     local lock="${CREDENTIALS_FILE}.lock"
     {
@@ -464,7 +564,8 @@ update_password() {
         if ! grep -q -E "^${username}:" "$CREDENTIALS_FILE"; then
             return 1
         fi
-        awk -F ':' -v user="$username" -v password="$password" 'BEGIN{OFS=":"} { if ($1==user) {$3=password}; print }' "$CREDENTIALS_FILE" > "${CREDENTIALS_FILE}.tmp"
+        # The hash alphabet is [./0-9A-Za-z$], so awk -v cannot mangle it.
+        awk -F ':' -v user="$username" -v password="$hashed" 'BEGIN{OFS=":"} { if ($1==user) {$3=password; NF=3}; print }' "$CREDENTIALS_FILE" > "${CREDENTIALS_FILE}.tmp"
         mv "${CREDENTIALS_FILE}.tmp" "$CREDENTIALS_FILE"
         ensure_defaults_locked
     } 200>"$lock"

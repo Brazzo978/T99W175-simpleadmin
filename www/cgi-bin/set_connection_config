@@ -28,6 +28,15 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
         PING_TARGETS=$(echo "$POST_DATA" | grep -o '"pingTargets":"[^"]*"' | cut -d'"' -f4)
         DNS_TESTS=$(echo "$POST_DATA" | grep -o '"dnsTests":"[^"]*"' | cut -d'"' -f4)
 
+        # Both values land inside double quotes in a file every CGI sources,
+        # so allow only host/IP characters: no $, `, \, ", | or spaces.
+        PING_TARGETS="${PING_TARGETS// /}"
+        DNS_TESTS="${DNS_TESTS// /}"
+        if ! [[ "$PING_TARGETS" =~ ^[A-Za-z0-9.:,_-]*$ ]] || ! [[ "$DNS_TESTS" =~ ^[A-Za-z0-9.:,_-]*$ ]]; then
+            send_json_response 400 '{"status":"error","message":"Ping targets and DNS tests may only contain letters, digits and . : , _ -"}'
+            exit 0
+        fi
+
         # Backup the config file
         cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
 

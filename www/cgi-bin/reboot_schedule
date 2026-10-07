@@ -79,11 +79,12 @@ validate_schedule() {
         return 0
     fi
     
-    local field_count
-    field_count=$(echo "$line" | awk '{print NF}')
-
-    if [ "$field_count" -lt 5 ]; then
-        send_json_response 400 '{"success":false,"message":"Invalid cron format. Expect at least 5 fields (minute hour day month weekday)."}'
+    # The line becomes root's crontab: accept only five time fields followed by
+    # the literal reboot command, never a client-supplied command.
+    local time_field='[0-9*/,-]+'
+    local pattern="^${time_field} ${time_field} ${time_field} ${time_field} ${time_field} reboot$"
+    if ! [[ "$line" =~ $pattern ]]; then
+        send_json_response 400 '{"success":false,"message":"Invalid schedule. Expect five cron time fields followed by reboot."}'
         exit 1
     fi
 }

@@ -3,6 +3,11 @@
 # Set to 1 (default) to require user login.
 SIMPLEADMIN_ENABLE_LOGIN=1
 
+# Cross-site request protection: authenticated CGI calls must carry a Referer
+# from the same host. Set to 0 only to drive the CGI endpoints from scripts
+# that cannot send a Referer (curl users can pass -e http://<modem-ip>/).
+SIMPLEADMIN_CSRF_CHECK=1
+
 # GUI lock: when set, the web interface redirects to SIMPLEADMIN_GUI_LOCK_PAGE and
 # CGI endpoints will behave as unauthenticated.
 SIMPLEADMIN_GUI_LOCKED=0

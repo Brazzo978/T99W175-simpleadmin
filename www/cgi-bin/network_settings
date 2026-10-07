@@ -565,49 +565,60 @@ handle_update() {
 
     mkdir -p "$(dirname "$CONFIG_FILE")"
 
-    if ! set_xml_value "APIPAddr" "$ip" "$CONFIG_FILE"; then
+    # Apply every change to a working copy and swap it in only when all of
+    # them succeeded, so a missing element cannot leave a half-written config.
+    work_file="${CONFIG_FILE}.work"
+    if ! cp -p "$CONFIG_FILE" "$work_file"; then
+        respond false "Unable to prepare the configuration update."
+    fi
+    trap 'rm -f "$work_file"' EXIT
+
+    if ! set_xml_value "APIPAddr" "$ip" "$work_file"; then
         respond false "Missing XML element: APIPAddr"
     fi
-    if ! set_xml_value "SubNetMask" "$mask" "$CONFIG_FILE"; then
+    if ! set_xml_value "SubNetMask" "$mask" "$work_file"; then
         respond false "Missing XML element: SubNetMask"
     fi
-    if ! set_xml_value "EnableDHCPServer" "$dhcp_flag" "$CONFIG_FILE"; then
+    if ! set_xml_value "EnableDHCPServer" "$dhcp_flag" "$work_file"; then
         respond false "Missing XML element: EnableDHCPServer"
     fi
 
     if [ "$dhcp_flag" = "1" ]; then
-        if ! set_xml_value "StartIP" "$dhcp_start" "$CONFIG_FILE"; then
+        if ! set_xml_value "StartIP" "$dhcp_start" "$work_file"; then
             respond false "Missing XML element: StartIP"
         fi
-        if ! set_xml_value "EndIP" "$dhcp_end" "$CONFIG_FILE"; then
+        if ! set_xml_value "EndIP" "$dhcp_end" "$work_file"; then
             respond false "Missing XML element: EndIP"
         fi
-        if ! set_xml_value "LeaseTime" "$dhcp_lease" "$CONFIG_FILE"; then
+        if ! set_xml_value "LeaseTime" "$dhcp_lease" "$work_file"; then
             respond false "Missing XML element: LeaseTime"
         fi
     fi
 
-    if ! set_scoped_xml_value "MobileAPNatCfg" "DmzIP" "$dmz_ip" "$CONFIG_FILE"; then
+    if ! set_scoped_xml_value "MobileAPNatCfg" "DmzIP" "$dmz_ip" "$work_file"; then
         respond false "Missing XML element: DmzIP"
     fi
 
-    if ! set_xml_value "EnableIPV6" "$ipv6_flag" "$CONFIG_FILE"; then
+    if ! set_xml_value "EnableIPV6" "$ipv6_flag" "$work_file"; then
         respond false "Missing XML element: EnableIPV6"
     fi
 
-    if ! set_scoped_xml_value "IPPassthroughCfg" "IPPassthroughEnable" "$bridge_flag" "$CONFIG_FILE"; then
+    if ! set_scoped_xml_value "IPPassthroughCfg" "IPPassthroughEnable" "$bridge_flag" "$work_file"; then
         respond false "Missing XML element: IPPassthroughEnable"
     fi
-    if ! set_scoped_xml_value "IPPassthroughCfg" "IPPassthroughMacAddr" "$bridge_mac" "$CONFIG_FILE"; then
+    if ! set_scoped_xml_value "IPPassthroughCfg" "IPPassthroughMacAddr" "$bridge_mac" "$work_file"; then
         respond false "Missing XML element: IPPassthroughMacAddr"
     fi
-    if ! set_xml_value "AutoConnect" "$auto_connect" "$CONFIG_FILE"; then
+    if ! set_xml_value "AutoConnect" "$auto_connect" "$work_file"; then
         respond false "Missing XML element: AutoConnect"
     fi
-    if ! set_xml_value "Roaming" "$roaming" "$CONFIG_FILE"; then
+    if ! set_xml_value "Roaming" "$roaming" "$work_file"; then
         respond false "Missing XML element: Roaming"
     fi
 
+    if ! mv "$work_file" "$CONFIG_FILE"; then
+        respond false "Unable to write the configuration file."
+    fi
     respond true "Network configuration updated successfully."
 }
 

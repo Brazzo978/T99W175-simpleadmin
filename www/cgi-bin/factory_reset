@@ -16,6 +16,12 @@ if [ "$SESSION_ROLE" != "admin" ]; then
     exit 0
 fi
 
+# Destructive: never on a GET, which links, images and redirects can trigger
+if [ "${REQUEST_METHOD:-}" != "POST" ]; then
+    send_json_response 405 '{"status":"error","message":"Method not allowed"}'
+    exit 0
+fi
+
 log_action() {
     logger -t "simpleadmin-factory-reset" "$1"
 }

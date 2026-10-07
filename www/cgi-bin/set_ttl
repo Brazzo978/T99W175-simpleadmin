@@ -21,21 +21,25 @@ log_debug() {
     debug_logs+=("$1")
 }
 
-# Get query
-QUERY_STRING=$(echo "${QUERY_STRING}" | sed 's/;//g')
-if [ "${QUERY_STRING}" ]; then
-    export IFS="&"
-    for cmd in ${QUERY_STRING}; do
-        if [ "$(echo $cmd | grep '=')" ]; then
-            key=$(echo $cmd | awk -F '=' '{print $1}')
-            value=$(echo $cmd | awk -F '=' '{print $2}')
-            eval $key=$value
-            log_debug "Received parameter: $key=$value"
-        fi
-    done
+# Get query: only ttlvalue is accepted, and only as a decimal 0-255
+ttlvalue=""
+IFS='&' read -r -a query_pairs <<< "${QUERY_STRING:-}"
+for pair in "${query_pairs[@]}"; do
+    if [ "${pair%%=*}" = "ttlvalue" ] && [ "$pair" != "${pair#*=}" ]; then
+        ttlvalue="${pair#*=}"
+        log_debug "Received parameter: ttlvalue=$ttlvalue"
+    fi
+done
+
+if [ -n "$ttlvalue" ]; then
+    if ! [[ "$ttlvalue" =~ ^[0-9]{1,3}$ ]] || [ "$((10#$ttlvalue))" -gt 255 ]; then
+        send_json_response 400 '{"status":"error","message":"ttlvalue must be an integer between 0 and 255"}'
+        exit 0
+    fi
+    ttlvalue="$((10#$ttlvalue))"
 fi
 
-setTTL=$(printf '%b\n' "${ttlvalue//%/\\x}")
+setTTL="$ttlvalue"
 ttlenabled=false
 ttlvalue_int=0
 
