@@ -146,6 +146,44 @@ systemctl restart qcmap_httpd.service
 
 Browse to the GUI and use Simpleadmin
 
+### Deploying from a workstation
+
+With SSH key access to the modem as `root`:
+
+```bash
+./deploy-www.sh [HOST] --nologin|--login   # web UI into /WEBSERVER/www
+./deploy-sw-deps.sh [HOST] [COMPONENT...]  # binaries the UI relies on
+```
+
+`deploy-sw-deps.sh` installs every component by default, or only the ones
+named (`diag_bridge`, `curl`, `jq`, `tailscale`):
+
+| Component | Source in this repo | On the modem |
+|---|---|---|
+| `diag_bridge` | `usr/bin/diag_bridge`, `scripts/systemd/diag_bridge.service` | `/usr/bin/diag_bridge`, `/lib/systemd/system/diag_bridge.service` (enabled) |
+| `curl`, `jq` | `usr/bin/`, `usr/lib/` | `/opt/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
+| `tailscale` | `Tailscale/` | `/opt/simpleadmin/Tailscale` |
+
+## 📡 Advanced Signal Details: AT-based or DIAG-based
+
+The signal card opens *Advanced Signal Details*, whose header has an
+**AT-based / DIAG-based** switch (remembered per browser):
+
+- **AT-based** parses `AT^DEBUG?` on every dashboard refresh.
+- **DIAG-based** reads the WebSocket pushed by `diag_bridge` on port 9001,
+  decoded from the Qualcomm DIAG interface. It adds per-antenna SINR,
+  modulation, MCS, TX antennas, DL throughput and NR SSB/beams/neighbours.
+  The stream is open only while the modal is visible. Secondary LTE cells
+  that the firmware does not log over DIAG are not shown in this mode.
+
+The dashboard cards stay AT-based in both cases.
+
+`diag_bridge` is developed in its own repository (`T99W175-diag-json-bridge`);
+its `scripts/publish-to-simpleadmin.sh` builds it and copies the binary, the
+systemd unit and `usr/bin/diag_bridge.version` into this repository. The
+service listens on `bridge0` only (`-i bridge0`), so it is not reachable from
+the mobile network.
+
 
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 

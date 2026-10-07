@@ -1020,6 +1020,22 @@
                       <polyline points="6 16 10 12 14 14 19 7"></polyline>
                     </svg>
                   </button>
+                  <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Signal data source">
+                    <button
+                      type="button"
+                      class="btn"
+                      :class="signalSource === 'at' ? 'btn-primary' : 'btn-outline-primary'"
+                      :aria-pressed="signalSource === 'at'"
+                      @click="setSignalSource('at')"
+                      title="Cell details from AT^DEBUG? polling">AT-based</button>
+                    <button
+                      type="button"
+                      class="btn"
+                      :class="signalSource === 'diag' ? 'btn-primary' : 'btn-outline-primary'"
+                      :aria-pressed="signalSource === 'diag'"
+                      @click="setSignalSource('diag')"
+                      title="Cell details pushed by diag_bridge from the Qualcomm DIAG interface">DIAG-based</button>
+                  </div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
@@ -1084,16 +1100,35 @@
                     <span x-text="'Min: ' + formatSignalChartValue(getSignalChartScale().min)"></span>
                   </div>
                 </div>
-                <template x-if="detailedSignals.length === 0">
-                  <p class="mb-0 text-muted">
-                    No advanced details available.
+                <template x-if="signalSource === 'diag'">
+                  <div class="d-flex flex-wrap align-items-center gap-2 small mb-3">
+                    <span
+                      class="badge"
+                      :class="diagStatus === 'connected' ? 'bg-success' : (diagStatus === 'connecting' ? 'bg-warning text-dark' : 'bg-danger')"
+                      x-text="diagStatusLabel()"
+                    ></span>
+                    <template x-if="diagSummary">
+                      <span
+                        class="text-muted"
+                        x-text="diagSummary.cells + ' cell(s) · ' + diagSummary.total_bandwidth_mhz + ' MHz aggregated' + (diagSummary.total_dl_mbps > 0 ? ' · ' + Number(diagSummary.total_dl_mbps).toFixed(1) + ' Mbps DL' : '')"
+                      ></span>
+                    </template>
+                    <template x-if="diagLastUpdate">
+                      <span class="text-muted" x-text="'Updated ' + diagLastUpdate"></span>
+                    </template>
+                  </div>
+                </template>
+
+                <template x-if="activeSignals().length === 0">
+                  <p class="mb-0 text-muted"
+                     x-text="signalSource === 'diag' ? 'Waiting for diag_bridge data…' : 'No advanced details available.'">
                   </p>
                 </template>
 
-                <template x-for="(entry, index) in detailedSignals" :key="entry.id ?? index">
+                <template x-for="(entry, index) in activeSignals()" :key="entry.id ?? index">
                   <div
                     class="mb-4 pb-3 border-bottom"
-                    :class="{ 'border-0 pb-0 mb-0': index === detailedSignals.length - 1 }"
+                    :class="{ 'border-0 pb-0 mb-0': index === activeSignals().length - 1 }"
                   >
                     <div
                       class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-2"
@@ -1146,6 +1181,33 @@
                         <p class="mb-1" x-text="'RX Diversity: ' + entry.rxDiversityDisplay"></p>
                       </div>
                     </div>
+
+                    <!-- DIAG-only details: modulation, MCS, TX antennas, DL rate (LTE); SSB, beams, neighbours (NR) -->
+                    <template x-if="entry.modulation || entry.mcs != null || entry.txAntennas || entry.dlMbps != null || entry.ssb != null || entry.numBeams || entry.neighborCells">
+                      <div class="mt-2 d-flex flex-wrap gap-1 small">
+                        <template x-if="entry.modulation">
+                          <span class="badge bg-secondary" x-text="'Mod: ' + entry.modulation"></span>
+                        </template>
+                        <template x-if="entry.mcs != null">
+                          <span class="badge bg-secondary" x-text="'MCS: ' + entry.mcs"></span>
+                        </template>
+                        <template x-if="entry.txAntennas">
+                          <span class="badge bg-secondary" x-text="'TX: ' + entry.txAntennas"></span>
+                        </template>
+                        <template x-if="entry.dlMbps != null">
+                          <span class="badge bg-info text-dark" x-text="entry.dlMbps.toFixed(1) + ' Mbps DL'"></span>
+                        </template>
+                        <template x-if="entry.ssb != null">
+                          <span class="badge bg-secondary" x-text="'SSB: ' + entry.ssb"></span>
+                        </template>
+                        <template x-if="entry.numBeams">
+                          <span class="badge bg-secondary" x-text="'Beams: ' + entry.numBeams"></span>
+                        </template>
+                        <template x-if="entry.neighborCells">
+                          <span class="badge bg-secondary" x-text="'Neighbours: ' + entry.neighborCells"></span>
+                        </template>
+                      </div>
+                    </template>
 
                     <div class="mt-3">
                       <template x-for="(metric, metricIndex) in entry.metrics" :key="metric.key">
@@ -1219,6 +1281,34 @@
                               </div>
                             </template>
                           </template>
+                          <!-- Per-chain SINR (DIAG only) after the SINR metric -->
+                          <template x-if="metric.key === 'sinr' && entry.sinrChains && entry.sinrChains.length > 0">
+                            <template x-for="(chain, chainIndex) in entry.sinrChains" :key="'sinr-chain-' + chainIndex">
+                              <div class="mb-2 d-flex align-items-center gap-2">
+                                <span class="fw-semibold" style="min-width: 80px; text-align: left;" x-html="'SINR<sub>(ANT' + (typeof chain.physicalAntenna === 'number' ? chain.physicalAntenna : chainIndex) + ')</sub>'"></span>
+                                <template x-if="chain.percentage > 0">
+                                  <div
+                                    class="progress flex-grow-1"
+                                    style="height: 24px"
+                                    role="progressbar"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    :aria-valuenow="chain.percentage"
+                                  >
+                                    <div
+                                      class="progress-bar"
+                                      :style="'width: ' + chain.percentage + '%; background: ' + (chain.color || '#6c757d') + ';'"
+                                    >
+                                      <span x-text="chain.display + ' / ' + chain.percentage + '%'"></span>
+                                    </div>
+                                  </div>
+                                </template>
+                                <template x-if="chain.percentage === 0">
+                                  <span class="fst-italic text-muted flex-grow-1">Value not available</span>
+                                </template>
+                              </div>
+                            </template>
+                          </template>
                         </div>
                       </template>
                     </div>
@@ -1227,43 +1317,43 @@
 
                 <div class="mt-4">
                   <h6 class="fw-semibold">Network analysis</h6>
-                  <template x-if="!networkAnalysis">
+                  <template x-if="!activeNetworkAnalysis()">
                     <p class="mb-0 text-muted">No network analysis available.</p>
                   </template>
-                  <template x-if="networkAnalysis">
+                  <template x-if="activeNetworkAnalysis()">
                     <div class="small">
                       <p class="mb-1">
-                        <strong x-text="networkAnalysis.primary_title"></strong>
+                        <strong x-text="activeNetworkAnalysis().primary_title"></strong>
                       </p>
-                      <p class="mb-2" x-text="networkAnalysis.primary_message"></p>
+                      <p class="mb-2" x-text="activeNetworkAnalysis().primary_message"></p>
 
-                      <template x-if="networkAnalysis.why && networkAnalysis.why.length">
+                      <template x-if="activeNetworkAnalysis().why && activeNetworkAnalysis().why.length">
                         <div class="mb-2">
                           <div class="text-muted fw-semibold">Why</div>
                           <ul class="mb-2 ps-3">
-                            <template x-for="(item, idx) in networkAnalysis.why" :key="'why-' + idx">
+                            <template x-for="(item, idx) in activeNetworkAnalysis().why" :key="'why-' + idx">
                               <li x-text="item"></li>
                             </template>
                           </ul>
                         </div>
                       </template>
 
-                      <template x-if="networkAnalysis.suggestions && networkAnalysis.suggestions.length">
+                      <template x-if="activeNetworkAnalysis().suggestions && activeNetworkAnalysis().suggestions.length">
                         <div class="mb-2">
                           <div class="text-muted fw-semibold">What to try</div>
                           <ul class="mb-2 ps-3">
-                            <template x-for="(item, idx) in networkAnalysis.suggestions" :key="'suggestion-' + idx">
+                            <template x-for="(item, idx) in activeNetworkAnalysis().suggestions" :key="'suggestion-' + idx">
                               <li x-text="item"></li>
                             </template>
                           </ul>
                         </div>
                       </template>
 
-                      <template x-if="networkAnalysis.secondary_notes && networkAnalysis.secondary_notes.length">
+                      <template x-if="activeNetworkAnalysis().secondary_notes && activeNetworkAnalysis().secondary_notes.length">
                         <div class="mb-0">
                           <div class="text-muted fw-semibold">Notes</div>
                           <ul class="mb-0 ps-3">
-                            <template x-for="(item, idx) in networkAnalysis.secondary_notes" :key="'note-' + idx">
+                            <template x-for="(item, idx) in activeNetworkAnalysis().secondary_notes" :key="'note-' + idx">
                               <li x-text="item"></li>
                             </template>
                           </ul>

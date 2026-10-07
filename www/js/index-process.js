@@ -189,6 +189,15 @@ function processAllInfos() {
     // SIM unlock prompt modal (first time only)
     showSimUnlockPrompt: false,
     simUnlockPromptDismissed: false,
+    // Advanced signal modal data source: "at" (AT^DEBUG? polling) or "diag"
+    // (diag_bridge WebSocket push). Only the modal follows it; the dashboard
+    // cards stay AT-based.
+    signalSource: "at",
+    diagSignals: [],
+    diagNetworkAnalysis: null,
+    diagSummary: null,
+    diagStatus: "idle",
+    diagLastUpdate: null,
     // Signal chart overlay state
     signalChartVisible: false,
     signalChartDurationMs: 3 * 60 * 1000,
@@ -204,6 +213,15 @@ function processAllInfos() {
     },
     signalHistory: [],
   };
+
+  // diag_bridge WebSocket state lives outside the reactive data: Alpine would
+  // wrap the socket in a proxy.
+  const DIAG_WS_PORT = 9001;
+  const DIAG_RECONNECT_MS = 3000;
+  let diagSocket = null;
+  let diagReconnectTimer = null;
+  let diagModalOpen = false;
+  let diagModalHooked = false;
 
   return {
     // Spread default state as component data
@@ -226,6 +244,12 @@ function processAllInfos() {
         showSimUnlockPrompt: this.showSimUnlockPrompt,
         simUnlockPromptDismissed: this.simUnlockPromptDismissed,
         simPinHasBeenUnlocked: this.simPinHasBeenUnlocked,
+        signalSource: this.signalSource,
+        diagSignals: this.diagSignals,
+        diagNetworkAnalysis: this.diagNetworkAnalysis,
+        diagSummary: this.diagSummary,
+        diagStatus: this.diagStatus,
+        diagLastUpdate: this.diagLastUpdate,
       };
 
       Object.assign(
@@ -3312,6 +3336,288 @@ function processAllInfos() {
     return 0;
   },
 
+  /**
+   * Signal entries shown in the Advanced Signal Details modal for the
+   * selected source.
+   *
+   * @returns {Array} AT-derived or DIAG-derived signal entries
+   */
+  activeSignals() {
+    return this.signalSource === "diag" ? this.diagSignals : this.detailedSignals;
+  },
+
+  /**
+   * Network analysis matching the selected signal source.
+   *
+   * @returns {Object|null} Analysis built from the active signal entries
+   */
+  activeNetworkAnalysis() {
+    return this.signalSource === "diag" ? this.diagNetworkAnalysis : this.networkAnalysis;
+  },
+
+  /**
+   * Switches the modal between AT-based and DIAG-based signal details.
+   *
+   * @param {string} source - "at" or "diag"
+   */
+  setSignalSource(source) {
+    const next = source === "diag" ? "diag" : "at";
+    this.signalSource = next;
+    try {
+      localStorage.setItem("signalSource", next);
+    } catch (_) {
+      // Storage unavailable: the choice just won't persist.
+    }
+    if (next === "diag") {
+      this.connectDiagWs();
+    } else {
+      this.disconnectDiagWs();
+    }
+  },
+
+  diagStatusLabel() {
+    switch (this.diagStatus) {
+      case "connected":
+        return "diag_bridge connected";
+      case "connecting":
+        return "Connecting to diag_bridge…";
+      case "disconnected":
+        return "diag_bridge unreachable (port " + DIAG_WS_PORT + "), retrying";
+      default:
+        return "diag_bridge idle";
+    }
+  },
+
+  /**
+   * Opens the DIAG stream only while the modal is visible and closes it when
+   * the modal is hidden, so the bridge is not consumed in the background.
+   */
+  hookSignalModal() {
+    if (diagModalHooked) {
+      return;
+    }
+    const modal = document.getElementById("advancedSignalModal");
+    if (!modal) {
+      return;
+    }
+    diagModalHooked = true;
+    modal.addEventListener("shown.bs.modal", () => {
+      diagModalOpen = true;
+      if (this.signalSource === "diag") {
+        this.connectDiagWs();
+      }
+    });
+    modal.addEventListener("hidden.bs.modal", () => {
+      diagModalOpen = false;
+      this.disconnectDiagWs();
+    });
+  },
+
+  connectDiagWs() {
+    if (this.signalSource !== "diag" || !diagModalOpen) {
+      return;
+    }
+    if (diagSocket && (diagSocket.readyState === WebSocket.OPEN ||
+                       diagSocket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    clearTimeout(diagReconnectTimer);
+    const host = window.location.hostname || "192.168.225.1";
+    let ws;
+    try {
+      ws = new WebSocket("ws://" + host + ":" + DIAG_WS_PORT);
+    } catch (_) {
+      this.diagStatus = "disconnected";
+      diagReconnectTimer = setTimeout(() => this.connectDiagWs(), DIAG_RECONNECT_MS);
+      return;
+    }
+    diagSocket = ws;
+    this.diagStatus = "connecting";
+    ws.onopen = () => {
+      if (diagSocket === ws) {
+        this.diagStatus = "connected";
+      }
+    };
+    ws.onmessage = (event) => {
+      if (diagSocket !== ws) {
+        return;
+      }
+      try {
+        this._applyDiagData(JSON.parse(event.data));
+      } catch (error) {
+        console.warn("Ignoring malformed diag_bridge message:", error);
+      }
+    };
+    ws.onerror = () => ws.close();
+    ws.onclose = () => {
+      if (diagSocket !== ws) {
+        return;
+      }
+      diagSocket = null;
+      this.diagStatus = "disconnected";
+      if (this.signalSource === "diag" && diagModalOpen) {
+        diagReconnectTimer = setTimeout(() => this.connectDiagWs(), DIAG_RECONNECT_MS);
+      }
+    };
+  },
+
+  disconnectDiagWs() {
+    clearTimeout(diagReconnectTimer);
+    diagReconnectTimer = null;
+    const ws = diagSocket;
+    diagSocket = null;
+    if (ws) {
+      ws.close();
+    }
+    this.diagStatus = "idle";
+  },
+
+  /**
+   * Converts a diag_bridge snapshot into modal entries with the same shape
+   * as the AT-derived detailedSignals, plus DIAG-only fields (per-chain
+   * SINR, modulation, MCS, TX antennas, DL throughput, NR beams).
+   *
+   * Leaves the AT-based dashboard state untouched.
+   *
+   * @param {Object} data - {lte: [...], nr: [...], summary: {...}}
+   */
+  _applyDiagData(data) {
+    if (!data || typeof data !== "object") {
+      return;
+    }
+    // Serving cell first: the bridge flags secondary cells explicitly.
+    const lte = (Array.isArray(data.lte) ? data.lte : [])
+      .slice()
+      .sort((a, b) => (a.is_scell ? 1 : 0) - (b.is_scell ? 1 : 0));
+    const nr = Array.isArray(data.nr) ? data.nr : [];
+
+    const popcount = (n) => {
+      let count = 0;
+      let value = n >>> 0;
+      while (value) {
+        count += value & 1;
+        value >>>= 1;
+      }
+      return count;
+    };
+    const round1 = (v) =>
+      typeof v === "number" && Number.isFinite(v) ? Math.round(v * 10) / 10 : null;
+    const positive = (v) => (typeof v === "number" && v > 0 ? v : null);
+
+    const bars = {
+      rsrp: (v, tech) => this.calculateRSRPBar(v, tech),
+      rsrq: (v, tech) => this.calculateRSRQBar(v, tech),
+      rssi: (v, tech) => this.calculateRSSIBar(v, tech),
+      sinr: (v, tech) => this.calculateSINRBar(v, tech),
+    };
+    const buildMetric = (key, label, raw, unit, tech, isCA = false) => {
+      const value = round1(raw);
+      if (value === null) {
+        return { key, label, display: "N/A", percentage: 0, color: "#6c757d", value: null, isCA };
+      }
+      const bar = bars[key](value, tech);
+      return { key, label, display: `${value} ${unit}`, percentage: bar.percentage, color: bar.color, value, isCA };
+    };
+    const buildChains = (values, unit, barFn, tech) =>
+      (Array.isArray(values) ? values : [])
+        .map((raw, index) => {
+          const value = round1(raw);
+          if (value === null) {
+            return null;
+          }
+          const bar = barFn(value, tech);
+          return {
+            physicalAntenna: index,
+            logicalIndex: index,
+            value,
+            percentage: bar.percentage,
+            color: bar.color,
+            display: `${value} ${unit}`,
+          };
+        })
+        .filter(Boolean);
+
+    const signals = [];
+
+    lte.forEach((cell, index) => {
+      const tech = "LTE";
+      const isCA = Boolean(cell.is_scell);
+      const caIndex = cell.scell_idx || index;
+      const baseTitle = isCA ? `CA 4G #${caIndex}` : "Primary 4G";
+      const bandwidthMhz = positive(cell.bandwidth_mhz);
+      const prb = positive(cell.bandwidth_prb);
+      signals.push({
+        id: `lte-diag-${cell.earfcn}-${cell.pci}`,
+        title: cell.band ? `${baseTitle} (Band ${cell.band})` : baseTitle,
+        technology: tech,
+        role: isCA ? "secondary" : "primary",
+        caIndex: isCA ? caIndex : null,
+        band: cell.band ? String(cell.band) : null,
+        bandDisplay: cell.band ? `Band ${cell.band}` : "N/A",
+        bandwidthDisplay: bandwidthMhz
+          ? (prb ? `${bandwidthMhz} MHz (${prb} PRB)` : `${bandwidthMhz} MHz`)
+          : "N/A",
+        channelDisplay: cell.earfcn != null ? String(cell.earfcn) : "N/A",
+        pciDisplay: cell.pci != null ? String(cell.pci) : "N/A",
+        rxDiversityDisplay: cell.rx_diversity ? `${popcount(cell.rx_diversity)}R` : "",
+        metrics: [
+          buildMetric("rsrp", "RSRP", cell.rsrp, "dBm", tech),
+          buildMetric("rsrq", "RSRQ", cell.rsrq, "dB", tech),
+          buildMetric("rssi", "RSSI", cell.rssi, "dBm", tech),
+          buildMetric("sinr", "SINR", cell.sinr, "dB", tech, isCA),
+        ],
+        antennas: buildChains(cell.rsrp_rx, "dBm", bars.rsrp, tech),
+        sinrChains: buildChains(cell.sinr_rx, "dB", bars.sinr, tech),
+        dlMbps: typeof cell.dl_mbps === "number" ? cell.dl_mbps : null,
+        modulation: cell.modulation || null,
+        mcs: typeof cell.mcs === "number" ? cell.mcs : null,
+        txAntennas: cell.tx_antennas || null,
+        ssb: null,
+        numBeams: null,
+        neighborCells: null,
+      });
+    });
+
+    nr.forEach((cell, index) => {
+      const tech = "NR";
+      const isCA = index > 0;
+      const baseTitle = isCA ? `CA 5G #${index}` : "Primary 5G";
+      const bandwidthMhz = positive(cell.bandwidth_mhz);
+      signals.push({
+        id: `nr-diag-${cell.arfcn}-${cell.pci}`,
+        title: cell.band ? `${baseTitle} (Band n${cell.band})` : baseTitle,
+        technology: tech,
+        role: isCA ? "secondary" : "primary",
+        caIndex: isCA ? index : null,
+        band: cell.band ? `n${cell.band}` : null,
+        bandDisplay: cell.band ? `Band n${cell.band}` : "N/A",
+        bandwidthDisplay: bandwidthMhz ? `${bandwidthMhz} MHz` : "N/A",
+        channelDisplay: cell.arfcn != null ? String(cell.arfcn) : "N/A",
+        pciDisplay: cell.pci != null ? String(cell.pci) : "N/A",
+        rxDiversityDisplay: cell.rx_diversity ? `${popcount(cell.rx_diversity)}R` : "",
+        // The bridge reports no SINR/RSSI for NR.
+        metrics: [
+          buildMetric("rsrp", "RSRP", cell.rsrp, "dBm", tech),
+          buildMetric("rsrq", "RSRQ", cell.rsrq, "dB", tech),
+        ],
+        antennas: buildChains(cell.rsrp_rx, "dBm", bars.rsrp, tech),
+        sinrChains: [],
+        dlMbps: null,
+        modulation: cell.modulation || null,
+        mcs: null,
+        txAntennas: null,
+        ssb: typeof cell.ssb === "number" ? cell.ssb : null,
+        numBeams: cell.num_beams || null,
+        neighborCells: cell.neighbor_cells || null,
+      });
+    });
+
+    this.diagSignals = signals;
+    this.diagNetworkAnalysis = this.buildNetworkAnalysis(signals);
+    this.diagSummary = data.summary && typeof data.summary === "object" ? data.summary : null;
+    this.diagLastUpdate = new Date().toLocaleTimeString();
+  },
+
   toggleSignalChart() {
     this.signalChartVisible = !this.signalChartVisible;
   },
@@ -3571,6 +3877,14 @@ function processAllInfos() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
     }
+    try {
+      if (localStorage.getItem("signalSource") === "diag") {
+        this.signalSource = "diag";
+      }
+    } catch (_) {
+      // Storage unavailable: keep the AT default.
+    }
+    this.hookSignalModal();
     // Fetch system information (uptime, load, network speed)
     this.fetchSysInfo();
     // Retrieve the refresh rate from local storage or session storage
