@@ -3,6 +3,8 @@
 // =============================================================================
 // The CGI stores one crontab line ending in "reboot". Interval schedules are
 // "0 */H * * *" (24 h is "0 0 * * *"); fixed ones are "M H dom * dow".
+// "*/H" counts from midnight every day, so it is evenly spaced only when H
+// divides 24: */5 fires at 20:00 and again four hours later at 00:00.
 // =============================================================================
 
 export type RebootFrequency = "daily" | "weekly" | "monthly";
@@ -26,6 +28,9 @@ export const DEFAULT_REBOOT_FORM: RebootForm = {
   dayOfMonth: 1,
   time: "00:00",
 };
+
+/** Intervals that divide the day evenly. */
+export const INTERVAL_HOURS = [1, 2, 3, 4, 6, 8, 12, 24] as const;
 
 export const WEEKDAYS = [
   "Sunday",
@@ -62,9 +67,9 @@ export function parseSchedule(line: string): RebootForm | null {
 
 export function validateSchedule(form: RebootForm): string | null {
   if (form.mode === "interval") {
-    return Number.isInteger(form.intervalHours) && form.intervalHours >= 1 && form.intervalHours <= 24
+    return (INTERVAL_HOURS as readonly number[]).includes(form.intervalHours)
       ? null
-      : "The interval must be 1 to 24 hours.";
+      : "Choose an interval that divides the day: 1, 2, 3, 4, 6, 8, 12 or 24 hours.";
   }
   const [h, m] = form.time.split(":").map(Number);
   if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return "Choose a valid time.";
@@ -86,7 +91,11 @@ export function buildSchedule(form: RebootForm): string {
 
 export function describeSchedule(form: RebootForm): string {
   if (form.mode === "interval") {
-    return form.intervalHours === 24 ? "Every day at midnight" : `Every ${form.intervalHours} hours`;
+    if (form.intervalHours === 24) return "Every day at midnight";
+    // A schedule saved by an older interface may not divide the day.
+    return 24 % form.intervalHours === 0
+      ? `Every ${form.intervalHours} hours from midnight`
+      : `Every ${form.intervalHours} hours from midnight, then again at midnight`;
   }
   if (form.frequency === "weekly") return `Every ${WEEKDAYS[form.dayOfWeek]} at ${form.time}`;
   if (form.frequency === "monthly") return `Day ${form.dayOfMonth} of every month at ${form.time}`;

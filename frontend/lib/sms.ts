@@ -1,19 +1,25 @@
 // =============================================================================
 // SMS in text mode — list parsing, body decoding, UCS-2 encoding
 // =============================================================================
-// Ported from the classic SMS page, which was validated on the T99W175:
-//   - the list comes from AT+CMGL="ALL" in text mode (+CMGF=1, +CSDH=0);
-//   - bodies arrive raw (GSM 7-bit alphabet, control bytes escaped by the
-//     CGI as \u00xx) or hex-encoded (UCS-2, sometimes UTF-8);
-//   - sending goes through cgi-bin/send_sms with UCS-2 hex number and text,
-//     70 characters per part.
+// As the T99W175 answers AT+CMGL="ALL" in text mode with +CSDH=1:
+//   +CMGL: 4,"REC READ","8610111412132...",,"26/02/07,10:29:33+04",208,123
+//   <body>
+// The last two header fields say how to read the rest:
+//   - <tooa> 208 (0xD0) is an alphanumeric sender, which this firmware
+//     prints as the decimal codes of its characters ("Very Mobile");
+//   - <length> counts characters for a 7-bit body, sent as text in the GSM
+//     alphabet (control bytes escaped by the CGI as \u00xx), and octets for
+//     an 8-bit or UCS-2 body, sent as hex: a body of exactly 2 x <length>
+//     hex digits is hex, anything else is text.
+// Sending goes through cgi-bin/send_sms with UCS-2 hex number and text,
+// 70 UTF-16 units per part.
 // =============================================================================
 
 import type { SmsMessage } from "@/types/sms";
 
 /** Prepares text mode and lists every message of the current storage. */
 export const SMS_LIST_COMMAND =
-  'AT+CSMS=1;+CSDH=0;+CNMI=2,1,0,0,0;+CMGF=1;+CSCA?;+CSMP=17,167,0,8;+CMGL="ALL"';
+  'AT+CSMS=1;+CSDH=1;+CNMI=2,1,0,0,0;+CMGF=1;+CSCA?;+CSMP=17,167,0,8;+CMGL="ALL"';
 
 /** UCS-2 characters per SMS part. */
 export const SMS_PART_LENGTH = 70;
@@ -69,16 +75,6 @@ export function decodeHexText(hex: string): string {
   return s8 >= s16 ? utf8 : utf16;
 }
 
-/** The body as hex when it is mostly hex digits, else null. */
-function hexPayload(raw: string): string | null {
-  const compact = raw.replace(/\s+/g, "");
-  if (!compact) return null;
-  let hex = compact.replace(/[^0-9a-fA-F]/g, "");
-  if (hex.length < 2 || hex.length / compact.length < 0.7) return null;
-  if (hex.length % 2) hex = hex.slice(0, -1);
-  return hex;
-}
-
 /**
  * GSM 03.38 letters that arrive as control characters (0x04 is "è",
  * 0x7F is "à"), and the 0x1B escape into the extension table.
@@ -95,23 +91,21 @@ export function decodeGsm7(text: string): string {
     .replace(/\u007f/g, "à");
 }
 
-/**
- * Alphanumeric senders ("Very Mobile") can arrive as their character codes
- * in decimal, run together: "86101114121...". A phone number has at most 15
- * digits, so a longer all-digit sender that decodes to printable text is one.
- */
-function decodeDecimalSender(sender: string): string | null {
-  if (!/^\d{16,}$/.test(sender)) return null;
+/** Type of address of an alphanumeric sender ("Very Mobile"). */
+const TOA_ALPHANUMERIC = 0xd0;
+
+/** The decimal character codes this firmware prints for such a sender. */
+function decodeDecimalSender(sender: string): string {
   let out = "";
   for (let i = 0; i < sender.length; ) {
     // Printable ASCII is 32-126: three digits when it starts with 1.
     const width = sender[i] === "1" ? 3 : 2;
     const code = Number(sender.substr(i, width));
-    if (!(code >= 32 && code <= 126)) return null;
+    if (!(code >= 32 && code <= 126)) return sender;
     out += String.fromCharCode(code);
     i += width;
   }
-  return /[A-Za-z]/.test(out) ? out.trim() : null;
+  return out.trim() || sender;
 }
 
 /** "YY/MM/DD,HH:MM:SS+TZ" → the "MM/DD/YY HH:MM:SS" the inbox expects. */
@@ -121,30 +115,37 @@ function inboxTimestamp(modem: string): string {
 }
 
 export function parseSmsList(output: string, storage: "ME" | "SM"): SmsMessage[] {
-  const header = /^\s*\+CMGL:\s*(\d+),"[^"]*","([^"]*)"[^"]*,"([^"]*)"/gm;
+  const header =
+    /^\s*\+CMGL:\s*(\d+),"[^"]*","([^"]*)",(?:"[^"]*")?,"([^"]*)",(\d+),(\d+)[ \t]*$/gm;
   const messages: SmsMessage[] = [];
   let match: RegExpExecArray | null;
   while ((match = header.exec(output)) !== null) {
     const index = Number.parseInt(match[1], 10);
     const senderRaw = match[2];
+    const toa = Number.parseInt(match[4], 10);
+    const length = Number.parseInt(match[5], 10);
     // A UCS-2 sender is hex, starting with "+" (002B) or a digit (003x).
     const sender =
-      senderRaw.length > 11 && (senderRaw.startsWith("002B") || senderRaw.startsWith("003"))
-        ? decodeHexText(senderRaw)
-        : decodeDecimalSender(senderRaw) ?? senderRaw;
-    const start = header.lastIndex;
+      toa === TOA_ALPHANUMERIC && /^\d+$/.test(senderRaw)
+        ? decodeDecimalSender(senderRaw)
+        : senderRaw.length > 11 && (senderRaw.startsWith("002B") || senderRaw.startsWith("003"))
+          ? decodeHexText(senderRaw)
+          : senderRaw;
+    // The body runs from the end of the header line to the next entry.
+    const start = output.indexOf("\n", header.lastIndex) + 1;
     const ends = [output.indexOf("+CMGL:", start), output.indexOf("+CSCA:", start)]
       .filter((i) => i !== -1);
     const end = ends.length ? Math.min(...ends) : output.length;
     const raw = output
       .substring(start, end)
-      .replace(/\n?OK\s*$/, "")
-      .trim();
-    const hex = hexPayload(raw);
+      .replace(/\s*OK\s*$/, "")
+      .replace(/^\r?\n|\r?\n$/g, "");
+    const compact = raw.replace(/\s+/g, "");
+    const isHex = length > 0 && compact.length === length * 2 && /^[0-9A-Fa-f]+$/.test(compact);
     messages.push({
       indexes: [index],
       sender,
-      content: decodeGsm7(hex ? decodeHexText(hex) : raw),
+      content: isHex ? decodeHexText(compact).trim() : decodeGsm7(raw.trim()),
       timestamp: inboxTimestamp(match[3]),
       storage,
     });
@@ -166,8 +167,20 @@ export function normalizeNumber(number: string): string {
   return compact.startsWith("+") ? `00${compact.slice(1)}` : compact;
 }
 
+/**
+ * Parts of at most `length` UTF-16 units. A character outside the BMP (an
+ * emoji) takes two units and never straddles two parts.
+ */
 export function splitParts(text: string, length = SMS_PART_LENGTH): string[] {
   const parts: string[] = [];
-  for (let i = 0; i < text.length; i += length) parts.push(text.substring(i, i + length));
+  let current = "";
+  for (const char of text) {
+    if (current.length + char.length > length) {
+      parts.push(current);
+      current = "";
+    }
+    current += char;
+  }
+  if (current) parts.push(current);
   return parts;
 }

@@ -42,6 +42,7 @@ import { imeiNvPayload, validateImei } from "@/lib/imei-utils";
 import { rebootModem } from "@/lib/modem-actions";
 import {
   DEFAULT_REBOOT_FORM,
+  INTERVAL_HOURS,
   WEEKDAYS,
   buildSchedule,
   describeSchedule,
@@ -148,13 +149,20 @@ function ScheduledRebootCard() {
                 </ToggleGroup>
                 {form.mode === "interval" ? (
                   <div className="grid gap-2">
-                    <Label htmlFor="reboot-hours">Hours between reboots</Label>
-                    <Input
-                      id="reboot-hours"
-                      inputMode="numeric"
-                      value={Number.isNaN(form.intervalHours) ? "" : String(form.intervalHours)}
-                      onChange={(e) => setForm({ ...form, intervalHours: Number.parseInt(e.target.value, 10) })}
-                    />
+                    <Label>Hours between reboots</Label>
+                    <Select
+                      value={String(form.intervalHours)}
+                      onValueChange={(v) => setForm({ ...form, intervalHours: Number(v) })}
+                    >
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {INTERVAL_HOURS.map((h) => (
+                          <SelectItem key={h} value={String(h)}>
+                            {h === 24 ? "24 (daily, at midnight)" : String(h)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 ) : (
                   <div className="grid gap-4 @md/main:grid-cols-3">
@@ -235,10 +243,16 @@ function ImeiCard() {
   const [busy, setBusy] = useState(false);
 
   const digits = value.trim();
-  const wellFormed = /^\d{15}$/.test(digits) && digits !== current;
   const luhnOk = validateImei(digits);
+  const writable = luhnOk && digits !== current;
 
   const write = async () => {
+    // Checked again here: the NV item is cleared first, so a bad value must
+    // never reach that point.
+    if (!validateImei(digits) || digits === current) {
+      toast.error("The IMEI must be 15 digits with a valid check digit");
+      return;
+    }
     setBusy(true);
     try {
       const clear = await sendAt("AT^NV=550,0");
@@ -277,11 +291,13 @@ function ImeiCard() {
           onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))}
         />
         {digits.length === 15 && !luhnOk && (
-          <p className="text-sm text-warning">The check digit does not match (Luhn).</p>
+          <p className="text-sm text-destructive">
+            The check digit does not match (Luhn): this is not a valid IMEI.
+          </p>
         )}
       </CardContent>
       <CardFooter>
-        <Button variant="outline" disabled={!wellFormed || busy} onClick={() => setStep("warning")}>
+        <Button variant="outline" disabled={!writable || busy} onClick={() => setStep("warning")}>
           Change IMEI
         </Button>
       </CardFooter>

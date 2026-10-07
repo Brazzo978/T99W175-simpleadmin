@@ -37,11 +37,13 @@ import {
 import { useNetworkSettings, type NetworkConfig } from "@/hooks/use-network-settings";
 import {
   LAN_MASKS,
+  dhcpRangeProblem,
   ipToNumber,
   isValidIp,
   isValidMac,
   maskPrefix,
   sameSubnet,
+  subnetBounds,
   suggestDhcpRange,
 } from "@/lib/ipv4";
 import { rebootModem } from "@/lib/modem-actions";
@@ -50,19 +52,20 @@ const MANUAL_MAC = "__manual__";
 
 function validate(c: NetworkConfig): string[] {
   const errors: string[] = [];
-  if (!isValidIp(c.ipAddress)) errors.push("Enter a valid LAN IP address.");
-  if (c.dhcpEnabled) {
-    if (!isValidIp(c.dhcpStart) || !isValidIp(c.dhcpEnd)) {
-      errors.push("Enter a valid DHCP range.");
-    } else {
-      if (!sameSubnet(c.ipAddress, c.dhcpStart, c.subnetMask) ||
-          !sameSubnet(c.ipAddress, c.dhcpEnd, c.subnetMask)) {
-        errors.push("The DHCP range must be in the LAN subnet.");
-      }
-      if (ipToNumber(c.dhcpStart) > ipToNumber(c.dhcpEnd)) {
-        errors.push("The DHCP range start must be lower than its end.");
-      }
+  if (!isValidIp(c.ipAddress)) {
+    errors.push("Enter a valid LAN IP address.");
+  } else {
+    const { network, broadcast } = subnetBounds(c.ipAddress, c.subnetMask);
+    const own = ipToNumber(c.ipAddress);
+    if (own === network || own === broadcast) {
+      errors.push("The LAN IP cannot be the network or broadcast address of its subnet.");
     }
+  }
+  if (c.dhcpEnabled) {
+    const problem = isValidIp(c.ipAddress)
+      ? dhcpRangeProblem(c.ipAddress, c.subnetMask, c.dhcpStart, c.dhcpEnd)
+      : null;
+    if (problem) errors.push(problem);
     const lease = Number(c.dhcpLease);
     if (!Number.isInteger(lease) || lease <= 0) {
       errors.push("The lease time must be a positive number of seconds.");

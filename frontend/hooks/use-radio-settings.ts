@@ -39,6 +39,9 @@ const READ_COMMAND =
 
 /** The SIM switch needs a moment before the modem answers again. */
 const SIM_SWITCH_SETTLE_MS = 5000;
+/** Attempts at restoring the network mode while the modem settles. */
+const SLMODE_RESTORE_ATTEMPTS = 3;
+const SLMODE_RESTORE_GAP_MS = 2000;
 
 export interface RadioSettings {
   bands: BandPrefs;
@@ -61,6 +64,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const fail = (result: AtResult, fallback: string): ActionResult => ({
   ok: false,
   message: result.message || fallback,
+});
+
+/** The first step went through, a follow-up did not: say both. */
+const partial = (result: AtResult, context: string): ActionResult => ({
+  ok: false,
+  message: result.message ? `${context} (${result.message})` : context,
 });
 
 export function useRadioSettings() {
@@ -163,10 +172,15 @@ export function useRadioSettings() {
         const r = await sendAt(simSlotCommand(slot));
         if (!r.ok) return fail(r, "Unable to switch SIM");
         await sleep(SIM_SWITCH_SETTLE_MS);
-        if (previousMode !== null) {
-          await sendAt(`AT^SLMODE=1,${previousMode}`);
+        if (previousMode === null) return { ok: true };
+        let restore: AtResult = { ok: false, output: "" };
+        for (let i = 0; i < SLMODE_RESTORE_ATTEMPTS && !restore.ok; i++) {
+          if (i > 0) await sleep(SLMODE_RESTORE_GAP_MS);
+          restore = await sendAt(`AT^SLMODE=1,${previousMode}`);
         }
-        return { ok: true };
+        return restore.ok
+          ? { ok: true }
+          : partial(restore, `SIM ${slot} is active, but restoring the network mode failed: set it again`);
       }),
     [run, data?.networkMode],
   );
@@ -220,8 +234,10 @@ export function useRadioSettings() {
       run(async () => {
         const r = await sendAt(lteLockCommand(cells));
         if (!r.ok) return fail(r, "Unable to apply the LTE lock");
-        await sendAt("AT^SLMODE=1,0");
-        return { ok: true };
+        const mode = await sendAt("AT^SLMODE=1,0");
+        return mode.ok
+          ? { ok: true }
+          : partial(mode, "The LTE lock is set, but the network mode could not be set to automatic");
       }),
     [run],
   );
@@ -231,8 +247,10 @@ export function useRadioSettings() {
       run(async () => {
         const r = await sendAt(nrLockCommand(lock));
         if (!r.ok) return fail(r, "Unable to apply the 5G SA lock");
-        await sendAt("AT^SLMODE=1,0");
-        return { ok: true };
+        const mode = await sendAt("AT^SLMODE=1,0");
+        return mode.ok
+          ? { ok: true }
+          : partial(mode, "The 5G SA lock is set, but the network mode could not be set to automatic");
       }),
     [run],
   );

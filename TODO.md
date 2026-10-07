@@ -57,5 +57,6 @@ pages removed from `frontend/` are re-imported from there when ported.
 - [ ] Verify QMI service rediscovery after an actual modem restart.
 - [ ] Remove the unused `cgi-bin/get_sys_info`?
 - [ ] `config/simpleadmin.conf` is readable without login and holds
-      `SIMPLEADMIN_GUI_TOGGLE_KEY`; the Tailscale auth key travels in a GET
-      query string. Both predate the new interface.
+      `SIMPLEADMIN_GUI_TOGGLE_KEY` (predates the new interface).
+- The Tailscale auth key travels in the GET query string of
+  `cgi-bin/tailscale`: risk accepted (2026-10-07).
