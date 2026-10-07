@@ -13,3 +13,8 @@ dist/
 .backup/scanner.html.20260101_211652.bak
 .backup/settings.html.20260101_211652.bak
 .backup/sms.html.20260101_211652.bak
+
+# diag_bridge is built in the T99W175-diag-json-bridge repository;
+# deploy/diag_bridge/bin/diag_bridge is a local symlink to it
+# (see deploy/diag_bridge/README.md)
+deploy/diag_bridge/bin/diag_bridge

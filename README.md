@@ -12,8 +12,8 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 
 ## Quick overview
 - Responsive HTML pages (Bootstrap 5 + Alpine.js) served from the modem web partition.
-- Bash CGI scripts in `www/cgi-bin/` that drive AT commands, Watchcat, TTL override, and utility actions.
-- Front-end settings via `www/config/simpleadmin.conf`, here you can enable or disable the login page and the esim configuration page,by default login is on , and esim is off
+- Bash CGI scripts in `deploy/www/cgi-bin/` that drive AT commands, the connection watchdog, TTL override, scheduled reboot and utility actions.
+- Front-end settings via `deploy/www/config/simpleadmin.conf`, here you can enable or disable the login page and the esim configuration page,by default login is on , and esim is off
 ```
 # SimpleAdmin configuration
 # Set to 0 to completely disable login and allow open access.
@@ -46,12 +46,12 @@ SIMPLEADMIN_ESIM_BASE_URL="http://localhost:8080/api/v1"
 ### Security notes
 
 - The default account is `admin` / `admin`: change its password after the first login. It is recreated only when no administrator account is left, and there is no default read-only account.
-- Passwords in `www/cgi-bin/credentials.txt` are stored as SHA-512 crypt hashes (`$6$salt$hash`, the `/etc/shadow` format, via `openssl passwd -6` or busybox `cryptpw`). A plaintext password left in the file from an older release still works and is replaced by its hash on the next successful login.
+- Passwords in `deploy/www/cgi-bin/credentials.txt` are stored as SHA-512 crypt hashes (`$6$salt$hash`, the `/etc/shadow` format, via `openssl passwd -6` or busybox `cryptpw`). A plaintext password left in the file from an older release still works and is replaced by its hash on the next successful login.
 - Accounts with the `user` role can only send read-only AT commands (queries, test commands, identification and the output-format settings the dashboard needs).
 - With `SIMPLEADMIN_ENABLE_LOGIN=0` every CGI endpoint runs with administrator rights for anyone who can reach the modem; `SIMPLEADMIN_CSRF_CHECK=1` keeps other websites from driving it through the browser, but it does not replace a password.
 
-Check [DOCUMENTAZIONE.md](DOCUMENTAZIONE.md) for file-by-file behavior, request flows, and how each page uses the CGI helpers.
-For the dedicated Tailscale integration documentation, see [Doc/Tailscale.md](Doc/Tailscale.md).
+Check [docs/Explaination.md](docs/Explaination.md) for file-by-file behavior, request flows, and how each page uses the CGI helpers.
+For the dedicated Tailscale integration documentation, see [docs/Tailscale.md](docs/Tailscale.md).
 
 ## GUI lock (maintenance mode)
 
@@ -63,7 +63,7 @@ How it works:
 - No extra "delay": the lock status is returned by the existing `/cgi-bin/session_status` request the UI already performs.
 
 ### Enable it
-1. Set a strong key in `www/config/simpleadmin.conf`:
+1. Set a strong key in `deploy/www/config/simpleadmin.conf`:
    - `SIMPLEADMIN_GUI_TOGGLE_KEY="use_a_long_random_string_here"`
 2. Deploy files to the modem (see Installation).
 
@@ -77,38 +77,38 @@ How it works:
 
 Notes:
 - The key is in the URL: it can end up in browser history, screenshots, and (depending on server setup) logs. Use a long random key and only on trusted networks.
-- If you lose the key, you can unlock by setting `SIMPLEADMIN_GUI_LOCKED=0` in `www/config/simpleadmin.conf` (or redeploying the stock config).
+- If you lose the key, you can unlock by setting `SIMPLEADMIN_GUI_LOCKED=0` in `deploy/www/config/simpleadmin.conf` (or redeploying the stock config).
 
 ---
 
 ## 📸 Screenshots
 
 ### Home
-![Home](Doc/MEDIA/Home.jpg)
+![Home](docs/media/Home.jpg)
 
 <details>
 <summary><b>More screenshots</b></summary>
 
 ### Device info
-![Device info](Doc/MEDIA/Device%20info.jpg)
+![Device info](docs/media/Device%20info.jpg)
 
 ### Advanced / CA
-![Advanced](Doc/MEDIA/Advanced.jpg)
-![CA](Doc/MEDIA/CA.jpg)
+![Advanced](docs/media/Advanced.jpg)
+![CA](docs/media/CA.jpg)
 
 ### Network
-![Network settings](Doc/MEDIA/Network%20settings.jpg)
-![Network Advisor](Doc/MEDIA/Network%20Advisor.jpg)
+![Network settings](docs/media/Network%20settings.jpg)
+![Network Advisor](docs/media/Network%20Advisor.jpg)
 
 ### System / User / Login
-![System Settings](Doc/MEDIA/System%20Settings.jpg)
-![User](Doc/MEDIA/User.jpg)
-![Login](Doc/MEDIA/Login.jpg)
+![System Settings](docs/media/System%20Settings.jpg)
+![User](docs/media/User.jpg)
+![Login](docs/media/Login.jpg)
 
 ### Tools
-![Ping](Doc/MEDIA/Ping.jpg)
-![Temp](Doc/MEDIA/Temp.jpg)
-![SMS](Doc/MEDIA/Sms.jpg)
+![Ping](docs/media/Ping.jpg)
+![Temp](docs/media/Temp.jpg)
+![SMS](docs/media/Sms.jpg)
 
 </details>
 
@@ -148,21 +148,42 @@ Browse to the GUI and use Simpleadmin
 
 ### Deploying from a workstation
 
+Everything that ends up on the modem lives in `deploy/`, one folder per
+module, each split by kind (`bin/`, `lib/`, `scripts/`, `systemd/`, ...):
+
+```
+deploy/
+  install-modem.sh       modem side of install.sh
+  www/                   web UI
+  diag_bridge/  curl/  jq/
+  ttl/  crontab/  watchdog/  euicc/  persistent-mac/  modem-config/
+  tailscale/             not pushed: the UI downloads it from GitHub
+```
+
 With SSH key access to the modem as `root`:
 
 ```bash
-./deploy-www.sh [HOST] --nologin|--login   # web UI into /WEBSERVER/www
-./deploy-sw-deps.sh [HOST] [COMPONENT...]  # binaries the UI relies on
+./install.sh [HOST] [--nologin|--login] [--noesim|--esim]
 ```
 
-`deploy-sw-deps.sh` installs every component by default, or only the ones
-named (`diag_bridge`, `curl`, `jq`, `tailscale`):
+It first checks that `HOST` (default `192.168.225.1`) really is a T99W175
+(hostname `sdxprairie`, `AT+CGMM` = `T99W175`, `/WEBSERVER` present) and
+refuses anything else, then installs everything in one go
+(`deploy/install-modem.sh` runs on the modem). Without flags the modem keeps
+its current `simpleadmin.conf` values and `credentials.txt`; the flags set
+`SIMPLEADMIN_ENABLE_LOGIN` / `SIMPLEADMIN_ENABLE_ESIM`.
 
-| Component | Source in this repo | On the modem |
+Binaries go to `/data/simpleadmin` (persistent UBIFS `usrfs`): the root
+filesystem has only a few MB free. Copies left in `/opt/simpleadmin` by older
+installs are removed.
+
+| What | Source in this repo | On the modem |
 |---|---|---|
-| `diag_bridge` | `usr/bin/diag_bridge`, `scripts/systemd/diag_bridge.service` | `/usr/bin/diag_bridge`, `/lib/systemd/system/diag_bridge.service` (enabled) |
-| `curl`, `jq` | `usr/bin/`, `usr/lib/` | `/opt/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
-| `tailscale` | `Tailscale/` | `/opt/simpleadmin/Tailscale` |
+| Web UI | `deploy/www/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
+| `diag_bridge` | `deploy/diag_bridge/`: `bin/diag_bridge` (symlink into the bridge repository, see its `README.md`), `systemd/diag_bridge.service` | `/data/simpleadmin/bin/diag_bridge` (~4 MB) linked from `/usr/bin/diag_bridge`, `/lib/systemd/system/diag_bridge.service` (enabled) |
+| `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
+| System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
+| `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
 
 ## 📡 Advanced Signal Details: AT-based or DIAG-based
 
@@ -171,16 +192,22 @@ The signal card opens *Advanced Signal Details*, whose header has an
 
 - **AT-based** parses `AT^DEBUG?` on every dashboard refresh.
 - **DIAG-based** reads the WebSocket pushed by `diag_bridge` on port 9001,
-  decoded from the Qualcomm DIAG interface. It adds per-antenna SINR,
-  modulation, MCS, TX antennas, DL throughput and NR SSB/beams/neighbours.
-  The stream is open only while the modal is visible. Secondary LTE cells
-  that the firmware does not log over DIAG are not shown in this mode.
+  decoded from the Qualcomm DIAG interface. Besides per-antenna SINR it shows,
+  per cell, a *Cell* row (TX antennas, Cell ID/TAC/PLMN when the firmware logs
+  them, NR SSB/beams/neighbours), a *DL* row (modulation, MCS, throughput,
+  BLER) and a *UL* row (LTE modulation/RB/throughput; NR MCS/PRB/throughput,
+  power headroom and maximum power). LTE SCells come from the RRC
+  configuration: this firmware does not measure them, so their RSRP/SINR read
+  N/A while bandwidth and throughput are shown. The stream is open only while
+  the modal is visible.
 
 The dashboard cards stay AT-based in both cases.
 
-`diag_bridge` is developed in its own repository (`T99W175-diag-json-bridge`);
-its `scripts/publish-to-simpleadmin.sh` builds it and copies the binary, the
-systemd unit and `usr/bin/diag_bridge.version` into this repository. The
+`diag_bridge` is developed in its own repository (`T99W175-diag-json-bridge`)
+and is not stored here: `deploy/diag_bridge/bin/diag_bridge` is a gitignored symlink to the
+binary in a checkout next to this one (`deploy/diag_bridge/README.md`). The bridge's
+`scripts/publish-to-simpleadmin.sh` builds it, creates the link and copies the
+systemd unit. The
 service listens on `bridge0` only (`-i bridge0`), so it is not reachable from
 the mobile network.
 
@@ -189,20 +216,20 @@ the mobile network.
 
 The Realtek **RTL8125** NIC inside the T99W175 ships **without a factory-programmed MAC**, so every reboot the kernel assigns `eth0` a fresh random MAC. To compound it, `QCMAP_ConnectionManager` then runs `system("ifconfig bridge0 hw ether <random>")` and gives `bridge0` *yet another* random MAC. Upstream routers see the modem as a new device on each boot — breaking DHCP reservations, MAC-based firewall rules, ARP-stable monitoring, etc.
 
-[`scripts/persistent-mac/`](scripts/persistent-mac/) provides an optional two-stage fix that pins both interfaces to the MAC declared in `/etc/data/mobileap_cfg.xml` `<EarlyEthMACAddr>`:
+[`deploy/persistent-mac/`](deploy/persistent-mac/) provides an optional two-stage fix that pins both interfaces to the MAC declared in `/etc/data/mobileap_cfg.xml` `<EarlyEthMACAddr>`:
 
 - **Stage 1** — udev rule fires on `r8125` driver-add → sets `eth0`'s MAC from the XML.
 - **Stage 2** — `/sbin/ifconfig` is replaced with a tiny wrapper that intercepts the exact `ifconfig bridge0 hw ether <random>` call QCMAP makes and substitutes the XML value. No QCMAP changes, no binary patches.
 
+`./install.sh` installs it (idempotently) with everything else; it applies at
+the next reboot:
+
 ```bash
-cd scripts/persistent-mac
-./install.sh                    # default host 192.168.225.1
-# reboot the modem to apply
 ssh root@192.168.225.1 'cat /sys/class/net/eth0/address && cat /sys/class/net/bridge0/address'
 # both should now equal the XML value, and stay equal across reboots
 ```
 
-To change the MAC fleet-wide, edit `<EarlyEthMACAddr>` in the XML and reboot — both the udev script and the wrapper re-read it. To remove the fix: `./install.sh --uninstall` (restores the original `/sbin/ifconfig`, removes the udev rule). See [`scripts/persistent-mac/README.md`](scripts/persistent-mac/README.md) for the full RE writeup (strace evidence, why busybox-direct invocation is required, why not flash the EEPROM).
+To change the MAC fleet-wide, edit `<EarlyEthMACAddr>` in the XML and reboot — both the udev script and the wrapper re-read it. Removal steps are in the module README. See [`deploy/persistent-mac/README.md`](deploy/persistent-mac/README.md) for the full RE writeup (strace evidence, why busybox-direct invocation is required, why not flash the EEPROM).
 
 
 ## 💬 Questions, Support & Requests
