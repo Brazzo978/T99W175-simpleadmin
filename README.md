@@ -46,7 +46,7 @@ SIMPLEADMIN_ESIM_BASE_URL="http://localhost:8080/api/v1"
 ### Security notes
 
 - The default account is `admin` / `admin`: change its password after the first login. It is recreated only when no administrator account is left, and there is no default read-only account.
-- Passwords in `deploy/www/cgi-bin/credentials.txt` are stored as SHA-512 crypt hashes (`$6$salt$hash`, the `/etc/shadow` format, via `openssl passwd -6` or busybox `cryptpw`). A plaintext password left in the file from an older release still works and is replaced by its hash on the next successful login.
+- Passwords in `deploy/www/cgi-bin/credentials.txt` are stored as SHA-512 crypt hashes (`$6$salt$hash`, the `/etc/shadow` format, via `openssl passwd -6` or busybox `cryptpw`). `./install.sh` converts any plaintext password left in the file to its hash; one that is still there (an install done by hand) works and is replaced by its hash on the next successful login.
 - Accounts with the `user` role can only send read-only AT commands (queries, test commands, identification and the output-format settings the dashboard needs).
 - With `SIMPLEADMIN_ENABLE_LOGIN=0` every CGI endpoint runs with administrator rights for anyone who can reach the modem; `SIMPLEADMIN_CSRF_CHECK=1` keeps other websites from driving it through the browser, but it does not replace a password.
 
@@ -170,7 +170,8 @@ It first checks that `HOST` (default `192.168.225.1`) really is a T99W175
 (hostname `sdxprairie`, `AT+CGMM` = `T99W175`, `/WEBSERVER` present) and
 refuses anything else, then installs everything in one go
 (`deploy/install-modem.sh` runs on the modem). Without flags the modem keeps
-its current `simpleadmin.conf` values and `credentials.txt`; the flags set
+its current `simpleadmin.conf` values and `credentials.txt` (plaintext passwords
+in it are converted to SHA-512 crypt); the flags set
 `SIMPLEADMIN_ENABLE_LOGIN` / `SIMPLEADMIN_ENABLE_ESIM`.
 
 Binaries go to `/data/simpleadmin` (persistent UBIFS `usrfs`): the root

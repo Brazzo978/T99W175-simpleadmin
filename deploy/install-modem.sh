@@ -92,6 +92,68 @@ conf_value() {
   sed -n "s/^$2=//p" "$1"
 }
 
+# SHA-512 crypt, exactly as cgi-bin/session_utils.sh does it, so the UI
+# verifies what we write.
+crypt_sha512() {
+  if command -v openssl >/dev/null 2>&1; then
+    printf '%s\n' "$1" | openssl passwd -6 -salt "$2" -stdin
+  elif command -v cryptpw >/dev/null 2>&1; then
+    printf '%s' "$1" | cryptpw -m sha512 -S "$2"
+  else
+    return 1
+  fi
+}
+
+new_salt() {
+  salt="$(openssl rand -base64 24 2>/dev/null | tr -dc 'A-Za-z0-9./' | cut -c1-16)"
+  [ "${#salt}" -ge 16 ] || salt="$(hexdump -n 8 -v -e '/1 "%02x"' /dev/urandom)"
+  printf '%s' "$salt"
+}
+
+# Hashes the passwords credentials.txt (username:role:password) still holds
+# in plaintext; the UI would only do it at each account's next login. Every
+# hash is checked against its own salt before the file is replaced, and no
+# password is ever printed.
+hash_credentials() {
+  file="$1"
+  plain=0
+  : > "$file.tmp"
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ''|'#'*) printf '%s\n' "$line" >> "$file.tmp"; continue ;;
+    esac
+    user="${line%%:*}"
+    rest="${line#*:}"
+    role="${rest%%:*}"
+    pw="${rest#*:}"
+    case "$pw" in
+      '$6$'*) printf '%s\n' "$line" >> "$file.tmp"; continue ;;
+    esac
+    salt="$(new_salt)"
+    hashed="$(crypt_sha512 "$pw" "$salt" 2>/dev/null || true)"
+    case "$hashed" in
+      '$6$'*) ;;
+      *) rm -f "$file.tmp"; warn "🔑 cannot hash passwords here: left as they are (hashed at next login)"; return 0 ;;
+    esac
+    if [ "$(crypt_sha512 "$pw" "$salt")" != "$hashed" ]; then
+      rm -f "$file.tmp"
+      warn "🔑 password hash check failed: credentials.txt left as it is"
+      return 0
+    fi
+    printf '%s:%s:%s\n' "$user" "$role" "$hashed" >> "$file.tmp"
+    plain=$((plain + 1))
+    info "🔑 $user: plaintext password hashed"
+  done < "$file"
+  if [ "$plain" = 0 ]; then
+    rm -f "$file.tmp"
+    info "🔑 all passwords already hashed"
+    return 0
+  fi
+  chmod "$(stat -c %a "$file")" "$file.tmp"
+  mv -f "$file.tmp" "$file"
+  ok "🔑 $plain plaintext password(s) converted to SHA-512 crypt"
+}
+
 # Enables or disables a unit and checks that it took: a unit that is not
 # enabled silently stops at the next reboot.
 unit_state() {
@@ -187,6 +249,7 @@ if [ -f "$WEB/cgi-bin/credentials.txt" ]; then
 else
   info "🔑 no previous credentials.txt: shipped default"
 fi
+hash_credentials "$WEB.new/cgi-bin/credentials.txt"
 
 # Swap with the old tree kept aside until the server is back: whatever
 # happens, the modem is left serving a complete UI.

@@ -115,7 +115,7 @@ Session and accounts:
 - `session_status`: reports whether the browser is logged in, its role, and the GUI lock state.
 - `logout`: invalidates the session and expires the cookie.
 - `manage_credentials`: admin management of the accounts in `credentials.txt` (SHA-512 crypt hashes).
-- `credentials.txt` / `credentials.stock`: accounts (`username:role:password`) and the shipped default (`admin:admin:admin`, to change); `install.sh` keeps the existing `credentials.txt`.
+- `credentials.txt` / `credentials.stock`: accounts (`username:role:password`) and the shipped default (`admin:admin:admin`, to change); `install.sh` keeps the existing `credentials.txt` and hashes any plaintext password in it.
 - `login_config`: reads `SIMPLEADMIN_ENABLE_LOGIN` for the front end.
 - `gui_toggle`: locks or unlocks the GUI with `SIMPLEADMIN_GUI_TOGGLE_KEY` (see the README).
 
