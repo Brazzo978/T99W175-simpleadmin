@@ -207,6 +207,9 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
   listens and the tab is visible, and turns the diag_bridge / system_bridge
   messages into the `ModemStatus` structure the QManager components expect
   (DIAG first, QMI as completion and fallback).
+- The header shows the two bridges (**DIAG**, **SYS**) with their state and
+  the radio source. It only watches: on pages without live data they read
+  *standby*, and *Check now* connects both for a few seconds.
 - Login uses the SimpleAdmin sessions (`authenticate`, `session_status`,
   `logout`). AT commands go through `get_atcommand` (read-only for non-admin
   accounts), the AT terminal through `user_atcommand`.

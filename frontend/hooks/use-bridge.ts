@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { getState, subscribe, type BridgeState } from "@/lib/bridge/store";
+import {
+  getState,
+  subscribe,
+  subscribePassive,
+  type BridgeState,
+} from "@/lib/bridge/store";
 
 // Prerender (static export) has no sockets: it sees the empty initial state.
 const serverState = getState();
@@ -13,6 +18,14 @@ const serverState = getState();
  */
 export function useBridgeState(): BridgeState {
   return useSyncExternalStore(subscribe, getState, () => serverState);
+}
+
+/**
+ * Bridge state without connecting: it follows whatever the page itself
+ * uses, and shows the links as idle when nothing needs the bridges.
+ */
+export function useBridgeStatePassive(): BridgeState {
+  return useSyncExternalStore(subscribePassive, getState, () => serverState);
 }
 
 /**

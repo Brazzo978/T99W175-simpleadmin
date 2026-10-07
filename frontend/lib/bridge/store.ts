@@ -57,6 +57,9 @@ let state: BridgeState = {
 };
 
 const listeners = new Set<() => void>();
+// Passive listeners see every update but do not keep the sockets open: the
+// bridge status in the header uses them, so it never makes the bridges poll.
+const passiveListeners = new Set<() => void>();
 const sockets: Record<Kind, WebSocket | null> = { diag: null, system: null };
 const timers: Record<Kind, ReturnType<typeof setTimeout> | null> = {
   diag: null,
@@ -73,6 +76,7 @@ let visibilityHooked = false;
 function setState(patch: Partial<BridgeState>) {
   state = { ...state, ...patch };
   listeners.forEach((listener) => listener());
+  passiveListeners.forEach((listener) => listener());
 }
 
 function linkKey(kind: Kind) {
@@ -224,6 +228,19 @@ export function subscribe(listener: () => void): () => void {
     // Let a page transition re-subscribe before tearing the sockets down.
     setTimeout(syncConnections, 0);
   };
+}
+
+export function subscribePassive(listener: () => void): () => void {
+  passiveListeners.add(listener);
+  return () => {
+    passiveListeners.delete(listener);
+  };
+}
+
+/** Keeps both bridges connected for `ms`, then lets them go. */
+export function holdConnections(ms: number): void {
+  const release = subscribe(() => {});
+  setTimeout(release, ms);
 }
 
 export function getState(): BridgeState {

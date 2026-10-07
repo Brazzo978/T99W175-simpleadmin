@@ -21,6 +21,7 @@ import {
 
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/app-sidebar";
+import { BridgeStatus } from "@/components/bridge-status";
 import { useBreadcrumbs } from "@/hooks/use-breadcrumbs";
 import { useSession } from "@/hooks/use-auth";
 import { useAutoLogout } from "@/hooks/use-auto-logout";
@@ -80,6 +81,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 ))}
               </BreadcrumbList>
             </Breadcrumb>
+          </div>
+          <div className="ml-auto px-4">
+            <BridgeStatus />
           </div>
         </header>
         <motion.div
