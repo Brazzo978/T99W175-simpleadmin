@@ -128,10 +128,6 @@ function processAllInfos() {
     memPercent: 0,
     // Last update timestamp
     lastUpdate: new Date().toLocaleString(),
-    // New refresh rate to apply
-    newRefreshRate: null,
-    // Current refresh rate in seconds
-    refreshRate: 10,
     // NR (5G) download speed
     nrDownload: "0",
     // NR (5G) upload speed
@@ -235,14 +231,12 @@ function processAllInfos() {
     /**
      * Resets component data to defaults with optional overrides.
      *
-     * Preserves refresh rate and interval ID while resetting all other values.
+     * Preserves the interval ID and SIM prompt state while resetting all other values.
      *
      * @param {Object} [overrides={}] - Optional data overrides to apply
      */
     resetData(overrides = {}) {
       const preservedState = {
-        refreshRate: this.refreshRate,
-        newRefreshRate: this.newRefreshRate,
         intervalId: this.intervalId,
         simPin: this.simPin,
         simPinDisableMode: this.simPinDisableMode,
@@ -1624,20 +1618,6 @@ function processAllInfos() {
     this.memPercent = parseInt(data.mem_percent) || 0;
   },
 
-  updateRefreshRate() {
-    // Check if the refresh rate is less than 5
-    if (this.newRefreshRate < 5) {
-      this.newRefreshRate = 5;
-    }
-    // Set the refresh rate
-    this.refreshRate = this.newRefreshRate;
-    console.log("Refresh Rate Updated to " + this.refreshRate);
-    // Store the refresh rate in local storage or session storage
-    localStorage.setItem("refreshRate", this.refreshRate);
-    // Initialize with the new refresh rate, skipping localStorage read since we just set it
-    this.init(true);
-  },
-
   copyToClipboard(text) {
     // Check if we're inside a modal
     const modal = document.querySelector('.modal.show');
@@ -2675,14 +2655,17 @@ function processAllInfos() {
     return `${Math.round(value * 10) / 10}`;
   },
 
-  init(skipLocalStorage = false) {
+  init() {
     // Clear any existing interval before creating a new one
     if (this.intervalId) {
       clearInterval(this.intervalId);
     }
-    if (!skipLocalStorage) {
-      const storedRefreshRate = localStorage.getItem("refreshRate");
-      this.refreshRate = storedRefreshRate ? parseInt(storedRefreshRate) : 10;
+    // Settings of the polling era: the dashboard is pushed now.
+    try {
+      localStorage.removeItem("refreshRate");
+      localStorage.removeItem("signalSource");
+    } catch (_) {
+      // Storage unavailable: nothing to clean.
     }
     // Everything on the dashboard is pushed by the two bridges; the only
     // request left is the LAN address, read once.
