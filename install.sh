@@ -70,23 +70,41 @@ echo "${C_W}🚀 SimpleAdmin installer → $TARGET${C_0}"
 
 # ---------------------------------------------------------------- payload
 section "📦 Payload"
-VERSION="$(sed -n 's/.*APP_VERSION = "\(.*\)".*/\1/p' deploy/www/js/app-version.js)"
+VERSION="$(sed -n 's/^- Current-Version: `\(.*\)`.*/\1/p' VERSION.md)"
 ok "🌐 web UI $VERSION"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 cp -R deploy/. "$STAGE/"
+printf '%s\n' "$VERSION" > "$STAGE/www/VERSION"
 # Documentation stays here; Tailscale is downloaded from GitHub by the UI
 # (cgi-bin/tailscale-helper), not pushed.
 rm -rf "$STAGE/tailscale"
 find "$STAGE" -name '*.md' -delete
 info "📚 documentation and the Tailscale payload left out"
+# The web UI is built from frontend/ (frontend/build.sh) into the versioned
+# deploy/www-app; it joins the classic pages and the CGIs of deploy/www.
+if [ -f deploy/www-app/BUILD ]; then
+  cp -R "$STAGE/www-app/." "$STAGE/www/"
+  rm -f "$STAGE/www/BUILD"
+  if [ -n "$(find frontend/app frontend/components frontend/hooks frontend/lib \
+      frontend/locales frontend/types -newer deploy/www-app/BUILD -type f | head -1)" ]; then
+    warn "🖥️  frontend sources are newer than deploy/www-app: run frontend/build.sh"
+  else
+    ok "🖥️  web app $(cat deploy/www-app/BUILD)"
+  fi
+else
+  warn "🖥️  deploy/www-app is missing: run frontend/build.sh (classic pages only)"
+fi
+rm -rf "$STAGE/www-app"
 # busybox httpd serves file.gz to browsers that accept gzip: a third of the
 # bytes on every page load, less work for the modem's single core.
 gz_before=$(find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/config/*' \
-  \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.svg' -o -name '*.json' \) \
+  \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.svg' -o -name '*.json' \
+     -o -name '*.txt' \) \
   -size +1k -printf '%s\n' | awk '{s+=$1} END {print s+0}')
 find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/config/*' \
-  \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.svg' -o -name '*.json' \) \
+  \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.svg' -o -name '*.json' \
+     -o -name '*.txt' \) \
   -size +1k -exec gzip -9 -n -k {} +
 gz_after=$(find "$STAGE/www" -type f -name '*.gz' -printf '%s\n' | awk '{s+=$1} END {print s+0}')
 ok "🗜️  text assets precompressed: $((gz_before / 1024)) KB → $((gz_after / 1024)) KB served"

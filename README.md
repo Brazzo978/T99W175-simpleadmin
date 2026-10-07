@@ -4,6 +4,7 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 
 ## Credits and thanks
 - Original project: [iamromulan](https://github.com/iamromulan) – repo: [quectel-rgmii-toolkit](https://github.com/iamromulan/quectel-rgmii-toolkit).
+- The new web interface (`frontend/`) is based on [QManager](https://github.com/dr-dolomite/QManager-RM520N) by [DrDolomite](https://github.com/dr-dolomite), MIT License with the Commons Clause condition (`frontend/LICENSE`): it may be used, modified and shared, not sold.
 - Core contributors for scripts, testing, and troubleshooting:
   - [1alessandro1](https://github.com/1alessandro1)
   - [stich86](https://github.com/stich86)
@@ -11,6 +12,7 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 
 
 ## Quick overview
+- A new web interface (Next.js static export, React + shadcn/ui, English and Italian) under `frontend/`, being ported from QManager: see [New web interface](#-new-web-interface). Pages not ported yet are the classic ones below, linked from its sidebar.
 - Responsive HTML pages (Bootstrap 5 + Alpine.js) served from the modem web partition.
 - Bash CGI scripts in `deploy/www/cgi-bin/` that drive AT commands, the connection watchdog, TTL override, scheduled reboot and utility actions.
 - Front-end settings via `deploy/www/config/simpleadmin.conf`, here you can enable or disable the login page and the esim configuration page,by default login is on , and esim is off
@@ -154,7 +156,8 @@ module, each split by kind (`bin/`, `lib/`, `scripts/`, `systemd/`, ...):
 ```
 deploy/
   install-modem.sh       modem side of install.sh
-  www/                   web UI
+  www/                   classic pages and the CGIs
+  www-app/               new web interface, built from frontend/
   diag_bridge/  system_bridge/  curl/  jq/
   ttl/  crontab/  watchdog/  euicc/  persistent-mac/  modem-config/
   tailscale/             not pushed: the UI downloads it from GitHub
@@ -184,11 +187,39 @@ installs are removed.
 
 | What | Source in this repo | On the modem |
 |---|---|---|
-| Web UI | `deploy/www/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
+| Web UI | `deploy/www/` plus the built `deploy/www-app/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
 | `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled) |
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
 | `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
+
+## 🖥 New web interface
+
+`frontend/` is a fork of the [QManager](https://github.com/dr-dolomite/QManager-RM520N)
+frontend (upstream commit `7a7007c`), rebuilt on this project's backend:
+QManager polls Quectel AT commands through a shell poller, which the T99W175
+neither understands nor needs. Here the pages read the two WebSocket bridges
+(below) and the existing CGIs:
+
+- `lib/bridge/` keeps one shared socket per bridge, open only while a page
+  listens and the tab is visible, and turns the diag_bridge / system_bridge
+  messages into the `ModemStatus` structure the QManager components expect
+  (DIAG first, QMI as completion and fallback, as in the classic dashboard).
+- Login uses the SimpleAdmin sessions (`authenticate`, `session_status`,
+  `logout`); user actions that need AT go through `user_atcommand`.
+- Ported so far: dashboard, login, About, reboot countdown. Every other page
+  is still the classic one (the old dashboard is `classic.html`), linked from
+  the sidebar. What is left is in `TODO.md`.
+
+Build it with Node.js 20+:
+
+```bash
+frontend/build.sh            # npm ci on first run, next build, copy to deploy/www-app
+```
+
+The output in `deploy/www-app/` is versioned (like the system_bridge binary),
+so `./install.sh` needs no Node.js; it warns when the frontend sources are
+newer than the last build. About 0.9 MB gzipped on the modem.
 
 ## 📡 Live data: diag_bridge and system_bridge
 

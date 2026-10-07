@@ -1,0 +1,13 @@
+# Dependencies and build output (published to deploy/www-app by build.sh)
+/node_modules
+/.next/
+/out/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Logs and local files
+npm-debug.log*
+.env*
+.DS_Store

@@ -111,32 +111,31 @@ cat <<EOF
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Simple T99</title>
     <meta http-equiv="Cache-Control" content="no-store" />
-    <link rel="stylesheet" href="/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="/css/custom-styles.css" />
+    <title>Simple T99</title>
+    <style>
+      :root { color-scheme: light dark; --bg: #f7f7f8; --card: #fff; --fg: #18181b; --muted: #71717a; --border: #e4e4e7; --accent: #2563eb; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #09090b; --card: #18181b; --fg: #fafafa; --muted: #a1a1aa; --border: #27272a; }
+      }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg);
+             color: var(--fg); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+      main { width: min(28rem, calc(100% - 2rem)); background: var(--card); border: 1px solid var(--border);
+             border-radius: 12px; padding: 2rem; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.75rem; }
+      a { display: inline-block; margin: 0.5rem 0.5rem 0.75rem 0; padding: 0.4rem 0.9rem; border-radius: 8px;
+          border: 1px solid var(--border); color: var(--fg); text-decoration: none; }
+      a.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      small { color: var(--muted); }
+    </style>
   </head>
-  <body data-require-auth="false">
-    <main class="container py-5">
-      <div class="row justify-content-center">
-        <div class="col-lg-7 col-md-9">
-          <div class="card shadow-sm">
-            <div class="card-header">
-              <strong>GUI Toggle</strong>
-            </div>
-            <div class="card-body">
-              <p class="mb-2">Current state: <strong>$(html_escape "$locked_label")</strong></p>
-              <p class="mb-0">
-                <a class="btn btn-primary btn-sm" href="/">Go to home</a>
-                <a class="btn btn-outline-secondary btn-sm" href="/webguioff.html">Locked page</a>
-              </p>
-            </div>
-            <div class="card-footer text-body-secondary">
-              <small>Tip: use <code>?mode=lock</code> or <code>?mode=unlock</code> for explicit behavior.</small>
-            </div>
-          </div>
-        </div>
-      </div>
+  <body>
+    <main>
+      <h1>GUI Toggle</h1>
+      <p>Current state: <strong>$(html_escape "$locked_label")</strong></p>
+      <a class="primary" href="/">Go to home</a>
+      <a href="/webguioff.html">Locked page</a><br />
+      <small>Tip: use <code>?mode=lock</code> or <code>?mode=unlock</code> for explicit behavior.</small>
     </main>
   </body>
 </html>

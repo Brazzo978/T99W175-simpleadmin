@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,31713,e=>{"use strict";var o=e.i(43476),t=e.i(71645);function c(){return(0,t.useEffect)(()=>{window.location.replace("/dashboard/")},[]),(0,o.jsx)("div",{className:"bg-background min-h-svh"})}e.s(["default",()=>c])}]);

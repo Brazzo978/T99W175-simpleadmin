@@ -271,7 +271,7 @@ rm -rf "$WEB.old"
 systemctl is-active qcmap_httpd.service >/dev/null || fail "qcmap_httpd is not running"
 conf="$WEB/config/simpleadmin.conf"
 ok "▶️  qcmap_httpd running"
-ok "🌐 $(sed -n 's/.*APP_VERSION = "\(.*\)".*/\1/p' "$WEB/js/app-version.js") in $WEB" \
+ok "🌐 $(cat "$WEB/VERSION" 2>/dev/null) in $WEB" \
   "(login $(conf_value "$conf" SIMPLEADMIN_ENABLE_LOGIN), eSIM $(conf_value "$conf" SIMPLEADMIN_ENABLE_ESIM))"
 
 # ---------------------------------------------------------------- binaries
