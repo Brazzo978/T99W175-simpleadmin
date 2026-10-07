@@ -1094,14 +1094,9 @@
                 <div class="d-flex flex-wrap align-items-center gap-2 small mb-3">
                   <span
                     class="badge"
-                    :class="diagStatus === 'connected' ? 'bg-success' : (diagStatus === 'connecting' ? 'bg-warning text-dark' : 'bg-danger')"
-                    x-text="diagStatusLabel()"
-                  ></span>
-                  <span
-                    class="badge"
-                    :class="radioSource === 'diag' ? 'bg-success' : (radioSource === 'qmi' ? 'bg-warning text-dark' : 'bg-secondary')"
+                    :class="radioSource === 'diag' ? 'bg-success' : (radioSource === 'qmi' ? 'bg-warning text-dark' : 'bg-danger')"
                     :title="radioSourceTitle()"
-                    x-text="'Source: ' + radioSourceLabel()"
+                    x-text="radioSource === 'qmi' ? 'QMI data' : diagStatusLabel()"
                   ></span>
                   <template x-if="diagSummary">
                     <span

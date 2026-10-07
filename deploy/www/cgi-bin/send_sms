@@ -92,6 +92,20 @@ fi
 send_sms() {
     local phone="$1"
     local msg="$2"
+    # The serialized client (system_bridge) answers the "> " prompt itself
+    # and holds the AT channel lock for the whole exchange.
+    # Checked through the link, never by running the client: the firmware's
+    # one would send any argument to the modem as a command.
+    if [ "$(basename "$(readlink -f "$(command -v atcli_smd8)")")" = system_bridge ]; then
+        atcli_smd8 'AT+CMGF=1;+CSCS="UCS2";+CSMP=17,167,0,8' >/dev/null 2>&1
+        local response
+        response=$(atcli_smd8 -t 60 -p "$msg" "AT+CMGS=\"${phone}\"" 2>&1)
+        echo "$response"
+        echo "$response" | grep -qiE "CMGS:|OK"
+        return
+    fi
+
+    # Firmware client: talk to the device directly.
     local device="/dev/smd8"
 
     # Configure serial port

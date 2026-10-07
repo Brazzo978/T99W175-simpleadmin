@@ -213,6 +213,14 @@ LTE SCells come from the RRC configuration (or QMI): this firmware does not
 measure them, so their RSRP/SINR read N/A. Both sockets close while the tab is
 hidden, and the bridges only poll the modem while someone is connected.
 
+`system_bridge` is also the AT client: `/usr/bin/atcli_smd8` links to it
+(the firmware's client is kept as `/usr/bin/atcli_smd8.real`). It takes an
+exclusive lock on the AT channel and drains what an earlier caller left
+unread before each command, so the CGIs (AT terminal, PIN, SMS, band lock,
+...), `modem_config` and the watchdog no longer interleave on the channel
+and read each other's answers. `atcli_smd8 -p TEXT` sends TEXT plus Ctrl-Z
+at the `> ` prompt (`AT+CMGS`).
+
 The WebSockets follow the same rules as the CGIs (`session_utils.sh`): a page
 from another site is refused (Origin check), a locked GUI refuses everyone,
 and with login enabled the `simpleadmin_session` cookie must name a live

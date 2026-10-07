@@ -411,6 +411,32 @@ install_daemon() {
 install_daemon diag_bridge
 install_daemon system_bridge
 
+# ---------------------------------------------------------------- AT client
+# system_bridge is also the serialized AT client: /usr/bin/atcli_smd8 links
+# to it (the firmware's client is kept once as atcli_smd8.real), so the
+# CGIs, modem_config and the watchdog all share one lock on the AT channel
+# instead of interleaving and reading each other's answers.
+section "📟 AT client"
+if [ -x "$BASE/bin/system_bridge" ]; then
+  if [ -e /usr/bin/atcli_smd8.real ] || [ -L /usr/bin/atcli_smd8.real ]; then
+    info "💾 /usr/bin/atcli_smd8.real already holds the firmware's client"
+  elif [ -f /usr/bin/atcli_smd8 ] && [ ! -L /usr/bin/atcli_smd8 ]; then
+    cp -a /usr/bin/atcli_smd8 /usr/bin/atcli_smd8.real
+    ok "💾 firmware client saved as /usr/bin/atcli_smd8.real"
+  fi
+  link "$BASE/bin/system_bridge" /usr/bin/atcli_smd8
+  if /usr/bin/atcli_smd8 -V 2>/dev/null | grep -q system_bridge &&
+     /usr/bin/atcli_smd8 -t 5 AT 2>/dev/null | tr -d '\r' | grep -qx OK; then
+    ok "🧪 atcli_smd8 AT answers OK"
+  else
+    err "the serialized client does not answer: firmware client restored"
+    [ -e /usr/bin/atcli_smd8.real ] && install_file /usr/bin/atcli_smd8.real 755 /usr/bin/atcli_smd8
+  fi
+elif [ -e /usr/bin/atcli_smd8.real ]; then
+  install_file /usr/bin/atcli_smd8.real 755 /usr/bin/atcli_smd8
+  warn "no system_bridge: firmware AT client restored"
+fi
+
 # ---------------------------------------------------------------- services
 section "▶️  Services"
 systemctl daemon-reload
