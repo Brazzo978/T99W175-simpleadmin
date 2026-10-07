@@ -189,10 +189,12 @@ function processAllInfos() {
     // SIM unlock prompt modal (first time only)
     showSimUnlockPrompt: false,
     simUnlockPromptDismissed: false,
-    // Advanced signal modal data source: "at" (AT^DEBUG? polling) or "diag"
-    // (diag_bridge WebSocket push). Only the modal follows it; the dashboard
-    // cards stay AT-based.
-    signalSource: "at",
+    // Data comes from two WebSockets: diag_bridge (radio, port 9001) and
+    // system_bridge (QMI modem data, system status, connectivity, port 9002).
+    // radioSource says where the radio data on screen comes from: "diag",
+    // "qmi" (system_bridge, when diag_bridge is not connected) or "none".
+    radioSource: "none",
+    sysStatus: "idle",
     diagSignals: [],
     diagNetworkAnalysis: null,
     diagSummary: null,
@@ -214,14 +216,17 @@ function processAllInfos() {
     signalHistory: [],
   };
 
-  // diag_bridge WebSocket state lives outside the reactive data: Alpine would
-  // wrap the socket in a proxy.
+  // Bridge sockets and their last messages live outside the reactive data:
+  // Alpine would wrap them in proxies.
   const DIAG_WS_PORT = 9001;
-  const DIAG_RECONNECT_MS = 3000;
-  let diagSocket = null;
-  let diagReconnectTimer = null;
-  let diagModalOpen = false;
-  let diagModalHooked = false;
+  const SYS_WS_PORT = 9002;
+  const BRIDGE_RECONNECT_MS = 3000;
+  const DIAG_STALE_MS = 6000;      // radio falls back to QMI past this
+  const SYS_STALE_MS = 10000;      // no system_bridge data: dashboard fallback
+  const HISTORY_EVERY_MS = 10000;  // signal chart sample period
+  const bridgeSockets = { diag: null, sys: null };
+  const bridgeTimers = { diag: null, sys: null };
+  const bridgeLast = { diag: null, diagAt: 0, sys: null, sysAt: 0 };
 
   return {
     // Spread default state as component data
@@ -244,7 +249,8 @@ function processAllInfos() {
         showSimUnlockPrompt: this.showSimUnlockPrompt,
         simUnlockPromptDismissed: this.simUnlockPromptDismissed,
         simPinHasBeenUnlocked: this.simPinHasBeenUnlocked,
-        signalSource: this.signalSource,
+        radioSource: this.radioSource,
+        sysStatus: this.sysStatus,
         diagSignals: this.diagSignals,
         diagNetworkAnalysis: this.diagNetworkAnalysis,
         diagSummary: this.diagSummary,
@@ -286,1541 +292,26 @@ function processAllInfos() {
       internetConnectionStatus: "Disconnected",
     });
   },
-  async fetchAllInfo() {
-    // First check if SIM is present
-    const simCheckCmd = 'AT+CPIN?';
-
-    try {
-      const simCheckResult = await ATCommandService.execute(simCheckCmd, {
-        retries: 2,
-        timeout: 5000,
-      });
-
-      let simReady = false;
-      let simStatusText = "No SIM";
-
-      if (simCheckResult.ok && simCheckResult.data) {
-        const simStatus = simCheckResult.data.trim();
-        simReady = simStatus.includes('READY');
-
-        // If SIM is ready, it means it has been unlocked at some point
-        if (simReady) {
-          this.simPinHasBeenUnlocked = true;
-        }
-
-        // Extract and normalize SIM status
-        if (simStatus.includes('CPIN:')) {
-          const pinStatus = simStatus.split(':')[1].trim();
-          if (pinStatus === 'READY') {
-            simStatusText = 'Active';
-          } else if (pinStatus.includes('SIM PIN')) {
-            simStatusText = 'PIN Locked';
-          } else if (pinStatus.includes('SIM PUK')) {
-            simStatusText = 'PUK Locked';
-          } else {
-            simStatusText = pinStatus;
-          }
-        } else {
-          simStatusText = "No SIM";
-        }
-      }
-      
-      // If SIM is not ready, get basic info only
-      if (!simReady) {
-        console.warn("SIM not ready:", simStatusText);
-        // Get basic info that doesn't require SIM (temperature + slot)
-        const basicCmd = 'AT^TEMP?;^SWITCH_SLOT?';
-        
-        let tempValue = "0";
-        let simSlot = "No SIM Detected";
-        
-        try {
-          const basicResult = await ATCommandService.execute(basicCmd, {
-            retries: 2,
-            timeout: 10000,
-          });
-          
-          if (basicResult.ok && basicResult.data) {
-            const lines = basicResult.data.split("\n");
-            // Temperature
-            try {
-              tempValue = lines
-                .find((line) => line.includes('TSENS:'))
-                .split(":")[1]
-                .replace(/"/g, "");
-            } catch (error) {
-              try {
-                tempValue = lines
-                  .find((line) => line.includes('TSENS:'))
-                  .split(",")[1]
-                  .replace(/"/g, "");
-              } catch (error2) {
-                tempValue = "0";
-              }
-            }
-            // Active SIM slot
-            try {
-              const current_sim = lines
-                .find((line) => line.includes("ENABLE"))
-                .split(" ")[0]
-                .replace(/\D/g, "");
-              if (current_sim == 1) {
-                simSlot = "SIM 1 (No SIM Detected)";
-              } else if (current_sim == 2) {
-                simSlot = "SIM 2 (No SIM Detected)";
-              } else {
-                simSlot = "Unknown Slot (No SIM Detected)";
-              }
-            } catch (error) {
-              simSlot = "Unknown Slot (No SIM Detected)";
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching basic info:", error);
-        }
-        
-      this.resetData({
-        simStatus: simStatusText,
-        activeSim: simSlot,
-        signalAssessment: "Unknown",
-        internetConnectionStatus: "Disconnected",
-        networkProvider: "N/A",
-        apn: "Not Available",
-        networkMode: "Not Available",
-        networkModeBadges: [],
-        bands: "Not Available",
-        temperature: tempValue,
-        decimalCellId: null
-      });
-
-      // Check if we should show SIM unlock prompt (only once per session)
+  /**
+   * Reads the LAN address once per page: it only changes from the network
+   * settings page, which reloads the dashboard anyway.
+   */
+  fetchLanIpOnce() {
+    if (this.lanIpLoaded) {
       this.checkSimUnlockPrompt();
-
       return;
-      }
-      // SIM is ready, execute full command set
-      this.atcmd =
-        'AT^TEMP?;^SWITCH_SLOT?;+CGPIAF=1,1,1,1;^DEBUG?;+CPIN?;+CGCONTRDP=1;$QCSIMSTAT?;+COPS?;+CIMI;+ICCID;+CNUM;+CSCS=\"GSM\";+CGMI;+CGMM;^VERSION?;+CGSN';
-
-      const result = await ATCommandService.execute(this.atcmd, {
-        retries: 3,
-        timeout: 15000,
-      });
-
-      if (!result.ok) {
-        const fallbackMessage = result.error
-          ? result.error.message
-          : 'Invalid AT Response.';
-
-        this.applyFallback(fallbackMessage);
-        return;
-      }
-
-      const rawdata = result.data;
-
-      if (!rawdata || !rawdata.trim()) {
-        this.applyFallback('Emtpy AT Response from Modem.');
-        return;
-      }
-
-      if (rawdata.includes('ERROR')) {
-        this.applyFallback('Modem is in error state.');
-        return;
-      }
-
-      try {
-          const lines = rawdata.split("\n");
-
-          console.log(lines);
-
-          const buildDetailedSignals = () => {
-            const details = [];
-            let currentEntry = null;
-            let scellCounter = 0;
-            let entryCounter = 0;
-            let pendingLteAntennas = [];
-            let pendingLteDiversity = null;
-
-            const roundValue = (value) => {
-              if (typeof value !== "number" || Number.isNaN(value)) {
-                return null;
-              }
-              return Math.round(value * 10) / 10;
-            };
-
-            const parseAntennaLine = (line, prefix) => {
-              const match = line.match(/\(([^)]+)\)/);
-              if (!match) {
-                return [];
-              }
-
-              return match[1].split(",").map((item, index) => {
-                const trimmed = item.trim();
-                const numeric = parseFloat(trimmed);
-                return {
-                  label: `${prefix} ${index + 1}`,
-                  logicalIndex: index, // 0-based logical antenna index
-                  value: Number.isNaN(numeric) ? null : numeric,
-                };
-              });
-            };
-
-            // Mapping from logical antenna index to physical antenna index
-            // Logical: 0, 1, 2, 3 (displayed as "Antenna 1", "Antenna 2", "Antenna 3", "Antenna 4")
-            // Physical: 0, 1, 2, 3 (ANT0, ANT1, ANT2, ANT3)
-
-            // LTE mapping: Logical 0->ANT0, Logical 1->ANT3, Logical 2->ANT2, Logical 3->ANT1
-            const LTE_LOGICAL_TO_PHYSICAL = [0, 3, 2, 1];
-
-            // Case 1: 5G FDD 2x2 MIMO (N5, N8, N12, N20, N28, N71) - Only 2 antennas used
-            // Mapping: [0, 3] means MAIN->ANT0, AUX1->ANT3, others (ANT1, ANT2) added as "Not Used"
-            const NR_FDD_2X2_LOGICAL_TO_PHYSICAL = [0, 3];
-
-            // Case 2: 5G FDD 4x4 MIMO (N1, N2, N3, N7, N25, N66) - All 4 antennas
-            // Mapping: [2, 3, 0, 1] means MAIN->ANT2, AUX1->ANT3, AUX2->ANT0, AUX3->ANT1
-            const NR_FDD_4X4_LOGICAL_TO_PHYSICAL = [2, 3, 0, 1];
-
-            // Case 3: 5G TDD 4x4 MIMO (N38, N40, N41, N77, N78, N79)
-            // Mapping: [2, 1, 0, 3] means MAIN->ANT2, AUX1->ANT1, AUX2->ANT0, AUX3->ANT3
-            const NR_TDD_LOGICAL_TO_PHYSICAL = [2, 1, 0, 3];
-
-            // Helper function to determine NR antenna mapping based on band
-            const getNrMapping = (band) => {
-              if (!band) return NR_FDD_4X4_LOGICAL_TO_PHYSICAL;
-
-              const bandNum = parseInt(band.replace(/\D/g, '')); // Extract number from band string
-
-              // Case 1: 5G FDD 2x2 MIMO bands
-              if ([5, 8, 12, 20, 28, 71].includes(bandNum)) {
-                return NR_FDD_2X2_LOGICAL_TO_PHYSICAL;
-              }
-
-              // Case 2: 5G FDD 4x4 MIMO bands
-              if ([1, 2, 3, 7, 25, 66].includes(bandNum)) {
-                return NR_FDD_4X4_LOGICAL_TO_PHYSICAL;
-              }
-
-              // Case 3: 5G TDD 4x4 MIMO bands
-              if ([38, 40, 41, 77, 78, 79].includes(bandNum)) {
-                return NR_TDD_LOGICAL_TO_PHYSICAL;
-              }
-
-              // Default: Assume 4x4 FDD for unknown bands
-              return NR_FDD_4X4_LOGICAL_TO_PHYSICAL;
-            };
-
-            const finalizeEntry = () => {
-              if (!currentEntry) {
-                return;
-              }
-
-              const bandDisplay = currentEntry.band
-                ? currentEntry.technology === "LTE"
-                  ? `Band ${currentEntry.band}`
-                  : currentEntry.band
-                : "N/A";
-
-              let title = "";
-              if (currentEntry.technology === "LTE") {
-                if (currentEntry.role === "primary") {
-                  title = "Primary 4G";
-                } else {
-                  title = currentEntry.caIndex
-                    ? `CA 4G #${currentEntry.caIndex}`
-                    : "CA 4G";
-                }
-              } else {
-                title = "Primary 5G";
-              }
-
-              if (bandDisplay !== "N/A") {
-                title += ` (${bandDisplay})`;
-              }
-
-              const detail = {
-                id: currentEntry.id,
-                title,
-                technology: currentEntry.technology,
-                role: currentEntry.role,
-                band: currentEntry.band,
-                bandDisplay,
-                bandwidthDisplay: currentEntry.bandwidth || "N/A",
-                channelDisplay: currentEntry.channel || "N/A",
-                pciDisplay: currentEntry.pci || "N/A",
-                rxDiversityDisplay: currentEntry.rxDiversity || "",
-                metrics: [],
-                antennas: [],
-              };
-
-              const addMetric = (key, label, value, unit, calculator, isCA = false) => {
-                const normalized = roundValue(value);
-                if (normalized === null) {
-                  detail.metrics.push({
-                    key,
-                    label,
-                    display: "N/A",
-                    percentage: 0,
-                    color: '#6c757d',
-                    value: null,
-                    isCA,
-                  });
-                  return;
-                }
-
-                const displayValue = unit ? `${normalized} ${unit}` : `${normalized}`;
-                const percentage = typeof calculator === "function"
-                  ? calculator.call(this, normalized)
-                  : 0;
-
-                // Calculate color based on metric type
-                let color = '#6c757d'; // default gray
-                const tech = currentEntry.technology || 'LTE';
-                if (key === 'rssi') {
-                  const barResult = this.calculateRSSIBar(normalized, tech);
-                  color = barResult.color;
-                } else if (key === 'rsrp') {
-                  const barResult = this.calculateRSRPBar(normalized, tech);
-                  color = barResult.color;
-                } else if (key === 'rsrq') {
-                  const barResult = this.calculateRSRQBar(normalized, tech);
-                  color = barResult.color;
-                } else if (key === 'sinr') {
-                  const barResult = this.calculateSINRBar(normalized, tech);
-                  color = barResult.color;
-                }
-
-                detail.metrics.push({
-                  key,
-                  label,
-                  display: displayValue,
-                  percentage,
-                  color,
-                  value: normalized,
-                  isCA,
-                });
-              };
-
-              addMetric(
-                "rssi",
-                "RSSI",
-                currentEntry.metricsData.rssi,
-                "dBm",
-                this.calculateRSSIPercentage
-              );
-              addMetric(
-                "rsrp",
-                "RSRP",
-                currentEntry.metricsData.rsrp,
-                "dBm",
-                this.calculateRSRPPercentage
-              );
-              addMetric(
-                "sinr",
-                "SINR",
-                currentEntry.metricsData.sinr,
-                "dB",
-                this.calculateSINRPercentage,
-                currentEntry.role === "secondary"
-              );
-              addMetric(
-                "rsrq",
-                "RSRQ",
-                currentEntry.metricsData.rsrq,
-                "dB",
-                this.calculateRSRQPercentage
-              );
-
-              // Process antennas for display
-              let processedAntennas = (currentEntry.antennas || [])
-                .filter(antenna => antenna.value !== null) // Filter out null values (NA) before mapping
-                .map((antenna, index) => {
-                const normalized = roundValue(antenna.value);
-                const label = antenna.label || `Antenna ${index + 1}`;
-
-                // Map logical antenna to physical antenna
-                let physicalAntenna;
-                if (antenna.logicalIndex !== undefined && antenna.logicalIndex >= 0 && antenna.logicalIndex <= 3) {
-                  const mapping = currentEntry.technology === 'LTE'
-                    ? LTE_LOGICAL_TO_PHYSICAL
-                    : getNrMapping(currentEntry.band);
-                  physicalAntenna = mapping[antenna.logicalIndex];
-                }
-
-                if (normalized === null) {
-                  return {
-                    label,
-                    display: "N/A",
-                    percentage: 0,
-                    color: '#6c757d',
-                    logicalIndex: antenna.logicalIndex,
-                    physicalAntenna,
-                  };
-                }
-
-                const tech = currentEntry.technology || 'LTE';
-                const barResult = this.calculateRSRPBar(normalized, tech);
-
-                return {
-                  label,
-                  display: `${normalized} dBm`,
-                  percentage: barResult.percentage,
-                  color: barResult.color,
-                  logicalIndex: antenna.logicalIndex,
-                  physicalAntenna,
-                };
-              });
-
-              // Add missing physical antennas as "Not Used" for 2x2 MIMO bands
-              if (currentEntry.technology === 'NR') {
-                const usedPhysicalAntennas = processedAntennas
-                  .map(a => a.physicalAntenna)
-                  .filter(p => p !== undefined && p !== null);
-
-                const allPhysicalAntennas = [0, 1, 2, 3]; // ANT0, ANT1, ANT2, ANT3
-                const missingAntennas = allPhysicalAntennas.filter(p => !usedPhysicalAntennas.includes(p));
-
-                // Add missing antennas as "Not Used"
-                missingAntennas.forEach(physicalAntenna => {
-                  processedAntennas.push({
-                    label: `Antenna ${physicalAntenna}`,
-                    display: "Not Used",
-                    percentage: 0,
-                    logicalIndex: null,
-                    physicalAntenna: physicalAntenna,
-                  });
-                });
-              }
-
-              detail.antennas = processedAntennas.sort((a, b) => {
-                // Sort by physical antenna number
-                const aPhys = a.physicalAntenna ?? 999;
-                const bPhys = b.physicalAntenna ?? 999;
-                return aPhys - bPhys;
-              });
-
-              details.push(detail);
-              currentEntry = null;
-            };
-
-            for (const rawLine of lines) {
-              const line = rawLine.trim();
-              if (!line) {
-                continue;
-              }
-
-              if (line.startsWith("lte_ant_rsrp")) {
-                pendingLteAntennas = parseAntennaLine(line, "Antenna");
-                const diversityMatch = line.match(/rx_diversity:([0-9]+)/i);
-                if (diversityMatch) {
-                  pendingLteDiversity = diversityMatch[1];
-                }
-                continue;
-              }
-
-              if (line.startsWith("pcell:")) {
-                finalizeEntry();
-                currentEntry = {
-                  id: `lte-primary-${entryCounter++}`,
-                  technology: "LTE",
-                  role: "primary",
-                  band: null,
-                  bandwidth: null,
-                  channel: null,
-                  pci: null,
-                  rxDiversity: pendingLteDiversity,
-                  antennas: pendingLteAntennas,
-                  metricsData: {},
-                };
-                pendingLteAntennas = [];
-                pendingLteDiversity = null;
-
-                const bandMatch = line.match(/lte_band:(\d+)/i);
-                if (bandMatch) {
-                  currentEntry.band = bandMatch[1];
-                }
-                const bwMatch = line.match(/lte_band_width:([^\s]+)/i);
-                if (bwMatch) {
-                  currentEntry.bandwidth = bwMatch[1];
-                }
-                continue;
-              }
-
-              if (line.startsWith("scell:")) {
-                finalizeEntry();
-                scellCounter += 1;
-                currentEntry = {
-                  id: `lte-scell-${entryCounter++}`,
-                  technology: "LTE",
-                  role: "secondary",
-                  caIndex: scellCounter,
-                  band: null,
-                  bandwidth: null,
-                  channel: null,
-                  pci: null,
-                  rxDiversity: null,
-                  antennas: [],
-                  metricsData: {},
-                };
-
-                const bandMatch = line.match(/lte_band:(\d+)/i);
-                if (bandMatch) {
-                  currentEntry.band = bandMatch[1];
-                }
-                const bwMatch = line.match(/lte_band_width:([^\s]+)/i);
-                if (bwMatch) {
-                  currentEntry.bandwidth = bwMatch[1];
-                }
-                continue;
-              }
-
-              if (
-                line.startsWith("channel:") &&
-                currentEntry &&
-                currentEntry.technology === "LTE"
-              ) {
-                const channelMatch = line.match(/channel:(\d+)/i);
-                if (channelMatch) {
-                  currentEntry.channel = channelMatch[1];
-                }
-                const pciMatch = line.match(/pci:(\d+)/i);
-                if (pciMatch) {
-                  currentEntry.pci = pciMatch[1];
-                }
-                continue;
-              }
-
-              if (
-                line.startsWith("lte_rsrp:") &&
-                currentEntry &&
-                currentEntry.technology === "LTE"
-              ) {
-                const rsrpMatch = line.match(/lte_rsrp:([\-\d\.]+)/i);
-                if (rsrpMatch) {
-                  currentEntry.metricsData.rsrp = parseFloat(rsrpMatch[1]);
-                }
-                const rsrqMatch = line.match(/rsrq:([\-\d\.]+)/i);
-                if (rsrqMatch) {
-                  currentEntry.metricsData.rsrq = parseFloat(rsrqMatch[1]);
-                }
-                continue;
-              }
-
-              if (
-                line.startsWith("lte_rssi:") &&
-                currentEntry &&
-                currentEntry.technology === "LTE"
-              ) {
-                const rssiMatch = line.match(/lte_rssi:([\-\d\.]+)/i);
-                if (rssiMatch) {
-                  currentEntry.metricsData.rssi = parseFloat(rssiMatch[1]);
-                }
-                const snrMatch = line.match(/lte_snr:([\-\d\.]+)/i);
-                if (snrMatch) {
-                  currentEntry.metricsData.sinr = parseFloat(snrMatch[1]);
-                }
-                continue;
-              }
-
-              if (line.startsWith("nr_band:")) {
-                finalizeEntry();
-                currentEntry = {
-                  id: `nr-primary-${entryCounter++}`,
-                  technology: "NR",
-                  role: "primary",
-                  band: null,
-                  bandwidth: null,
-                  channel: null,
-                  pci: null,
-                  rxDiversity: null,
-                  antennas: [],
-                  metricsData: {},
-                };
-                const bandMatch = line.match(/nr_band:([^\s]+)/i);
-                if (bandMatch) {
-                  currentEntry.band = bandMatch[1];
-                }
-                continue;
-              }
-
-              if (
-                line.startsWith("nr_band_width:") &&
-                currentEntry &&
-                currentEntry.technology === "NR"
-              ) {
-                const parts = line.split(":");
-                currentEntry.bandwidth = parts.length > 1 ? parts[1].trim() : null;
-                continue;
-              }
-
-              if (
-                line.startsWith("nr_channel:") &&
-                currentEntry &&
-                currentEntry.technology === "NR"
-              ) {
-                const parts = line.split(":");
-                currentEntry.channel = parts.length > 1 ? parts[1].trim() : null;
-                continue;
-              }
-
-              if (
-                line.startsWith("nr_pci:") &&
-                currentEntry &&
-                currentEntry.technology === "NR"
-              ) {
-                const parts = line.split(":");
-                currentEntry.pci = parts.length > 1 ? parts[1].trim() : null;
-                continue;
-              }
-
-              if (
-                line.startsWith("nr_rsrp:") &&
-                currentEntry &&
-                currentEntry.technology === "NR"
-              ) {
-                const rsrpMatch = line.match(/nr_rsrp:([\-\d\.]+)/i);
-                if (rsrpMatch) {
-                  currentEntry.metricsData.rsrp = parseFloat(rsrpMatch[1]);
-                }
-                const diversityMatch = line.match(/rx_diversity:\s*([\d]+)/i);
-                if (diversityMatch) {
-                  currentEntry.rxDiversity = diversityMatch[1];
-                }
-                currentEntry.antennas = parseAntennaLine(line, "Antenna");
-                continue;
-              }
-
-              if (
-                line.startsWith("nr_rsrq:") &&
-                currentEntry &&
-                currentEntry.technology === "NR"
-              ) {
-                const rsrqMatch = line.match(/nr_rsrq:([\-\d\.]+)/i);
-                if (rsrqMatch) {
-                  currentEntry.metricsData.rsrq = parseFloat(rsrqMatch[1]);
-                }
-                continue;
-              }
-
-              if (
-                line.startsWith("nr_rssi:") &&
-                currentEntry &&
-                currentEntry.technology === "NR"
-              ) {
-                const rssiMatch = line.match(/nr_rssi:([\-\d\.]+)/i);
-                if (rssiMatch) {
-                  currentEntry.metricsData.rssi = parseFloat(rssiMatch[1]);
-                }
-                continue;
-              }
-
-              if (
-                line.startsWith("nr_snr:") &&
-                currentEntry &&
-                currentEntry.technology === "NR"
-              ) {
-                const snrMatch = line.match(/nr_snr:([\-\d\.]+)/i);
-                if (snrMatch) {
-                  currentEntry.metricsData.sinr = parseFloat(snrMatch[1]);
-                }
-                continue;
-              }
-            }
-
-            finalizeEntry();
-            return details;
-          };
-
-          this.detailedSignals = buildDetailedSignals();
-          this.networkAnalysis = this.buildNetworkAnalysis(this.detailedSignals);
-          this.updateSignalHistory();
-
-          // --- Temperature ---
-          try {
-            this.temperature = lines
-              .find((line) => line.includes('TSENS:'))
-              .split(":")[1]
-              .replace(/"/g, "");
-          } catch (error) {
-            this.temperature = lines
-              .find((line) => line.includes('TSENS:'))
-              .split(",")[1]
-              .replace(/"/g, "");
-          }
-
-          // --- PA Temperature ---
-          try {
-            const paLine = lines.find((line) => line.trim().startsWith('PA:'));
-            if (paLine) {
-              this.paTemperature = paLine.split(':')[1].trim() || 'Unknown';
-            }
-          } catch (error) {
-            this.paTemperature = 'Unknown';
-          }
-
-          // --- Skin Temperature ---
-          try {
-            const skinLine = lines.find((line) => line.trim().startsWith('Skin Sensor:'));
-            if (skinLine) {
-              this.skinTemperature = skinLine.split(':')[1].trim() || 'Unknown';
-            }
-          } catch (error) {
-            this.skinTemperature = 'Unknown';
-          }
-          // --- SIM Status ---
-          const sim_status = lines
-            .find((line) => line.includes("+CPIN:"))
-            .split(":")[1]
-            .replace(/"/g, "")
-            .trim();
-
-          // console.log(sim_status)
-          if (sim_status == "READY") {
-            this.simStatus = "Active";
-          } else if (sim_status.includes("SIM PIN") || sim_status.includes("PIN")) {
-            this.simStatus = "SIM il pr";
-          } else if (sim_status.includes("PUK")) {
-            this.simStatus = "SIM PUK Locked";
-          } else {
-            this.simStatus = sim_status;
-          }
-          // --- Active SIM ---
-          const current_sim = lines
-            .find((line) => line.includes("ENABLE"))
-            .split(" ")[0]
-            .replace(/\D/g, "");
-          if (current_sim == 1) {
-            this.activeSim = "SIM 1";
-          } else if (current_sim == 2) {
-            this.activeSim = "SIM 2";
-          } else {
-            this.activeSim = "No SIM";
-          }
-          // --- Network Provider & MCCMNC ---
-          // Helper function to remove consecutive duplicate words
-          const removeConsecutiveDuplicates = (str) => {
-            return str.replace(/(.+)(\s+\1)+/gi, '$1').trim();
-          };
-
-          // Try to get operator name from +COPS? first
-          const copsLine = lines.find((line) => line.includes("+COPS:"));
-          if (copsLine) {
-            // Format: +COPS: mode,format,"operator_name",act
-            const copsMatch = copsLine.match(/\+COPS:\s*\d+,\d+,"([^"]*)"/);
-            if (copsMatch && copsMatch[1]) {
-              let operatorName = copsMatch[1].trim();
-              // Remove consecutive duplicates like "BetterRoaming BetterRoaming"
-              operatorName = removeConsecutiveDuplicates(operatorName);
-              this.networkProvider = operatorName || "Unknown";
-            } else {
-              this.networkProvider = "Unknown";
-            }
-          } else {
-            this.networkProvider = "Unknown";
-          }
-
-          // Still extract MCCMNC code from debug output for reference
-          const mccLine = lines.find((line) => line.includes("mcc:"));
-          if (mccLine) {
-            const mccMatch = mccLine.match(/mcc:\s*(\d+)/i);
-            const mncMatch = mccLine.match(/mnc:\s*(\d+)/i);
-            this.mccmnc =
-              mccMatch && mncMatch
-                ? `${mccMatch[1]}${mncMatch[1].padStart(2, "0")}`
-                : mccLine.replace(/\D/g, "") || "Unknown";
-          } else {
-            this.mccmnc = "Unknown";
-          }
-          // --- APN ---
-          // find this example value from lines "+CGCONTRDP: 1,0,\"internet.dito.ph\",\"100.65.141.236\",\"36.5.141.64.76.204.39.68.23.210.251.16.49.239.42.149\", \"254.128.0.0.0.0.0.0.0.0.0.0.0.0.0.1\",\"131.226.72.19\",\"131.226.73.19\"\r"
-          this.apn = lines
-            .find((line) => line.includes("+CGCONTRDP:"))
-            .split(",")[2]
-            .replace(/"/g, "");
-          // --- Network Mode ---
-          // Parse RAT field and create badges for display
-          const ratLine = lines.find((line) => line.includes('RAT:'));
-          const ratValue = ratLine
-            ? ratLine.split(":")[1].trim()
-            : "Unknown";
-          this.networkMode = ratValue;
-          
-          // Parse RAT value and create badges array
-          this.networkModeBadges = [];
-          if (ratValue === "LTE+NR") {
-            this.networkModeBadges = [
-              { label: "LTE", class: "badge-success-modern" },
-              { label: "NR-NSA", class: "badge-info-modern" }
-            ];
-          } else if (ratValue === "LTE") {
-            this.networkModeBadges = [
-              { label: "LTE", class: "badge-success-modern" }
-            ];
-          } else if (ratValue === "NR5G_SA") {
-            this.networkModeBadges = [
-              { label: "NR-SA", class: "badge-purple-dark-modern" }
-            ];
-          } else {
-            // For unknown or other values, show as text
-            this.networkModeBadges = [];
-          }
-          // --- Bands ---
-          // Get all the values with LTE BAND n (for example, LTE BAND 3, LTE BAND 1) and then store them in an array
-          const bands = lines.filter((line) =>
-            line.includes("lte_band:")
-          );
-          // since it includes the whole line, we need to extract the band part only
-          for (let i = 0; i < bands.length; i++) {
-            bands[i] = bands[i].split(":")[2].split(" ")[0].replace(/"/g, "");
-          }
-          // Get all the values with NR BAND n (for example, NR BAND 3, NR BAND 1) and then store them in an array
-          const bands_5g = lines.filter((line) =>
-            line.includes("nr_band:")
-          );
-          // since it includes the whole line, we need to extract the band number only
-          for (let i = 0; i < bands_5g.length; i++) {
-            bands_5g[i] = bands_5g[i].split(":")[1].replace(/"/g, "");
-          }
-          // Combine the bands and bands_5g arrays seperated by a comma. however, bands or bands_5g can be empty
-          if (bands.length > 0 && bands_5g.length > 0) {
-            this.bands = bands.join(", ") + ", " + bands_5g.join(", ");
-          } else if (bands.length > 0) {
-            this.bands = bands.join(", ");
-          } else if (bands_5g.length > 0) {
-            this.bands = bands_5g.join(", ");
-          } else {
-            this.bands = "No Bands";
-          }
-          // --- Bandwidth ---
-          const bandwidth = lines.filter((line) =>
-            line.includes("lte_band_width:")
-          );
-          for (let i = 0; i < bandwidth.length; i++) {
-            bandwidth[i] = bandwidth[i].split(":")[3].replace(/"/g, "");
-          }
-          const bandwidth_5gs = lines.filter((line) =>
-            line.includes("nr_band_width:")
-          );
-          console.log(bandwidth_5gs)
-          for (let i = 0; i < bandwidth_5gs.length; i++) {
-            bandwidth_5gs[i] = bandwidth_5gs[i].split(":")[1];
-          }
-          if (bandwidth.length > 0 && bandwidth_5gs.length > 0) {
-            this.bandwidth = bandwidth.join(", ") + ", " + bandwidth_5gs.join(", ");
-          } else if (bandwidth.length > 0) {
-            this.bandwidth = bandwidth.join(", ");
-          } else if (bandwidth_5gs.length > 0) {
-            this.bandwidth = bandwidth_5gs.join(", ");
-          } else {
-            this.bandwidth = "Unknown Bandwidth";
-          }
-          // --- E/ARFCN ---
-          const lteArfcnLines = lines.filter((line) =>
-            line.startsWith("channel:")
-          );
-          const nrArfcnLines = lines.filter((line) =>
-            line.includes("nr_channel:")
-          );
-
-          const lteArfcns = lteArfcnLines
-            .map((line) => {
-              const segment = line.split(":")[1];
-              if (!segment) {
-                return null;
-              }
-              return segment.split(" ")[0].trim();
-            })
-            .filter((value) => value && value.length > 0);
-
-          const nrArfcns = nrArfcnLines
-            .map((line) => {
-              const segment = line.split(":")[1];
-              return segment ? segment.trim() : null;
-            })
-            .filter((value) => value && value.length > 0);
-
-          const allArfcns = [...lteArfcns, ...nrArfcns];
-          if (allArfcns.length > 0) {
-            this.earfcns = allArfcns.join(", ");
-          } else {
-            this.earfcns = "Unknown E/ARFCN";
-          }
-          // --- PCI ---
-          const ltePciLines = lines.filter(
-            (line) => line.startsWith("channel:") && line.includes('pci:')
-          );
-          const nrPciLines = lines.filter((line) =>
-            line.includes('nr_pci:')
-          );
-
-          const ltePcis = ltePciLines
-            .map((line) => {
-              const segment = line.split('pci:')[1];
-              return segment ? segment.trim().split(' ')[0] : null;
-            })
-            .filter((value) => value && value.length > 0);
-
-          const nrPcis = nrPciLines
-            .map((line) => {
-              const segment = line.split(":")[1];
-              return segment ? segment.trim() : null;
-            })
-            .filter((value) => value && value.length > 0);
-
-          const allPcis = [...ltePcis, ...nrPcis];
-          if (allPcis.length > 0) {
-            this.pccPCI = allPcis.join(", ");
-            this.sccPCI = "-";
-          } else {
-            this.pccPCI = "0";
-            this.sccPCI = "-";
-          }
-          // --- IPv4 and IPv6 ---
-          // find the value from line "IPV4"
-          this.ipv4 = lines
-            .find((line) => line.includes("+CGCONTRDP:"))
-            .split(",")[3]
-            .replace(/"/g, "");
-          // find the value from line "IPV6"
-          this.ipv6 = lines
-            .find((line) => line.includes("+CGCONTRDP:"))
-            .split(",")[4]
-            .replace(/"/g, "");
-
-          // Also store in wwanIpv4/wwanIpv6 for device info modal
-          this.wwanIpv4 = this.ipv4;
-          this.wwanIpv6 = this.ipv6;
-
-          // Signal Informations
-          const currentNetworkMode = this.networkMode;
-          const hasNRStats = lines.some((line) =>
-            line.includes('nr_rsrp:')
-          );
-          const hasLTEStats = lines.some((line) =>
-            line.includes('lte_rsrp:')
-          );
-
-          const normalizeCellId = (value) => {
-            if (!value) {
-              return null;
-            }
-            const trimmed = value.trim().replace(/"/g, "");
-            if (trimmed === "") {
-              return null;
-            }
-            if (/^0x/i.test(trimmed)) {
-              return trimmed.replace(/^0x/i, "").toUpperCase();
-            }
-            if (/^[0-9A-Fa-f]+$/.test(trimmed) && /[A-Fa-f]/.test(trimmed)) {
-              return trimmed.toUpperCase();
-            }
-            const decimalValue = parseInt(trimmed, 10);
-            if (Number.isNaN(decimalValue)) {
-              return null;
-            }
-            return decimalValue.toString(16).toUpperCase();
-          };
-
-          const formatCellInfo = (hexValue) => {
-            if (!hexValue) {
-              return null;
-            }
-            const longDec = parseInt(hexValue, 16);
-            const shortHex = hexValue.slice(-2);
-            const shortDec = parseInt(shortHex, 16);
-            const eNbHex = hexValue.slice(0, -2);
-            const eNbDec = eNbHex ? parseInt(eNbHex, 16) : NaN;
-            const cellDisplay =
-              "Short " +
-              shortHex +
-              "(" +
-              (Number.isNaN(shortDec) ? "-" : shortDec) +
-              ")" +
-              ", " +
-              "Long " +
-              hexValue +
-              "(" +
-              (Number.isNaN(longDec) ? "-" : longDec) +
-              ")";
-            return {
-              display: cellDisplay,
-              eNbId: Number.isNaN(eNbDec) ? "-" : eNbDec,
-              decimalCellId: Number.isNaN(longDec) ? null : longDec,
-            };
-          };
-
-          const formatTac = (value) => {
-            if (!value) {
-              return null;
-            }
-            const trimmed = value.trim().replace(/"/g, "");
-            if (trimmed === "") {
-              return null;
-            }
-            const isHexCandidate = /[A-Fa-f]/.test(trimmed) || /^0x/i.test(trimmed);
-            const numericValue = isHexCandidate
-              ? parseInt(trimmed, 16)
-              : parseInt(trimmed, 10);
-            if (Number.isNaN(numericValue)) {
-              const fallback = parseInt(trimmed, 16);
-              if (Number.isNaN(fallback)) {
-                return null;
-              }
-              return fallback + " (" + trimmed + ")";
-            }
-            return numericValue + " (" + trimmed + ")";
-          };
-
-          let cellInfoSet = false;
-          let signalSamples = [];
-
-          if (hasNRStats || hasLTEStats) {
-            if (!hasNRStats) {
-              this.rsrpNR = "-";
-              this.rsrqNR = "-";
-              this.sinrNR = "-";
-              this.rsrpNRPercentage = 0;
-              this.rsrqNRPercentage = 0;
-              this.sinrNRPercentage = 0;
-              this.eNBIDNR = "-";
-            }
-
-            if (!hasLTEStats) {
-              this.rsrpLTE = "-";
-              this.rsrqLTE = "-";
-              this.sinrLTE = "-";
-              this.rsrpLTEPercentage = 0;
-              this.rsrqLTEPercentage = 0;
-              this.sinrLTEPercentage = 0;
-              this.eNBIDLTE = "-";
-            }
-
-            if (hasLTEStats) {
-              const lteCellIdLine = lines.find((line) =>
-                line.includes('lte_cell_id:')
-              );
-              if (lteCellIdLine) {
-                const lteCellIdValue = lteCellIdLine.split(":")[1];
-                const cellInfo = formatCellInfo(
-                  normalizeCellId(lteCellIdValue)
-                );
-                if (cellInfo) {
-                  this.cellID = cellInfo.display;
-                  this.eNBIDLTE = cellInfo.eNbId;
-                  this.decimalCellId = cellInfo.decimalCellId;
-                  cellInfoSet = true;
-                }
-              }
-
-              const lteTacLine = lines.find((line) =>
-                line.includes('lte_tac:')
-              );
-              if (lteTacLine) {
-                const tacValue = lteTacLine.split(":")[1].trim().replace(/"/g, "");
-                if (tacValue) {
-                  const isHexCandidate = /[A-Fa-f]/.test(tacValue) || /^0x/i.test(tacValue);
-                  const numericValue = isHexCandidate
-                    ? parseInt(tacValue, 16)
-                    : parseInt(tacValue, 10);
-                  if (!Number.isNaN(numericValue)) {
-                    this.tacLTE = numericValue.toString();
-                    this.tac = formatTac(lteTacLine.split(":")[1]);
-                  }
-                }
-              }
-
-              const csqLine = lines.find((line) =>
-                line.includes("+CSQ:")
-              );
-              if (csqLine) {
-                this.csq = csqLine
-                  .split(" ")[1]
-                  .replace("+CSQ: ", "")
-                  .replace(/"/g, "");
-              } else {
-                this.csq = hasNRStats ? "LTE+NR Mode" : "LTE Mode";
-              }
-
-              const lteRsrpLine = lines.find((line) =>
-                line.includes('lte_rsrp:')
-              );
-              if (lteRsrpLine) {
-                const rsrpParts = lteRsrpLine.split(',');
-                const rsrpValue = rsrpParts[0]
-                  ? rsrpParts[0].split(":")[1].trim()
-                  : null;
-                const rsrqValue = rsrpParts[1]
-                  ? rsrpParts[1].split(":")[1].trim()
-                  : null;
-                this.rsrpLTE = rsrpValue || "-";
-                this.rsrqLTE = rsrqValue || "-";
-              }
-
-              const lteSnrLine = lines.find((line) =>
-                line.includes('lte_snr:')
-              );
-              if (lteSnrLine) {
-                const snrSegment = lteSnrLine.split('lte_snr:')[1];
-                this.sinrLTE = snrSegment
-                  ? snrSegment.trim().split(',')[0]
-                  : "-";
-              }
-
-              const lteRssiLine = lines.find((line) =>
-                line.includes('lte_rssi:')
-              );
-              if (lteRssiLine) {
-                const rssiMatch = lteRssiLine.match(/lte_rssi:([^,\s]+)/i);
-                this.rssiLTE = rssiMatch ? rssiMatch[1].trim() : "-";
-              } else {
-                this.rssiLTE = "-";
-              }
-
-              this.rsrpLTEPercentage = this.calculateRSRPPercentage(
-                parseFloat(this.rsrpLTE)
-              );
-              this.rsrqLTEPercentage = this.calculateRSRQPercentage(
-                parseFloat(this.rsrqLTE)
-              );
-              this.sinrLTEPercentage = this.calculateSINRPercentage(
-                parseFloat(this.sinrLTE)
-              );
-              this.rssiLTEPercentage = this.calculateRSSIPercentage(
-                parseFloat(this.rssiLTE)
-              );
-
-              const lteSignal = this.calculateSignalPercentage(
-                this.sinrLTEPercentage,
-                this.rsrpLTEPercentage,
-                this.rsrqLTEPercentage
-              );
-              signalSamples.push(lteSignal);
-            }
-
-            if (hasNRStats) {
-              const nrCellIdLine = lines.find((line) =>
-                line.includes('nr_cell_id:')
-              );
-              if (nrCellIdLine) {
-                const nrCellIdValue = nrCellIdLine.split(":")[1];
-                const cellInfo = formatCellInfo(
-                  normalizeCellId(nrCellIdValue)
-                );
-                if (cellInfo) {
-                  this.cellID = cellInfo.display;
-                  this.eNBIDNR = cellInfo.eNbId;
-                  this.decimalCellId = cellInfo.decimalCellId;
-                  if (!cellInfoSet) {
-                    cellInfoSet = true;
-                  }
-                }
-              }
-
-              const nrTacLine = lines.find((line) =>
-                line.includes('nr_tac:')
-              );
-              if (nrTacLine) {
-                const tacValue = nrTacLine.split(":")[1].trim().replace(/"/g, "");
-                if (tacValue) {
-                  const isHexCandidate = /[A-Fa-f]/.test(tacValue) || /^0x/i.test(tacValue);
-                  const numericValue = isHexCandidate
-                    ? parseInt(tacValue, 16)
-                    : parseInt(tacValue, 10);
-                  if (!Number.isNaN(numericValue)) {
-                    this.tacNR = numericValue.toString();
-                    if (!cellInfoSet) {
-                      this.tac = formatTac(nrTacLine.split(":")[1]);
-                    }
-                  }
-                }
-              }
-
-            }
-
-            if (hasNRStats) {
-              if (!hasLTEStats && !lines.some((line) => line.includes("+CSQ:"))) {
-                this.csq = "NR Mode";
-              }
-
-              const nrRsrpLine = lines.find((line) =>
-                line.includes('nr_rsrp:')
-              );
-              if (nrRsrpLine) {
-                const rsrpSegment = nrRsrpLine.split(":")[1];
-                this.rsrpNR = rsrpSegment
-                  ? rsrpSegment.split(" ")[0].trim()
-                  : "-";
-              }
-
-              const nrRsrqLine = lines.find((line) =>
-                line.includes('nr_rsrq:')
-              );
-              if (nrRsrqLine) {
-                const rsrqSegment = nrRsrqLine.split(":")[1];
-                this.rsrqNR = rsrqSegment ? rsrqSegment.trim() : "-";
-              }
-
-              const nrSnrLine = lines.find((line) =>
-                line.includes('nr_snr:')
-              );
-              if (nrSnrLine) {
-                const snrSegment = nrSnrLine.split(":")[1];
-                this.sinrNR = snrSegment ? snrSegment.trim() : "-";
-              }
-
-              const nrRssiLine = lines.find((line) =>
-                line.includes('nr_rssi:')
-              );
-              if (nrRssiLine) {
-                const rssiMatch = nrRssiLine.match(/nr_rssi:([^,\s]+)/i);
-                this.rssiNR = rssiMatch ? rssiMatch[1].trim() : "-";
-              } else {
-                this.rssiNR = "-";
-              }
-
-              this.rsrpNRPercentage = this.calculateRSRPPercentage(
-                parseFloat(this.rsrpNR)
-              );
-              this.rsrqNRPercentage = this.calculateRSRQPercentage(
-                parseFloat(this.rsrqNR)
-              );
-              this.sinrNRPercentage = this.calculateSINRPercentage(
-                parseFloat(this.sinrNR)
-              );
-              this.rssiNRPercentage = this.calculateRSSIPercentage(
-                parseFloat(this.rssiNR)
-              );
-
-              const nrSignal = this.calculateSignalPercentage(
-                this.sinrNRPercentage,
-                this.rsrpNRPercentage,
-                this.rsrqNRPercentage
-              );
-              signalSamples.push(nrSignal);
-            }
-
-            if (signalSamples.length > 0) {
-              const totalSignal = signalSamples.reduce(
-                (accumulator, current) => accumulator + current,
-                0
-              );
-              this.signalPercentage = Math.round(
-                totalSignal / signalSamples.length
-              );
-              this.signalAssessment = this.signalQuality(
-                this.signalPercentage
-              );
-            } else {
-              this.signalPercentage = 0;
-              this.signalAssessment = "No Signal";
-            }
-          } else if (currentNetworkMode == "5G NSA") {
-            // find the value from line "+QENG: \"LTE\" for LTE
-            // LongCID
-            const longCID = lines
-              .find((line) => line.includes('+QENG: "LTE"'))
-              .split(",")[4]
-              .replace(/"/g, "");
-            // Get the eNBID. Its just Cell ID minus the last 2 characters
-            this.eNBIDLTE = parseInt(longCID.substring(0, longCID.length - 2), 16);
-            // Get the short Cell ID (Last 2 characters of the Cell ID)
-            const shortCID = longCID.substring(longCID.length - 2);
-            // Store decimal cell ID directly
-            this.decimalCellId = parseInt(longCID, 16);
-            // cellID
-            this.cellID =
-              "Short " +
-              shortCID +
-              "(" +
-              parseInt(shortCID, 16) +
-              ")" +
-              ", " +
-              "Long " +
-              longCID +
-              "(" +
-              this.decimalCellId +
-              ")";
-            // TAC
-            const localTac = lines
-              .find((line) => line.includes('+QENG: "LTE"'))
-              .split(",")[10]
-              .replace(/"/g, "");
-            const tacNumeric = parseInt(localTac, 16);
-            if (!Number.isNaN(tacNumeric)) {
-              this.tacLTE = tacNumeric.toString();
-              this.tac = tacNumeric + " ("+localTac+")";
-            }
-            this.cellID =
-              "Short " +
-              shortCID +
-              "(" +
-              parseInt(shortCID, 16) +
-              ")" +
-              ", " +
-              "Long " +
-              longCID +
-              "(" +
-              this.decimalCellId +
-              ")";
-            this.csq = "LTE+NR Mode";
-            // RSRP LTE
-            this.rsrpLTE = lines
-              .find((line) => line.includes('+QENG: "LTE"'))
-              .split(",")[11]
-              .replace(/"/g, "");
-            // RSRQ LTE
-            this.rsrqLTE = lines
-              .find((line) => line.includes('+QENG: "LTE"'))
-              .split(",")[12]
-              .replace(/"/g, "");
-            // RSSI LTE
-            this.rssiLTE = lines
-              .find((line) => line.includes('+QENG: "LTE"'))
-              .split(",")[13]
-              .replace(/"/g, "");
-            // SINR LTE
-            this.sinrLTE = lines
-              .find((line) => line.includes('+QENG: "LTE"'))
-              .split(",")[14]
-              .replace(/"/g, "");
-            // Calculate the RSRP LTE Percentage
-            this.rsrpLTEPercentage = this.calculateRSRPPercentage(
-              parseInt(this.rsrpLTE)
-            );
-            // Calculate the RSRQ LTE Percentage
-            this.rsrqLTEPercentage = this.calculateRSRQPercentage(
-              parseInt(this.rsrqLTE)
-            );
-            // Calculate the SINR LTE Percentage
-            this.sinrLTEPercentage = this.calculateSINRPercentage(
-              parseInt(this.sinrLTE)
-            );
-            // Calculate the RSSI LTE Percentage
-            this.rssiLTEPercentage = this.calculateRSSIPercentage(
-              parseInt(this.rssiLTE)
-            );
-            // Calculate the Signal Percentage
-            const lte_signal_percentage =
-              this.calculateSignalPercentage(
-                this.sinrLTEPercentage,
-                this.rsrpLTEPercentage,
-                this.rsrqLTEPercentage
-              );
-            // RSRP NR
-            this.rsrpNR = lines
-              .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-              .split(",")[4]
-              .replace(/"/g, "");
-            // SINR NR
-            this.sinrNR = lines
-              .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-              .split(",")[5]
-              .replace(/"/g, "");
-            // RSRQ NR
-            this.rsrqNR = lines
-              .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-              .split(",")[6]
-              .replace(/"/g, "");
-            try {
-              this.rssiNR = lines
-                .find((line) => line.includes('+QENG: "NR5G-NSA"'))
-                .split(",")[7]
-                .replace(/"/g, "");
-            } catch (error) {
-              this.rssiNR = "-";
-            }
-            // Calculate the RSRP NR Percentage
-            this.rsrpNRPercentage = this.calculateRSRPPercentage(
-              parseInt(this.rsrpNR)
-            );
-            // Calculate the RSRQ NR Percentage
-            this.rsrqNRPercentage = this.calculateRSRQPercentage(
-              parseInt(this.rsrqNR)
-            );
-            // Calculate the SINR NR Percentage
-            this.sinrNRPercentage = this.calculateSINRPercentage(
-              parseInt(this.sinrNR)
-            );
-            // Calculate the RSSI NR Percentage
-            this.rssiNRPercentage = this.calculateRSSIPercentage(
-              parseInt(this.rssiNR)
-            );
-            // Calculate the Signal Percentage
-            const nr_signal_percentage = this.calculateSignalPercentage(
-              this.sinrNRPercentage,
-              this.rsrpNRPercentage,
-              this.rsrqNRPercentage
-            );
-            // Average the LTE and NR Signal Percentages
-            this.signalPercentage =
-              (lte_signal_percentage + nr_signal_percentage) / 2;
-            // Calculate the Signal Assessment
-            this.signalAssessment = this.signalQuality(
-              this.signalPercentage
-            );
-          } else {
-            this.signalAssessment = "No Signal";
-          }
-
-          // Parse SIM info: IMSI, ICCID, Phone Number, Device Info
-          let ctx = null;
-          for (const line of lines) {
-            const trimmed = line.trim();
-
-            // Track context for multi-line AT command responses
-            if (trimmed.startsWith("AT+")) {
-              ctx = trimmed;
-              continue;
-            }
-
-            // Parse IMSI (15 digits) - only in AT+CIMI context
-            if (ctx?.startsWith("AT+CIMI") && /^\d{15}$/.test(trimmed)) {
-              this.imsi = trimmed;
-              ctx = null;
-              continue;
-            }
-            // Fallback IMSI detection
-            if ((!this.imsi || this.imsi === "Unknown" || this.imsi === "-") && /^\d{15}$/.test(trimmed) && !trimmed.startsWith("89") && trimmed !== this.imei) {
-              this.imsi = trimmed;
-              continue;
-            }
-
-            // Parse ICCID
-            if (trimmed.startsWith('ICCID:')) {
-              this.iccid = trimmed.replace('ICCID:', '').trim();
-            } else if (trimmed.startsWith('+ICCID:')) {
-              const parts = trimmed.split(':');
-              if (parts[1]) {
-                this.iccid = parts[1].replace(/"/g, '').trim();
-              }
-            }
-
-            // Parse phone number
-            if (trimmed.includes('+CNUM:')) {
-              const match = trimmed.match(/,"?(\+?\d+)"?/);
-              if (match && match[1]) {
-                this.phoneNumber = match[1];
-              }
-            }
-
-            // Parse IMEI (from AT+CGSN context or +CGSN: response)
-            if (ctx?.startsWith("AT+CGSN")) {
-              const imeiMatch = trimmed.match(/(\d{15,17})/);
-              if (imeiMatch) {
-                this.imei = imeiMatch[1].substring(0, 15);
-              }
-              ctx = null;
-              continue;
-            }
-            if (trimmed.includes('+CGSN:')) {
-              const imeiMatch = trimmed.match(/(\d{15,17})/);
-              if (imeiMatch) {
-                this.imei = imeiMatch[1].substring(0, 15);
-              }
-              continue;
-            }
-            // Fallback IMEI detection (only if not already found)
-            if ((this.imei === "Unknown" || this.imei === "-" || !this.imei) && /^\d{15,17}$/.test(trimmed) && !trimmed.startsWith("89") && trimmed !== this.imsi) {
-              this.imei = trimmed.substring(0, 15);
-              continue;
-            }
-
-            // Parse firmware version (^VERSION?)
-            if (trimmed.startsWith('^VERSION:')) {
-              this.firmwareVersion = trimmed.split(':')[1]?.trim() || trimmed;
-              // Extract model name from version if not yet set
-              if (this.modelName === "-") {
-                const modelMatch = this.firmwareVersion.match(/^([A-Za-z0-9_-]+)/);
-                if (modelMatch) {
-                  this.modelName = modelMatch[1];
-                }
-              }
-            }
-
-            // Parse manufacturer (+CGMI)
-            if (ctx?.startsWith("AT+CGMI")) {
-              this.manufacturer = trimmed;
-              ctx = null;
-              continue;
-            }
-            // Fallback manufacturer detection
-            if (this.manufacturer === "-" && /QUALCOMM|QUECTEL|HUAWEI|FIBOCOM|Sierra|Foxconn/i.test(trimmed)) {
-              this.manufacturer = trimmed;
-            }
-
-            // Parse model name (+CGMM)
-            if (ctx?.startsWith("AT+CGMM")) {
-              this.modelName = trimmed;
-              ctx = null;
-              continue;
-            }
-          }
-
-        this.lastUpdate = new Date().toLocaleString();
-      } catch (parseError) {
-        console.error("Error while parsing the AT response", parseError);
-        this.applyFallback("Failed to parse the AT response.");
-      }
-    } catch (error) {
-      console.error("Error while executing the AT command", error);
-      this.applyFallback(
-        error.message || "Unknown error occurred during the AT request."
-      );
     }
-
-    // Fetch LAN IP (this works even without SIM)
     fetch("/cgi-bin/get_lanip")
       .then(res => res.json())
       .then(data => {
         this.lanIp = data.lanip;
-
+        this.lanIpLoaded = true;
         // Check if we should show SIM unlock prompt (only once per session)
         // Must be here after simStatus is set
         this.checkSimUnlockPrompt();
       })
       .catch(error => {
         console.error("Error fetching LAN IP:", error);
-      });
-  },
-
-
-  bytesToSize(bytes) {
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-    if (bytes == 0) return "0 Byte";
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-    return Math.round(bytes / Math.pow(1024, i), 2) + " " + sizes[i];
-  },
-
-  requestPing() {
-    // Create timeout controller (10 seconds)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    return fetch("/cgi-bin/get_ping", { signal: controller.signal })
-      .then((response) => {
-        clearTimeout(timeoutId);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        // Save detailed connection data for the modal
-        if (data.ping && data.dns) {
-          this.connectionDetails = {
-            ping: data.ping,
-            dns: data.dns
-          };
-        }
-        return data;
-      })
-      .catch((error) => {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-          console.error("Ping request timeout");
-          throw new Error('Request timeout');
-        }
-        console.error("Error:", error);
-        throw error;
       });
   },
 
@@ -2948,7 +1439,7 @@ function processAllInfos() {
       this.simStatus = "Active";
       this.simPin = "";
       this.simPinHasBeenUnlocked = true;  // Mark that SIM has been unlocked
-      this.fetchAllInfo();
+      // The bridges push the new SIM state within seconds.
     } catch (error) {
       this.simUnlockError = error.message || "Unexpected error while unlocking SIM.";
     } finally {
@@ -3061,7 +1552,7 @@ function processAllInfos() {
       this.simPin = "";
       this.showSimUnlockPrompt = false;
       this.simPinHasBeenUnlocked = true;  // Mark that SIM has been unlocked
-      setTimeout(() => { this.fetchAllInfo(); }, 1000);
+      // The bridges push the new SIM state within seconds.
     } catch (error) {
       this.simUnlockError = error.message || "Unexpected error while unlocking SIM.";
     } finally {
@@ -3069,75 +1560,12 @@ function processAllInfos() {
     }
   },
 
- fetchSysInfo() {
-  fetch("/cgi-bin/get_sys_info")
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then((data) => {
-      if (data.status !== 'ok') {
-        this.uptime = "Unknown Time";
-        this.systemSpeed = "Unknown";
-        this.systemDuplex = "Unknown";
-        this.cpuUsage = 0;
-        this.memUsed = 0;
-        this.memTotal = 0;
-        this.memPercent = 0;
-        return;
-      }
-
-      const days = parseInt(data.days) || 0;
-      const hours = parseInt(data.hours) || 0;
-      const minutes = parseInt(data.minutes) || 0;
-
-      const parts = [];
-
-      // Format days
-      if (days > 0) {
-        parts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
-      }
-
-      // Format hours
-      if (hours > 0) {
-        parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
-      }
-
-      // Format minutes
-      if (minutes > 0) {
-        parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`);
-      }
-
-      // Join with commas and spaces
-      if (parts.length === 0) {
-        this.uptime = "Less than 1 minute";
-      } else if (parts.length === 1) {
-        this.uptime = parts[0];
-      } else if (parts.length === 2) {
-        this.uptime = parts.join(' and ');
-      } else {
-        // For 3 parts (days, hours, minutes)
-        this.uptime = parts[0] + ', ' + parts[1] + ' and ' + parts[2];
-      }
-
-      // Extract system speed
-      this.systemSpeed = data.speed || "Unknown";
-
-      // Extract duplex mode
-      this.systemDuplex = data.duplex || "Unknown";
-
-      // Extract CPU usage percentage
-      this.cpuUsage = parseInt(data.cpu_usage) || 0;
-
-      // Extract memory usage
-      this.memUsed = parseInt(data.mem_used) || 0;
-      this.memTotal = parseInt(data.mem_total) || 0;
-      this.memPercent = parseInt(data.mem_percent) || 0;
-    })
-    .catch((error) => {
-      console.error("Error fetching uptime:", error);
+  /**
+   * Uptime, link speed, CPU and memory for the dashboard, from a
+   * get_sys_info-shaped object (system_bridge data is converted to it).
+   */
+  applySysInfo(data) {
+    if (data.status !== 'ok') {
       this.uptime = "Unknown Time";
       this.systemSpeed = "Unknown";
       this.systemDuplex = "Unknown";
@@ -3145,7 +1573,55 @@ function processAllInfos() {
       this.memUsed = 0;
       this.memTotal = 0;
       this.memPercent = 0;
-    });
+      return;
+    }
+
+    const days = parseInt(data.days) || 0;
+    const hours = parseInt(data.hours) || 0;
+    const minutes = parseInt(data.minutes) || 0;
+
+    const parts = [];
+
+    // Format days
+    if (days > 0) {
+      parts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
+    }
+
+    // Format hours
+    if (hours > 0) {
+      parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
+    }
+
+    // Format minutes
+    if (minutes > 0) {
+      parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`);
+    }
+
+    // Join with commas and spaces
+    if (parts.length === 0) {
+      this.uptime = "Less than 1 minute";
+    } else if (parts.length === 1) {
+      this.uptime = parts[0];
+    } else if (parts.length === 2) {
+      this.uptime = parts.join(' and ');
+    } else {
+      // For 3 parts (days, hours, minutes)
+      this.uptime = parts[0] + ', ' + parts[1] + ' and ' + parts[2];
+    }
+
+    // Extract system speed
+    this.systemSpeed = data.speed || "Unknown";
+
+    // Extract duplex mode
+    this.systemDuplex = data.duplex || "Unknown";
+
+    // Extract CPU usage percentage
+    this.cpuUsage = parseInt(data.cpu_usage) || 0;
+
+    // Extract memory usage
+    this.memUsed = parseInt(data.mem_used) || 0;
+    this.memTotal = parseInt(data.mem_total) || 0;
+    this.memPercent = parseInt(data.mem_percent) || 0;
   },
 
   updateRefreshRate() {
@@ -3359,147 +1835,369 @@ function processAllInfos() {
   },
 
   /**
-   * Signal entries shown in the Advanced Signal Details modal for the
-   * selected source.
+   * Signal entries shown in the Advanced Signal Details modal.
    *
-   * @returns {Array} AT-derived or DIAG-derived signal entries
+   * @returns {Array} entries built from the current radio snapshot
    */
   activeSignals() {
-    return this.signalSource === "diag" ? this.diagSignals : this.detailedSignals;
+    return this.diagSignals;
   },
 
   /**
-   * Network analysis matching the selected signal source.
+   * Network analysis of the current radio snapshot.
    *
-   * @returns {Object|null} Analysis built from the active signal entries
+   * @returns {Object|null}
    */
   activeNetworkAnalysis() {
-    return this.signalSource === "diag" ? this.diagNetworkAnalysis : this.networkAnalysis;
-  },
-
-  /**
-   * Switches the modal between AT-based and DIAG-based signal details.
-   *
-   * @param {string} source - "at" or "diag"
-   */
-  setSignalSource(source) {
-    const next = source === "diag" ? "diag" : "at";
-    this.signalSource = next;
-    try {
-      localStorage.setItem("signalSource", next);
-    } catch (_) {
-      // Storage unavailable: the choice just won't persist.
-    }
-    if (next === "diag") {
-      this.connectDiagWs();
-    } else {
-      this.disconnectDiagWs();
-    }
+    return this.diagNetworkAnalysis;
   },
 
   diagStatusLabel() {
     switch (this.diagStatus) {
       case "connected":
-        return "Bridge connected";
+        return "DIAG bridge connected";
       case "connecting":
-        return "Connecting to bridge…";
+        return "Connecting to DIAG bridge…";
       case "disconnected":
-        return "Bridge unreachable (port " + DIAG_WS_PORT + "), retrying";
+        return "DIAG bridge unreachable (port " + DIAG_WS_PORT + "), retrying";
       default:
-        return "Bridge idle";
+        return "DIAG bridge idle";
     }
+  },
+
+  /** Short label of the radio data source, for the toolbar and the modal. */
+  radioSourceLabel() {
+    return this.radioSource === "diag" ? "DIAG" : this.radioSource === "qmi" ? "QMI" : "—";
+  },
+
+  radioSourceTitle() {
+    if (this.radioSource === "diag") return "Radio data from the Qualcomm DIAG interface (diag_bridge)";
+    if (this.radioSource === "qmi") return "diag_bridge not connected: radio data from QMI (system_bridge)";
+    return "No radio data: bridges unreachable";
   },
 
   /**
-   * Opens the DIAG stream only while the modal is visible and closes it when
-   * the modal is hidden, so the bridge is not consumed in the background.
+   * Opens one bridge WebSocket ("diag" or "sys") and keeps it open, retrying
+   * every BRIDGE_RECONNECT_MS. Closed while the tab is hidden, so the
+   * bridges stop polling the modem for nobody.
    */
-  hookSignalModal() {
-    if (diagModalHooked) {
+  connectBridge(kind) {
+    if (document.hidden) return;
+    const port = kind === "diag" ? DIAG_WS_PORT : SYS_WS_PORT;
+    const statusKey = kind === "diag" ? "diagStatus" : "sysStatus";
+    const current = bridgeSockets[kind];
+    if (current && (current.readyState === WebSocket.OPEN || current.readyState === WebSocket.CONNECTING)) {
       return;
     }
-    const modal = document.getElementById("advancedSignalModal");
-    if (!modal) {
-      return;
-    }
-    diagModalHooked = true;
-    modal.addEventListener("shown.bs.modal", () => {
-      diagModalOpen = true;
-      if (this.signalSource === "diag") {
-        this.connectDiagWs();
-      }
-    });
-    modal.addEventListener("hidden.bs.modal", () => {
-      diagModalOpen = false;
-      this.disconnectDiagWs();
-    });
-  },
-
-  connectDiagWs() {
-    if (this.signalSource !== "diag" || !diagModalOpen) {
-      return;
-    }
-    if (diagSocket && (diagSocket.readyState === WebSocket.OPEN ||
-                       diagSocket.readyState === WebSocket.CONNECTING)) {
-      return;
-    }
-    clearTimeout(diagReconnectTimer);
+    clearTimeout(bridgeTimers[kind]);
     const host = window.location.hostname || "192.168.225.1";
     let ws;
     try {
-      ws = new WebSocket("ws://" + host + ":" + DIAG_WS_PORT);
+      ws = new WebSocket("ws://" + host + ":" + port);
     } catch (_) {
-      this.diagStatus = "disconnected";
-      diagReconnectTimer = setTimeout(() => this.connectDiagWs(), DIAG_RECONNECT_MS);
+      this[statusKey] = "disconnected";
+      bridgeTimers[kind] = setTimeout(() => this.connectBridge(kind), BRIDGE_RECONNECT_MS);
       return;
     }
-    diagSocket = ws;
-    this.diagStatus = "connecting";
+    bridgeSockets[kind] = ws;
+    this[statusKey] = "connecting";
     ws.onopen = () => {
-      if (diagSocket === ws) {
-        this.diagStatus = "connected";
-      }
+      if (bridgeSockets[kind] === ws) this[statusKey] = "connected";
     };
     ws.onmessage = (event) => {
-      if (diagSocket !== ws) {
+      if (bridgeSockets[kind] !== ws) return;
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch (error) {
+        console.warn("Ignoring malformed " + kind + " bridge message:", error);
         return;
       }
-      try {
-        this._applyDiagData(JSON.parse(event.data));
-      } catch (error) {
-        console.warn("Ignoring malformed diag_bridge message:", error);
+      if (kind === "diag") {
+        bridgeLast.diag = data;
+        bridgeLast.diagAt = Date.now();
+      } else {
+        bridgeLast.sys = data;
+        bridgeLast.sysAt = Date.now();
+        this.applySystemData(data);
       }
+      this.refreshFromBridges();
     };
     ws.onerror = () => ws.close();
     ws.onclose = () => {
-      if (diagSocket !== ws) {
-        return;
-      }
-      diagSocket = null;
-      this.diagStatus = "disconnected";
-      if (this.signalSource === "diag" && diagModalOpen) {
-        diagReconnectTimer = setTimeout(() => this.connectDiagWs(), DIAG_RECONNECT_MS);
-      }
+      if (bridgeSockets[kind] !== ws) return;
+      bridgeSockets[kind] = null;
+      this[statusKey] = "disconnected";
+      bridgeTimers[kind] = setTimeout(() => this.connectBridge(kind), BRIDGE_RECONNECT_MS);
     };
   },
 
-  disconnectDiagWs() {
-    clearTimeout(diagReconnectTimer);
-    diagReconnectTimer = null;
-    const ws = diagSocket;
-    diagSocket = null;
-    if (ws) {
-      ws.close();
-    }
-    this.diagStatus = "idle";
+  disconnectBridge(kind) {
+    clearTimeout(bridgeTimers[kind]);
+    bridgeTimers[kind] = null;
+    const ws = bridgeSockets[kind];
+    bridgeSockets[kind] = null;
+    if (ws) ws.close();
+    this[kind === "diag" ? "diagStatus" : "sysStatus"] = "idle";
   },
 
   /**
-   * Converts a diag_bridge snapshot into modal entries with the same shape
-   * as the AT-derived detailedSignals, plus DIAG-only fields (per-chain
-   * SINR, modulation, MCS, TX antennas, DL throughput, NR beams).
-   *
-   * Leaves the AT-based dashboard state untouched.
+   * Picks the radio snapshot (diag_bridge if fresh, else the QMI radio of
+   * system_bridge) and updates the dashboard and the advanced view from it.
+   */
+  refreshFromBridges() {
+    const now = Date.now();
+    const diag = bridgeLast.diag;
+    const sysFresh = bridgeLast.sys && now - bridgeLast.sysAt < SYS_STALE_MS;
+    const diagFresh = diag && now - bridgeLast.diagAt < DIAG_STALE_MS &&
+      ((diag.lte || []).length + (diag.nr || []).length) > 0;
+    const qmiRadio = sysFresh ? bridgeLast.sys.radio : null;
+    let snapshot = null;
+    if (diagFresh) {
+      snapshot = this.withQmiExtras(diag, sysFresh ? bridgeLast.sys : null);
+      this.radioSource = "diag";
+    } else if (qmiRadio && (qmiRadio.lte || qmiRadio.nr)) {
+      snapshot = this.qmiAsDiag(bridgeLast.sys);
+      this.radioSource = "qmi";
+    } else {
+      this.radioSource = "none";
+      if (!sysFresh && (bridgeLast.sysAt || now - this.bridgesSince > SYS_STALE_MS)) {
+        this.applyFallback("Bridges unreachable: no data from diag_bridge or system_bridge.");
+      }
+      return;
+    }
+    this._applyDiagData(snapshot);
+    this.detailedSignals = this.diagSignals;
+    this.networkAnalysis = this.diagNetworkAnalysis;
+    this.applyRadioToDashboard(snapshot);
+    if (now - (this.lastHistoryAt || 0) >= HISTORY_EVERY_MS) {
+      this.updateSignalHistory();
+      this.lastHistoryAt = now;
+    }
+    this.lastUpdate = new Date().toLocaleString();
+  },
+
+  /**
+   * diag_bridge snapshot completed with what DIAG does not carry: the NR
+   * SINR, and the PCell bandwidth / identity until RRC reports them.
+   */
+  withQmiExtras(diag, sys) {
+    const snap = JSON.parse(JSON.stringify(diag));
+    const radio = sys && sys.radio;
+    if (!radio) return snap;
+    const nr = (snap.nr || [])[0];
+    if (nr && radio.nr && typeof radio.nr.sinr === "number" &&
+        (snap.nr.length === 1 || radio.nr.pci === nr.pci)) {
+      nr.sinr = radio.nr.sinr;
+    }
+    const pcell = (snap.lte || []).find((cell) => !cell.is_scell);
+    if (pcell && radio.lte && radio.lte.earfcn === pcell.earfcn && radio.lte.pci === pcell.pci) {
+      if (pcell.cell_id == null && radio.lte.cell_id) {
+        pcell.cell_id = radio.lte.cell_id;
+        pcell.tac = radio.lte.tac;
+        pcell.mcc = sys.modem.mcc;
+        pcell.mnc = sys.modem.mnc;
+      }
+      if (pcell.bandwidth_estimated && radio.lte.bandwidth_mhz) {
+        pcell.bandwidth_mhz = radio.lte.bandwidth_mhz;
+        delete pcell.bandwidth_estimated;
+      }
+    }
+    // Active SCells diag_bridge has not learnt from RRC yet (it only sees
+    // them in reconfigurations, so not right after it starts).
+    if (radio.lte) {
+      const none = [null, null, null, null];
+      (radio.lte.scells || []).forEach((sc) => {
+        if ((snap.lte || []).some((cell) => cell.earfcn === sc.earfcn && cell.pci === sc.pci)) return;
+        (snap.lte = snap.lte || []).push({
+          earfcn: sc.earfcn, pci: sc.pci, band: sc.band, scell_idx: sc.scell_idx, is_scell: 1,
+          rsrp: null, rsrq: null, rssi: null, sinr: null, measured: false,
+          rx_diversity: 0, rsrp_rx: none, sinr_rx: none, bandwidth_mhz: sc.bandwidth_mhz,
+        });
+      });
+    }
+    return snap;
+  },
+
+  /** system_bridge QMI radio in the diag_bridge JSON shape. */
+  qmiAsDiag(sys) {
+    const radio = sys.radio || {};
+    const modem = sys.modem || {};
+    const chainMask = (chains) =>
+      (chains || []).reduce((mask, value, index) => (value != null ? mask | (1 << index) : mask), 0);
+    const none = [null, null, null, null];
+    const lte = [];
+    const nr = [];
+    if (radio.lte) {
+      const l = radio.lte;
+      lte.push({
+        earfcn: l.earfcn, pci: l.pci, band: l.band, scell_idx: 0, is_scell: 0,
+        rsrp: l.rsrp, rsrq: l.rsrq, rssi: l.rssi, sinr: l.sinr,
+        rx_diversity: chainMask(l.rsrp_rx), rsrp_rx: l.rsrp_rx || none, sinr_rx: none,
+        bandwidth_mhz: l.bandwidth_mhz, cell_id: l.cell_id, tac: l.tac, mcc: modem.mcc, mnc: modem.mnc,
+      });
+      (l.scells || []).forEach((sc) => lte.push({
+        earfcn: sc.earfcn, pci: sc.pci, band: sc.band, scell_idx: sc.scell_idx, is_scell: 1,
+        rsrp: null, rsrq: null, rssi: null, sinr: null, measured: false,
+        rx_diversity: 0, rsrp_rx: none, sinr_rx: none, bandwidth_mhz: sc.bandwidth_mhz,
+      }));
+    }
+    if (radio.nr) {
+      const n = radio.nr;
+      nr.push({
+        arfcn: n.arfcn, pci: n.pci, band: n.band, rsrp: n.rsrp, rsrq: n.rsrq, sinr: n.sinr,
+        rx_diversity: chainMask(n.rsrp_rx), rsrp_rx: n.rsrp_rx || none,
+      });
+    }
+    const total = lte.concat(nr).reduce((sum, cell) => sum + (cell.bandwidth_mhz || 0), 0);
+    return {
+      lte, nr,
+      summary: { cells: lte.length + nr.length, lte: lte.length, nr: nr.length,
+                 total_bandwidth_mhz: total, total_dl_mbps: 0, total_ul_mbps: 0 },
+    };
+  },
+
+  /** Dashboard cards from a radio snapshot (diag_bridge JSON shape). */
+  applyRadioToDashboard(snap) {
+    const lte = (snap.lte || []).slice().sort(
+      (a, b) => (a.is_scell ? 1 : 0) - (b.is_scell ? 1 : 0) || (a.scell_idx || 0) - (b.scell_idx || 0)
+    );
+    const nr = snap.nr || [];
+    const pcell = lte.find((cell) => !cell.is_scell) || null;
+    const nr0 = nr[0] || null;
+    const num = (v) => typeof v === "number" && Number.isFinite(v);
+    const fmt = (v, unit) => (num(v) ? `${Math.round(v * 10) / 10}${unit}` : "-");
+
+    if (pcell && nr0) {
+      this.networkMode = "LTE+NR";
+      this.networkModeBadges = [
+        { label: "LTE", class: "badge-success-modern" },
+        { label: "NR-NSA", class: "badge-info-modern" },
+      ];
+      this.csq = "LTE+NR Mode";
+    } else if (pcell) {
+      this.networkMode = "LTE";
+      this.networkModeBadges = [{ label: "LTE", class: "badge-success-modern" }];
+      this.csq = "LTE Mode";
+    } else if (nr0) {
+      this.networkMode = "NR5G_SA";
+      this.networkModeBadges = [{ label: "NR-SA", class: "badge-purple-dark-modern" }];
+      this.csq = "NR Mode";
+    } else {
+      this.networkMode = "Unknown";
+      this.networkModeBadges = [];
+    }
+
+    const bands = lte.filter((c) => c.band).map((c) => String(c.band))
+      .concat(nr.filter((c) => c.band).map((c) => `n${c.band}`));
+    this.bands = bands.length ? bands.join(", ") : "No Bands";
+    const widths = lte.concat(nr).filter((c) => num(c.bandwidth_mhz) && c.bandwidth_mhz > 0)
+      .map((c) => `${c.bandwidth_mhz.toFixed(1)}MHz`);
+    this.bandwidth = widths.length ? widths.join(", ") : "Unknown Bandwidth";
+    const channels = lte.map((c) => c.earfcn).concat(nr.map((c) => c.arfcn)).filter((v) => v != null);
+    this.earfcns = channels.length ? channels.join(", ") : "Unknown E/ARFCN";
+    const pcis = lte.map((c) => c.pci).concat(nr.map((c) => c.pci)).filter((v) => v != null && v >= 0);
+    this.pccPCI = pcis.length ? pcis.join(", ") : "0";
+    this.sccPCI = "-";
+
+    if (pcell && num(pcell.cell_id) && pcell.cell_id > 0) {
+      const hex = pcell.cell_id.toString(16).toUpperCase();
+      const shortHex = hex.slice(-2);
+      this.cellID = `Short ${shortHex}(${parseInt(shortHex, 16)}), Long ${hex}(${pcell.cell_id})`;
+      this.eNBIDLTE = hex.length > 2 ? parseInt(hex.slice(0, -2), 16) : "-";
+      this.decimalCellId = pcell.cell_id;
+    }
+    if (pcell && num(pcell.tac) && pcell.tac > 0) {
+      this.tacLTE = String(pcell.tac);
+      this.tac = `${pcell.tac} (${pcell.tac.toString(16).toUpperCase()})`;
+    }
+
+    const samples = [];
+    if (pcell) {
+      this.rsrpLTE = fmt(pcell.rsrp, "dBm");
+      this.rsrqLTE = fmt(pcell.rsrq, "dB");
+      this.sinrLTE = fmt(pcell.sinr, "dB");
+      this.rssiLTE = fmt(pcell.rssi, "dBm");
+      this.rsrpLTEPercentage = this.calculateRSRPPercentage(parseFloat(this.rsrpLTE));
+      this.rsrqLTEPercentage = this.calculateRSRQPercentage(parseFloat(this.rsrqLTE));
+      this.sinrLTEPercentage = this.calculateSINRPercentage(parseFloat(this.sinrLTE));
+      this.rssiLTEPercentage = this.calculateRSSIPercentage(parseFloat(this.rssiLTE));
+      samples.push(this.calculateSignalPercentage(this.sinrLTEPercentage, this.rsrpLTEPercentage, this.rsrqLTEPercentage));
+    } else {
+      this.rsrpLTE = this.rsrqLTE = this.sinrLTE = this.rssiLTE = "-";
+      this.rsrpLTEPercentage = this.rsrqLTEPercentage = this.sinrLTEPercentage = this.rssiLTEPercentage = 0;
+      this.eNBIDLTE = "-";
+    }
+    if (nr0) {
+      this.rsrpNR = fmt(nr0.rsrp, "dBm");
+      this.rsrqNR = fmt(nr0.rsrq, "dB");
+      this.sinrNR = fmt(nr0.sinr, "dB");
+      this.rssiNR = "-";
+      this.rsrpNRPercentage = this.calculateRSRPPercentage(parseFloat(this.rsrpNR));
+      this.rsrqNRPercentage = this.calculateRSRQPercentage(parseFloat(this.rsrqNR));
+      this.sinrNRPercentage = this.calculateSINRPercentage(parseFloat(this.sinrNR));
+      this.rssiNRPercentage = 0;
+      samples.push(this.calculateSignalPercentage(this.sinrNRPercentage, this.rsrpNRPercentage, this.rsrqNRPercentage));
+    } else {
+      this.rsrpNR = this.rsrqNR = this.sinrNR = this.rssiNR = "-";
+      this.rsrpNRPercentage = this.rsrqNRPercentage = this.sinrNRPercentage = this.rssiNRPercentage = 0;
+      this.eNBIDNR = "-";
+    }
+    if (samples.length) {
+      this.signalPercentage = Math.round(samples.reduce((a, b) => a + b, 0) / samples.length);
+      this.signalAssessment = this.signalQuality(this.signalPercentage);
+    } else {
+      this.signalPercentage = 0;
+      this.signalAssessment = "No Signal";
+    }
+  },
+
+  /** Modem identity, SIM, network and system status from system_bridge. */
+  applySystemData(data) {
+    const s = data.sys || {};
+    const up = Math.floor(s.uptime_s || 0);
+    this.applySysInfo({
+      status: "ok",
+      days: Math.floor(up / 86400), hours: Math.floor((up % 86400) / 3600), minutes: Math.floor((up % 3600) / 60),
+      speed: s.eth && s.eth.speed, duplex: s.eth && s.eth.duplex,
+      cpu_usage: s.cpu_pct, mem_used: s.mem_used_kb, mem_total: s.mem_total_kb, mem_percent: s.mem_pct,
+    });
+
+    const conn = data.conn || {};
+    if (conn.status === "ok") this.internetConnectionStatus = "Connected";
+    else if (conn.status === "warning") this.internetConnectionStatus = "Partial";
+    else if (conn.status === "error") this.internetConnectionStatus = "Disconnected";
+
+    const m = data.modem || {};
+    const text = (v) => (typeof v === "string" && v.trim() ? v.trim() : "-");
+    this.imei = text(m.imei);
+    this.imsi = text(m.imsi);
+    this.iccid = text(m.iccid);
+    this.firmwareVersion = text(m.firmware);
+    this.manufacturer = text(m.manufacturer);
+    this.modelName = text(m.model);
+    this.simStatus = m.sim && m.sim.state ? m.sim.state : "Unknown";
+    this.activeSim = m.sim && m.sim.slot ? `SIM ${m.sim.slot}` : "No SIM";
+    // "BetterRoaming BetterRoaming" style names are repeated by some networks.
+    const words = text(m.operator).split(/\s+/);
+    this.networkProvider = words.filter((w, i) => i === 0 || w !== words[i - 1]).join(" ");
+    this.mccmnc = m.mcc ? `${m.mcc}${m.mnc}` : "Unknown";
+    const t = m.temperature || {};
+    this.temperature = typeof t.modem === "number" ? `${Math.round(t.modem)}C` : "0";
+    this.paTemperature = typeof t.pa === "number" ? `${Math.round(t.pa)}C` : "Unknown";
+    this.skinTemperature = typeof t.sys1 === "number" ? `${Math.round(t.sys1)}C` : "Unknown";
+
+    const net = data.net || {};
+    this.apn = text(net.apn);
+    this.ipv4 = this.wwanIpv4 = text(net.wan_ip);
+    this.checkSimUnlockPrompt();
+  },
+
+  /**
+   * Converts a radio snapshot (diag_bridge JSON shape; QMI data is
+   * converted to it) into the Advanced Signal Details entries, with the
+   * DIAG-only fields (per-chain SINR, modulation, MCS, TX antennas,
+   * throughput, NR beams) when present.
    *
    * @param {Object} data - {lte: [...], nr: [...], summary: {...}}
    */
@@ -3667,10 +2365,12 @@ function processAllInfos() {
         channelDisplay: cell.arfcn != null ? String(cell.arfcn) : "N/A",
         pciDisplay: cell.pci != null ? String(cell.pci) : "N/A",
         rxDiversityDisplay: cell.rx_diversity ? `${popcount(cell.rx_diversity)}R` : "",
-        // The bridge reports no SINR/RSSI for NR.
+        // NR SINR comes from QMI (system_bridge) or the last RRC
+        // measurement report; there is no NR RSSI.
         metrics: [
           buildMetric("rsrp", "RSRP", cell.rsrp, "dBm", tech),
           buildMetric("rsrq", "RSRQ", cell.rsrq, "dB", tech),
+          ...(typeof cell.sinr === "number" ? [buildMetric("sinr", "SINR", cell.sinr, "dB", tech)] : []),
         ],
         antennas: buildChains(cell.rsrp_rx, "dBm", bars.rsrp, tech),
         sinrChains: [],
@@ -3980,68 +2680,34 @@ function processAllInfos() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
     }
-    try {
-      if (localStorage.getItem("signalSource") === "diag") {
-        this.signalSource = "diag";
-      }
-    } catch (_) {
-      // Storage unavailable: keep the AT default.
-    }
-    this.hookSignalModal();
-    // Fetch system information (uptime, load, network speed)
-    this.fetchSysInfo();
-    // Retrieve the refresh rate from local storage or session storage
-    // Skip reading from localStorage if skipLocalStorage is true (e.g., when called from updateRefreshRate)
     if (!skipLocalStorage) {
       const storedRefreshRate = localStorage.getItem("refreshRate");
-      // If a refresh rate is stored, use it; otherwise, use a default value
-      this.refreshRate = storedRefreshRate
-        ? parseInt(storedRefreshRate)
-        : 10; // Default refresh rate in seconds
+      this.refreshRate = storedRefreshRate ? parseInt(storedRefreshRate) : 10;
     }
-    this.fetchAllInfo();
-
-    this.requestPing()
-      .then((data) => {
-        if (data.status === 'ok') {
-          this.internetConnectionStatus = "Connected";
-        } else if (data.status === 'warning') {
-          this.internetConnectionStatus = "Partial";
-        } else {
-          this.internetConnectionStatus = "Disconnected";
-        }
-      })
-      .catch((error) => {
-        console.error("Error:", error);
-        this.internetConnectionStatus = "Disconnected";
-      });
-
-    this.lastUpdate = new Date().toLocaleString();
-    console.log("Initialized");
-    // Set the refresh rate for interval
+    // Everything on the dashboard is pushed by the two bridges; the only
+    // request left is the LAN address, read once.
+    this.bridgesSince = Date.now();
+    this.connectBridge("diag");
+    this.connectBridge("sys");
+    this.fetchLanIpOnce();
+    // Re-evaluates the radio source every 2 s: a diag_bridge that stops
+    // pushing hands over to QMI even when nothing else arrives.
     this.intervalId = setInterval(() => {
-      this.fetchSysInfo();
-
-      this.fetchAllInfo();
-
-      this.requestPing()
-        .then((data) => {
-          if (data.status === 'ok') {
-            this.internetConnectionStatus = "Connected";
-          } else if (data.status === 'warning') {
-            this.internetConnectionStatus = "Partial";
-          } else {
-            this.internetConnectionStatus = "Disconnected";
-          }
-        })
-        .catch((error) => {
-          console.error("Error:", error);
-          this.internetConnectionStatus = "Disconnected";
-        });
-
-      this.lastUpdate = new Date().toLocaleString();
-      console.log("Refreshed");
-    }, this.refreshRate * 1000);
+      if (!document.hidden) this.refreshFromBridges();
+    }, 2000);
+    if (!this.visibilityHooked) {
+      this.visibilityHooked = true;
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          this.disconnectBridge("diag");
+          this.disconnectBridge("sys");
+        } else {
+          this.connectBridge("diag");
+          this.connectBridge("sys");
+        }
+      });
+    }
+    console.log("Initialized");
   },
 
   /**

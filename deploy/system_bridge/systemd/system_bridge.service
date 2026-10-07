@@ -1,0 +1,15 @@
+[Unit]
+Description=SimpleAdmin System Bridge (QMI, system status, connectivity)
+After=network.target
+# The binary lives in /data/simpleadmin/bin (/usr/bin/system_bridge links to it).
+RequiresMountsFor=/data
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/system_bridge -i bridge0
+PIDFile=/run/system_bridge.pid
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

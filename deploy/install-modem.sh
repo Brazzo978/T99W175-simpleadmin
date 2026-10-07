@@ -13,7 +13,7 @@
 # Layout on the modem:
 #   /WEBSERVER/www                   web UI; simpleadmin.conf values and
 #                                    cgi-bin/credentials.txt survive updates
-#   /data/simpleadmin/{bin,lib}      diag_bridge, curl, jq, modem_config (UBIFS
+#   /data/simpleadmin/{bin,lib}      diag_bridge, system_bridge, curl, jq, modem_config (UBIFS
 #                                    usrfs, the root filesystem has only a few
 #                                    MB free), reached through /usr/bin
 #   /opt/scripts, /etc/init.d        TTL, watchdog and crontab scripts
@@ -28,7 +28,7 @@ SA_ESIM="${SA_ESIM:-}"
 WEB=/WEBSERVER/www
 BASE=/data/simpleadmin
 UNIT_DIR=/lib/systemd/system
-UNITS="crontab ttl-override connection-watchdog euicc diag_bridge"
+UNITS="crontab ttl-override connection-watchdog euicc diag_bridge system_bridge"
 WARNINGS=0
 REMOVED=0
 
@@ -363,47 +363,53 @@ else
   info "🏷️  eth0 is $now, becomes $mac at the next reboot"
 fi
 
-# ---------------------------------------------------------------- bridge
-# Installed only with a binary that runs on this modem: the new one from the
-# payload or, without it, the one already here. Otherwise the unit goes too,
+# ---------------------------------------------------------------- bridges
+# diag_bridge (radio metrics from /dev/diag, port 9001) and system_bridge
+# (QMI modem data, system status, connectivity, port 9002). Each is
+# installed only with a binary that runs on this modem: the new one from the
+# payload or, without it, the one already here. Otherwise its unit goes too,
 # rather than a service failing and restarting forever. Not fatal.
-section "📡 diag_bridge"
-bridge=""
-new="$SRC/diag_bridge/bin/diag_bridge"
-if [ -f "$new" ]; then
-  if "$new" -h >/dev/null 2>&1; then
-    bridge=new
-    info "🧪 payload binary runs ($(cat "$SRC/diag_bridge/diag_bridge.version" 2>/dev/null || echo unknown))"
+install_daemon() {
+  d="$1"
+  section "📡 $d"
+  how=""
+  new="$SRC/$d/bin/$d"
+  if [ -f "$new" ]; then
+    if "$new" -h >/dev/null 2>&1; then
+      how=new
+      info "🧪 payload binary runs ($(cat "$SRC/$d/$d.version" 2>/dev/null || echo unknown))"
+    else
+      err "the $d in the payload does not run on this modem"
+    fi
   else
-    err "the diag_bridge in the payload does not run on this modem"
+    err "no $d in the payload (link not resolved on the workstation)"
   fi
-else
-  err "no diag_bridge in the payload (bridge link not resolved on the workstation)"
-fi
-if [ -z "$bridge" ] && [ -x "$BASE/bin/diag_bridge" ] && "$BASE/bin/diag_bridge" -h >/dev/null 2>&1; then
-  bridge=installed
-  warn "keeping the diag_bridge already installed ($(cat "$BASE/diag_bridge.version" 2>/dev/null || echo unknown))"
-fi
-if [ -n "$bridge" ]; then
-  install_file "$SRC/diag_bridge/systemd/diag_bridge.service" 644 "$UNIT_DIR/diag_bridge.service"
-  systemctl daemon-reload
-  if [ "$bridge" = new ]; then
-    systemctl stop diag_bridge 2>/dev/null || true
-    install_file "$new" 755 "$BASE/bin/diag_bridge"
-    install_file "$SRC/diag_bridge/diag_bridge.version" 644 "$BASE/diag_bridge.version"
+  if [ -z "$how" ] && [ -x "$BASE/bin/$d" ] && "$BASE/bin/$d" -h >/dev/null 2>&1; then
+    how=installed
+    warn "keeping the $d already installed ($(cat "$BASE/$d.version" 2>/dev/null || echo unknown))"
   fi
-  link "$BASE/bin/diag_bridge" /usr/bin/diag_bridge
-  unit_state diag_bridge on
-  restart diag_bridge
-else
-  err "diag_bridge not installed: the DIAG view of the UI will stay empty"
-  if [ -e "$UNIT_DIR/diag_bridge.service" ]; then
-    systemctl disable diag_bridge >/dev/null 2>&1 || true
-    systemctl stop diag_bridge 2>/dev/null || true
+  if [ -n "$how" ]; then
+    install_file "$SRC/$d/systemd/$d.service" 644 "$UNIT_DIR/$d.service"
+    systemctl daemon-reload
+    if [ "$how" = new ]; then
+      systemctl stop "$d" 2>/dev/null || true
+      install_file "$new" 755 "$BASE/bin/$d"
+      install_file "$SRC/$d/$d.version" 644 "$BASE/$d.version"
+    fi
+    link "$BASE/bin/$d" "/usr/bin/$d"
+    unit_state "$d" on
+    restart "$d"
+  else
+    err "$d not installed: the UI data it feeds will stay empty"
+    if [ -e "$UNIT_DIR/$d.service" ]; then
+      systemctl disable "$d" >/dev/null 2>&1 || true
+      systemctl stop "$d" 2>/dev/null || true
+    fi
+    remove "$UNIT_DIR/$d.service" "/usr/bin/$d" "$BASE/bin/$d" "$BASE/$d.version"
   fi
-  remove "$UNIT_DIR/diag_bridge.service" /usr/bin/diag_bridge "$BASE/bin/diag_bridge" \
-    "$BASE/diag_bridge.version"
-fi
+}
+install_daemon diag_bridge
+install_daemon system_bridge
 
 # ---------------------------------------------------------------- services
 section "▶️  Services"
@@ -448,7 +454,7 @@ section "📋 Summary"
 # Flush to flash: the files are on disk before we say so, and UBIFS reports
 # the real free space only after write-back.
 sync
-for u in qcmap_httpd crontab ttl-override connection-watchdog euicc diag_bridge; do
+for u in qcmap_httpd crontab ttl-override connection-watchdog euicc diag_bridge system_bridge; do
   en="$(systemctl is-enabled "$u" 2>/dev/null || true)"
   say "  $(printf '%-22s' "$u") $(printf '%-9s' "${en:--}") $(systemctl is-active "$u" 2>/dev/null || true)"
 done

@@ -26,7 +26,7 @@
 ## HTML pages: what they do and how they do it
 ### `deploy/www/index.html` — Home / status
 - Purpose: live dashboard for modem health (temperature, SIM, signal, uptime, LTE/5G throughput, cell details, IPs).
-- How: the Alpine component `processAllInfos()` builds a batch of AT commands and sends them to `cgi-bin/get_atcommand`, parses responses into cards/tables, refreshes periodically, and uses timeouts plus loading spinners to handle slow modems.
+- How: the Alpine component `processAllInfos()` keeps two WebSockets open, to `diag_bridge` (radio, port 9001) and `system_bridge` (QMI modem data, system status, connectivity, port 9002), and renders every push; when `diag_bridge` is down the radio data comes from QMI (badge at the top right). No AT commands are polled. See the README section *Live data*.
 
 ### `deploy/www/radio-settings.html` — Radio settings
 - Purpose: band locking, cell locking, SIM slot, APN, and the eSIM page switch.
@@ -144,7 +144,7 @@ Services installed by `install.sh`:
 ### `install.sh` — Deployment script
 - Purpose: installs SimpleAdmin on the modem over SSH in one go: the `www` directory, `diag_bridge`, `curl`, `jq` and the system scripts and units (TTL, crontab, connection watchdog, euicc).
 - Prerequisites: an SSH key installed for the `root` user on the modem (passwordless SSH access).
-- Safety: before copying anything it checks that the target is a T99W175 (hostname `sdxprairie`, `AT+CGMM` = `T99W175`, `/WEBSERVER` present) and refuses any other host.
+- Safety: before copying anything it checks that the target is a T99W175 (hostname `sdxprairie`, SDX55 SoC, Foxconn firmware tools, `/WEBSERVER` present; the AT channel is not used) and refuses any other host.
 - Usage: `./install.sh [HOST] [--nologin|--login] [--noesim|--esim]` (default host `192.168.225.1`). Without flags the modem keeps its current `simpleadmin.conf` values and `cgi-bin/credentials.txt`; the flags set `SIMPLEADMIN_ENABLE_LOGIN` / `SIMPLEADMIN_ENABLE_ESIM`. Conflicting flags (`--login` with `--nologin`, `--esim` with `--noesim`) are an error.
 - How it works: the payload is streamed as a tar over SSH to `/tmp/simpleadmin-install` and `deploy/install-modem.sh` runs on the modem: it replaces `/WEBSERVER/www` (restarting `qcmap_httpd.service`), installs the binaries in `/data/simpleadmin`, the scripts in `/opt/scripts` and `/etc/init.d`, the units in `/lib/systemd/system`, restarts the services and removes what older installs left in `/opt/simpleadmin`.
 

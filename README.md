@@ -155,7 +155,7 @@ module, each split by kind (`bin/`, `lib/`, `scripts/`, `systemd/`, ...):
 deploy/
   install-modem.sh       modem side of install.sh
   www/                   web UI
-  diag_bridge/  curl/  jq/
+  diag_bridge/  system_bridge/  curl/  jq/
   ttl/  crontab/  watchdog/  euicc/  persistent-mac/  modem-config/
   tailscale/             not pushed: the UI downloads it from GitHub
 ```
@@ -167,12 +167,16 @@ With SSH key access to the modem as `root`:
 ```
 
 It first checks that `HOST` (default `192.168.225.1`) really is a T99W175
-(hostname `sdxprairie`, `AT+CGMM` = `T99W175`, `/WEBSERVER` present) and
+(hostname `sdxprairie`, SDX55 SoC, Foxconn firmware tools, `/WEBSERVER` present; the AT channel is not used) and
 refuses anything else, then installs everything in one go
 (`deploy/install-modem.sh` runs on the modem). Without flags the modem keeps
 its current `simpleadmin.conf` values and `credentials.txt` (plaintext passwords
 in it are converted to SHA-512 crypt); the flags set
 `SIMPLEADMIN_ENABLE_LOGIN` / `SIMPLEADMIN_ENABLE_ESIM`.
+
+Text assets (`.html`, `.css`, `.js`, ...) are installed with a gzip copy next to
+them, which busybox httpd serves to browsers that accept it (about a fifth of
+the bytes).
 
 Binaries go to `/data/simpleadmin` (persistent UBIFS `usrfs`): the root
 filesystem has only a few MB free. Copies left in `/opt/simpleadmin` by older
@@ -181,37 +185,46 @@ installs are removed.
 | What | Source in this repo | On the modem |
 |---|---|---|
 | Web UI | `deploy/www/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
-| `diag_bridge` | `deploy/diag_bridge/`: `bin/diag_bridge` (symlink into the bridge repository, see its `README.md`), `systemd/diag_bridge.service` | `/data/simpleadmin/bin/diag_bridge` (~4 MB) linked from `/usr/bin/diag_bridge`, `/lib/systemd/system/diag_bridge.service` (enabled) |
+| `diag_bridge`, `system_bridge` | `deploy/diag_bridge/`, `deploy/system_bridge/`: `bin/<daemon>` (symlinks into the bridge repository, see `deploy/diag_bridge/README.md`), `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled) |
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
 | `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
 
-## 📡 Advanced Signal Details: AT-based or DIAG-based
+## 📡 Live data: diag_bridge and system_bridge
 
-The signal card opens *Advanced Signal Details*, whose header has an
-**AT-based / DIAG-based** switch (remembered per browser):
+The dashboard and *Advanced Signal Details* are fed by two daemons over
+WebSockets, without polling AT commands:
 
-- **AT-based** parses `AT^DEBUG?` on every dashboard refresh.
-- **DIAG-based** reads the WebSocket pushed by `diag_bridge` on port 9001,
-  decoded from the Qualcomm DIAG interface. Besides per-antenna SINR it shows,
-  per cell, a *Cell* row (TX antennas, Cell ID/TAC/PLMN when the firmware logs
-  them, NR SSB/beams/neighbours), a *DL* row (modulation, MCS, throughput,
-  BLER) and a *UL* row (LTE modulation/RB/throughput; NR MCS/PRB/throughput,
-  power headroom and maximum power). LTE SCells come from the RRC
-  configuration: this firmware does not measure them, so their RSRP/SINR read
-  N/A while bandwidth and throughput are shown. The stream is open only while
-  the modal is visible.
+- **`diag_bridge`** (port 9001) decodes the Qualcomm DIAG interface: serving
+  and aggregated cells, per-antenna RSRP/SINR, modulation, MCS, BLER and
+  throughput per carrier, UL MCS/PRB/power headroom, LTE RRC (SCells, cell
+  identity, NR bandwidth). It is the source of all radio data.
+- **`system_bridge`** (port 9002) uses QMI over QRTR for what DIAG does not
+  carry: NR SINR, temperatures, SIM state and slot, IMEI/IMSI/ICCID,
+  firmware, operator, APN; it also reports uptime, CPU, memory, link speed,
+  WAN address and the ping/DNS connectivity checks of `simpleadmin.conf`.
+  When `diag_bridge` is not connected, its QMI radio data (serving cells,
+  per-chain RSRP, active SCells) takes over.
 
-The dashboard cards stay AT-based in both cases.
+The badge at the top right shows the radio source: **DIAG**, or **QMI** when
+`diag_bridge` is down. Advanced Signal Details shows the same snapshot, with
+the DIAG-only details (DL/UL rows, per-chain SINR, beams) when available.
+LTE SCells come from the RRC configuration (or QMI): this firmware does not
+measure them, so their RSRP/SINR read N/A. Both sockets close while the tab is
+hidden, and the bridges only poll the modem while someone is connected.
 
-`diag_bridge` is developed in its own repository (`T99W175-diag-json-bridge`)
-and is not stored here: `deploy/diag_bridge/bin/diag_bridge` is a gitignored symlink to the
-binary in a checkout next to this one (`deploy/diag_bridge/README.md`). The bridge's
-`scripts/publish-to-simpleadmin.sh` builds it, creates the link and copies the
-systemd unit. The
-service listens on `bridge0` only (`-i bridge0`), so it is not reachable from
-the mobile network.
+The WebSockets follow the same rules as the CGIs (`session_utils.sh`): a page
+from another site is refused (Origin check), a locked GUI refuses everyone,
+and with login enabled the `simpleadmin_session` cookie must name a live
+session.
 
+Both daemons are developed in their own repository
+(`T99W175-diag-json-bridge`) and are not stored here:
+`deploy/<daemon>/bin/<daemon>` are gitignored symlinks to the binaries in a
+checkout next to this one (`deploy/diag_bridge/README.md`). The bridge
+repository's `scripts/publish-to-simpleadmin.sh` builds them, creates the
+links and copies the systemd units. Both listen on `bridge0` only
+(`-i bridge0`), so they are not reachable from the mobile network.
 
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 

@@ -11,8 +11,9 @@
 #   --noesim    set SIMPLEADMIN_ENABLE_ESIM=0    (--esim sets it to 1)
 #
 # Without flags the modem keeps its current simpleadmin.conf values and
-# credentials.txt. The target is checked first (hostname sdxprairie, AT+CGMM
-# T99W175, /WEBSERVER): anything else is refused.
+# credentials.txt. The target is checked first, without touching the AT
+# channel (hostname sdxprairie, SDX55 SoC, Foxconn firmware tools,
+# /WEBSERVER): anything else is refused.
 #
 # Everything that goes on the modem lives in deploy/, one folder per module;
 # deploy/install-modem.sh is the modem side. deploy/diag_bridge/bin/diag_bridge
@@ -78,20 +79,33 @@ cp -R deploy/. "$STAGE/"
 rm -rf "$STAGE/tailscale"
 find "$STAGE" -name '*.md' -delete
 info "📚 documentation and the Tailscale payload left out"
+# busybox httpd serves file.gz to browsers that accept gzip: a third of the
+# bytes on every page load, less work for the modem's single core.
+gz_before=$(find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/config/*' \
+  \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.svg' -o -name '*.json' \) \
+  -size +1k -printf '%s\n' | awk '{s+=$1} END {print s+0}')
+find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/config/*' \
+  \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.svg' -o -name '*.json' \) \
+  -size +1k -exec gzip -9 -n -k {} +
+gz_after=$(find "$STAGE/www" -type f -name '*.gz' -printf '%s\n' | awk '{s+=$1} END {print s+0}')
+ok "🗜️  text assets precompressed: $((gz_before / 1024)) KB → $((gz_after / 1024)) KB served"
 
-BRIDGE_LINK=deploy/diag_bridge/bin/diag_bridge
-rm -f "$STAGE/diag_bridge/bin/diag_bridge"
-if [ -f "$BRIDGE_LINK" ]; then
-  BRIDGE_REPO="$(dirname "$(readlink -f "$BRIDGE_LINK")")"
-  BRIDGE_VERSION="$(git -C "$BRIDGE_REPO" describe --always --dirty --tags 2>/dev/null || echo unknown)"
-  cp -L "$BRIDGE_LINK" "$STAGE/diag_bridge/bin/diag_bridge"
-  printf '%s\n' "$BRIDGE_VERSION" > "$STAGE/diag_bridge/diag_bridge.version"
-  ok "📡 diag_bridge $BRIDGE_VERSION from $BRIDGE_REPO"
-else
-  warn "📡 $BRIDGE_LINK is missing or a dangling link: no diag_bridge in this install"
-  info "   clone T99W175-diag-json-bridge next to this repository and run its"
-  info "   scripts/publish-to-simpleadmin.sh (deploy/diag_bridge/README.md)"
-fi
+# The daemons are symlinks into the T99W175-diag-json-bridge checkout.
+for d in diag_bridge system_bridge; do
+  link="deploy/$d/bin/$d"
+  rm -f "$STAGE/$d/bin/$d"
+  if [ -f "$link" ]; then
+    repo="$(cd "$(dirname "$(readlink -f "$link")")" && git rev-parse --show-toplevel 2>/dev/null || dirname "$(readlink -f "$link")")"
+    version="$(git -C "$repo" describe --always --dirty --tags 2>/dev/null || echo unknown)"
+    cp -L "$link" "$STAGE/$d/bin/$d"
+    printf '%s\n' "$version" > "$STAGE/$d/$d.version"
+    ok "📡 $d $version from $repo"
+  else
+    warn "📡 $link is missing or a dangling link: no $d in this install"
+    info "   clone T99W175-diag-json-bridge next to this repository and run its"
+    info "   scripts/publish-to-simpleadmin.sh (deploy/diag_bridge/README.md)"
+  fi
+done
 for t in curl jq modem-config ttl crontab watchdog euicc persistent-mac; do
   [ -d "$STAGE/$t" ] || die "module deploy/$t is missing"
 done
@@ -102,16 +116,23 @@ info "📏 $(du -sh "$STAGE" | cut -f1) to transfer"
 
 # ---------------------------------------------------------------- target
 section "🔎 Target"
+# Identified without the AT channel, which can be slow or out of step: the
+# hostname and SoC of the SDX55, Foxconn's firmware tools and the QCMAP web
+# root. The model name itself is only reachable through AT.
 ID="$(ssh -o ConnectTimeout=10 "$TARGET" \
-  'printf "%s|" "$(uname -n)"; [ -d /WEBSERVER ] && printf "web|" || printf "noweb|";
-   atcli_smd8 "AT+CGMM" 2>/dev/null | tr -d "\r" | grep -x "T99W[0-9]*" | head -1' 2>/dev/null)" ||
+  'printf "%s|" "$(uname -n)";
+   printf "%s|" "$(cat /sys/devices/soc0/machine 2>/dev/null)";
+   [ -x /usr/bin/fxdiag ] && printf "foxconn|" || printf "other|";
+   [ -d /WEBSERVER ] && printf "web" || printf "noweb"' 2>/dev/null)" ||
   die "cannot reach $TARGET over SSH"
 ok "🔌 SSH to $TARGET"
-IFS='|' read -r ID_HOST ID_WEB ID_MODEL <<< "$ID"
+IFS='|' read -r ID_HOST ID_SOC ID_VENDOR ID_WEB <<< "$ID"
 [ "$ID_HOST" = "sdxprairie" ] && ok "🖥️  hostname $ID_HOST" ||
   die "hostname '${ID_HOST:-?}' is not sdxprairie: $HOST is not a T99W175"
-[ "$ID_MODEL" = "T99W175" ] && ok "📟 AT+CGMM $ID_MODEL" ||
-  die "AT+CGMM answered '${ID_MODEL:-nothing}', not T99W175"
+[ "$ID_SOC" = "SDXPRAIRIE" ] && ok "🧠 SoC $ID_SOC (SDX55)" ||
+  die "SoC '${ID_SOC:-?}' is not SDXPRAIRIE (SDX55)"
+[ "$ID_VENDOR" = "foxconn" ] && ok "🏭 Foxconn firmware (fxdiag)" ||
+  die "no Foxconn firmware tools (/usr/bin/fxdiag): not a T99W175"
 [ "$ID_WEB" = "web" ] && ok "📁 /WEBSERVER present" ||
   die "/WEBSERVER is missing: not a SimpleAdmin-capable firmware"
 

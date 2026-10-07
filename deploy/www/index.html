@@ -78,6 +78,13 @@
           </a>
           <!-- RIGHT CONTROLS (mobile + desktop) -->
           <div class="d-flex align-items-center ms-auto gap-1 order-lg-3">
+            <!-- Radio data source: DIAG (diag_bridge) or QMI (system_bridge) -->
+            <span
+              class="badge me-1"
+              :class="radioSource === 'diag' ? 'bg-success' : (radioSource === 'qmi' ? 'bg-warning text-dark' : 'bg-secondary')"
+              :title="radioSourceTitle()"
+              x-text="radioSourceLabel()"
+            ></span>
             <!-- Dark mode MOBILE -->
             <button
               id="darkModeToggleMobile"
@@ -1020,22 +1027,6 @@
                       <polyline points="6 16 10 12 14 14 19 7"></polyline>
                     </svg>
                   </button>
-                  <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Signal data source">
-                    <button
-                      type="button"
-                      class="btn"
-                      :class="signalSource === 'at' ? 'btn-primary' : 'btn-outline-primary'"
-                      :aria-pressed="signalSource === 'at'"
-                      @click="setSignalSource('at')"
-                      title="Cell details from AT^DEBUG? polling">AT-based</button>
-                    <button
-                      type="button"
-                      class="btn"
-                      :class="signalSource === 'diag' ? 'btn-primary' : 'btn-outline-primary'"
-                      :aria-pressed="signalSource === 'diag'"
-                      @click="setSignalSource('diag')"
-                      title="Cell details pushed by diag_bridge from the Qualcomm DIAG interface">DIAG-based</button>
-                  </div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
@@ -1100,28 +1091,32 @@
                     <span x-text="'Min: ' + formatSignalChartValue(getSignalChartScale().min)"></span>
                   </div>
                 </div>
-                <template x-if="signalSource === 'diag'">
-                  <div class="d-flex flex-wrap align-items-center gap-2 small mb-3">
+                <div class="d-flex flex-wrap align-items-center gap-2 small mb-3">
+                  <span
+                    class="badge"
+                    :class="diagStatus === 'connected' ? 'bg-success' : (diagStatus === 'connecting' ? 'bg-warning text-dark' : 'bg-danger')"
+                    x-text="diagStatusLabel()"
+                  ></span>
+                  <span
+                    class="badge"
+                    :class="radioSource === 'diag' ? 'bg-success' : (radioSource === 'qmi' ? 'bg-warning text-dark' : 'bg-secondary')"
+                    :title="radioSourceTitle()"
+                    x-text="'Source: ' + radioSourceLabel()"
+                  ></span>
+                  <template x-if="diagSummary">
                     <span
-                      class="badge"
-                      :class="diagStatus === 'connected' ? 'bg-success' : (diagStatus === 'connecting' ? 'bg-warning text-dark' : 'bg-danger')"
-                      x-text="diagStatusLabel()"
+                      class="text-muted"
+                      x-text="diagSummary.cells + ' cell(s) · ' + diagSummary.total_bandwidth_mhz + ' MHz aggregated' + (diagSummary.total_dl_mbps > 0 ? ' · ' + Number(diagSummary.total_dl_mbps).toFixed(1) + ' Mbps DL' : '') + (diagSummary.total_ul_mbps > 0 ? ' · ' + Number(diagSummary.total_ul_mbps).toFixed(1) + ' Mbps UL' : '')"
                     ></span>
-                    <template x-if="diagSummary">
-                      <span
-                        class="text-muted"
-                        x-text="diagSummary.cells + ' cell(s) · ' + diagSummary.total_bandwidth_mhz + ' MHz aggregated' + (diagSummary.total_dl_mbps > 0 ? ' · ' + Number(diagSummary.total_dl_mbps).toFixed(1) + ' Mbps DL' : '') + (diagSummary.total_ul_mbps > 0 ? ' · ' + Number(diagSummary.total_ul_mbps).toFixed(1) + ' Mbps UL' : '')"
-                      ></span>
-                    </template>
-                    <template x-if="diagLastUpdate">
-                      <span class="text-muted" x-text="'Updated ' + diagLastUpdate"></span>
-                    </template>
-                  </div>
-                </template>
+                  </template>
+                  <template x-if="diagLastUpdate">
+                    <span class="text-muted" x-text="'Updated ' + diagLastUpdate"></span>
+                  </template>
+                </div>
 
                 <template x-if="activeSignals().length === 0">
                   <p class="mb-0 text-muted"
-                     x-text="signalSource === 'diag' ? 'Waiting for bridge…' : 'No advanced details available.'">
+                     x-text="'Waiting for bridge…'">
                   </p>
                 </template>
 
@@ -1299,7 +1294,7 @@
                   </div>
                 </template>
 
-                <div class="mt-4" x-show="signalSource !== 'diag'">
+                <div class="mt-4">
                   <h6 class="fw-semibold">Network analysis</h6>
                   <template x-if="!activeNetworkAnalysis()">
                     <p class="mb-0 text-muted">No network analysis available.</p>
