@@ -20,9 +20,8 @@ import { cn } from "@/lib/utils";
 // BridgeStatus — header badges for diag_bridge and system_bridge
 // =============================================================================
 // Passive: it reads the shared bridge store without connecting, so it never
-// makes the bridges poll the modem by itself. On pages that use live data it
-// shows the real link state; elsewhere the links are idle ("standby"), and
-// "Check now" connects both for a few seconds.
+// makes the bridges poll the modem by itself. It only appears on pages that
+// use live data; "Check now" reconnects both for a few seconds.
 // =============================================================================
 
 const CHECK_MS = 8000;
@@ -106,6 +105,9 @@ export function BridgeStatus() {
     setTimeout(() => setChecking(false), CHECK_MS);
   };
 
+  // Pages without live data leave both links idle: nothing to show there.
+  if (diag === "standby" && system === "standby") return null;
+
   const badge = (label: string, h: Health) => (
     <span className="flex items-center gap-1.5">
       <span className={cn("size-2 rounded-full", DOT[h])} />
@@ -122,8 +124,8 @@ export function BridgeStatus() {
           className="gap-3 font-mono text-xs"
           aria-label={`diag_bridge: ${LABEL[diag]}; system_bridge: ${LABEL[system]}`}
         >
-          {badge("DIAG", diag)}
-          {badge("SYS", system)}
+          {diag !== "standby" && badge("DIAG", diag)}
+          {system !== "standby" && badge("SYS", system)}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
@@ -131,9 +133,7 @@ export function BridgeStatus() {
           <PopoverTitle>Live data bridges</PopoverTitle>
           <PopoverDescription>
             Radio source now:{" "}
-            {diag === "standby" && system === "standby"
-              ? "— (not connected)"
-              : source === "diag"
+            {source === "diag"
                 ? "DIAG"
                 : source === "qmi"
                   ? "QMI (diag_bridge not available)"
