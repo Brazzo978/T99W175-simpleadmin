@@ -145,7 +145,8 @@ export function parseSmsList(output: string, storage: "ME" | "SM"): SmsMessage[]
     messages.push({
       indexes: [index],
       sender,
-      content: isHex ? decodeHexText(compact).trim() : decodeGsm7(raw.trim()),
+      // Only protocol line endings are stripped: the text itself is kept as sent.
+      content: isHex ? decodeHexText(compact) : decodeGsm7(raw),
       timestamp: inboxTimestamp(match[3]),
       storage,
     });
