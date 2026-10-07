@@ -1,0 +1,6 @@
+[Unit]
+Description=Remove stale IP passthrough entries from the QCMAP DHCP server
+
+[Service]
+Type=oneshot
+ExecStart=/opt/scripts/dhcp-guard/dhcp-guard

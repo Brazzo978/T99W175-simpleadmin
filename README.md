@@ -162,6 +162,7 @@ deploy/
   www-app/               web interface, built from frontend/
   diag_bridge/  system_bridge/  curl/  jq/
   ttl/  crontab/  watchdog/  euicc/  persistent-mac/  modem-config/
+  dhcp-guard/            keeps stale passthrough leases out of the LAN DHCP
   tailscale/             not pushed: the UI downloads it from GitHub
 ```
 
@@ -193,6 +194,7 @@ installs are removed.
 | `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled) |
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
+| DHCP guard | `deploy/dhcp-guard/` | `/opt/scripts/dhcp-guard/dhcp-guard`, run every minute by `dhcp-guard.timer` (see below) |
 | `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
 
 ## 🖥 Web interface
@@ -284,6 +286,23 @@ a checkout next to this one (`deploy/diag_bridge/README.md`); that
 repository's `scripts/publish-to-simpleadmin.sh` builds it, creates the link
 and copies the unit. Both listen on `bridge0` only (`-i bridge0`), so they
 are not reachable from the mobile network.
+
+## 🛡 DHCP guard
+
+QCMAP keeps the MAC,IP pairs of every IP passthrough session in
+`/etc/data/dhcp_hosts` and rewrites them on each WAN change; the stock
+`/etc/data/dnsmasq.conf` also carries `dhcp-range=10.0.0.10,10.0.0.200,2h`,
+which without a netmask covers all of 10.0.0.0/8. Together they let dnsmasq,
+once QCMAP restarts it, lease a LAN client an old WAN address instead of a
+192.168.225.x one: a host that used to be the passthrough client, or that
+manages the modem through its LAN, loses its LAN address.
+
+`dhcp-guard` (every minute, `dhcp-guard.timer`) comments out that range and
+keeps in `dhcp_hosts` only the lines whose MAC `mobileap_cfg.xml` knows (the
+passthrough client, DHCP reservations), then has dnsmasq reread the file
+(`SIGHUP`). It never restarts dnsmasq: started by hand it cannot bind the
+passthrough gateway address, so the range change applies at QCMAP's next
+restart. What it removes goes to the journal (`journalctl -u dhcp-guard`).
 
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 

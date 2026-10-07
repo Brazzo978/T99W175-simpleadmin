@@ -138,10 +138,10 @@ if [ -f "$sb" ]; then
 else
   warn "📡 $sb is missing: run deploy/system_bridge/build.sh"
 fi
-for t in curl jq modem-config ttl crontab watchdog euicc persistent-mac; do
+for t in curl jq modem-config ttl crontab watchdog euicc persistent-mac dhcp-guard; do
   [ -d "$STAGE/$t" ] || die "module deploy/$t is missing"
 done
-ok "🧩 modules: curl jq modem-config ttl crontab watchdog euicc persistent-mac"
+ok "🧩 modules: curl jq modem-config ttl crontab watchdog euicc persistent-mac dhcp-guard"
 [ -n "$SA_LOGIN" ] && ok "🔐 login will be set to $SA_LOGIN" || info "🔐 login setting kept"
 [ -n "$SA_ESIM" ] && ok "📶 eSIM will be set to $SA_ESIM" || info "📶 eSIM setting kept"
 info "📏 $(du -sh "$STAGE" | cut -f1) to transfer"

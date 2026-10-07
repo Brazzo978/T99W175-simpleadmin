@@ -333,6 +333,10 @@ install_file "$SRC/ttl/systemd/ttl-override.service" 644 "$UNIT_DIR/ttl-override
 install_file "$SRC/watchdog/systemd/connection-watchdog.service" 644 \
   "$UNIT_DIR/connection-watchdog.service"
 install_file "$SRC/euicc/systemd/euicc.service" 644 "$UNIT_DIR/euicc.service"
+mkdir -p /opt/scripts/dhcp-guard
+install_file "$SRC/dhcp-guard/scripts/dhcp-guard" 755 /opt/scripts/dhcp-guard/dhcp-guard
+install_file "$SRC/dhcp-guard/systemd/dhcp-guard.service" 644 "$UNIT_DIR/dhcp-guard.service"
+install_file "$SRC/dhcp-guard/systemd/dhcp-guard.timer" 644 "$UNIT_DIR/dhcp-guard.timer"
 
 # ---------------------------------------------------------------- MAC
 # eth0 and bridge0 get <EarlyEthMACAddr> instead of a random MAC per boot:
@@ -443,6 +447,10 @@ systemctl daemon-reload
 info "🔄 systemd reloaded"
 unit_state crontab on
 restart crontab
+# Stale IP passthrough entries in the QCMAP DHCP server (see the script).
+/opt/scripts/dhcp-guard/dhcp-guard | sed 's/^/  /' || warn "dhcp-guard failed"
+unit_state dhcp-guard.timer on
+restart dhcp-guard.timer
 unit_state ttl-override on
 # Oneshot: re-applies the TTL rules from /persist/ttlvalue.
 ttl="$(cat /persist/ttlvalue 2>/dev/null || echo 0)"
@@ -480,7 +488,7 @@ section "📋 Summary"
 # Flush to flash: the files are on disk before we say so, and UBIFS reports
 # the real free space only after write-back.
 sync
-for u in qcmap_httpd crontab ttl-override connection-watchdog euicc diag_bridge system_bridge; do
+for u in qcmap_httpd crontab dhcp-guard.timer ttl-override connection-watchdog euicc diag_bridge system_bridge; do
   en="$(systemctl is-enabled "$u" 2>/dev/null || true)"
   say "  $(printf '%-22s' "$u") $(printf '%-9s' "${en:--}") $(systemctl is-active "$u" 2>/dev/null || true)"
 done

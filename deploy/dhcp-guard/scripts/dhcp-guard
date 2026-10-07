@@ -1,0 +1,64 @@
+#!/bin/sh
+# Keeps the QCMAP DHCP server (dnsmasq) from handing LAN clients addresses
+# left over from old IP passthrough sessions. Run every minute by
+# dhcp-guard.timer; does nothing when there is nothing to fix.
+#
+# QCMAP rewrites /etc/data/dhcp_hosts on every WAN change and carries over
+# the MAC,IP pairs already in it, so pairs of passthrough sessions that
+# ended stay forever. Together with the stock
+# "dhcp-range=10.0.0.10,10.0.0.200,2h" of /etc/data/dnsmasq.conf (no
+# netmask: all of 10.0.0.0/8) such a pair makes dnsmasq lease a LAN client
+# an old WAN address instead of a 192.168.225.x one, after QCMAP restarts
+# dnsmasq. Seen on 2026-10-07: the management host lost its LAN address.
+#
+# 1. the stock range is commented out (effective at QCMAP's next dnsmasq
+#    start: dnsmasq started by hand cannot bind the passthrough gateway);
+# 2. dhcp_hosts keeps only the lines whose MAC mobileap_cfg.xml knows (the
+#    passthrough client, DHCP reservations); dnsmasq rereads it on SIGHUP.
+set -eu
+
+CONF=/etc/data/dnsmasq.conf
+HOSTS=/etc/data/dhcp_hosts
+CFG=/etc/data/mobileap_cfg.xml
+PIDFILE=/var/run/data/dnsmasq.pid
+STOCK_RANGE='dhcp-range=10.0.0.10,10.0.0.200,2h'
+
+log() {
+  logger -t dhcp-guard "$1" 2>/dev/null || true
+  echo "$1"
+}
+
+if [ -f "$CONF" ] && grep -qx "$STOCK_RANGE" "$CONF"; then
+  sed -i "s/^dhcp-range=10\.0\.0\.10,10\.0\.0\.200,2h\$/# & (disabled by SimpleAdmin dhcp-guard)/" "$CONF"
+  log "🛡️  stock range $STOCK_RANGE disabled in $CONF"
+fi
+
+# Without the QCMAP configuration there is no way to tell current entries
+# from stale ones: leave the file alone.
+[ -f "$HOSTS" ] && [ -f "$CFG" ] || exit 0
+
+known="$(grep -o -i -E '([0-9a-f]{2}:){5}[0-9a-f]{2}' "$CFG" | tr 'A-F' 'a-f' | sort -u)"
+tmp="$HOSTS.guard"
+: > "$tmp"
+removed=0
+while IFS= read -r line || [ -n "$line" ]; do
+  [ -n "$line" ] || continue
+  mac="$(printf '%s' "${line%%,*}" | tr 'A-F' 'a-f')"
+  if printf '%s\n' "$known" | grep -qx "$mac"; then
+    printf '%s\n' "$line" >> "$tmp"
+  else
+    removed=$((removed + 1))
+    log "🧹 stale entry removed from $HOSTS: $line"
+  fi
+done < "$HOSTS"
+
+if [ "$removed" -eq 0 ]; then
+  rm -f "$tmp"
+  exit 0
+fi
+mv -f "$tmp" "$HOSTS"
+if [ -f "$PIDFILE" ] && kill -HUP "$(cat "$PIDFILE")" 2>/dev/null; then
+  log "🔄 dnsmasq reloaded $HOSTS ($removed stale entries removed)"
+else
+  log "⚠️  $removed stale entries removed, dnsmasq not running: applies at its next start"
+fi
