@@ -18,7 +18,6 @@ pages removed from `frontend/` are re-imported from there when ported.
 
 ### Next
 - [ ] Page strings are English only: move them to `locales/` (en, it).
-- [ ] New screenshots for the README, with IMEI/ICCID/IMSI/SMS masked.
 - [ ] Verify on the modem the actions not exercised yet (they send the same
       commands as the classic pages did): band/cell lock, APN change, SIM
       switch, SMS send/delete, IMEI write, watchdog save, eSIM download.

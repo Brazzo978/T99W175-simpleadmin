@@ -84,10 +84,37 @@ Notes:
 
 ## 📸 Screenshots
 
-These show the classic Alpine.js front-end (`--www-alpine`), not the default
-one described in [Web interface](#-web-interface).
+### Default front-end (`deploy/www-nextjs`)
 
-### Home
+Identifiers (IMEI, IMSI, ICCID, cell ID, MAC and WAN addresses) are masked.
+
+![Dashboard](docs/media/nextjs/dashboard.png)
+
+<details>
+<summary><b>More screenshots</b></summary>
+
+### Signal Details
+![Signal Details](docs/media/nextjs/signal-details.png)
+
+### Cellular Settings
+![Cellular Settings](docs/media/nextjs/cellular-settings.png)
+
+### Band Locking
+![Band Locking](docs/media/nextjs/band-locking.png)
+
+### Local Network
+![Local Network](docs/media/nextjs/local-network.png)
+
+### Connection Monitoring
+![Connection Monitoring](docs/media/nextjs/connection-monitoring.png)
+
+### System
+![System](docs/media/nextjs/system.png)
+
+</details>
+
+### Classic front-end (`deploy/www-alpine`, `--www-alpine`)
+
 ![Home](docs/media/Home.jpg)
 
 <details>
@@ -116,41 +143,120 @@ one described in [Web interface](#-web-interface).
 
 </details>
 
-
-
 ## 🛠 Installation
 
-Simpleadmin is designed to run directly on the Foxconn T99W175 inside the modem’s web partition.
-Follow these steps to deploy it safely.
+### Requirements
 
+- A Foxconn T99W175 reachable from the workstation (default `192.168.225.1`)
+  with SSH access as `root` by key.
+- A Linux workstation with `bash`, `ssh`, `tar`, `gzip` and GNU `find`
+  (the installer uses `find -printf`).
+- Nothing to build: the web front-end (`deploy/www-nextjs`) and
+  `system_bridge` are versioned. Node.js 20+ is needed only to change the
+  front-end (`frontend/build.sh`). `diag_bridge` comes from the
+  `T99W175-diag-json-bridge` repository checked out next to this one
+  (`deploy/diag_bridge/README.md`); without it the install goes on and the
+  modem keeps the bridge it has.
 
-1 Download or clone the repository
-
-2 Extract the ZIP and locate the www folder
-
-3 Connect via SSH to the modem (default IP: 192.168.225.1, default user: root)
-
-4 Locate the webserver folder and inside it find the current www directory
-
-5 Delete or rename the existing www folder
-
-6 Upload the freshly downloaded www folder from the repository
-
-7 Give the www folder recursive 777 permissions:
+### Procedure
 
 ```bash
-chmod -R 777 /www
+git clone https://github.com/Brazzo978/T99W175-simpleadmin.git
+cd T99W175-simpleadmin
+git checkout Beta
+./install.sh                 # or: ./install.sh 192.168.225.1 --nologin
 ```
 
-8 Either reboot the modem or restart the webserver:
+Then open `http://192.168.225.1/`. The installer is idempotent: run it again
+after every update, it only changes what differs.
+
+| Option | Effect |
+|---|---|
+| `HOST` | modem address (default `192.168.225.1`) |
+| `--www-nextjs` | web front-end: the new interface of `deploy/www-nextjs` (the default) |
+| `--www-alpine` | web front-end: the classic Bootstrap/Alpine.js pages of `deploy/www-alpine` |
+| `--onlywww` | install the web UI only (front-end, CGIs, configuration): no binaries, scripts, units or services |
+| `--nologin` / `--login` | set `SIMPLEADMIN_ENABLE_LOGIN` to 0 / 1 (otherwise the current value is kept) |
+| `--noesim` / `--esim` | set `SIMPLEADMIN_ENABLE_ESIM` to 0 / 1 and stop / start the euicc service (not with `--onlywww`) |
+
+Examples:
 
 ```bash
-systemctl restart qcmap_httpd.service
+./install.sh --www-alpine              # everything, classic front-end
+./install.sh --onlywww                 # update the web UI only
+./install.sh 10.0.0.1 --login --esim   # another address, login and eSIM on
 ```
 
-Browse to the GUI and use Simpleadmin
+Conflicting options (`--login --nologin`, `--www-alpine --www-nextjs`) stop
+the installer before anything is copied.
 
-### Deploying from a workstation
+### What `install.sh` does (workstation)
+
+1. Reads the version from `VERSION.md` and stages `deploy/` in a temporary
+   directory (only `www`, the front-ends and `install-modem.sh` with
+   `--onlywww`); documentation and the Tailscale payload stay behind.
+2. Builds the web root: `deploy/www` (CGIs, `config/`, GUI lock page) plus
+   the chosen front-end, warns when `frontend/` is newer than its build, and
+   adds a gzip copy of every text asset (busybox httpd serves it to browsers
+   that accept gzip).
+3. Adds `diag_bridge` (from the bridge repository) and `system_bridge`,
+   warning when a binary is missing or older than its sources, and checks
+   that every module folder is there.
+4. Identifies the target without the AT channel (hostname `sdxprairie`,
+   SDX55 SoC, Foxconn `fxdiag`, `/WEBSERVER`) and refuses anything else.
+5. Copies the payload to `/tmp/simpleadmin-install` on the modem, runs
+   `install-modem.sh` there and removes the payload afterwards.
+
+### What `install-modem.sh` does (modem)
+
+In this order; each step reports `unchanged` when there is nothing to do.
+
+1. **Leftovers of older installs**: removes `/opt/simpleadmin`,
+   `/opt/scripts/diag`, the old TTL value file, a shadowing
+   `diag_bridge.service` in `/etc`, hand-made `wants` links of the managed
+   units, and the systemd version of the MAC fix.
+2. **Web UI**: stages the new web root next to `/WEBSERVER/www`, keeps every
+   `simpleadmin.conf` value already set (new keys get their default) and the
+   existing `cgi-bin/credentials.txt` (plaintext passwords become SHA-512
+   crypt), applies `--login`/`--esim`, then stops `qcmap_httpd`, swaps the
+   tree and starts it again; on failure the previous UI is put back.
+   With `--onlywww` the installer stops here.
+3. **Tools in `/data/simpleadmin`**: `curl` and `jq` with their libraries
+   (wrappers in `/usr/bin`, the firmware's `libcurl` untouched) and
+   `modem_config` (linked from `/usr/bin` and `/usr/sbin`); each one is run
+   once to check it works.
+4. **System scripts and units**: `ttl-override`, `connection-watchdog` (its
+   configuration `/opt/scripts/Watchdog` only the first time), the crontab
+   init script, `dhcp-guard` and the systemd units in `/lib/systemd/system`.
+5. **Persistent MAC**: udev rule and script for `eth0`, `/sbin/ifconfig`
+   wrapper for `bridge0` (the firmware's `ifconfig` kept as
+   `/sbin/ifconfig.real`); applies at the next reboot.
+6. **diag_bridge, system_bridge**: binaries in `/data/simpleadmin/bin`,
+   linked from `/usr/bin`, units enabled and restarted; a binary that does not
+   run on the modem is not installed (the one already there is kept).
+7. **AT client**: `/usr/bin/atcli_smd8` becomes a link to `system_bridge`,
+   the serialized AT client (the firmware's is kept as
+   `/usr/bin/atcli_smd8.real` and put back if the new one does not answer).
+8. **Services**: `crontab`, `dhcp-guard.timer` (run once right away),
+   `ttl-override` (re-applies `/persist/ttlvalue`), `connection-watchdog` and
+   `euicc` enabled or disabled as their configuration says.
+9. **Summary**: state of every unit and free space on `/` and `/data`.
+
+### Manual install (web UI only)
+
+Without the installer, build the web root by hand and copy it over; this
+does not keep the modem's `simpleadmin.conf` and `credentials.txt`, and does
+not install the bridges the dashboard reads.
+
+```bash
+mkdir /tmp/www && cp -R deploy/www/. deploy/www-nextjs/. /tmp/www/   # or deploy/www-alpine/.
+scp -r /tmp/www root@192.168.225.1:/WEBSERVER/www.new
+ssh root@192.168.225.1 'chmod -R 755 /WEBSERVER/www.new &&
+  rm -rf /WEBSERVER/www && mv /WEBSERVER/www.new /WEBSERVER/www &&
+  systemctl restart qcmap_httpd.service'
+```
+
+### Repository layout
 
 Everything that ends up on the modem lives in `deploy/`, one folder per
 module, each split by kind (`bin/`, `lib/`, `scripts/`, `systemd/`, ...):
@@ -166,26 +272,6 @@ deploy/
   dhcp-guard/            keeps stale passthrough leases out of the LAN DHCP
   tailscale/             not pushed: the UI downloads it from GitHub
 ```
-
-With SSH key access to the modem as `root`:
-
-```bash
-./install.sh [HOST] [--www-alpine|--www-nextjs] [--onlywww] [--nologin|--login] [--noesim|--esim]
-```
-
-It first checks that `HOST` (default `192.168.225.1`) really is a T99W175
-(hostname `sdxprairie`, SDX55 SoC, Foxconn firmware tools, `/WEBSERVER` present; the AT channel is not used) and
-refuses anything else, then installs everything in one go
-(`deploy/install-modem.sh` runs on the modem). Without flags the modem keeps
-its current `simpleadmin.conf` values and `credentials.txt` (plaintext passwords
-in it are converted to SHA-512 crypt); the flags set
-`SIMPLEADMIN_ENABLE_LOGIN` / `SIMPLEADMIN_ENABLE_ESIM`.
-
-The web root is `deploy/www` plus one front-end: `deploy/www-nextjs` by
-default, the classic pages of `deploy/www-alpine` with `--www-alpine`.
-`--onlywww` installs the web UI only (front-end, CGIs, configuration, login
-flag) and leaves binaries, scripts, units and services alone; it refuses
-`--esim`/`--noesim`, which also start or stop the euicc service.
 
 Text assets (`.html`, `.css`, `.js`, ...) are installed with a gzip copy next to
 them, which busybox httpd serves to browsers that accept it (about a fifth of
