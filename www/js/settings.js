@@ -143,6 +143,10 @@ function registerNetworkSettings() {
     },
     // ARP table entries array
     arpEntries: [],
+    // Bridge MAC dropdown selection: "" (none), a MAC from arpEntries,
+    // or bridgeMacManual to type an arbitrary MAC address
+    bridgeMacChoice: "",
+    bridgeMacManual: "__manual__",
     // Flag showing if there are pending changes that require restart
     pendingRestartWarning: false,
     // Save confirmation modal visibility
@@ -245,6 +249,7 @@ function registerNetworkSettings() {
       this.form.ipv6Enabled = Boolean(data.ipv6Enabled);
       this.form.bridgeEnabled = Boolean(data.bridgeEnabled);
       this.form.bridgeMac = data.bridgeMac || "";
+      this.syncBridgeMacChoice();
       this.form.autoConnect = data.autoConnect !== undefined ? Boolean(data.autoConnect) : true;
       this.form.roamingEnabled = data.roamingEnabled !== undefined ? Boolean(data.roamingEnabled) : false;
       this.originalData = JSON.parse(JSON.stringify(this.form));
@@ -344,6 +349,7 @@ function registerNetworkSettings() {
       // Case 2: No MAC set while disabling - clear it
       else if (!this.form.bridgeEnabled) {
         this.form.bridgeMac = "";
+        this.bridgeMacChoice = "";
       }
       // Case 3: Enabling bridge mode - show enable confirmation
       else if (this.form.bridgeEnabled && !this.showBridgeDisableModal) {
@@ -388,6 +394,7 @@ function registerNetworkSettings() {
       // User confirmed - disable bridge mode and clear MAC
       this.form.bridgeEnabled = false;
       this.form.bridgeMac = "";
+      this.bridgeMacChoice = "";
 
       // Save immediately without restart
       await this.saveBridgeDisable();
@@ -1298,6 +1305,27 @@ function registerNetworkSettings() {
         }
       }, 1000);
     },
+    /**
+     * Points the bridge MAC dropdown at the configured MAC: the matching
+     * ARP entry when the modem has seen it, otherwise manual entry so a
+     * MAC that is not in the ARP table stays visible and editable.
+     */
+    syncBridgeMacChoice() {
+      const mac = (this.form.bridgeMac || "").trim().toUpperCase();
+      if (!mac) {
+        if (this.bridgeMacChoice !== this.bridgeMacManual) {
+          this.bridgeMacChoice = "";
+        }
+        return;
+      }
+      const known = this.arpEntries.some((entry) => entry.mac === mac);
+      this.bridgeMacChoice = known ? mac : this.bridgeMacManual;
+    },
+    onBridgeMacChoice() {
+      if (this.bridgeMacChoice !== this.bridgeMacManual) {
+        this.form.bridgeMac = this.bridgeMacChoice;
+      }
+    },
     async fetchArpEntries() {
       try {
         const response = await fetch("/cgi-bin/get_arp");
@@ -1332,6 +1360,7 @@ function registerNetworkSettings() {
               label: `${item.mac} (${ipList})`
             };
           });
+          this.syncBridgeMacChoice();
         }
       } catch (error) {
         console.error("Error loading ARP entries:", error);
