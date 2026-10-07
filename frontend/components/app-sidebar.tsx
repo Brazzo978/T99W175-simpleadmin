@@ -1,7 +1,21 @@
 "use client";
 
 import * as React from "react";
-import { HomeIcon, RouterIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  CogIcon,
+  CreditCardIcon,
+  GlobeIcon,
+  HomeIcon,
+  KeyRoundIcon,
+  MessageCircleIcon,
+  NetworkIcon,
+  RadioTowerIcon,
+  RouterIcon,
+  Settings2Icon,
+  SignalIcon,
+  TerminalIcon,
+} from "lucide-react";
 
 import SimpleT99Icon from "@/public/simple-t99-icon.png";
 
@@ -27,6 +41,35 @@ const navigation: { groupKey: string; items: NavItem[] }[] = [
   {
     groupKey: "dashboard",
     items: [{ t_key: "home", url: "/dashboard", icon: HomeIcon }],
+  },
+  {
+    groupKey: "cellular",
+    items: [
+      { t_key: "signal_details", url: "/cellular/signal", icon: RadioTowerIcon },
+      { t_key: "settings", url: "/cellular/settings", icon: Settings2Icon },
+      {
+        t_key: "band_locking",
+        url: "/cellular/band-locking",
+        icon: SignalIcon,
+        items: [{ t_key: "cell_locking", url: "/cellular/cell-locking" }],
+      },
+      { t_key: "sms_center", url: "/cellular/sms", icon: MessageCircleIcon },
+      { t_key: "esim", url: "/cellular/esim", icon: CreditCardIcon },
+    ],
+  },
+  {
+    groupKey: "local_network",
+    items: [{ t_key: "local_network_settings", url: "/network/settings", icon: NetworkIcon }],
+  },
+  {
+    groupKey: "system",
+    items: [
+      { t_key: "connection_monitoring", url: "/system/monitoring", icon: ActivityIcon },
+      { t_key: "tailscale", url: "/system/tailscale", icon: GlobeIcon },
+      { t_key: "at_terminal", url: "/system/terminal", icon: TerminalIcon },
+      { t_key: "credentials", url: "/system/credentials", icon: KeyRoundIcon },
+      { t_key: "system_settings", url: "/system/settings", icon: CogIcon },
+    ],
   },
 ];
 

@@ -75,7 +75,7 @@ export function NavUser({
     e.preventDefault();
     setRebooting(true);
     const result = await rebootModem();
-    if (!result.success) {
+    if (!result.ok) {
       toast.error(result.message || "Reboot refused.");
       setRebooting(false);
       setRebootDialogOpen(false);
@@ -90,7 +90,7 @@ export function NavUser({
     setReconnecting(true);
     try {
       const result = await reconnectNetwork();
-      if (result.success) {
+      if (result.ok) {
         toast.success("Network reconnect initiated. Connection may drop briefly.");
       } else {
         toast.error(result.message || "Reconnect failed.");

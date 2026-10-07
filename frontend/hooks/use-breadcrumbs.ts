@@ -10,48 +10,48 @@ export interface BreadcrumbItem {
   isCurrentPage: boolean;
 }
 
-// Map each route segment to a key in the "sidebar" namespace (groups.* or
-// items.*), so breadcrumbs read exactly like the sidebar they mirror and pick up
-// translations for free. Segments not listed here fall back to a capitalized
-// version of the raw segment.
-const routeKeyMap: Record<string, string> = {
-  dashboard: 'groups.dashboard',
-  home: 'items.home',
-  cellular: 'groups.cellular',
-  sms: 'items.sms_center',
-  'custom-profiles': 'items.custom_profiles',
-  'connection-scenarios': 'items.connection_scenarios',
-  'cell-locking': 'items.band_locking',
-  'tower-locking': 'items.tower_locking',
-  'frequency-locking': 'items.frequency_locking',
-  'cell-scanner': 'items.cell_scanner',
-  'neighbourcell-scanner': 'items.neighboring_cells',
-  'frequency-calculator': 'items.frequency_calculator',
-  settings: 'items.settings',
-  'apn-management': 'items.apn_management',
-  'network-priority': 'items.network_priority',
-  'imei-settings': 'items.imei_settings',
-  'fplmn-settings': 'items.fplmn_settings',
-  'local-network': 'groups.local_network',
-  'ip-passthrough': 'items.ip_passthrough',
-  ethernet: 'items.ethernet_status',
-  'ttl-settings': 'items.ttl_mtu_settings',
-  'custom-dns': 'items.custom_dns',
-  monitoring: 'groups.monitoring',
-  latency: 'items.latency_monitor',
-  alerts: 'items.alerts',
-  logs: 'items.logs',
-  watchdog: 'items.watchdog',
-  tailscale: 'items.tailscale',
-  'system-settings': 'items.system_settings',
-  'system-health-check': 'items.system_health_check',
-  'connection-quality': 'items.connection_quality',
-  'software-update': 'items.software_update',
-  'at-terminal': 'items.at_terminal',
-  'web-console': 'items.web_console',
-  languages: 'items.languages',
-  'about-device': 'items.about_device',
-  support: 'items.support',
+// Every page, by full path, as the sidebar shows it: its group, then itself
+// (and its parent page for nested ones). Keys live in the "sidebar"
+// namespace, so breadcrumbs read like the sidebar and follow the language.
+// A group crumb links to the group's first page: groups have no page.
+interface Trail {
+  group: string;
+  groupHref: string;
+  items: { key: string; href: string }[];
+}
+
+const CELLULAR = { group: 'groups.cellular', groupHref: '/cellular/signal' };
+const SYSTEM = { group: 'groups.system', groupHref: '/system/monitoring' };
+
+const TRAILS: Record<string, Trail> = {
+  '/dashboard': { group: 'groups.dashboard', groupHref: '/dashboard', items: [{ key: 'items.home', href: '/dashboard' }] },
+  '/cellular/signal': { ...CELLULAR, items: [{ key: 'items.signal_details', href: '/cellular/signal' }] },
+  '/cellular/settings': { ...CELLULAR, items: [{ key: 'items.settings', href: '/cellular/settings' }] },
+  '/cellular/band-locking': { ...CELLULAR, items: [{ key: 'items.band_locking', href: '/cellular/band-locking' }] },
+  '/cellular/cell-locking': {
+    ...CELLULAR,
+    items: [
+      { key: 'items.band_locking', href: '/cellular/band-locking' },
+      { key: 'items.cell_locking', href: '/cellular/cell-locking' },
+    ],
+  },
+  '/cellular/sms': { ...CELLULAR, items: [{ key: 'items.sms_center', href: '/cellular/sms' }] },
+  '/cellular/esim': { ...CELLULAR, items: [{ key: 'items.esim', href: '/cellular/esim' }] },
+  '/network/settings': {
+    group: 'groups.local_network',
+    groupHref: '/network/settings',
+    items: [{ key: 'items.local_network_settings', href: '/network/settings' }],
+  },
+  '/system/monitoring': { ...SYSTEM, items: [{ key: 'items.connection_monitoring', href: '/system/monitoring' }] },
+  '/system/tailscale': { ...SYSTEM, items: [{ key: 'items.tailscale', href: '/system/tailscale' }] },
+  '/system/terminal': { ...SYSTEM, items: [{ key: 'items.at_terminal', href: '/system/terminal' }] },
+  '/system/credentials': { ...SYSTEM, items: [{ key: 'items.credentials', href: '/system/credentials' }] },
+  '/system/settings': { ...SYSTEM, items: [{ key: 'items.system_settings', href: '/system/settings' }] },
+  '/about-device': {
+    group: 'items.about_device',
+    groupHref: '/about-device',
+    items: [],
+  },
 };
 
 export function useBreadcrumbs(): BreadcrumbItem[] {
@@ -59,36 +59,14 @@ export function useBreadcrumbs(): BreadcrumbItem[] {
   const { t, i18n } = useTranslation('sidebar');
 
   return useMemo(() => {
-    // Remove leading/trailing slashes and split by '/'
-    const segments = pathname.split('/').filter(Boolean);
-
-    if (segments.length === 0) {
-      return [];
-    }
-
-    // Build breadcrumb items
-    const breadcrumbs: BreadcrumbItem[] = segments.map((segment, index) => {
-      // Build the href by joining all segments up to current index
-      const href = '/' + segments.slice(0, index + 1).join('/');
-
-      // Translate via the sidebar namespace when the segment is known;
-      // otherwise capitalize the raw segment.
-      const key = routeKeyMap[segment];
-      const label = key
-        ? t(key)
-        : segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
-
-      // Last segment is the current page
-      const isCurrentPage = index === segments.length - 1;
-
-      return {
-        label,
-        href,
-        isCurrentPage,
-      };
-    });
-
-    return breadcrumbs;
+    const path = pathname.replace(/\/+$/, '') || '/';
+    const trail = TRAILS[path];
+    if (!trail) return [];
+    const crumbs = [
+      { label: t(trail.group), href: trail.groupHref },
+      ...trail.items.map((item) => ({ label: t(item.key), href: item.href })),
+    ].filter((crumb, i, all) => i === 0 || crumb.label !== all[i - 1].label);
+    return crumbs.map((crumb, i) => ({ ...crumb, isCurrentPage: i === crumbs.length - 1 }));
     // i18n.language is in deps so labels re-render on language change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, t, i18n.language]);

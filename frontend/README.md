@@ -16,11 +16,11 @@ reference for the visual rules (its font is replaced here by Geist).
 
 | Path | What |
 |---|---|
-| `app/` | routes: `/dashboard`, `/login`, `/about-device`, `/reboot` |
-| `components/` | QManager components; `nav-group.tsx` drives the sidebar, `classic: true` entries open the classic HTML pages |
+| `app/` | routes: `/dashboard`, `/cellular/*`, `/network/settings`, `/system/*`, `/login`, `/about-device`, `/reboot` |
+| `components/` | QManager components (dashboard, SMS inbox, band cards, AT terminal) and the SimpleAdmin pages; `page-shell.tsx` gives every page the same header and card grid |
 | `lib/bridge/` | WebSocket store for diag_bridge (9001) and system_bridge (9002), DIAG/QMI selection, `ModemStatus` adapter |
-| `hooks/` | data hooks; `use-modem-status`, `use-signal-history`, `use-about-device` read the bridges |
-| `lib/modem-actions.ts` | user-triggered AT commands through `cgi-bin/user_atcommand` |
+| `lib/at.ts`, `lib/radio-at.ts`, `lib/sms.ts` | AT client (`get_atcommand`), Foxconn radio command parsers and builders, SMS text-mode decoding |
+| `hooks/` | data hooks, one per page or feature |
 | `locales/` | en and it strings, bundled into the JS (namespaces not used yet stay out of the bundle) |
 
 ## Build

@@ -3,7 +3,7 @@
 ## New web interface (branch `feature/qmanager-ui`)
 
 Port of the QManager frontend onto the bridges and the SimpleAdmin CGIs
-(README, "New web interface"). Upstream reference: QManager-RM520N `7a7007c`;
+(README, "Web interface"). Upstream reference: QManager-RM520N `7a7007c`;
 pages removed from `frontend/` are re-imported from there when ported.
 
 ### Done
@@ -11,18 +11,16 @@ pages removed from `frontend/` are re-imported from there when ported.
   reconnect, reboot, logout), en + it.
 - Dashboard from diag_bridge / system_bridge (`lib/bridge/`), About page,
   reboot countdown.
+- Every former page rebuilt: Signal Details, Cellular Settings, Band and
+  Cell Locking, SMS Center, eSIM, Local Network, Connection Monitoring,
+  Tailscale, AT Terminal, Credentials, System. The classic pages are gone.
 
-### Next: pages that exist as classic pages
-- [ ] Signal details (`advanced.html` CA view) → `/cellular` page with all
-      carriers, DL/UL rows, per-chain values.
-- [ ] Radio settings (`radio-settings.html`): band lock (`AT^BAND_PREF_EXT`),
-      cell lock (`AT^LTE_LOCK`), network mode (`AT^SLMODE`), SIM slot, APN.
-- [ ] SMS center (`sms.html`), eSIM (`esim.html`).
-- [ ] System settings (`settings.html`): connection watchdog, TTL, bridge mode,
-      scheduled reboot; credentials (`credentials.html`); device tools and AT
-      terminal (`deviceinfo.html`, `advanced.html`).
-- [ ] Connection monitoring (`monitor.html`), Tailscale.
-- [ ] Then drop `classic.html` and the classic pages they replace.
+### Next
+- [ ] Page strings are English only: move them to `locales/` (en, it).
+- [ ] New screenshots for the README, with IMEI/ICCID/IMSI/SMS masked.
+- [ ] Verify on the modem the actions not exercised yet (they send the same
+      commands as the classic pages did): band/cell lock, APN change, SIM
+      switch, SMS send/delete, IMEI write, watchdog save, eSIM download.
 
 ### Features chosen from QManager (first round)
 - [ ] Network events (band change, handover, CA change, data link
@@ -44,7 +42,7 @@ pages removed from `frontend/` are re-imported from there when ported.
 ### Gaps in the dashboard
 - [ ] system_bridge: hostname, kernel version, storage of `/data`
       (`hooks/use-modem-subsys.ts`), connection uptime, LTE category.
-- [ ] Change password from the user menu (today it opens `credentials.html`).
+- [ ] Change password from the user menu (today it is in Credentials).
 - [ ] `lib/bridge/radio.ts`: copy the QMI NR SINR only onto the same NR
       PCI (today a single DIAG NR cell takes it unconditionally, wrong for a
       few seconds around an NR handover); recompute `summary` after the QMI
@@ -58,3 +56,6 @@ pages removed from `frontend/` are re-imported from there when ported.
 - [ ] Verify a real SMS send through `atcli_smd8 -p` (`cgi-bin/send_sms`).
 - [ ] Verify QMI service rediscovery after an actual modem restart.
 - [ ] Remove the unused `cgi-bin/get_sys_info`?
+- [ ] `config/simpleadmin.conf` is readable without login and holds
+      `SIMPLEADMIN_GUI_TOGGLE_KEY`; the Tailscale auth key travels in a GET
+      query string. Both predate the new interface.

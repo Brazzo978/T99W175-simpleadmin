@@ -12,8 +12,7 @@ Static web interface (HTML/JS with Bash CGI helpers) to administer Foxconn T99W1
 
 
 ## Quick overview
-- A new web interface (Next.js static export, React + shadcn/ui, English and Italian) under `frontend/`, being ported from QManager: see [New web interface](#-new-web-interface). Pages not ported yet are the classic ones below, linked from its sidebar.
-- Responsive HTML pages (Bootstrap 5 + Alpine.js) served from the modem web partition.
+- Web interface (Next.js static export, React + shadcn/ui, English and Italian) under `frontend/`, ported from QManager: see [Web interface](#-web-interface). It replaces the former Bootstrap/Alpine.js pages.
 - Bash CGI scripts in `deploy/www/cgi-bin/` that drive AT commands, the connection watchdog, TTL override, scheduled reboot and utility actions.
 - Front-end settings via `deploy/www/config/simpleadmin.conf`, here you can enable or disable the login page and the esim configuration page,by default login is on , and esim is off
 ```
@@ -84,6 +83,9 @@ Notes:
 ---
 
 ## 📸 Screenshots
+
+These still show the former interface, replaced by the one described in
+[Web interface](#-web-interface).
 
 ### Home
 ![Home](docs/media/Home.jpg)
@@ -156,8 +158,8 @@ module, each split by kind (`bin/`, `lib/`, `scripts/`, `systemd/`, ...):
 ```
 deploy/
   install-modem.sh       modem side of install.sh
-  www/                   classic pages and the CGIs
-  www-app/               new web interface, built from frontend/
+  www/                   CGIs, configuration and the GUI lock page
+  www-app/               web interface, built from frontend/
   diag_bridge/  system_bridge/  curl/  jq/
   ttl/  crontab/  watchdog/  euicc/  persistent-mac/  modem-config/
   tailscale/             not pushed: the UI downloads it from GitHub
@@ -193,7 +195,7 @@ installs are removed.
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
 | `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
 
-## 🖥 New web interface
+## 🖥 Web interface
 
 `frontend/` is a fork of the [QManager](https://github.com/dr-dolomite/QManager-RM520N)
 frontend (upstream commit `7a7007c`), rebuilt on this project's backend:
@@ -204,12 +206,23 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 - `lib/bridge/` keeps one shared socket per bridge, open only while a page
   listens and the tab is visible, and turns the diag_bridge / system_bridge
   messages into the `ModemStatus` structure the QManager components expect
-  (DIAG first, QMI as completion and fallback, as in the classic dashboard).
+  (DIAG first, QMI as completion and fallback).
 - Login uses the SimpleAdmin sessions (`authenticate`, `session_status`,
-  `logout`); user actions that need AT go through `user_atcommand`.
-- Ported so far: dashboard, login, About, reboot countdown. Every other page
-  is still the classic one (the old dashboard is `classic.html`), linked from
-  the sidebar. What is left is in `TODO.md`.
+  `logout`). AT commands go through `get_atcommand` (read-only for non-admin
+  accounts), the AT terminal through `user_atcommand`.
+
+| Page | What | Backend |
+|---|---|---|
+| Dashboard | network, LTE/5G cells, device, latency, signal chart | WebSockets |
+| Signal Details | every carrier, per-antenna RSRP/SINR, DL/UL details | WebSockets |
+| Cellular Settings | network mode, 5G NSA/SA, SIM slot, APN | `^SLMODE`, `^NR5G_MODE`, `^SWITCH_SLOT`, `+CGDCONT` |
+| Band Locking / Cell Locking | LTE, NSA, SA bands; LTE and 5G SA cell locks | `^BAND_PREF_EXT`, `^LTE_LOCK`, `^NR5G_LOCK` |
+| SMS Center | inbox, send, delete | `+CMGL`, `send_sms` |
+| eSIM | profiles, download (QR), notifications | euicc-client API |
+| Local Network | LAN, DHCP, DMZ, IP passthrough, WAN, TTL | `network_settings`, `set_ttl` |
+| Connection Monitoring | connectivity checks, watchdog, its log | `*_connection_config`, `connection_watchdog` |
+| Tailscale VPN, AT Terminal, Credentials | as named | `tailscale`, `user_atcommand`, `manage_credentials` |
+| System | scheduled reboot, IMEI, eSIM manager, factory reset | `reboot_schedule`, `^NV=550`, `toggle_esim`, `factory_reset` |
 
 Build it with Node.js 20+:
 
@@ -219,11 +232,12 @@ frontend/build.sh            # npm ci on first run, next build, copy to deploy/w
 
 The output in `deploy/www-app/` is versioned (like the system_bridge binary),
 so `./install.sh` needs no Node.js; it warns when the frontend sources are
-newer than the last build. About 0.9 MB gzipped on the modem.
+newer than the last build. About 0.8 MB gzipped is served; with the gzip
+copies the web root takes about 5 MB of the root filesystem.
 
 ## 📡 Live data: diag_bridge and system_bridge
 
-The dashboard and *Advanced Signal Details* are fed by two daemons over
+The dashboard and *Signal Details* are fed by two daemons over
 WebSockets, without polling AT commands:
 
 - **`diag_bridge`** (port 9001) decodes the Qualcomm DIAG interface: serving
@@ -237,12 +251,12 @@ WebSockets, without polling AT commands:
   When `diag_bridge` is not connected, its QMI radio data (serving cells,
   per-chain RSRP, active SCells) takes over.
 
-The badge at the top right shows the radio source: **DIAG**, or **QMI** when
-`diag_bridge` is down. Advanced Signal Details shows the same snapshot, with
-the DIAG-only details (DL/UL rows, per-chain SINR, beams) when available.
-LTE SCells come from the RRC configuration (or QMI): this firmware does not
-measure them, so their RSRP/SINR read N/A. Both sockets close while the tab is
-hidden, and the bridges only poll the modem while someone is connected.
+Signal Details names the radio source: **DIAG**, or **QMI** when
+`diag_bridge` is down, with the DIAG-only details (DL/UL rows, per-chain SINR,
+beams) when available. LTE SCells come from the RRC configuration (or QMI):
+this firmware does not always measure them, so their RSRP/SINR can be
+missing. Both sockets close while the tab is hidden, and the bridges only
+poll the modem while someone is connected.
 
 `system_bridge` is also the AT client: `/usr/bin/atcli_smd8` links to it
 (the firmware's client is kept as `/usr/bin/atcli_smd8.real`). It takes an

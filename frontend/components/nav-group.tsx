@@ -24,30 +24,22 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 
-// A classic page (`classic: true`) is one of the pre-React SimpleAdmin HTML
-// pages still served next to the app: it is a full page load, so it gets a
-// plain anchor instead of the client-side router.
-export type NavSubItem = { t_key: string; url: string; classic?: boolean }
+export type NavSubItem = { t_key: string; url: string }
 
 export type NavItem = {
   t_key: string
   url: string
   icon: LucideIcon
-  classic?: boolean
   items?: NavSubItem[]
 }
 
 // Forwards the props SidebarMenuButton/SubButton inject through asChild
-// (className, data attributes) to the anchor.
+// (className, data attributes) to the link.
 function NavLink({
   item,
   ...props
-}: { item: { url: string; classic?: boolean } } & React.ComponentProps<"a">) {
-  return item.classic ? (
-    <a href={item.url} {...props} />
-  ) : (
-    <Link href={item.url} {...props} />
-  )
+}: { item: { url: string } } & Omit<React.ComponentProps<typeof Link>, "href">) {
+  return <Link href={item.url} {...props} />
 }
 
 export function NavGroup({

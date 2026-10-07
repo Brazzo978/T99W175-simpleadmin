@@ -21,13 +21,13 @@
     "cell_scanner": "Cell Scanner",
     "neighboring_cells": "Neighboring Cells",
     "frequency_calculator": "Frequency Calculator",
-    "settings": "Settings",
+    "settings": "Cellular Settings",
     "apn_management": "APN Management",
     "network_priority": "Network Priority",
     "imei_settings": "IMEI Settings",
     "fplmn_settings": "FPLMN Settings",
     "ethernet_status": "Ethernet Status",
-    "local_network_settings": "Settings",
+    "local_network_settings": "Local Network",
     "ip_passthrough": "IP Passthrough",
     "ttl_mtu_settings": "TTL & MTU Settings",
     "custom_dns": "Custom DNS",
@@ -36,7 +36,7 @@
     "alerts": "Alerts",
     "watchdog": "Watchdog",
     "tailscale": "Tailscale VPN",
-    "system_settings": "System Settings",
+    "system_settings": "System",
     "logs": "Logs",
     "system_health_check": "System Health Check",
     "connection_quality": "Connection Quality",
@@ -49,11 +49,9 @@
     "support": "Support",
     "donate": "Donate to the Project",
     "signal_details": "Signal Details",
-    "radio_settings": "Radio Settings",
     "esim": "eSIM",
     "connection_monitoring": "Connection Monitoring",
     "credentials": "Credentials",
-    "device_tools": "Device Tools",
-    "classic_dashboard": "Classic Dashboard"
+    "cell_locking": "Cell Locking"
   }
 }

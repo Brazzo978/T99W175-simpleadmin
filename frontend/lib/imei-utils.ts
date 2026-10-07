@@ -87,3 +87,17 @@ export function parseImeiBreakdown(imei: string): ImeiBreakdown | null {
     checkDigit: imei.slice(14),
   };
 }
+
+/**
+ * The IMEI as the T99W175 stores it in NV item 550 (AT^NV=550,9,"..."):
+ * "80A" followed by the digits, as nine nibble-swapped bytes.
+ */
+export function imeiNvPayload(imei: string): string {
+  const digits = `80A${imei}`;
+  const bytes: string[] = [];
+  for (let i = 0; i < digits.length; i += 2) {
+    const pair = digits.substring(i, i + 2);
+    bytes.push(pair.length === 2 ? pair[1] + pair[0] : pair);
+  }
+  return bytes.join(",").toLowerCase();
+}

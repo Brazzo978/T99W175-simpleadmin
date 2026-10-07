@@ -53,6 +53,7 @@
     "embla-carousel-react": "^8.6.0",
     "i18next": "^26.0.5",
     "input-otp": "^1.4.2",
+    "jsqr": "^1.4.0",
     "lucide-react": "^0.562.0",
     "motion": "^12.38.0",
     "next": "16.0.7",
