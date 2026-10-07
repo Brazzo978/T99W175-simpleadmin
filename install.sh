@@ -19,7 +19,8 @@
 # deploy/install-modem.sh is the modem side. deploy/diag_bridge/bin/diag_bridge
 # is a gitignored symlink into a T99W175-diag-json-bridge checkout next to this
 # repository (see deploy/diag_bridge/README.md); without it the install goes
-# on and the modem keeps (or drops) the bridge it has.
+# on and the modem keeps (or drops) the bridge it has. system_bridge is built
+# here by deploy/system_bridge/build.sh.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -57,7 +58,7 @@ for arg in "$@"; do
     --login) set_flag SA_LOGIN 1 ;;
     --noesim) set_flag SA_ESIM 0 ;;
     --esim) set_flag SA_ESIM 1 ;;
-    -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) die "unknown option: $arg (see --help)" ;;
     *) HOST="$arg" ;;
   esac
@@ -90,22 +91,35 @@ find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/config/*' \
 gz_after=$(find "$STAGE/www" -type f -name '*.gz' -printf '%s\n' | awk '{s+=$1} END {print s+0}')
 ok "🗜️  text assets precompressed: $((gz_before / 1024)) KB → $((gz_after / 1024)) KB served"
 
-# The daemons are symlinks into the T99W175-diag-json-bridge checkout.
-for d in diag_bridge system_bridge; do
-  link="deploy/$d/bin/$d"
-  rm -f "$STAGE/$d/bin/$d"
-  if [ -f "$link" ]; then
-    repo="$(cd "$(dirname "$(readlink -f "$link")")" && git rev-parse --show-toplevel 2>/dev/null || dirname "$(readlink -f "$link")")"
-    version="$(git -C "$repo" describe --always --dirty --tags 2>/dev/null || echo unknown)"
-    cp -L "$link" "$STAGE/$d/bin/$d"
-    printf '%s\n' "$version" > "$STAGE/$d/$d.version"
-    ok "📡 $d $version from $repo"
+# diag_bridge is a symlink into the T99W175-diag-json-bridge checkout.
+link=deploy/diag_bridge/bin/diag_bridge
+rm -f "$STAGE/diag_bridge/bin/diag_bridge"
+if [ -f "$link" ]; then
+  repo="$(cd "$(dirname "$(readlink -f "$link")")" && git rev-parse --show-toplevel 2>/dev/null || dirname "$(readlink -f "$link")")"
+  version="$(git -C "$repo" describe --always --dirty --tags 2>/dev/null || echo unknown)"
+  cp -L "$link" "$STAGE/diag_bridge/bin/diag_bridge"
+  printf '%s\n' "$version" > "$STAGE/diag_bridge/diag_bridge.version"
+  ok "📡 diag_bridge $version from $repo"
+else
+  warn "📡 $link is missing or a dangling link: no diag_bridge in this install"
+  info "   clone T99W175-diag-json-bridge next to this repository and run its"
+  info "   scripts/publish-to-simpleadmin.sh (deploy/diag_bridge/README.md)"
+fi
+# system_bridge is built here (deploy/system_bridge/build.sh); the binary is
+# versioned, the sources stay on the workstation.
+rm -rf "$STAGE/system_bridge/src" "$STAGE/system_bridge/build.sh"
+sb=deploy/system_bridge/bin/system_bridge
+if [ -f "$sb" ]; then
+  version="$(git describe --always --dirty --tags 2>/dev/null || echo unknown)"
+  printf '%s\n' "$version" > "$STAGE/system_bridge/system_bridge.version"
+  if [ -n "$(find deploy/system_bridge/src -newer "$sb" -type f | head -1)" ]; then
+    warn "📡 system_bridge sources are newer than the binary: run deploy/system_bridge/build.sh"
   else
-    warn "📡 $link is missing or a dangling link: no $d in this install"
-    info "   clone T99W175-diag-json-bridge next to this repository and run its"
-    info "   scripts/publish-to-simpleadmin.sh (deploy/diag_bridge/README.md)"
+    ok "📡 system_bridge $version"
   fi
-done
+else
+  warn "📡 $sb is missing: run deploy/system_bridge/build.sh"
+fi
 for t in curl jq modem-config ttl crontab watchdog euicc persistent-mac; do
   [ -d "$STAGE/$t" ] || die "module deploy/$t is missing"
 done

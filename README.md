@@ -185,7 +185,7 @@ installs are removed.
 | What | Source in this repo | On the modem |
 |---|---|---|
 | Web UI | `deploy/www/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
-| `diag_bridge`, `system_bridge` | `deploy/diag_bridge/`, `deploy/system_bridge/`: `bin/<daemon>` (symlinks into the bridge repository, see `deploy/diag_bridge/README.md`), `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled) |
+| `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled) |
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
 | `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
@@ -226,13 +226,16 @@ from another site is refused (Origin check), a locked GUI refuses everyone,
 and with login enabled the `simpleadmin_session` cookie must name a live
 session.
 
-Both daemons are developed in their own repository
-(`T99W175-diag-json-bridge`) and are not stored here:
-`deploy/<daemon>/bin/<daemon>` are gitignored symlinks to the binaries in a
-checkout next to this one (`deploy/diag_bridge/README.md`). The bridge
-repository's `scripts/publish-to-simpleadmin.sh` builds them, creates the
-links and copies the systemd units. Both listen on `bridge0` only
-(`-i bridge0`), so they are not reachable from the mobile network.
+`system_bridge` lives here: sources in `deploy/system_bridge/src`, built by
+`deploy/system_bridge/build.sh` (it uses the musl cross compiler of a
+`T99W175-diag-json-bridge` checkout next to this one, or `CC`) into the
+versioned `deploy/system_bridge/bin/system_bridge`. `diag_bridge` is developed
+in its own repository (`T99W175-diag-json-bridge`) and is not stored here:
+`deploy/diag_bridge/bin/diag_bridge` is a gitignored symlink to the binary in
+a checkout next to this one (`deploy/diag_bridge/README.md`); that
+repository's `scripts/publish-to-simpleadmin.sh` builds it, creates the link
+and copies the unit. Both listen on `bridge0` only (`-i bridge0`), so they
+are not reachable from the mobile network.
 
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 
