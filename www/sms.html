@@ -450,7 +450,9 @@
   </main>
 
   <!-- Device Info Modal -->
-  <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true" x-data="fetchDeviceInfo()">
+  <!-- Device info modal and IMEI overlays share one Alpine scope -->
+  <div x-data="fetchDeviceInfo()">
+  <div class="modal fade" id="deviceInfoModal" tabindex="-1" aria-labelledby="deviceInfoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content">
         <div class="modal-header">
@@ -675,6 +677,7 @@
         </button>
       </div>
     </div>
+  </div>
   </div>
 
   <!-- Global Reboot Modal Confirmation -->
