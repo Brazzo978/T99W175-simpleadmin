@@ -331,7 +331,9 @@ return {
       }
       const messageRaw = data.substring(startIndex, endIndex).trim();
       const messageHex = this.extractHexPayload(messageRaw);
-      const message = messageHex ? this.decodeHexToText(messageHex) : messageRaw;
+      // GSM 7-bit letters can arrive either raw or hex-encoded one byte per
+      // character, so map them after the hex decoding as well.
+      const message = this.decodeGsm7Text(messageHex ? this.decodeHexToText(messageHex) : messageRaw);
       this.messageIndices.push([index]);
       this.senders.push(sender);
       this.dates.push(this.formatDate(date));
@@ -355,6 +357,31 @@ return {
   convertHexToText(hex) {
     const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
     return new TextDecoder('utf-16be').decode(bytes);
+  },
+
+  /**
+   * Maps GSM 03.38 code points that arrive as control characters back to
+   * the letters they stand for.
+   *
+   * With AT+CSCS="GSM" the modem returns text-mode SMS bodies in the GSM
+   * 7-bit alphabet. Printable ASCII mostly matches, but 0x00-0x1F are
+   * letters there (0x04 is "è", 0x7F is "à"), and 0x1B escapes into the extension table
+   * ("€", "{", "}"...). LF and CR are kept as line breaks.
+   *
+   * @param {string} text - Raw message body
+   * @returns {string} Text with GSM 7-bit letters restored
+   */
+  decodeGsm7Text(text) {
+    const basic = "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\u001bÆæßÉ";
+    const extension = {
+      "\n": "\f", "\u0014": "^", "(": "{", ")": "}", "/": "\\",
+      "<": "[", "=": "~", ">": "]", "@": "|", "e": "€",
+    };
+    return text
+      .replace(/\u001b([\s\S])/g, (seq, next) => extension[next] ?? next)
+      .replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001a\u001c-\u001f]/g,
+        (char) => basic[char.charCodeAt(0)])
+      .replace(/\u007f/g, "à");
   },
 
   /**
