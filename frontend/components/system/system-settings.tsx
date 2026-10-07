@@ -344,17 +344,29 @@ function ImeiCard() {
 // --- eSIM manager ----------------------------------------------------------------
 
 function EsimToggleCard() {
-  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [state, setState] = useState<{
+    enabled: boolean;
+    clientInstalled: boolean;
+    clientPath: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     authFetch("/cgi-bin/esim_config", { cache: "no-store" })
       .then((r) => r.json())
-      .then((json) => setEnabled(json.success === true && Number(json.data?.enabled) === 1))
-      .catch(() => setEnabled(false));
+      .then((json) =>
+        setState({
+          enabled: json.success === true && Number(json.data?.enabled) === 1,
+          // Older CGIs do not report it: assume present, the toggle still checks.
+          clientInstalled: json.data?.client_installed !== false,
+          clientPath: json.data?.client_path || "/home/root/euicc-sd-client",
+        }),
+      )
+      .catch(() => setState({ enabled: false, clientInstalled: true, clientPath: "" }));
   }, []);
 
   const toggle = async (value: boolean) => {
+    if (!state) return;
     setBusy(true);
     try {
       const resp = await authFetch("/cgi-bin/toggle_esim", {
@@ -363,8 +375,11 @@ function EsimToggleCard() {
         body: JSON.stringify({ enabled: value ? 1 : 0 }),
       });
       const json = await resp.json();
+      if (json.code === "client_missing") {
+        setState({ ...state, clientInstalled: false });
+      }
       if (!json.ok) throw new Error(json.message);
-      setEnabled(value);
+      setState({ ...state, enabled: value });
       toast.success(value ? "eSIM manager enabled" : "eSIM manager disabled");
     } catch (err) {
       toast.error(err instanceof Error && err.message ? err.message : "Unable to change the eSIM manager");
@@ -372,6 +387,9 @@ function EsimToggleCard() {
       setBusy(false);
     }
   };
+
+  // Without the client it can only be switched off, never on.
+  const missing = state !== null && !state.clientInstalled;
 
   return (
     <Card>
@@ -381,16 +399,29 @@ function EsimToggleCard() {
           Runs the local euicc-client service behind the eSIM page (profiles on SIM 2).
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="grid gap-3">
         <div className="flex items-center justify-between">
           <Label htmlFor="esim-enabled">Enabled</Label>
           <Switch
             id="esim-enabled"
-            checked={enabled ?? false}
-            disabled={enabled === null || busy}
+            checked={state?.enabled ?? false}
+            disabled={state === null || busy || (missing && !state.enabled)}
             onCheckedChange={toggle}
           />
         </div>
+        {missing && (
+          <div
+            role="status"
+            className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning"
+          >
+            <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
+            <span>
+              The euicc-client is not installed ({state.clientPath}), so the eSIM manager
+              cannot be enabled. It is not part of SimpleAdmin: copy it to the modem as
+              described in docs/Enable_New_feature.md.
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

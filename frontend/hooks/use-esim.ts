@@ -58,6 +58,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function useEsim() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [clientInstalled, setClientInstalled] = useState(true);
   const [baseUrl, setBaseUrl] = useState("");
   const [healthy, setHealthy] = useState<boolean | null>(null);
   const [eid, setEid] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export function useEsim() {
       const json = await resp.json();
       const on = json.success === true && Number(json.data?.enabled) === 1;
       setEnabled(on);
+      setClientInstalled(json.data?.client_installed !== false);
       if (!on) return;
       baseRef.current = browserBaseUrl(json.data?.base_url ?? "");
       setBaseUrl(baseRef.current);
@@ -220,6 +222,7 @@ export function useEsim() {
 
   return {
     enabled,
+    clientInstalled,
     baseUrl,
     healthy,
     eid,

@@ -491,10 +491,12 @@ else
   info "🐕 watchdog disabled in /opt/scripts/Watchdog"
   unit_state connection-watchdog off
 fi
-if [ "$(conf_value "$conf" SIMPLEADMIN_ENABLE_ESIM)" = 1 ]; then
+if [ "$(conf_value "$conf" SIMPLEADMIN_ENABLE_ESIM)" = 1 ] && [ ! -x /home/root/euicc-sd-client ]; then
+  # Same rule as cgi-bin/toggle_esim: no client, no service.
+  warn "eSIM enabled in simpleadmin.conf but /home/root/euicc-sd-client is missing: euicc left off (docs/Enable_New_feature.md)"
+  unit_state euicc off
+elif [ "$(conf_value "$conf" SIMPLEADMIN_ENABLE_ESIM)" = 1 ]; then
   info "📶 eSIM enabled in simpleadmin.conf"
-  [ -x /home/root/euicc-sd-client ] || \
-    warn "/home/root/euicc-sd-client is missing (docs/Enable_New_feature.md)"
   unit_state euicc on
   systemctl restart euicc 2>/dev/null || true
   info "▶️  euicc $(systemctl is-active euicc 2>/dev/null || true)"

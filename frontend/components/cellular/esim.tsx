@@ -97,14 +97,19 @@ export default function EsimComponent() {
   const [toDelete, setToDelete] = useState<string | null>(null);
   const [serverDraft, setServerDraft] = useState<EsimServerConfig | null>(null);
 
-  if (esim.enabled === false) {
+  if (esim.enabled === false || !esim.clientInstalled) {
+    const missing = !esim.clientInstalled;
     return (
       <PageShell title="eSIM" description="eSIM profiles on SIM 2.">
         <Card className="col-span-full">
           <CardHeader>
-            <CardTitle>eSIM management is off</CardTitle>
+            <CardTitle>
+              {missing ? "The euicc-client is not installed" : "eSIM management is off"}
+            </CardTitle>
             <CardDescription>
-              Turn on the eSIM manager in System to start the euicc-client service.
+              {missing
+                ? "eSIM profiles are managed by the euicc-client LPA server, which is not part of SimpleAdmin. Copy it to /home/root/euicc-sd-client with its client.yaml (docs/Enable_New_feature.md), then enable the eSIM manager in System."
+                : "Turn on the eSIM manager in System to start the euicc-client service."}
             </CardDescription>
           </CardHeader>
           <CardFooter>

@@ -177,7 +177,7 @@ after every update, it only changes what differs.
 | `--www-alpine` | web front-end: the classic Bootstrap/Alpine.js pages of `deploy/www-alpine` |
 | `--onlywww` | install the web UI only (front-end, CGIs, configuration): no binaries, scripts, units or services |
 | `--nologin` / `--login` | set `SIMPLEADMIN_ENABLE_LOGIN` to 0 / 1 (otherwise the current value is kept) |
-| `--noesim` / `--esim` | set `SIMPLEADMIN_ENABLE_ESIM` to 0 / 1 and stop / start the euicc service (not with `--onlywww`) |
+| `--noesim` / `--esim` | set `SIMPLEADMIN_ENABLE_ESIM` to 0 / 1 and stop / start the euicc service, which starts only when `/home/root/euicc-sd-client` is on the modem (not with `--onlywww`) |
 
 Examples:
 

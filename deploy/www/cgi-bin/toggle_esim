@@ -10,6 +10,14 @@ if ! session_load; then
     exit 0
 fi
 
+if ! session_require_role "admin"; then
+    send_json_response 403 '{"ok":false,"message":"Admin privileges required"}'
+    exit 0
+fi
+
+# The service runs this client; without it euicc.service cannot start.
+EUICC_CLIENT="/home/root/euicc-sd-client"
+
 # Read POST data
 POST_DATA="$(cat)"
 
@@ -23,6 +31,13 @@ fi
 
 CONF_FILE="/WEBSERVER/www/config/simpleadmin.conf"
 SERVICE_NAME="euicc"
+
+# Enabling without the client would only leave the service failing: refuse
+# and keep the configuration as it is.
+if [ "$ENABLED" = "1" ] && [ ! -x "$EUICC_CLIENT" ]; then
+    send_json_response 409 "{\"ok\":false,\"code\":\"client_missing\",\"message\":\"euicc-sd-client is not installed ($EUICC_CLIENT): see docs/Enable_New_feature.md\"}"
+    exit 0
+fi
 
 # Check if config file exists
 if [ ! -f "$CONF_FILE" ]; then

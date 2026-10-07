@@ -33,11 +33,15 @@ Together with the web UI and the binaries, it copies the files over SSH
   `ttl-override` (re-applies `/persist/ttlvalue`)
 * enables and starts `connection-watchdog` only when `WD_ENABLED=1`, as the
   UI does
-* leaves `euicc` alone: the eSIM page enables it
+* enables and starts `euicc` only when `SIMPLEADMIN_ENABLE_ESIM=1` **and**
+  `/home/root/euicc-sd-client` exists; otherwise it leaves it off
 
 The eSIM service needs the `euicc-client` LPA server, which is not part of
-this repository: copy it to `/home/root/euicc-sd-client` with its
-`/home/root/client.yaml` before enabling eSIM in the UI.
+this repository: copy it to `/home/root/euicc-sd-client` (executable) with
+its `/home/root/client.yaml` before enabling eSIM. Without it the UI refuses
+to enable the eSIM manager (`cgi-bin/toggle_esim` answers `client_missing`),
+the installer keeps `euicc` off, and `euicc.service` skips its start
+(`ConditionPathExists`) instead of restarting forever.
 
 ### Verify
 

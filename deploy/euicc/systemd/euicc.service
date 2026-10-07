@@ -2,6 +2,10 @@
 Description=eUICC SD Client
 After=network.target
 Wants=network.target
+# Without the client (see docs/Enable_New_feature.md) the start is skipped
+# instead of failing and restarting forever. ConditionPathIsExecutable is
+# not honoured by this firmware's systemd (239): it passed with no file.
+ConditionPathExists=/home/root/euicc-sd-client
 
 [Service]
 Type=simple
