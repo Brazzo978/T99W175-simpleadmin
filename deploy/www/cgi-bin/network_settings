@@ -616,7 +616,9 @@ handle_update() {
         respond false "Missing XML element: Roaming"
     fi
 
-    if ! mv "$work_file" "$CONFIG_FILE"; then
+    # The firmware bind-mounts mobileap_cfg.xml from the systemrw volume, so
+    # rename() onto it fails with EBUSY: overwrite the content in place.
+    if ! cat "$work_file" > "$CONFIG_FILE"; then
         respond false "Unable to write the configuration file."
     fi
     respond true "Network configuration updated successfully."
