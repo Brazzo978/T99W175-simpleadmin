@@ -397,6 +397,12 @@ passthrough client, DHCP reservations), then has dnsmasq reread the file
 passthrough gateway address, so the range change applies at QCMAP's next
 restart. What it removes goes to the journal (`journalctl -u dhcp-guard`).
 
+Never restart dnsmasq by hand: QCMAP only manages the instance it started
+itself. A dnsmasq started from a shell keeps the passthrough address of that
+moment, QCMAP cannot replace it at the next WAN change, and the passthrough
+client gets a 192.168.225.x lease instead of the WAN address (seen on
+2026-10-08). A modem reboot gives dnsmasq back to QCMAP.
+
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 
 The Realtek **RTL8125** NIC inside the T99W175 ships **without a factory-programmed MAC**, so every reboot the kernel assigns `eth0` a fresh random MAC. To compound it, `QCMAP_ConnectionManager` then runs `system("ifconfig bridge0 hw ether <random>")` and gives `bridge0` *yet another* random MAC. Upstream routers see the modem as a new device on each boot — breaking DHCP reservations, MAC-based firewall rules, ARP-stable monitoring, etc.
