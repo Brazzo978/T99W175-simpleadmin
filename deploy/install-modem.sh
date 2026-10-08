@@ -15,7 +15,7 @@
 # Layout on the modem:
 #   /WEBSERVER/www                   web UI; simpleadmin.conf values and
 #                                    cgi-bin/credentials.txt survive updates
-#   /data/simpleadmin/{bin,lib}      diag_bridge, system_bridge, curl, jq, modem_config (UBIFS
+#   /data/simpleadmin/{bin,lib}      diag_bridge, system_bridge, ra-guard, curl, jq, modem_config (UBIFS
 #                                    usrfs, the root filesystem has only a few
 #                                    MB free), reached through /usr/bin
 #   /opt/scripts, /etc/init.d        TTL, watchdog and crontab scripts
@@ -32,7 +32,7 @@ SA_UI="${SA_UI:-nextjs}"
 WEB=/WEBSERVER/www
 BASE=/data/simpleadmin
 UNIT_DIR=/lib/systemd/system
-UNITS="crontab ttl-override connection-watchdog euicc diag_bridge system_bridge"
+UNITS="crontab ttl-override connection-watchdog euicc diag_bridge system_bridge ra-guard"
 WARNINGS=0
 REMOVED=0
 
@@ -424,7 +424,7 @@ install_daemon() {
     unit_state "$d" on
     restart "$d"
   else
-    err "$d not installed: the UI data it feeds will stay empty"
+    err "$d not installed: what it provides stays off"
     if [ -e "$UNIT_DIR/$d.service" ]; then
       systemctl disable "$d" >/dev/null 2>&1 || true
       systemctl stop "$d" 2>/dev/null || true
@@ -434,6 +434,9 @@ install_daemon() {
 }
 install_daemon diag_bridge
 install_daemon system_bridge
+# Deprecates old IPv6 prefixes and routers on the LAN after the mobile
+# network hands out a new prefix (deploy/ra-guard/src/ra-guard.c).
+install_daemon ra-guard
 
 # ---------------------------------------------------------------- AT client
 # system_bridge is also the serialized AT client: /usr/bin/atcli_smd8 links
@@ -510,7 +513,7 @@ section "📋 Summary"
 # Flush to flash: the files are on disk before we say so, and UBIFS reports
 # the real free space only after write-back.
 sync
-for u in qcmap_httpd crontab dhcp-guard.timer ttl-override connection-watchdog euicc diag_bridge system_bridge; do
+for u in qcmap_httpd crontab dhcp-guard.timer ttl-override connection-watchdog euicc diag_bridge system_bridge ra-guard; do
   en="$(systemctl is-enabled "$u" 2>/dev/null || true)"
   say "  $(printf '%-22s' "$u") $(printf '%-9s' "${en:--}") $(systemctl is-active "$u" 2>/dev/null || true)"
 done

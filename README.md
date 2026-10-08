@@ -151,8 +151,8 @@ Identifiers (IMEI, IMSI, ICCID, cell ID, MAC and WAN addresses) are masked.
   with SSH access as `root` by key.
 - A Linux workstation with `bash`, `ssh`, `tar`, `gzip` and GNU `find`
   (the installer uses `find -printf`).
-- Nothing to build: the web front-end (`deploy/www-nextjs`) and
-  `system_bridge` are versioned. Node.js 20+ is needed only to change the
+- Nothing to build: the web front-end (`deploy/www-nextjs`), `system_bridge`
+  and `ra-guard` are versioned. Node.js 20+ is needed only to change the
   front-end (`frontend/build.sh`). `diag_bridge` comes from the
   `T99W175-diag-json-bridge` repository checked out next to this one
   (`deploy/diag_bridge/README.md`); without it the install goes on and the
@@ -199,8 +199,8 @@ the installer before anything is copied.
    the chosen front-end, warns when `frontend/` is newer than its build, and
    adds a gzip copy of every text asset (busybox httpd serves it to browsers
    that accept gzip).
-3. Adds `diag_bridge` (from the bridge repository) and `system_bridge`,
-   warning when a binary is missing or older than its sources, and checks
+3. Adds `diag_bridge` (from the bridge repository), `system_bridge` and
+   `ra-guard`, warning when a binary is missing or older than its sources, and checks
    that every module folder is there.
 4. Identifies the target without the AT channel (hostname `sdxprairie`,
    SDX55 SoC, Foxconn `fxdiag`, `/WEBSERVER`) and refuses anything else.
@@ -231,7 +231,7 @@ In this order; each step reports `unchanged` when there is nothing to do.
 5. **Persistent MAC**: udev rule and script for `eth0`, `/sbin/ifconfig`
    wrapper for `bridge0` (the firmware's `ifconfig` kept as
    `/sbin/ifconfig.real`); applies at the next reboot.
-6. **diag_bridge, system_bridge**: binaries in `/data/simpleadmin/bin`,
+6. **diag_bridge, system_bridge, ra-guard**: binaries in `/data/simpleadmin/bin`,
    linked from `/usr/bin`, units enabled and restarted; a binary that does not
    run on the modem is not installed (the one already there is kept).
 7. **AT client**: `/usr/bin/atcli_smd8` becomes a link to `system_bridge`,
@@ -270,6 +270,7 @@ deploy/
   diag_bridge/  system_bridge/  curl/  jq/
   ttl/  crontab/  watchdog/  euicc/  persistent-mac/  modem-config/
   dhcp-guard/            keeps stale passthrough leases out of the LAN DHCP
+  ra-guard/              deprecates old IPv6 prefixes and routers on the LAN
   tailscale/             not pushed: the UI downloads it from GitHub
 ```
 
@@ -288,6 +289,7 @@ installs are removed.
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
 | DHCP guard | `deploy/dhcp-guard/` | `/opt/scripts/dhcp-guard/dhcp-guard`, run every minute by `dhcp-guard.timer` (see below) |
+| IPv6 RA guard | `deploy/ra-guard/` (`src/`, `build.sh`, `bin/ra-guard`, `systemd/ra-guard.service`) | `/data/simpleadmin/bin/ra-guard` linked from `/usr/bin/ra-guard`, state in `/data/simpleadmin/ra-guard.state`, `ra-guard.service` (enabled; see below) |
 | `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
 
 ## 🖥 Web interface
@@ -402,6 +404,38 @@ itself. A dnsmasq started from a shell keeps the passthrough address of that
 moment, QCMAP cannot replace it at the next WAN change, and the passthrough
 client gets a 192.168.225.x lease instead of the WAN address (seen on
 2026-10-08). A modem reboot gives dnsmasq back to QCMAP.
+
+## 🛡 IPv6 RA guard
+
+The LAN gets its IPv6 prefix from QCMAP's `radish`, which relays the router
+advertisement of the mobile network to `bridge0` as it is: the /64 with
+infinite valid and preferred lifetimes, the router (the link-local address of
+the network's gateway, different for every data session) with a lifetime of
+65535 s. When the session comes back with another prefix, `radish` just
+starts relaying the new one. The LAN hosts keep the old prefix as valid and
+preferred forever and may keep sending from an address the operator no longer
+routes, and keep the old, now unreachable, gateway as a default router for up
+to 18 hours.
+
+`ra-guard` (`ra-guard.service`) checks every 15 s the global prefixes
+`radish` routes on `bridge0` and learns the gateway of each from the
+advertisements received on the mobile data interface (it sends a router
+solicitation itself when the prefix changes). A prefix that is replaced by a
+new one becomes stale together with its gateway (one that just disappears is
+left alone: its session may come back with it):
+for a week `ra-guard` advertises them on the LAN with lifetime 0, three times
+in a row, then every 5 minutes and in answer to every router solicitation.
+Hosts deprecate the prefix at once (no new connections from it), drop its
+addresses within two hours (RFC 4862 5.5.3) and remove the gateway from their
+default routers. The current gateway is never withdrawn: while it is unknown,
+or when it is the old one, the advertisement comes from a neutral link-local
+address. Stale entries are kept in `/data/simpleadmin/ra-guard.state` and
+survive a reboot (the week starts only once the clock is set); the journal (`journalctl -u ra-guard`) tells what it does.
+`ra-guard dump -i any` prints every router advertisement and solicitation the
+modem sends or receives.
+
+`radish` itself is left alone: the lifetimes of the current prefix stay
+infinite, as the network sends them.
 
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 

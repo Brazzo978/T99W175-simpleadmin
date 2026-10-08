@@ -1,0 +1,15 @@
+[Unit]
+Description=Deprecate old IPv6 prefixes and routers on the LAN after a WAN prefix change
+After=network.target
+# The binary and its state live in /data/simpleadmin (/usr/bin/ra-guard
+# links to the binary).
+RequiresMountsFor=/data
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ra-guard run
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

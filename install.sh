@@ -150,21 +150,23 @@ if [ "$SA_ONLY_WWW" = 0 ]; then
     info "   clone T99W175-diag-json-bridge next to this repository and run its"
     info "   scripts/publish-to-simpleadmin.sh (deploy/diag_bridge/README.md)"
   fi
-  # system_bridge is built here (deploy/system_bridge/build.sh); the binary is
-  # versioned, the sources stay on the workstation.
-  rm -rf "$STAGE/system_bridge/src" "$STAGE/system_bridge/build.sh"
-  sb=deploy/system_bridge/bin/system_bridge
-  if [ -f "$sb" ]; then
-    version="$(git describe --always --dirty --tags 2>/dev/null || echo unknown)"
-    printf '%s\n' "$version" > "$STAGE/system_bridge/system_bridge.version"
-    if [ -n "$(find deploy/system_bridge/src -newer "$sb" -type f | head -1)" ]; then
-      warn "📡 system_bridge sources are newer than the binary: run deploy/system_bridge/build.sh"
+  # system_bridge and ra-guard are built here (deploy/<name>/build.sh); the
+  # binaries are versioned, the sources stay on the workstation.
+  for d in system_bridge ra-guard; do
+    rm -rf "$STAGE/$d/src" "$STAGE/$d/build.sh"
+    sb="deploy/$d/bin/$d"
+    if [ -f "$sb" ]; then
+      version="$(git describe --always --dirty --tags 2>/dev/null || echo unknown)"
+      printf '%s\n' "$version" > "$STAGE/$d/$d.version"
+      if [ -n "$(find "deploy/$d/src" -newer "$sb" -type f | head -1)" ]; then
+        warn "📡 $d sources are newer than the binary: run deploy/$d/build.sh"
+      else
+        ok "📡 $d $version"
+      fi
     else
-      ok "📡 system_bridge $version"
+      warn "📡 $sb is missing: run deploy/$d/build.sh"
     fi
-  else
-    warn "📡 $sb is missing: run deploy/system_bridge/build.sh"
-  fi
+  done
   for t in curl jq modem-config ttl crontab watchdog euicc persistent-mac dhcp-guard; do
     [ -d "$STAGE/$t" ] || die "module deploy/$t is missing"
   done
