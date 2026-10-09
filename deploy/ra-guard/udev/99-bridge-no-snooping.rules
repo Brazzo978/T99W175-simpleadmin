@@ -1,0 +1,8 @@
+# Turn multicast snooping off on the QCMAP LAN bridge as soon as it exists.
+# QCMAP makes bridge0 the MLD querier, yet no LAN host ever registers in its
+# group table, so with snooping on (the kernel default) every neighbor
+# solicitation, sent to an unregistered solicited-node group, is dropped
+# before eth0 and the modem cannot reach the LAN hosts over IPv6.
+# The bridge attributes may appear a moment after the add event: wait.
+# ra-guard puts it back off if anything turns it on later.
+KERNEL=="bridge*", SUBSYSTEM=="net", ACTION=="add", RUN+="/bin/sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do if [ -w /sys/class/net/%k/bridge/multicast_snooping ]; then echo 0 > /sys/class/net/%k/bridge/multicast_snooping; exit 0; fi; sleep 1; done'"

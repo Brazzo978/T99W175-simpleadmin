@@ -289,7 +289,7 @@ installs are removed.
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
 | DHCP guard | `deploy/dhcp-guard/` | `/opt/scripts/dhcp-guard/dhcp-guard`, run every minute by `dhcp-guard.timer` (see below) |
-| IPv6 RA guard | `deploy/ra-guard/` (`src/`, `build.sh`, `bin/ra-guard`, `systemd/ra-guard.service`) | `/data/simpleadmin/bin/ra-guard` linked from `/usr/bin/ra-guard`, state in `/data/simpleadmin/ra-guard.state`, `ra-guard.service` (enabled; see below) |
+| IPv6 RA guard | `deploy/ra-guard/` (`src/`, `build.sh`, `bin/ra-guard`, `systemd/ra-guard.service`, `udev/99-bridge-no-snooping.rules`) | `/data/simpleadmin/bin/ra-guard` linked from `/usr/bin/ra-guard`, state in `/data/simpleadmin/ra-guard.state`, `ra-guard.service` (enabled), `/etc/udev/rules.d/99-bridge-no-snooping.rules` (see below) |
 | `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
 
 ## 🖥 Web interface
@@ -437,7 +437,7 @@ modem sends or receives.
 `radish` itself is left alone: the lifetimes of the current prefix stay
 infinite, as the network sends them.
 
-Two more things keep IPv6 working towards the LAN hosts:
+One more thing keeps IPv6 working towards the LAN hosts:
 
 - **Multicast snooping off on `bridge0`.** The firmware leaves it on, with
   `bridge0` as MLD querier, yet no LAN host ever appears in its group table
@@ -446,12 +446,10 @@ Two more things keep IPv6 working towards the LAN hosts:
   solicited-node address of the target): the modem cannot resolve the
   address of a LAN host, so replies from the Internet to that host are
   dropped. It works for a while after a host joins and breaks again later.
-  `ra-guard` sets `multicast_snooping` back to 0 whenever it finds it on.
-- **Pinned EUI-64 neighbors.** For every link-local neighbor on `bridge0`
-  whose interface identifier is the EUI-64 of its MAC (RouterOS uses
-  EUI-64 for SLAAC), `ra-guard` adds a permanent entry for the current
-  prefix plus that identifier, and removes it when the prefix goes stale.
-  Such a host stays reachable even before neighbor discovery has run.
+  The udev rule `/etc/udev/rules.d/99-bridge-no-snooping.rules` (from
+  `deploy/ra-guard/udev/`) turns `multicast_snooping` off when QCMAP
+  creates the bridge, and `ra-guard` sets it back to 0 whenever it finds
+  it on.
 
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 

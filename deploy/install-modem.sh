@@ -437,6 +437,16 @@ install_daemon system_bridge
 # Deprecates old IPv6 prefixes and routers on the LAN after the mobile
 # network hands out a new prefix (deploy/ra-guard/src/ra-guard.c).
 install_daemon ra-guard
+# Multicast snooping off on the LAN bridge from the moment QCMAP creates it:
+# with it on, neighbor solicitations never reach the LAN (see the rule).
+mkdir -p /etc/udev/rules.d
+install_file "$SRC/ra-guard/udev/99-bridge-no-snooping.rules" 644 \
+  /etc/udev/rules.d/99-bridge-no-snooping.rules
+udevadm control --reload 2>/dev/null || true
+if [ -w /sys/class/net/bridge0/bridge/multicast_snooping ]; then
+  echo 0 > /sys/class/net/bridge0/bridge/multicast_snooping
+  ok "📣 multicast snooping off on bridge0"
+fi
 
 # ---------------------------------------------------------------- AT client
 # system_bridge is also the serialized AT client: /usr/bin/atcli_smd8 links
