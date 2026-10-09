@@ -417,7 +417,7 @@ preferred forever and may keep sending from an address the operator no longer
 routes, and keep the old, now unreachable, gateway as a default router for up
 to 18 hours.
 
-`ra-guard` (`ra-guard.service`) checks every 15 s the global prefixes
+`ra-guard` (`ra-guard.service`) checks every 15 s the global /64s
 `radish` routes on `bridge0` and learns the gateway of each from the
 advertisements received on the mobile data interface (it sends a router
 solicitation itself when the prefix changes). A prefix that is replaced by a
@@ -436,6 +436,22 @@ modem sends or receives.
 
 `radish` itself is left alone: the lifetimes of the current prefix stay
 infinite, as the network sends them.
+
+Two more things keep IPv6 working towards the LAN hosts:
+
+- **Multicast snooping off on `bridge0`.** The firmware leaves it on, with
+  `bridge0` as MLD querier, yet no LAN host ever appears in its group table
+  (`bridge mdb show` stays empty). Multicast to an unregistered group never
+  leaves through `eth0`, and every neighbor solicitation goes to one (the
+  solicited-node address of the target): the modem cannot resolve the
+  address of a LAN host, so replies from the Internet to that host are
+  dropped. It works for a while after a host joins and breaks again later.
+  `ra-guard` sets `multicast_snooping` back to 0 whenever it finds it on.
+- **Pinned EUI-64 neighbors.** For every link-local neighbor on `bridge0`
+  whose interface identifier is the EUI-64 of its MAC (RouterOS uses
+  EUI-64 for SLAAC), `ra-guard` adds a permanent entry for the current
+  prefix plus that identifier, and removes it when the prefix goes stale.
+  Such a host stays reachable even before neighbor discovery has run.
 
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 
