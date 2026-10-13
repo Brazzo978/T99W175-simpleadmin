@@ -423,22 +423,21 @@ advertisements received on the mobile data interface (it sends a router
 solicitation itself when the prefix changes). A prefix that is replaced by a
 new one becomes stale together with its gateway (one that just disappears is
 left alone: its session may come back with it):
-for a week `ra-guard` advertises them on the LAN with lifetime 0, three times
-in a row, then every 5 minutes and in answer to every router solicitation.
-Hosts deprecate the prefix at once (no new connections from it), drop its
-addresses within two hours (RFC 4862 5.5.3) and remove the gateway from their
-default routers. The current gateway is never withdrawn: while it is unknown,
+for a week `ra-guard` advertises them on the LAN, three times in a row, then
+every 5 minutes and in answer to every router solicitation: the gateway with
+router lifetime 0, so hosts remove it from their default routers, the prefix
+with the short lifetimes below. The current gateway is never withdrawn: while it is unknown,
 or when it is the old one, the advertisement comes from a neutral link-local
 address. Stale entries are kept in `/data/simpleadmin/ra-guard.state` and
 survive a reboot (the week starts only once the clock is set); the journal (`journalctl -u ra-guard`) tells what it does.
 `ra-guard dump -i any` prints every router advertisement and solicitation the
 modem sends or receives.
 
-During the first hour a stale prefix goes out with a valid lifetime of
-7200 s instead of 0: RouterOS ignores 0 and keeps the address forever,
-while 7200 is the decrease RFC 4862 accepts (down to two hours). Only for
-an hour, because a host that does not know the prefix creates a deprecated
-address from it.
+A stale prefix goes out with valid 2 s and preferred 1 s, as QCMAP itself
+does when it closes a session cleanly. RFC 4862 would clamp that to two
+hours, but RouterOS 7.24.5 drops the address at once, while it ignores both
+0 and 7200. A host that does not know the prefix gets an address that
+expires two seconds later.
 
 `radish` also advertises from the link-local address of `bridge0` itself,
 which is random at every boot. `ra-guard` keeps it in the state file

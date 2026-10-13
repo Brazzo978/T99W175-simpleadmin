@@ -14,18 +14,18 @@
  * ra-guard watches the prefixes radish routes on bridge0 and learns the
  * router of each from the advertisements it sees. When a prefix goes away
  * and another one takes its place, the old prefix and router become stale:
- * for a week ra-guard advertises them on the LAN with lifetime 0 (prefix
- * deprecated at once and dropped by the hosts within two hours, RFC 4862
- * 5.5.3; router timed out at once, RFC 4861 6.3.4), three times in a row,
+ * for a week ra-guard advertises them on the LAN (prefix with valid 2 and
+ * preferred 1, see below; router lifetime 0, which times the router out at
+ * once, RFC 4861 6.3.4), three times in a row,
  * then every five minutes and in answer to every router solicitation.
  * The current router is never withdrawn. Stale entries survive a reboot in
  * the state file.
  *
- * During the first hour a stale prefix goes out with valid 7200 instead of
- * 0: RouterOS ignores a valid lifetime of 0 and keeps the address forever,
- * while 7200 is the decrease RFC 4862 5.5.3(e) honours (down to two hours).
- * Only for an hour, since a host that does not know the prefix creates a
- * deprecated address from such a PIO.
+ * The stale prefix goes out with valid 2 and preferred 1, as QCMAP itself
+ * does when it tears a session down cleanly. RFC 4862 5.5.3(e) would clamp
+ * that to two hours, but RouterOS drops the address at once, while it
+ * ignores both 0 and 7200 (seen on RouterOS 7.24.5). A host that does not
+ * know the prefix gets an address that expires two seconds later.
  *
  * radish also advertises from bridge0's own link-local address, which is
  * random at every boot. ra-guard keeps it in the state file and, when it
@@ -66,9 +66,9 @@
 
 #define MAX_PREFIXES 8
 #define MAX_STALE 16
-/* how long a stale prefix is advertised with a valid lifetime of 2 hours
- * before it goes to 0 (see the top) */
-#define TWO_HOURS_FOR_S 3600
+/* PIO lifetimes of a stale prefix (see the top) */
+#define STALE_VALID 2
+#define STALE_PREFERRED 1
 #define POLL_S 15
 #define BURST 3
 #define BURST_GAP_S 4
@@ -503,8 +503,6 @@ static int send_ra(int fd, unsigned int ifindex, const struct in6_addr *src,
 static void send_stale(int fd, unsigned int ifindex, const struct stale *s)
 {
     struct in6_addr src;
-    time_t now = time(NULL);
-    uint32_t valid;
 
     /* a former link-local of bridge0: withdraw it, nothing else */
     if (s->pfx.len == 0) {
@@ -518,9 +516,7 @@ static void send_stale(int fd, unsigned int ifindex, const struct stale *s)
         src = s->router;
     else
         inet_pton(AF_INET6, NEUTRAL_SRC, &src);
-    valid = s->since != 0 && now >= SANE_CLOCK && now - s->since < TWO_HOURS_FOR_S
-        ? 7200 : 0;
-    send_ra(fd, ifindex, &src, 0, 0, 0, &s->pfx, valid, 0);
+    send_ra(fd, ifindex, &src, 0, 0, 0, &s->pfx, STALE_VALID, STALE_PREFERRED);
 }
 
 /* bridge0's link-local address, from /proc/net/if_inet6. */
