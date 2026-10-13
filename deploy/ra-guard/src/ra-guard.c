@@ -22,10 +22,12 @@
  * the state file.
  *
  * The stale prefix goes out with valid 2 and preferred 1, as QCMAP itself
- * does when it tears a session down cleanly. RFC 4862 5.5.3(e) would clamp
- * that to two hours, but RouterOS drops the address at once, while it
- * ignores both 0 and 7200 (seen on RouterOS 7.24.5). A host that does not
- * know the prefix gets an address that expires two seconds later.
+ * does when it tears a session down cleanly (RFC 4862 5.5.3(e) clamps the
+ * valid lifetime to two hours). RouterOS 7.24.5 ignores a PIO coming from a
+ * router it no longer uses, and from a live router it honours the
+ * preferred lifetime but never the valid one, so its stale SLAAC addresses
+ * have to be removed on the router itself; the withdrawn default routes
+ * are what ra-guard fixes there.
  *
  * radish also advertises from bridge0's own link-local address, which is
  * random at every boot. ra-guard keeps it in the state file and, when it

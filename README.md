@@ -434,10 +434,14 @@ survive a reboot (the week starts only once the clock is set); the journal (`jou
 modem sends or receives.
 
 A stale prefix goes out with valid 2 s and preferred 1 s, as QCMAP itself
-does when it closes a session cleanly. RFC 4862 would clamp that to two
-hours, but RouterOS 7.24.5 drops the address at once, while it ignores both
-0 and 7200. A host that does not know the prefix gets an address that
-expires two seconds later.
+does when it closes a session cleanly. Hosts that follow RFC 4862 deprecate
+the address at once and drop it within two hours. RouterOS 7.24.5 does not:
+it ignores a prefix advertised by a router it no longer uses, and from a
+live router it honours the preferred lifetime but never the valid one. A
+RouterOS host behind the modem therefore keeps its old SLAAC addresses and
+has to remove them itself (for example, a scheduler that keeps only the
+newest global address on the interface); what `ra-guard` fixes there are
+the default routes through the old gateways.
 
 `radish` also advertises from the link-local address of `bridge0` itself,
 which is random at every boot. `ra-guard` keeps it in the state file
