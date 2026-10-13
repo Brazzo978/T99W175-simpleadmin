@@ -43,6 +43,18 @@
  * (deploy/ra-guard/udev) turns it off when the bridge is created; ra-guard
  * puts it back off if anything turns it on later.
  *
+ * It also pins the LAN neighbors that use EUI-64 (the core router does).
+ * RouterOS 7.24.5 drops its solicited-node membership on a VRF interface a
+ * few minutes after an address is added, and from then on answers no
+ * neighbor solicitation, for its global address or its link-local one,
+ * which share that group. Every neighbor seen once with a MAC whose EUI-64
+ * is its interface identifier is remembered, by link-local, in the state file
+ * ("pin" lines); its link-local, and each current prefix plus that
+ * identifier, get a permanent entry to the MAC, which the identifier
+ * itself encodes, so the modem reaches them without solicitations, after
+ * a reboot and a prefix change too. Pins of prefixes that are no longer
+ * current are removed.
+ *
  *   ra-guard run  [-i IFACE] [-s STATE] [-w WINDOW_S] [-t INTERVAL_S]
  *   ra-guard dump [-i IFACE]   print every RA/RS seen (IFACE "any": all)
  *   ra-guard rs   [-i IFACE]   send one router solicitation on IFACE
@@ -67,6 +79,7 @@
 #include <unistd.h>
 
 #define MAX_PREFIXES 8
+#define MAX_PINS 8
 #define MAX_STALE 16
 /* PIO lifetimes of a stale prefix (see the top) */
 #define STALE_VALID 2
@@ -106,6 +119,8 @@ static struct in6_addr cur_router[MAX_PREFIXES];
 static struct stale stale[MAX_STALE];
 static int nstale;
 static struct in6_addr lan_ll; /* bridge0's link-local, as last seen */
+static struct in6_addr pin_ll[MAX_PINS]; /* EUI-64 link-local neighbors */
+static int npin;
 
 static void logmsg(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void logmsg(const char *fmt, ...)
@@ -164,6 +179,8 @@ static void save_state(void)
                 is_unspec(&cur_router[i]) ? "-" : ntop(&cur_router[i]));
     if (!is_unspec(&lan_ll))
         fprintf(f, "lanll %s\n", ntop(&lan_ll));
+    for (i = 0; i < npin; i++)
+        fprintf(f, "pin %s\n", ntop(&pin_ll[i]));
     for (i = 0; i < nstale; i++)
         fprintf(f, "stale %s/%u %s %ld\n", ntop(&stale[i].pfx.addr),
                 stale[i].pfx.len,
@@ -205,6 +222,13 @@ static void load_state(void)
 
         if (n == 2 && strcmp(kind, "lanll") == 0) {
             inet_pton(AF_INET6, pfx, &lan_ll);
+            continue;
+        }
+        if (n == 2 && strcmp(kind, "pin") == 0) {
+            if (npin < MAX_PINS && inet_pton(AF_INET6, pfx, &r) == 1 &&
+                IN6_IS_ADDR_LINKLOCAL(&r) && r.s6_addr[11] == 0xff &&
+                r.s6_addr[12] == 0xfe)
+                pin_ll[npin++] = r;
             continue;
         }
         /* /64s, and ::/0 for a withdrawn router without a prefix (older
@@ -608,6 +632,158 @@ static void snooping_off(void)
         logmsg("⚠️  cannot turn multicast snooping off on %s", iface);
 }
 
+/* ------------------------------------------------------ neighbor pins */
+
+static void eui64_iid(const uint8_t *mac, uint8_t *iid)
+{
+    iid[0] = mac[0] ^ 0x02;
+    iid[1] = mac[1];
+    iid[2] = mac[2];
+    iid[3] = 0xff;
+    iid[4] = 0xfe;
+    iid[5] = mac[3];
+    iid[6] = mac[4];
+    iid[7] = mac[5];
+}
+
+static int parse_mac(const char *s, uint8_t *mac)
+{
+    unsigned int b[6];
+    int i;
+
+    if (sscanf(s, "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != 6)
+        return -1;
+    for (i = 0; i < 6; i++) {
+        if (b[i] > 0xff)
+            return -1;
+        mac[i] = (uint8_t)b[i];
+    }
+    return 0;
+}
+
+/* True when ADDR's interface identifier is the EUI-64 of MAC. */
+static int is_eui64_of(const struct in6_addr *addr, const uint8_t *mac)
+{
+    uint8_t iid[8];
+    eui64_iid(mac, iid);
+    return memcmp(addr->s6_addr + 8, iid, 8) == 0;
+}
+
+/* The MAC an EUI-64 interface identifier encodes. */
+static void eui64_mac(const struct in6_addr *addr, uint8_t *mac)
+{
+    const uint8_t *iid = addr->s6_addr + 8;
+    mac[0] = iid[0] ^ 0x02;
+    mac[1] = iid[1];
+    mac[2] = iid[2];
+    mac[3] = iid[5];
+    mac[4] = iid[6];
+    mac[5] = iid[7];
+}
+
+static int is_pinned_iid(const struct in6_addr *a)
+{
+    int i;
+    for (i = 0; i < npin; i++)
+        if (memcmp(a->s6_addr + 8, pin_ll[i].s6_addr + 8, 8) == 0)
+            return 1;
+    return 0;
+}
+
+static int run_ip(const char *verb, const struct in6_addr *a, const uint8_t *mac)
+{
+    char cmd[256];
+
+    if (mac)
+        snprintf(cmd, sizeof(cmd),
+                 "ip -6 neigh %s %s lladdr %02x:%02x:%02x:%02x:%02x:%02x "
+                 "dev %s nud permanent", verb, ntop(a), mac[0], mac[1],
+                 mac[2], mac[3], mac[4], mac[5], iface);
+    else
+        snprintf(cmd, sizeof(cmd), "ip -6 neigh %s %s dev %s", verb, ntop(a), iface);
+    return system(cmd);
+}
+
+#define MAX_NEIGH 32
+
+/* Learns the EUI-64 link-local neighbors on IFACE, pins each of them and
+ * its address in every current prefix to its MAC, and unpins the pinned
+ * addresses of other prefixes. Returns 1 when a neighbor was learnt. */
+static int pin_neighbors(void)
+{
+    struct { struct in6_addr a; uint8_t mac[6]; int perm; } nb[MAX_NEIGH];
+    char cmd[64], line[256];
+    int n = 0, i, j, k, learnt = 0;
+    FILE *f;
+
+    snprintf(cmd, sizeof(cmd), "ip -6 neigh show dev %s", iface);
+    f = popen(cmd, "r");
+    if (!f)
+        return 0;
+    while (fgets(line, sizeof(line), f) && n < MAX_NEIGH) {
+        char addr[64], *ll = strstr(line, " lladdr ");
+        if (sscanf(line, "%63s", addr) != 1 || !ll ||
+            inet_pton(AF_INET6, addr, &nb[n].a) != 1 ||
+            parse_mac(ll + 8, nb[n].mac) != 0)
+            continue;
+        nb[n].perm = strstr(line, "PERMANENT") != NULL;
+        n++;
+    }
+    pclose(f);
+
+    /* any address of a neighbor whose identifier is the EUI-64 of its MAC
+     * gives its link-local */
+    for (i = 0; i < n; i++) {
+        struct in6_addr ll = IN6ADDR_ANY_INIT;
+        if (!is_eui64_of(&nb[i].a, nb[i].mac) || is_pinned_iid(&nb[i].a))
+            continue;
+        if (npin == MAX_PINS) {
+            logmsg("⚠️  no room to remember %s", ntop(&nb[i].a));
+            continue;
+        }
+        ll.s6_addr[0] = 0xfe;
+        ll.s6_addr[1] = 0x80;
+        memcpy(ll.s6_addr + 8, nb[i].a.s6_addr + 8, 8);
+        pin_ll[npin++] = ll;
+        logmsg("🔎 EUI-64 neighbor %s", ntop(&ll));
+        learnt = 1;
+    }
+    /* pins that belong to no current prefix any more */
+    for (i = 0; i < n; i++) {
+        struct prefix p = { nb[i].a, 64 };
+        if (!nb[i].perm || IN6_IS_ADDR_LINKLOCAL(&nb[i].a) ||
+            !is_eui64_of(&nb[i].a, nb[i].mac) || !is_pinned_iid(&nb[i].a))
+            continue;
+        mask_prefix(&p);
+        if (find_cur(&p) < 0 && run_ip("del", &nb[i].a, NULL) == 0)
+            logmsg("📌 unpinned %s (prefix no longer current)", ntop(&nb[i].a));
+    }
+    /* each remembered neighbor: its link-local, then every current prefix */
+    for (i = 0; i < npin; i++) {
+        uint8_t mac[6];
+        eui64_mac(&pin_ll[i], mac);
+        for (k = -1; k < ncur; k++) {
+            struct in6_addr g = pin_ll[i];
+            if (k >= 0) {
+                g = cur[k].addr;
+                memcpy(g.s6_addr + 8, pin_ll[i].s6_addr + 8, 8);
+            }
+            for (j = 0; j < n; j++)
+                if (nb[j].perm && memcmp(&nb[j].a, &g, 16) == 0 &&
+                    memcmp(nb[j].mac, mac, 6) == 0)
+                    break;
+            if (j < n)
+                continue;
+            if (run_ip("replace", &g, mac) == 0)
+                logmsg("📌 pinned %s to %02x:%02x:%02x:%02x:%02x:%02x", ntop(&g),
+                       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            else
+                logmsg("⚠️  cannot pin %s", ntop(&g));
+        }
+    }
+    return learnt;
+}
+
 /* The interface of the IPv6 default route: the mobile data interface. */
 static int wan_iface(char *out)
 {
@@ -779,6 +955,7 @@ static int cmd_run(void)
         if (now >= next_poll) {
             dirty |= refresh_prefixes(&changed_prefix);
             snooping_off();
+            dirty |= pin_neighbors();
             dirty |= refresh_lan_ll();
             if (changed_prefix) {
                 char wan[IF_NAMESIZE + 1];

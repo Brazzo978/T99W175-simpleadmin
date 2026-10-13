@@ -454,7 +454,7 @@ which is random at every boot. `ra-guard` keeps it in the state file
 `radish` itself is left alone: the lifetimes of the current prefix stay
 infinite, as the network sends them.
 
-One more thing keeps IPv6 working towards the LAN hosts:
+Two more things keep IPv6 working towards the LAN hosts:
 
 - **Multicast snooping off on `bridge0`.** The firmware leaves it on, with
   `bridge0` as MLD querier, yet no LAN host ever appears in its group table
@@ -467,6 +467,15 @@ One more thing keeps IPv6 working towards the LAN hosts:
   `deploy/ra-guard/udev/`) turns `multicast_snooping` off when QCMAP
   creates the bridge, and `ra-guard` sets it back to 0 whenever it finds
   it on.
+- **Pinned EUI-64 neighbors.** RouterOS 7.24.5 drops its solicited-node
+  membership on a VRF interface a few minutes after an address is added
+  and then answers no neighbor solicitation, for its global address or
+  its link-local. `ra-guard` remembers every LAN neighbor whose interface
+  identifier is the EUI-64 of its MAC (`pin` lines in the state file) and
+  keeps permanent neighbor entries for its link-local and for each current
+  prefix plus that identifier, removing them when the prefix goes away.
+  The MAC is the one the identifier encodes, so the pins survive a reboot
+  and follow a prefix change without any solicitation answered.
 
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 
