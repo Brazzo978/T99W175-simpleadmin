@@ -437,7 +437,10 @@ A stale prefix goes out with valid 2 s and preferred 1 s, as QCMAP itself
 does when it closes a session cleanly. RFC 4862 would clamp that to two
 hours, but RouterOS 7.24.5 drops the address at once, while it ignores both
 0 and 7200. A host that does not know the prefix gets an address that
-expires two seconds later.
+expires two seconds later. RouterOS only takes it from a router it
+currently uses, so the same prefix also goes out from the current
+link-local of `bridge0`, with the router lifetime (65535) and flags (O)
+`radish` advertises from there, which leaves that default route as it is.
 
 `radish` also advertises from the link-local address of `bridge0` itself,
 which is random at every boot. `ra-guard` keeps it in the state file
