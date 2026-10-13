@@ -26,10 +26,6 @@
  * that to two hours, but RouterOS drops the address at once, while it
  * ignores both 0 and 7200 (seen on RouterOS 7.24.5). A host that does not
  * know the prefix gets an address that expires two seconds later.
- * RouterOS only takes it from a router it currently uses: the same PIO is
- * therefore also sent from bridge0's current link-local, with the router
- * lifetime and flags radish advertises from it (65535, O), so that router
- * entry is left as it is.
  *
  * radish also advertises from bridge0's own link-local address, which is
  * random at every boot. ra-guard keeps it in the state file and, when it
@@ -73,10 +69,6 @@
 /* PIO lifetimes of a stale prefix (see the top) */
 #define STALE_VALID 2
 #define STALE_PREFERRED 1
-/* router lifetime and flags of radish's advertisements from bridge0's own
- * link-local, repeated when the stale PIO goes out from there */
-#define LAN_RLT 65535
-#define LAN_FLAGS ND_RA_FLAG_OTHER
 #define POLL_S 15
 #define BURST 3
 #define BURST_GAP_S 4
@@ -525,10 +517,6 @@ static void send_stale(int fd, unsigned int ifindex, const struct stale *s)
     else
         inet_pton(AF_INET6, NEUTRAL_SRC, &src);
     send_ra(fd, ifindex, &src, 0, 0, 0, &s->pfx, STALE_VALID, STALE_PREFERRED);
-    /* and from a router the hosts currently use (see the top) */
-    if (!is_unspec(&lan_ll))
-        send_ra(fd, ifindex, &lan_ll, LAN_FLAGS, LAN_RLT, 0, &s->pfx,
-                STALE_VALID, STALE_PREFERRED);
 }
 
 /* bridge0's link-local address, from /proc/net/if_inet6. */
