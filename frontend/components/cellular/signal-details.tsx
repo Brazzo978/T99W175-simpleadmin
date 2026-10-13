@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { PageShell } from "@/components/page-shell";
 import { getValueColorClass } from "@/components/dashboard/signal-card-utils";
+import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -14,7 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBridgeState, useNow } from "@/hooks/use-bridge";
 import { pickRadio, type RadioSource } from "@/lib/bridge/radio";
-import type { ChainValues, DiagLteCell, DiagNrCell } from "@/types/bridge";
+import type { ChainValues, DiagLteCell, DiagNrCell, DiagSnapshot } from "@/types/bridge";
 import {
   RSRP_THRESHOLDS,
   RSRQ_THRESHOLDS,
@@ -206,6 +207,73 @@ function NrCard({ cell, index, nsa }: { cell: DiagNrCell; index: number; nsa: bo
   );
 }
 
+function Rate({
+  label,
+  mbps,
+  icon,
+  tone,
+}: {
+  label: string;
+  mbps: number | null;
+  icon: React.ReactNode;
+  tone: string;
+}) {
+  return (
+    <div className="grid gap-1">
+      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <span className={tone}>{icon}</span>
+        {label}
+      </span>
+      <span className="text-3xl font-semibold tabular-nums @[540px]/card:text-4xl">
+        {mbps === null ? "—" : mbps.toFixed(mbps < 10 ? 2 : 1)}
+        <span className="ml-1 text-base font-normal text-muted-foreground">Mbps</span>
+      </span>
+    </div>
+  );
+}
+
+// Aggregate throughput across every carrier, counted by diag_bridge from the
+// transport blocks the modem decodes: below the IPA, so hardware-offloaded
+// traffic is included, and so are HARQ retransmissions. QMI has no rates.
+function AggregateCard({ snapshot, source }: { snapshot: DiagSnapshot; source: RadioSource }) {
+  const cells = [...snapshot.lte, ...snapshot.nr];
+  const sum = (pick: (c: DiagLteCell | DiagNrCell) => number | undefined) =>
+    cells.reduce((s, c) => s + (pick(c) ?? 0), 0);
+  const live = source === "diag";
+  const dl = live ? (snapshot.summary?.total_dl_mbps ?? sum((c) => c.dl_mbps)) : null;
+  const ul = live ? (snapshot.summary?.total_ul_mbps ?? sum((c) => c.ul_mbps)) : null;
+  const bandwidth = snapshot.summary?.total_bandwidth_mhz ?? sum((c) => c.bandwidth_mhz);
+  return (
+    <Card className="@container/card border-primary/30 bg-gradient-to-t from-primary/5 to-card @3xl/main:col-span-2">
+      <CardHeader>
+        <CardTitle>Aggregate throughput</CardTitle>
+        <CardDescription>
+          {live
+            ? "All carriers, measured at the radio layer (includes IPA-offloaded traffic and retransmissions)."
+            : "Needs diag_bridge: QMI does not report data rates."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid grid-cols-2 gap-6 @[540px]/card:grid-cols-4">
+        <Rate label="Download" mbps={dl} icon={<ArrowDownIcon className="size-4" />} tone="text-success" />
+        <Rate label="Upload" mbps={ul} icon={<ArrowUpIcon className="size-4" />} tone="text-info" />
+        <div className="grid gap-1">
+          <span className="text-sm text-muted-foreground">Aggregated bandwidth</span>
+          <span className="text-2xl font-semibold tabular-nums">{bandwidth ? `${bandwidth} MHz` : "—"}</span>
+        </div>
+        <div className="grid gap-1">
+          <span className="text-sm text-muted-foreground">Carriers</span>
+          <span className="text-2xl font-semibold tabular-nums">
+            {[
+              snapshot.lte.length ? `${snapshot.lte.length} LTE` : "",
+              snapshot.nr.length ? `${snapshot.nr.length} NR` : "",
+            ].filter(Boolean).join(" + ") || "—"}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const SOURCE_LABEL: Record<RadioSource, string> = {
   diag: "DIAG",
   qmi: "QMI (diag_bridge not connected)",
@@ -234,6 +302,7 @@ export default function SignalDetailsComponent() {
         Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-72 w-full rounded-xl" />)
       ) : (
         <>
+          <AggregateCard snapshot={snapshot} source={source} />
           {lte.map((cell) => (
             <LteCard key={`lte-${cell.earfcn}-${cell.pci}`} cell={cell} />
           ))}
