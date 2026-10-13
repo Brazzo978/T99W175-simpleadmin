@@ -21,6 +21,17 @@
  * The current router is never withdrawn. Stale entries survive a reboot in
  * the state file.
  *
+ * During the first hour a stale prefix goes out with valid 7200 instead of
+ * 0: RouterOS ignores a valid lifetime of 0 and keeps the address forever,
+ * while 7200 is the decrease RFC 4862 5.5.3(e) honours (down to two hours).
+ * Only for an hour, since a host that does not know the prefix creates a
+ * deprecated address from such a PIO.
+ *
+ * radish also advertises from bridge0's own link-local address, which is
+ * random at every boot. ra-guard keeps it in the state file and, when it
+ * changes, withdraws the old one (router lifetime 0, no prefix) for the
+ * same window.
+ *
  * It keeps multicast snooping off on the bridge. The firmware leaves it on,
  * with bridge0 as the MLD querier, but no LAN host ever shows up in its
  * group table, so multicast to a group it has not registered (the
@@ -54,7 +65,10 @@
 #include <unistd.h>
 
 #define MAX_PREFIXES 8
-#define MAX_STALE 8
+#define MAX_STALE 16
+/* how long a stale prefix is advertised with a valid lifetime of 2 hours
+ * before it goes to 0 (see the top) */
+#define TWO_HOURS_FOR_S 3600
 #define POLL_S 15
 #define BURST 3
 #define BURST_GAP_S 4
@@ -89,6 +103,7 @@ static int ncur;
 static struct in6_addr cur_router[MAX_PREFIXES];
 static struct stale stale[MAX_STALE];
 static int nstale;
+static struct in6_addr lan_ll; /* bridge0's link-local, as last seen */
 
 static void logmsg(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void logmsg(const char *fmt, ...)
@@ -145,6 +160,8 @@ static void save_state(void)
     for (i = 0; i < ncur; i++)
         fprintf(f, "current %s/%u %s\n", ntop(&cur[i].addr), cur[i].len,
                 is_unspec(&cur_router[i]) ? "-" : ntop(&cur_router[i]));
+    if (!is_unspec(&lan_ll))
+        fprintf(f, "lanll %s\n", ntop(&lan_ll));
     for (i = 0; i < nstale; i++)
         fprintf(f, "stale %s/%u %s %ld\n", ntop(&stale[i].pfx.addr),
                 stale[i].pfx.len,
@@ -184,8 +201,13 @@ static void load_state(void)
         struct in6_addr r = IN6ADDR_ANY_INIT;
         int n = sscanf(line, "%15s %63s %63s %ld", kind, pfx, rtr, &since);
 
-        /* only /64s: older versions also recorded radish's aggregates */
-        if (n < 3 || parse_prefix(pfx, &p) != 0 || p.len != 64)
+        if (n == 2 && strcmp(kind, "lanll") == 0) {
+            inet_pton(AF_INET6, pfx, &lan_ll);
+            continue;
+        }
+        /* /64s, and ::/0 for a withdrawn router without a prefix (older
+         * versions also recorded radish's aggregates) */
+        if (n < 3 || parse_prefix(pfx, &p) != 0 || (p.len != 64 && p.len != 0))
             continue;
         if (strcmp(rtr, "-") != 0 && inet_pton(AF_INET6, rtr, &r) != 1)
             continue;
@@ -269,8 +291,10 @@ static void add_stale(const struct prefix *p, const struct in6_addr *router)
     struct stale *s;
     int i;
 
+    /* a router-only entry (::/0) is one per router */
     for (i = 0; i < nstale; i++)
-        if (same_prefix(&stale[i].pfx, p))
+        if (same_prefix(&stale[i].pfx, p) &&
+            (p->len != 0 || memcmp(&stale[i].router, router, 16) == 0))
             break;
     if (i == nstale) {
         if (nstale == MAX_STALE) {
@@ -286,9 +310,12 @@ static void add_stale(const struct prefix *p, const struct in6_addr *router)
     s->since = time(NULL) >= SANE_CLOCK ? time(NULL) : 0;
     s->burst = BURST;
     s->next = 0;
-    logmsg("🧹 %s/%u is stale (router %s): deprecating it on %s",
-           ntop(&p->addr), p->len, is_unspec(router) ? "unknown" : ntop(router),
-           iface);
+    if (p->len == 0)
+        logmsg("🧹 router %s is gone: withdrawing it on %s", ntop(router), iface);
+    else
+        logmsg("🧹 %s/%u is stale (router %s): deprecating it on %s",
+               ntop(&p->addr), p->len, is_unspec(router) ? "unknown" : ntop(router),
+               iface);
 }
 
 static void drop_stale(int i)
@@ -476,14 +503,66 @@ static int send_ra(int fd, unsigned int ifindex, const struct in6_addr *src,
 static void send_stale(int fd, unsigned int ifindex, const struct stale *s)
 {
     struct in6_addr src;
+    time_t now = time(NULL);
+    uint32_t valid;
 
+    /* a former link-local of bridge0: withdraw it, nothing else */
+    if (s->pfx.len == 0) {
+        if (memcmp(&s->router, &lan_ll, 16) != 0)
+            send_ra(fd, ifindex, &s->router, 0, 0, 0, NULL, 0, 0);
+        return;
+    }
     /* withdraw the old router under its own address, unless it may be a
      * current router too: then the RA must not speak for it */
     if (!is_unspec(&s->router) && !maybe_cur_router(&s->router))
         src = s->router;
     else
         inet_pton(AF_INET6, NEUTRAL_SRC, &src);
-    send_ra(fd, ifindex, &src, 0, 0, 0, &s->pfx, 0, 0);
+    valid = s->since != 0 && now >= SANE_CLOCK && now - s->since < TWO_HOURS_FOR_S
+        ? 7200 : 0;
+    send_ra(fd, ifindex, &src, 0, 0, 0, &s->pfx, valid, 0);
+}
+
+/* bridge0's link-local address, from /proc/net/if_inet6. */
+static int read_lan_ll(struct in6_addr *out)
+{
+    char line[256], hex[33], dev[IF_NAMESIZE + 1];
+    unsigned int scope;
+    FILE *f = fopen("/proc/net/if_inet6", "r");
+    int found = 0;
+
+    if (!f)
+        return 0;
+    while (!found && fgets(line, sizeof(line), f)) {
+        int i;
+        if (sscanf(line, "%32s %*x %*x %x %*x %16s", hex, &scope, dev) != 3 ||
+            scope != 0x20 || strcmp(dev, iface) != 0)
+            continue;
+        for (i = 0; i < 16; i++) {
+            unsigned int b;
+            sscanf(hex + 2 * i, "%2x", &b);
+            out->s6_addr[i] = (uint8_t)b;
+        }
+        found = 1;
+    }
+    fclose(f);
+    return found;
+}
+
+/* Returns 1 when the state changed: a new link-local of bridge0, after a
+ * reboot, makes the previous one a router to withdraw. */
+static int refresh_lan_ll(void)
+{
+    struct prefix none = { IN6ADDR_ANY_INIT, 0 };
+    struct in6_addr ll;
+
+    if (!read_lan_ll(&ll) || memcmp(&ll, &lan_ll, 16) == 0)
+        return 0;
+    if (!is_unspec(&lan_ll))
+        add_stale(&none, &lan_ll);
+    lan_ll = ll;
+    logmsg("🔗 %s link-local is %s", iface, ntop(&lan_ll));
+    return 1;
 }
 
 static int send_rs(const char *ifname)
@@ -702,6 +781,7 @@ static int cmd_run(void)
         if (now >= next_poll) {
             dirty |= refresh_prefixes(&changed_prefix);
             snooping_off();
+            dirty |= refresh_lan_ll();
             if (changed_prefix) {
                 char wan[IF_NAMESIZE + 1];
                 /* learn the new router now instead of at its next RA */

@@ -434,6 +434,17 @@ survive a reboot (the week starts only once the clock is set); the journal (`jou
 `ra-guard dump -i any` prints every router advertisement and solicitation the
 modem sends or receives.
 
+During the first hour a stale prefix goes out with a valid lifetime of
+7200 s instead of 0: RouterOS ignores 0 and keeps the address forever,
+while 7200 is the decrease RFC 4862 accepts (down to two hours). Only for
+an hour, because a host that does not know the prefix creates a deprecated
+address from it.
+
+`radish` also advertises from the link-local address of `bridge0` itself,
+which is random at every boot. `ra-guard` keeps it in the state file
+(`lanll`) and, after a reboot, withdraws the previous one (router lifetime
+0, no prefix) for the same week.
+
 `radish` itself is left alone: the lifetimes of the current prefix stay
 infinite, as the network sends them.
 
