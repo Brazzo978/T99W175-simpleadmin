@@ -170,6 +170,12 @@ export interface LteStatus {
   rssi: number | null;
   /** Timing Advance index (0–1282). Used for cell distance estimation. */
   ta: number | null;
+  /** Wideband CQI 0..15 (DIAG) */
+  cqi: number | null;
+  /** MIMO rank 1..4 (DIAG) */
+  ri: number | null;
+  /** PUSCH TX power (dBm), only while transmitting (DIAG) */
+  tx_power: number | null;
 }
 
 export interface NrStatus {
@@ -199,6 +205,10 @@ export interface NrStatus {
   scs: number | null;
   /** NR Timing Advance (NTA value). Used for cell distance estimation. */
   ta: number | null;
+  /** Wideband CQI 0..15 (DIAG) */
+  cqi: number | null;
+  /** MIMO rank 1..4, or the average DL layers rounded (DIAG) */
+  ri: number | null;
 }
 
 export interface DeviceStatus {
@@ -303,6 +313,14 @@ export const RSRQ_THRESHOLDS: SignalThresholds = {
 };
 
 /** SINR thresholds (dB) — higher is better */
+/** CQI 0..15: 12+ carries 64QAM and up, under 6 is QPSK territory. */
+export const CQI_THRESHOLDS: SignalThresholds = {
+  excellent: 12,
+  good: 9,
+  fair: 6,
+  poor: 0,
+};
+
 export const SINR_THRESHOLDS: SignalThresholds = {
   excellent: 20,
   good: 13,

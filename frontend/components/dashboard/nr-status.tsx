@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { SignalStatusCard } from "./signal-status-card";
 import type { NrStatus } from "@/types/modem-status";
 import {
+  CQI_THRESHOLDS,
   RSRP_THRESHOLDS,
   RSRQ_THRESHOLDS,
   SINR_THRESHOLDS,
@@ -44,7 +45,16 @@ const NrStatusComponent = ({ data, isLoading }: NrStatusComponentProps) => {
       rawValue: data?.sinr,
       thresholds: SINR_THRESHOLDS,
     },
-    { label: t("signal_status.scs"), value: fmt(data?.scs, "kHz") },
+    {
+      label: t("signal_status.cqi"),
+      value: data?.cqi != null ? `${data.cqi} / 15` : "-",
+      rawValue: data?.cqi,
+      thresholds: CQI_THRESHOLDS,
+    },
+    {
+      label: t("signal_status.rank"),
+      value: data?.ri != null ? `${data.ri}` : "-",
+    },
   ];
 
   return (

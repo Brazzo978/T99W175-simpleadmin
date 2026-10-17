@@ -36,27 +36,27 @@ export const description = "Signal history chart for RSRP, RSRQ, and SINR";
 const chartConfig = {
   rsrp4G: {
     label: "LTE",
-    color: "var(--chart-1)",
+    color: "var(--chart-lte)",
   },
   rsrp5G: {
     label: "5G",
-    color: "var(--chart-3)",
+    color: "var(--chart-nr)",
   },
   rsrq4G: {
     label: "LTE",
-    color: "var(--chart-1)",
+    color: "var(--chart-lte)",
   },
   rsrq5G: {
     label: "5G",
-    color: "var(--chart-3)",
+    color: "var(--chart-nr)",
   },
   sinr4G: {
     label: "LTE",
-    color: "var(--chart-1)",
+    color: "var(--chart-lte)",
   },
   sinr5G: {
     label: "5G",
-    color: "var(--chart-3)",
+    color: "var(--chart-nr)",
   },
 } satisfies ChartConfig;
 
@@ -191,7 +191,7 @@ export function SignalHistoryComponent() {
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
-                tickFormatter={(value) => `${value}`}
+                tickFormatter={(value: number) => `${Math.round(value)}`}
                 domain={["dataMin - 5", "dataMax + 5"]}
               />
               <ChartTooltip

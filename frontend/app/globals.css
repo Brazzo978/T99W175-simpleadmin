@@ -24,6 +24,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-chart-lte: var(--chart-lte);
+  --color-chart-nr: var(--chart-nr);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -86,6 +88,11 @@
   --chart-5: oklch(0.424 0.199 265.638);
   /* Orange for Chart 6 */
   --chart-6: oklch(0.705 0.213 47.604);
+  /* Radio access technology pair (LTE vs 5G NR), validated for CVD and the
+     categorical lightness band on both surfaces: indigo against an orange
+     one step darker than chart-6, which sits above the dark-mode band. */
+  --chart-lte: var(--chart-3);
+  --chart-nr: oklch(0.66 0.2 47.6);
   --success: oklch(0.59 0.18 149);
   --success-foreground: oklch(0.985 0 0);
   /* On-surface text variant of --success: darker so text reads at WCAG AA 4.5:1
@@ -134,6 +141,8 @@
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
   --chart-6: oklch(0.705 0.213 47.604);
+  --chart-lte: var(--chart-3);
+  --chart-nr: oklch(0.66 0.2 47.6);
   --success: oklch(0.65 0.17 149);
   --success-foreground: oklch(0.985 0 0);
   /* On-surface text variant for the dark Slate card (L 0.21): lighter so it

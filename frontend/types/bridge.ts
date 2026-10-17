@@ -39,6 +39,15 @@ export interface DiagLteCell {
   ul_mbps?: number;
   ul_rb?: number;
   ul_modulation?: string;
+  /** Wideband CQI 0..15 (codeword 0) of the last PUCCH CSI report */
+  cqi?: number;
+  /** Rank indicator 1..4: MIMO layers the UE asks for */
+  ri?: number;
+  /** PUSCH TX power (dBm), only while the UE transmits on this carrier */
+  tx_power_dbm?: number;
+  /** Raw timing advance command from the last RACH Msg2 (about 78 m each) */
+  ta?: number;
+  ta_age_s?: number;
   cell_id?: number | null;
   tac?: number | null;
   mcc?: number;
@@ -53,6 +62,8 @@ export interface DiagNrCell {
   rsrq: number | null;
   /** From QMI or the last RRC measurement report; DIAG has no steady NR SINR */
   sinr?: number | null;
+  /** Age of an RRC-reported sinr (s) */
+  sinr_age_s?: number;
   ssb?: number;
   rx_diversity: number;
   rsrp_rx: ChainValues;
@@ -69,6 +80,25 @@ export interface DiagNrCell {
   ul_prb?: number;
   phr_db?: number;
   pcmax_dbm?: number;
+  /** Average DL MCS of the PDSCH grants in the last log */
+  dl_mcs?: number;
+  /** Average resource blocks per DL grant */
+  dl_rb?: number;
+  /** Average MIMO layers per DL grant, 1..4 */
+  dl_layers?: number;
+  /** Wideband CQI 0..15 of the last type-I CSI report */
+  cqi?: number;
+  /** Rank indicator 1..4 */
+  ri?: number;
+  /** FTL SNR (dB), best chain and per chain (not logged by every firmware) */
+  snr?: number;
+  snr_rx?: ChainValues;
+  /** PUSCH TX power (dBm) and DL path loss (dB), when logged */
+  tx_power_dbm?: number;
+  pathloss_db?: number;
+  /** Raw timing advance from RACH Msg2 and its age */
+  ta?: number;
+  ta_age_s?: number;
   cell_id?: number | null;
   tac?: number | null;
   mcc?: number;

@@ -220,7 +220,10 @@ export function buildModemStatus(
       rsrq: round1(pcell?.rsrq),
       sinr: round1(pcell?.sinr),
       rssi: round1(pcell?.rssi),
-      ta: null,
+      ta: pcell?.ta ?? null,
+      cqi: pcell?.cqi ?? null,
+      ri: pcell?.ri ?? null,
+      tx_power: pcell?.tx_power_dbm ?? null,
     },
     nr: {
       state: nr0 ? cellState : "inactive",
@@ -235,7 +238,13 @@ export function buildModemStatus(
       rsrq: round1(nr0?.rsrq),
       sinr: round1(nr0?.sinr),
       scs: null,
+      // diag_bridge sends the raw TA command, not NTA: converting it needs
+      // the subcarrier spacing, which is not known here.
       ta: null,
+      cqi: nr0?.cqi ?? null,
+      ri:
+        nr0?.ri ??
+        (typeof nr0?.dl_layers === "number" ? Math.round(nr0.dl_layers) : null),
     },
     device: {
       temperature: round1(modem?.temperature?.modem),

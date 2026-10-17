@@ -100,7 +100,10 @@
     "rsrq": "RSRQ",
     "rssi": "RSSI",
     "sinr": "SINR",
-    "scs": "SCS"
+    "scs": "SCS",
+    "cqi": "CQI",
+    "rank": "Rank MIMO",
+    "tx_power": "Potenza TX"
   },
   "signal_card": {
     "strength_heading": "Potenza del segnale",

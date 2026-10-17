@@ -14,6 +14,12 @@
 import type { DiagSnapshot, SystemSnapshot } from "@/types/bridge";
 import type { SignalHistoryEntry } from "@/types/modem-status";
 import { pickRadio, type RadioSource } from "./radio";
+import {
+  RADIO_HISTORY_INTERVAL_MS,
+  RADIO_HISTORY_MAX,
+  takeRadioSample,
+  type RadioSample,
+} from "./radio-history";
 
 export type LinkState = "idle" | "connecting" | "connected" | "disconnected";
 
@@ -31,6 +37,8 @@ export interface BridgeState {
   latencyHistory: (number | null)[];
   /** Mean seconds between latency samples, 0 until two have arrived */
   latencyIntervalSec: number;
+  /** One radio sample per second, oldest first (Signal Details trends) */
+  radioHistory: RadioSample[];
 }
 
 const PORTS = { diag: 9001, system: 9002 } as const;
@@ -54,6 +62,7 @@ let state: BridgeState = {
   signalHistory: [],
   latencyHistory: [],
   latencyIntervalSec: 0,
+  radioHistory: [],
 };
 
 const listeners = new Set<() => void>();
@@ -70,6 +79,7 @@ const backoff: Record<Kind, number> = {
   system: RECONNECT_MIN_MS,
 };
 let lastSignalSampleAt = 0;
+let lastRadioSampleAt = 0;
 let lastLatencySampleAt = 0;
 let visibilityHooked = false;
 
@@ -160,6 +170,7 @@ function disconnect(kind: Kind) {
 function onDiag(diag: DiagSnapshot) {
   setState({ diag, diagAt: Date.now() });
   sampleSignal();
+  sampleRadio();
 }
 
 function onSystem(system: SystemSnapshot) {
@@ -180,6 +191,7 @@ function onSystem(system: SystemSnapshot) {
   }
   setState({ system, systemAt: now, latencyHistory, latencyIntervalSec });
   sampleSignal();
+  sampleRadio();
 }
 
 function sampleSignal() {
@@ -203,6 +215,26 @@ function sampleSignal() {
   setState({
     signalHistory: [...state.signalHistory, entry].slice(-SIGNAL_HISTORY_MAX),
   });
+}
+
+function sampleRadio() {
+  const now = Date.now();
+  if (now - lastRadioSampleAt < RADIO_HISTORY_INTERVAL_MS) return;
+  const { snapshot, source } = pickRadio(state, now);
+  if (!snapshot) return;
+  lastRadioSampleAt = now;
+  setState({
+    radioHistory: [
+      ...state.radioHistory,
+      takeRadioSample(snapshot, source, now),
+    ].slice(-RADIO_HISTORY_MAX),
+  });
+}
+
+/** Drops the radio samples (Signal Details "Reset"). */
+export function clearRadioHistory(): void {
+  lastRadioSampleAt = 0;
+  setState({ radioHistory: [] });
 }
 
 function syncConnections() {

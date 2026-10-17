@@ -314,7 +314,7 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 | Page | What | Backend |
 |---|---|---|
 | Dashboard | network, LTE/5G cells, device, latency, signal chart | WebSockets |
-| Signal Details | aggregate DL/UL throughput on top, then every carrier, per-antenna RSRP/SINR, DL/UL details | WebSockets |
+| Signal Details | aggregate DL/UL throughput with its trend, a carrier table, throughput by carrier, metric trends and histograms (CQI, MCS, rank, SINR, RSRP, TX power, BLER), then one card per carrier with per-antenna RSRP/SINR/SNR, CQI, rank, TX power and a DL/UL link table | WebSockets |
 | Cellular Settings | network mode, 5G NSA/SA, SIM slot, APN | `^SLMODE`, `^NR5G_MODE`, `^SWITCH_SLOT`, `+CGDCONT` |
 | Band Locking / Cell Locking | LTE, NSA, SA bands; LTE and 5G SA cell locks | `^BAND_PREF_EXT`, `^LTE_LOCK`, `^NR5G_LOCK` |
 | SMS Center | inbox, send, delete | `+CMGL`, `send_sms` |
@@ -353,10 +353,15 @@ WebSockets, without polling AT commands:
 
 Signal Details names the radio source: **DIAG**, or **QMI** when
 `diag_bridge` is down, with the DIAG-only details (DL/UL rows, per-chain SINR,
-beams) when available. Its top card sums download and upload across every
-carrier; the rate is counted from the transport blocks the modem decodes, so it
-includes the traffic the IPA hardware-offloads (which the kernel interface
-counters miss) and HARQ retransmissions. LTE SCells come from the RRC configuration (or QMI):
+CQI, rank, TX power, beams) when available. Its top card sums download and
+upload across every carrier; the rate is counted from the transport blocks the
+modem decodes, so it includes the traffic the IPA hardware-offloads (which the
+kernel interface counters miss) and HARQ retransmissions. While the page is
+open the browser keeps one radio sample a second for ten minutes (PCell and
+first NR cell): the trend and distribution cards, and the throughput trend,
+read it over a 1, 5 or 10 minute window. Values the bridge leaves out (TX
+power while idle, NR SNR and timing advance on this firmware) are hidden, never
+shown as zero. LTE SCells come from the RRC configuration (or QMI):
 this firmware does not always measure them, so their RSRP/SINR can be
 missing. Both sockets close while the tab is hidden, and the bridges only
 poll the modem while someone is connected.
