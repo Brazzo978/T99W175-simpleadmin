@@ -100,7 +100,15 @@ function withQmiExtras(
 ): DiagSnapshot {
   const lte = (diag.lte ?? []).map((cell) => ({ ...cell }));
   const nr = (diag.nr ?? []).map((cell) => ({ ...cell }));
-  const snap: DiagSnapshot = { lte, nr, summary: diag.summary };
+  const snap: DiagSnapshot = {
+    lte,
+    nr,
+    summary: diag.summary,
+    lte_neighbors: diag.lte_neighbors,
+    diag_logs: diag.diag_logs,
+    rrc: diag.rrc,
+    events: diag.events,
+  };
   const radio = system?.radio;
   if (!radio) return snap;
 

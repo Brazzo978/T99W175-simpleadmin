@@ -11,7 +11,7 @@
 // reference exactly when something changed.
 // =============================================================================
 
-import type { DiagSnapshot, SystemSnapshot } from "@/types/bridge";
+import type { DiagEvent, DiagSnapshot, SystemSnapshot } from "@/types/bridge";
 import type { SignalHistoryEntry } from "@/types/modem-status";
 import { pickRadio, type RadioSource } from "./radio";
 import {
@@ -39,7 +39,24 @@ export interface BridgeState {
   latencyIntervalSec: number;
   /** One radio sample per second, oldest first (Signal Details trends) */
   radioHistory: RadioSample[];
+  /** First sighting of each DIAG log counter in this page session, for a
+   *  per-minute rate: code -> Date.now() and count then */
+  diagLogBase: Record<string, { t: number; n: number }>;
+  /** DIAG events seen while the page was open, newest first: the bridge
+   *  sends only its last 20, this keeps the whole session */
+  radioEvents: RadioEvent[];
 }
+
+export interface RadioEvent extends Omit<DiagEvent, "age_s"> {
+  /** Unique within the session */
+  key: string;
+  /** Date.now() of the event: receive time minus its age */
+  ts: number;
+}
+
+const RADIO_EVENTS_MAX = 500;
+/** Ages are whole seconds and messages arrive late: same event within this. */
+const EVENT_MATCH_MS = 2500;
 
 const PORTS = { diag: 9001, system: 9002 } as const;
 type Kind = keyof typeof PORTS;
@@ -63,6 +80,8 @@ let state: BridgeState = {
   latencyHistory: [],
   latencyIntervalSec: 0,
   radioHistory: [],
+  diagLogBase: {},
+  radioEvents: [],
 };
 
 const listeners = new Set<() => void>();
@@ -80,6 +99,29 @@ const backoff: Record<Kind, number> = {
 };
 let lastSignalSampleAt = 0;
 let lastRadioSampleAt = 0;
+let eventSeq = 0;
+/** Events older than this were cleared by the user: not re-added. */
+let eventsClearedAt = 0;
+
+/** New events of a snapshot (its list repeats them with growing ages). */
+function mergeEvents(events: DiagEvent[] | undefined, now: number): RadioEvent[] {
+  const known = state.radioEvents;
+  if (!events?.length) return known;
+  const added: RadioEvent[] = [];
+  // Oldest first, so equal events in one snapshot stay apart.
+  for (const e of [...events].reverse()) {
+    const ts = now - e.age_s * 1000;
+    if (ts < eventsClearedAt) continue;
+    const f = JSON.stringify(e.f ?? {});
+    const dup = [...added, ...known.slice(0, 60)].some(
+      (k) => k.id === e.id && Math.abs(k.ts - ts) <= EVENT_MATCH_MS && JSON.stringify(k.f ?? {}) === f,
+    );
+    if (dup) continue;
+    added.push({ key: `${ts}-${e.id}-${eventSeq++}`, ts, id: e.id, name: e.name, f: e.f });
+  }
+  if (!added.length) return known;
+  return [...added.reverse(), ...known].slice(0, RADIO_EVENTS_MAX);
+}
 let lastLatencySampleAt = 0;
 let visibilityHooked = false;
 
@@ -168,7 +210,19 @@ function disconnect(kind: Kind) {
 }
 
 function onDiag(diag: DiagSnapshot) {
-  setState({ diag, diagAt: Date.now() });
+  const now = Date.now();
+  let { diagLogBase } = state;
+  const fresh = (diag.diag_logs ?? []).filter((l) => !(l.code in diagLogBase));
+  if (fresh.length) {
+    diagLogBase = { ...diagLogBase };
+    for (const l of fresh) diagLogBase[l.code] = { t: now, n: l.n };
+  }
+  setState({
+    diag,
+    diagAt: now,
+    diagLogBase,
+    radioEvents: mergeEvents(diag.events, now),
+  });
   sampleSignal();
   sampleRadio();
 }
@@ -235,6 +289,12 @@ function sampleRadio() {
 export function clearRadioHistory(): void {
   lastRadioSampleAt = 0;
   setState({ radioHistory: [] });
+}
+
+/** Clears the session's event log (Radio events "Clear"). */
+export function clearRadioEvents(): void {
+  eventsClearedAt = Date.now() + EVENT_MATCH_MS;
+  setState({ radioEvents: [] });
 }
 
 function syncConnections() {

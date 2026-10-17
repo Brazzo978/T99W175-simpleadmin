@@ -314,7 +314,7 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 | Page | What | Backend |
 |---|---|---|
 | Dashboard | network, LTE/5G cells, device, latency, signal chart | WebSockets |
-| Signal Details | aggregate DL/UL throughput with its trend, a carrier table, throughput by carrier, metric trends and histograms (CQI, MCS, rank, SINR, RSRP, TX power, BLER), then one card per carrier with per-antenna RSRP/SINR/SNR, CQI, rank, TX power and a DL/UL link table | WebSockets |
+| Signal Details | aggregate DL/UL throughput with its trend, a carrier table, a radio events log (LTE RRC state, failure counters, events by category), throughput by carrier, metric trends and histograms (CQI, MCS, rank, SINR, RSRP, TX power, BLER), LTE neighbour cells, one card per carrier (per-antenna RSRP/SINR/SNR, CQI, rank, TX power, timing advance distance, DL/UL link table) and the DIAG log coverage | WebSockets |
 | Cellular Settings | network mode, 5G NSA/SA, SIM slot, APN | `^SLMODE`, `^NR5G_MODE`, `^SWITCH_SLOT`, `+CGDCONT` |
 | Band Locking / Cell Locking | LTE, NSA, SA bands; LTE and 5G SA cell locks | `^BAND_PREF_EXT`, `^LTE_LOCK`, `^NR5G_LOCK` |
 | SMS Center | inbox, send, delete | `+CMGL`, `send_sms` |
@@ -359,9 +359,12 @@ modem decodes, so it includes the traffic the IPA hardware-offloads (which the
 kernel interface counters miss) and HARQ retransmissions. While the page is
 open the browser keeps one radio sample a second for ten minutes (PCell and
 first NR cell): the trend and distribution cards, and the throughput trend,
-read it over a 1, 5 or 10 minute window. Values the bridge leaves out (TX
-power while idle, NR SNR and timing advance on this firmware) are hidden, never
-shown as zero. LTE SCells come from the RRC configuration (or QMI):
+read it over a 1, 5 or 10 minute window. The radio events log keeps every
+DIAG event of the session (the bridge sends its last 20), with a badge per
+category (failure, mobility, RRC state, RACH, carrier aggregation). Values the
+bridge does not send are shown as a dash, never as zero; the DIAG log
+coverage card says which logs this firmware emits (timing advance, for
+instance, only comes at attach or handover). LTE SCells come from the RRC configuration (or QMI):
 this firmware does not always measure them, so their RSRP/SINR can be
 missing. Both sockets close while the tab is hidden, and the bridges only
 poll the modem while someone is connected.

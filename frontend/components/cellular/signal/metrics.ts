@@ -321,8 +321,3 @@ export function niceCeil(v: number): number {
   for (const m of [1, 2, 2.5, 5, 10]) if (v <= m * p) return m * p;
   return 10 * p;
 }
-
-/** TA command to distance (LTE: 16 Ts per unit, about 78 m one way). */
-export function taDistanceM(ta: number): number {
-  return ta * 78.12;
-}

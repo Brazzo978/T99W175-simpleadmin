@@ -34,7 +34,6 @@ import {
   fmtMbps,
   pct,
   quality,
-  taDistanceM,
   txPowerQuality,
 } from "./metrics";
 
@@ -86,10 +85,10 @@ function ChainBars({
   thresholds: SignalThresholds;
 }) {
   const chains = (values ?? []).map((v, i) => ({ v, i })).filter((c) => has(c.v));
-  if (chains.length === 0) return null;
   return (
     <div className="grid gap-2">
       <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">{label}</span>
+      {chains.length === 0 && <span className="text-sm text-muted-foreground">Not reported</span>}
       {chains.map(({ v, i }) => {
         const value = v as number;
         return (
@@ -124,7 +123,6 @@ function LinkAdaptation({
   txPower?: number;
   pcmax?: number;
 }) {
-  if (!has(cqi) && !has(ri) && !has(layers) && !has(txPower)) return null;
   const cqiQ = quality(cqi, CQI_THRESHOLDS);
   const txQ = txPowerQuality(txPower);
   const rank = has(ri) ? ri : layers;
@@ -171,9 +169,11 @@ function LinkAdaptation({
           marker={pcmax}
           label="PUSCH TX power"
         />
-        {!has(txPower) && (
-          <span className="text-[11px] text-muted-foreground">Only while transmitting</span>
-        )}
+        <span className="text-[11px] text-muted-foreground">
+          {has(txPower)
+            ? "Last PUSCH transmission, not an average"
+            : "No PUSCH in the last 5 s"}
+        </span>
       </div>
     </div>
   );
@@ -185,10 +185,9 @@ interface LinkRow {
   ul?: React.ReactNode;
 }
 
-/** DL against UL, one row per quantity; rows with neither value are hidden. */
+/** DL against UL, one row per quantity; a dash where the modem reports nothing. */
 function LinkTable({ rows }: { rows: LinkRow[] }) {
-  const shown = rows.filter((r) => r.dl != null || r.ul != null);
-  if (shown.length === 0) return null;
+  const shown = rows;
   return (
     <Table>
       <TableHeader>
@@ -212,10 +211,10 @@ function LinkTable({ rows }: { rows: LinkRow[] }) {
 }
 
 function Detail({ label, value }: { label: string; value: string | number | null | undefined }) {
-  if (value === null || value === undefined || value === "") return null;
+  const empty = value === null || value === undefined || value === "";
   return (
     <Badge variant="secondary" className="font-normal">
-      <span className="text-muted-foreground">{label}</span> {value}
+      <span className="text-muted-foreground">{label}</span> {empty ? "—" : value}
     </Badge>
   );
 }
@@ -229,11 +228,28 @@ function Rate({ value }: { value?: number }) {
   return has(value) ? <>{fmtMbps(value)} Mbps</> : null;
 }
 
-function TimingAdvance({ ta, age, lte }: { ta?: number; age?: number; lte: boolean }) {
-  if (!has(ta)) return null;
-  const dist = lte ? ` (≈ ${(taDistanceM(ta) / 1000).toFixed(2)} km)` : "";
-  const ago = has(age) ? `, ${age} s ago` : "";
-  return <Detail label="TA" value={`${ta}${dist}${ago}`} />;
+/** Timing advance as the bridge reports it: raw command, distance, age. */
+function TimingAdvance({
+  ta,
+  meters,
+  age,
+  scs,
+  scsEstimated,
+}: {
+  ta?: number;
+  meters?: number;
+  age?: number;
+  scs?: number;
+  scsEstimated?: boolean;
+}) {
+  if (!has(ta)) return <Detail label="TA" value="— (no RACH logged yet)" />;
+  const parts = [`${ta}`];
+  if (has(meters)) {
+    parts.push(meters >= 1000 ? `≈ ${(meters / 1000).toFixed(2)} km` : `≈ ${Math.round(meters)} m`);
+  }
+  if (has(scs)) parts.push(`SCS ${scs} kHz${scsEstimated ? " (est.)" : ""}`);
+  if (has(age)) parts.push(`${age} s ago`);
+  return <Detail label="TA" value={parts.join(" · ")} />;
 }
 
 export function LteCard({ cell }: { cell: DiagLteCell }) {
@@ -267,7 +283,7 @@ export function LteCard({ cell }: { cell: DiagLteCell }) {
             <ChainBars label="SINR per antenna" values={cell.sinr_rx} unit="dB" range={SINR_RANGE} thresholds={SINR_THRESHOLDS} />
           </>
         )}
-        <LinkAdaptation cqi={cell.cqi} ri={cell.ri} txPower={cell.tx_power_dbm} />
+        <LinkAdaptation cqi={cell.cqi} ri={cell.ri} txPower={cell.tx_power_dbm} pcmax={cell.mtpl_dbm} />
         <LinkTable
           rows={[
             { label: "Modulation", dl: cell.modulation, ul: cell.ul_modulation },
@@ -283,6 +299,14 @@ export function LteCard({ cell }: { cell: DiagLteCell }) {
               dl: has(cell.dl_mbps) ? <Rate value={cell.dl_mbps} /> : undefined,
               ul: has(cell.ul_mbps) ? <Rate value={cell.ul_mbps} /> : undefined,
             },
+            {
+              label: "Power headroom",
+              ul: has(cell.phr_db) ? `${cell.phr_db} dB` : undefined,
+            },
+            {
+              label: "Max TX power (MTPL)",
+              ul: has(cell.mtpl_dbm) ? `${cell.mtpl_dbm} dBm` : undefined,
+            },
           ]}
         />
         <div className="flex flex-wrap gap-2">
@@ -290,7 +314,7 @@ export function LteCard({ cell }: { cell: DiagLteCell }) {
           <Detail label="TAC" value={cell.tac} />
           <Detail label="PLMN" value={cell.mcc != null && cell.mnc != null ? `${cell.mcc}-${cell.mnc}` : null} />
           <Detail label="TX antennas" value={cell.tx_antennas} />
-          <TimingAdvance ta={cell.ta} age={cell.ta_age_s} lte />
+          <TimingAdvance ta={cell.ta} meters={cell.ta_m} age={cell.ta_age_s} />
         </div>
       </CardContent>
     </Card>
@@ -321,9 +345,7 @@ export function NrCard({ cell, index, nsa }: { cell: DiagNrCell; index: number; 
           <Metric label="RSRP" value={cell.rsrp} unit="dBm" thresholds={RSRP_THRESHOLDS} />
           <Metric label="RSRQ" value={cell.rsrq} unit="dB" thresholds={RSRQ_THRESHOLDS} />
           <Metric label="SINR" value={cell.sinr} unit="dB" thresholds={SINR_THRESHOLDS} note={sinrNote} />
-          {has(cell.snr) && (
-            <Metric label="SNR (best)" value={cell.snr} unit="dB" thresholds={SINR_THRESHOLDS} />
-          )}
+          <Metric label="SNR (best)" value={cell.snr} unit="dB" thresholds={SINR_THRESHOLDS} />
         </div>
         <ChainBars label="RSRP per antenna" values={cell.rsrp_rx} unit="dBm" range={RSRP_RANGE} thresholds={RSRP_THRESHOLDS} />
         <ChainBars label="SNR per antenna" values={cell.snr_rx} unit="dB" range={SINR_RANGE} thresholds={SINR_THRESHOLDS} />
@@ -378,7 +400,13 @@ export function NrCard({ cell, index, nsa }: { cell: DiagNrCell; index: number; 
           <Detail label="Beams" value={cell.num_beams} />
           <Detail label="Neighbours" value={cell.neighbor_cells} />
           <Detail label="Cell ID" value={cell.cell_id} />
-          <TimingAdvance ta={cell.ta} age={cell.ta_age_s} lte={false} />
+          <TimingAdvance
+            ta={cell.ta}
+            meters={cell.ta_m}
+            age={cell.ta_age_s}
+            scs={cell.ta_scs_khz}
+            scsEstimated={cell.ta_scs_estimated}
+          />
         </div>
       </CardContent>
     </Card>

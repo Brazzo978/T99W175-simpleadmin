@@ -102,7 +102,7 @@ export function TrendCard({ samples, from, to }: { samples: RadioSample[]; from:
         {!hasLte && !hasNr ? (
           <EmptyChart height="h-[240px]">
             No {def.label} samples in this window.
-            {key === "tx_power" ? " The modem reports TX power only while it transmits." : ""}
+            {key === "tx_power" ? " TX power is the last PUSCH transmission, kept for 5 s." : ""}
           </EmptyChart>
         ) : (
           <ChartContainer config={ratConfig} className="aspect-auto h-[240px] w-full">
@@ -267,7 +267,7 @@ export function DistributionCard({ samples }: { samples: RadioSample[] }) {
         {bins.length === 0 ? (
           <EmptyChart height="h-[240px]">
             No {def.label} samples in this window.
-            {key === "tx_power" ? " The modem reports TX power only while it transmits." : ""}
+            {key === "tx_power" ? " TX power is the last PUSCH transmission, kept for 5 s." : ""}
           </EmptyChart>
         ) : (
           <ChartContainer config={ratConfig} className="aspect-auto h-[240px] w-full">

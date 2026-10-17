@@ -42,7 +42,6 @@ import {
   formatBytes,
   formatUptime,
   calculateLteDistance,
-  calculateNrDistance,
   formatDistance,
   formatTemperature,
 } from "@/types/modem-status";
@@ -306,7 +305,12 @@ const DeviceMetricsComponent = ({
                 </TooltipContent>
               </Tooltip>
               <p className="font-semibold text-sm tabular-nums">
-                {formatDistance(calculateLteDistance(lteData?.ta ?? null), unitPrefs?.distanceUnit)}
+                {formatDistance(
+                  lteData?.ta_m != null
+                    ? lteData.ta_m / 1000
+                    : calculateLteDistance(lteData?.ta ?? null),
+                  unitPrefs?.distanceUnit,
+                )}
               </p>
             </div>
           </div>
@@ -337,7 +341,10 @@ const DeviceMetricsComponent = ({
                 </TooltipContent>
               </Tooltip>
               <p className="font-semibold text-sm tabular-nums">
-                {formatDistance(calculateNrDistance(nrData?.ta ?? null), unitPrefs?.distanceUnit)}
+                {formatDistance(
+                  nrData?.ta_m != null ? nrData.ta_m / 1000 : null,
+                  unitPrefs?.distanceUnit,
+                )}
               </p>
             </div>
           </div>

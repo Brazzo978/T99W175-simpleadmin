@@ -170,11 +170,13 @@ export interface LteStatus {
   rssi: number | null;
   /** Timing Advance index (0–1282). Used for cell distance estimation. */
   ta: number | null;
+  /** Cell distance (m) from the timing advance, computed by diag_bridge */
+  ta_m: number | null;
   /** Wideband CQI 0..15 (DIAG) */
   cqi: number | null;
   /** MIMO rank 1..4 (DIAG) */
   ri: number | null;
-  /** PUSCH TX power (dBm), only while transmitting (DIAG) */
+  /** PUSCH TX power (dBm) of the last PUSCH transmission (DIAG) */
   tx_power: number | null;
 }
 
@@ -203,8 +205,11 @@ export interface NrStatus {
   sinr: number | null;
   /** Subcarrier Spacing in kHz (15, 30, 60, 120) */
   scs: number | null;
-  /** NR Timing Advance (NTA value). Used for cell distance estimation. */
+  /** NR timing advance: the raw TA command from diag_bridge, not NTA */
   ta: number | null;
+  /** Cell distance (m) from the timing advance, computed by diag_bridge
+   *  with the subcarrier spacing (calculateNrDistance() takes NTA) */
+  ta_m: number | null;
   /** Wideband CQI 0..15 (DIAG) */
   cqi: number | null;
   /** MIMO rank 1..4, or the average DL layers rounded (DIAG) */

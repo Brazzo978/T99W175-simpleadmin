@@ -8,6 +8,8 @@ import { pickRadio, type RadioSource } from "@/lib/bridge/radio";
 import { clearRadioHistory } from "@/lib/bridge/store";
 import { DistributionCard, TrendCard } from "./signal/analysis-cards";
 import { CarrierTableCard } from "./signal/carrier-table";
+import { DiagLogsCard, NeighbourCard } from "./signal/diag-cards";
+import { RadioEventsCard } from "./signal/events-card";
 import { LteCard, NrCard } from "./signal/cell-cards";
 import { SignalToolbar } from "./signal/controls";
 import { windowed } from "./signal/metrics";
@@ -65,15 +67,18 @@ export default function SignalDetailsComponent() {
           />
           <AggregateThroughputCard snapshot={snapshot} source={source} samples={samples} from={from} to={now} />
           <CarrierTableCard snapshot={snapshot} live={source === "diag"} />
+          <RadioEventsCard events={state.radioEvents} rrc={snapshot.rrc} live={source === "diag"} />
           <CarrierThroughputCard snapshot={snapshot} source={source} />
           <TrendCard samples={samples} from={from} to={now} />
           <DistributionCard samples={samples} />
+          <NeighbourCard snapshot={snapshot} live={source === "diag"} />
           {lte.map((cell) => (
             <LteCard key={`lte-${cell.earfcn}-${cell.pci}`} cell={cell} />
           ))}
           {nr.map((cell, i) => (
             <NrCard key={`nr-${cell.arfcn}-${cell.pci}`} cell={cell} index={i} nsa={lte.length > 0} />
           ))}
+          <DiagLogsCard snapshot={snapshot} live={source === "diag"} now={now} base={state.diagLogBase} />
         </>
       )}
     </PageShell>

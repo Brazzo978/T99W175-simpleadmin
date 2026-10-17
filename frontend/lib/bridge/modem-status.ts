@@ -221,6 +221,7 @@ export function buildModemStatus(
       sinr: round1(pcell?.sinr),
       rssi: round1(pcell?.rssi),
       ta: pcell?.ta ?? null,
+      ta_m: pcell?.ta_m ?? null,
       cqi: pcell?.cqi ?? null,
       ri: pcell?.ri ?? null,
       tx_power: pcell?.tx_power_dbm ?? null,
@@ -238,9 +239,10 @@ export function buildModemStatus(
       rsrq: round1(nr0?.rsrq),
       sinr: round1(nr0?.sinr),
       scs: null,
-      // diag_bridge sends the raw TA command, not NTA: converting it needs
-      // the subcarrier spacing, which is not known here.
-      ta: null,
+      // The raw TA command, for the tooltip; the distance is ta_m, which
+      // diag_bridge computes with the subcarrier spacing.
+      ta: nr0?.ta ?? null,
+      ta_m: nr0?.ta_m ?? null,
       cqi: nr0?.cqi ?? null,
       ri:
         nr0?.ri ??

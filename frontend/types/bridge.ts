@@ -43,11 +43,19 @@ export interface DiagLteCell {
   cqi?: number;
   /** Rank indicator 1..4: MIMO layers the UE asks for */
   ri?: number;
-  /** PUSCH TX power (dBm), only while the UE transmits on this carrier */
+  /** PUSCH TX power (dBm) of the last PUSCH transmission, kept 5 s: idle
+   *  keep-alive grants count, so high values at idle mean a weak signal */
   tx_power_dbm?: number;
-  /** Raw timing advance command from the last RACH Msg2 (about 78 m each) */
+  /** Raw timing advance command from the last RACH Msg2, its distance (m)
+   *  and its age (s) */
   ta?: number;
+  ta_m?: number;
   ta_age_s?: number;
+  /** PCell only, from EVENT_LTE_ML1_EPHR_REPORT (kept 15 s): power headroom
+   *  (dB, low or negative = at the power limit) and the maximum TX power
+   *  currently allowed (dBm) */
+  phr_db?: number;
+  mtpl_dbm?: number;
   cell_id?: number | null;
   tac?: number | null;
   mcc?: number;
@@ -96,8 +104,13 @@ export interface DiagNrCell {
   /** PUSCH TX power (dBm) and DL path loss (dB), when logged */
   tx_power_dbm?: number;
   pathloss_db?: number;
-  /** Raw timing advance from RACH Msg2 and its age */
+  /** Raw timing advance from RACH Msg2, its distance (m) for the
+   *  subcarrier spacing used (kHz; estimated from the band when 0xB825 was
+   *  not logged) and its age (s) */
   ta?: number;
+  ta_m?: number;
+  ta_scs_khz?: number;
+  ta_scs_estimated?: boolean;
   ta_age_s?: number;
   cell_id?: number | null;
   tac?: number | null;
@@ -114,11 +127,51 @@ export interface DiagSummary {
   total_ul_mbps: number;
 }
 
+/** LTE neighbour cell from 0xB180, measured in the last 10 s. */
+export interface LteNeighbor {
+  earfcn: number;
+  pci: number;
+  band: number;
+  rsrp: number;
+  rsrq: number;
+  rssi: number;
+  age_s: number;
+}
+
+/** One subscribed DIAG log code: received count since the bridge started
+ *  and seconds since the last one (-1: never). */
+export interface DiagLogStat {
+  code: string;
+  n: number;
+  age_s: number;
+}
+
+/** LTE RRC state from DIAG events, and failure/mobility counters since the
+ *  bridge started. lte_state is absent until the first state change. */
+export interface RrcInfo {
+  lte_state?: string;
+  lte_state_age_s?: number;
+  counters?: Record<string, number>;
+}
+
+/** One DIAG event: fields with AirScreen's names, or {raw: hex}. */
+export interface DiagEvent {
+  age_s: number;
+  id: number;
+  name: string;
+  f?: Record<string, string | number>;
+}
+
 /** One diag_bridge radio snapshot (also the shape QMI radio is converted to). */
 export interface DiagSnapshot {
   lte: DiagLteCell[];
   nr: DiagNrCell[];
   summary?: DiagSummary;
+  lte_neighbors?: LteNeighbor[];
+  diag_logs?: DiagLogStat[];
+  rrc?: RrcInfo;
+  /** Last 20 events, newest first */
+  events?: DiagEvent[];
 }
 
 export interface QmiScell {
