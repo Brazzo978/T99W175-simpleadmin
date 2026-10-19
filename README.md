@@ -627,11 +627,16 @@ Two more things keep IPv6 working towards the LAN hosts:
   membership on a VRF interface a few minutes after an address is added
   and then answers no neighbor solicitation, for its global address or
   its link-local. `ra-guard` remembers every LAN neighbor whose interface
-  identifier is the EUI-64 of its MAC (`pin` lines in the state file) and
-  keeps permanent neighbor entries for its link-local and for each current
-  prefix plus that identifier, removing them when the prefix goes away.
-  The MAC is the one the identifier encodes, so the pins survive a reboot
-  and follow a prefix change without any solicitation answered.
+  identifier is the EUI-64 of its MAC (`pin` lines in the state file),
+  keeps a permanent neighbor entry for its link-local (the MAC is the one
+  the identifier encodes) and a `/128` route via that link-local for each
+  current prefix plus the identifier, removed when the prefix goes away,
+  so the modem reaches it after a reboot and a prefix change without any
+  solicitation answered. Global addresses are routed rather than pinned as
+  neighbors: `radish -x` proxies neighbor discovery on `bridge0` and
+  answers for a permanent neighbor, so after a link bounce the router
+  failed duplicate address detection on its own address and stayed
+  without one (2026-10-19).
 
 ## 🔧 Optional fix: persistent MAC for `eth0` / `bridge0`
 

@@ -50,11 +50,14 @@
  * neighbor solicitation, for its global address or its link-local one,
  * which share that group. Every neighbor seen once with a MAC whose EUI-64
  * is its interface identifier is remembered, by link-local, in the state file
- * ("pin" lines); its link-local, and each current prefix plus that
- * identifier, get a permanent entry to the MAC, which the identifier
- * itself encodes, so the modem reaches them without solicitations, after
- * a reboot and a prefix change too. Pins of prefixes that are no longer
- * current are removed.
+ * ("pin" lines); its link-local gets a permanent neighbor entry to the MAC,
+ * which the identifier itself encodes, and each current prefix plus that
+ * identifier a /128 route via that link-local, so the modem reaches them
+ * without solicitations, after a reboot and a prefix change too. Global
+ * addresses are routed, not pinned as neighbors: radish proxies neighbor
+ * discovery on bridge0 and answers for a permanent neighbor, which made the
+ * router fail duplicate address detection on its own address. Routes of
+ * prefixes that are no longer current are removed.
  *
  *   ra-guard run  [-i IFACE] [-s STATE] [-w WINDOW_S] [-t INTERVAL_S]
  *   ra-guard dump [-i IFACE]   print every RA/RS seen (IFACE "any": all)
@@ -707,14 +710,36 @@ static int run_ip(const char *verb, const struct in6_addr *a, const uint8_t *mac
 
 #define MAX_NEIGH 32
 
-/* Learns the EUI-64 link-local neighbors on IFACE, pins each of them and
- * its address in every current prefix to its MAC, and unpins the pinned
- * addresses of other prefixes. Returns 1 when a neighbor was learnt. */
+/* "ip -6 route <verb> ADDR/128 [via LL] dev IFACE" */
+static int run_route(const char *verb, const struct in6_addr *a, const struct in6_addr *via)
+{
+    char cmd[256];
+
+    if (via)
+        snprintf(cmd, sizeof(cmd), "ip -6 route %s %s/128 via %s dev %s", verb,
+                 ntop(a), ntop(via), iface);
+    else
+        snprintf(cmd, sizeof(cmd), "ip -6 route %s %s/128 dev %s", verb, ntop(a), iface);
+    return system(cmd);
+}
+
+#define MAX_ROUTES 32
+
+/* Learns the EUI-64 link-local neighbors on IFACE and pins each of them to
+ * its MAC; their address in every current prefix gets a /128 route via the
+ * pinned link-local, and those of other prefixes lose theirs. A global
+ * address is routed rather than pinned as a neighbor: radish proxies
+ * neighbor discovery on bridge0 (-x) and answers a neighbor solicitation
+ * for an address it holds as a permanent neighbor, the router's own
+ * duplicate address detection included, so the router would drop its
+ * address after any link bounce (seen 2026-10-19). Returns 1 when a
+ * neighbor was learnt. */
 static int pin_neighbors(void)
 {
     struct { struct in6_addr a; uint8_t mac[6]; int perm; } nb[MAX_NEIGH];
+    struct { struct in6_addr dst, via; } rt[MAX_ROUTES];
     char cmd[64], line[256];
-    int n = 0, i, j, k, learnt = 0;
+    int n = 0, nrt = 0, i, j, k, learnt = 0;
     FILE *f;
 
     snprintf(cmd, sizeof(cmd), "ip -6 neigh show dev %s", iface);
@@ -731,6 +756,21 @@ static int pin_neighbors(void)
         n++;
     }
     pclose(f);
+
+    /* host routes: "ADDR via LL ..." (a /128 is printed without length) */
+    snprintf(cmd, sizeof(cmd), "ip -6 route show dev %s", iface);
+    f = popen(cmd, "r");
+    if (f) {
+        while (fgets(line, sizeof(line), f) && nrt < MAX_ROUTES) {
+            char dst[64], via[64];
+            if (sscanf(line, "%63s via %63s", dst, via) != 2 || strchr(dst, '/') ||
+                inet_pton(AF_INET6, dst, &rt[nrt].dst) != 1 ||
+                inet_pton(AF_INET6, via, &rt[nrt].via) != 1)
+                continue;
+            nrt++;
+        }
+        pclose(f);
+    }
 
     /* any address of a neighbor whose identifier is the EUI-64 of its MAC
      * gives its link-local */
@@ -749,37 +789,51 @@ static int pin_neighbors(void)
         logmsg("🔎 EUI-64 neighbor %s", ntop(&ll));
         learnt = 1;
     }
-    /* pins that belong to no current prefix any more */
+    /* global addresses pinned as neighbors (older versions): unpinned */
     for (i = 0; i < n; i++) {
-        struct prefix p = { nb[i].a, 64 };
         if (!nb[i].perm || IN6_IS_ADDR_LINKLOCAL(&nb[i].a) ||
             !is_eui64_of(&nb[i].a, nb[i].mac) || !is_pinned_iid(&nb[i].a))
             continue;
-        mask_prefix(&p);
-        if (find_cur(&p) < 0 && run_ip("del", &nb[i].a, NULL) == 0)
-            logmsg("📌 unpinned %s (prefix no longer current)", ntop(&nb[i].a));
+        if (run_ip("del", &nb[i].a, NULL) == 0)
+            logmsg("📌 unpinned %s (routed via its link-local instead)", ntop(&nb[i].a));
     }
-    /* each remembered neighbor: its link-local, then every current prefix */
+    /* host routes of prefixes that are no longer current */
+    for (i = 0; i < nrt; i++) {
+        struct prefix p = { rt[i].dst, 64 };
+        if (IN6_IS_ADDR_LINKLOCAL(&rt[i].dst) || !is_pinned_iid(&rt[i].dst))
+            continue;
+        mask_prefix(&p);
+        if (find_cur(&p) < 0 && run_route("del", &rt[i].dst, NULL) == 0)
+            logmsg("🧭 unrouted %s (prefix no longer current)", ntop(&rt[i].dst));
+    }
+    /* each remembered neighbor: its link-local pinned, its address in every
+     * current prefix routed via it */
     for (i = 0; i < npin; i++) {
         uint8_t mac[6];
         eui64_mac(&pin_ll[i], mac);
-        for (k = -1; k < ncur; k++) {
-            struct in6_addr g = pin_ll[i];
-            if (k >= 0) {
-                g = cur[k].addr;
-                memcpy(g.s6_addr + 8, pin_ll[i].s6_addr + 8, 8);
-            }
-            for (j = 0; j < n; j++)
-                if (nb[j].perm && memcmp(&nb[j].a, &g, 16) == 0 &&
-                    memcmp(nb[j].mac, mac, 6) == 0)
-                    break;
-            if (j < n)
-                continue;
-            if (run_ip("replace", &g, mac) == 0)
-                logmsg("📌 pinned %s to %02x:%02x:%02x:%02x:%02x:%02x", ntop(&g),
+        for (j = 0; j < n; j++)
+            if (nb[j].perm && memcmp(&nb[j].a, &pin_ll[i], 16) == 0 &&
+                memcmp(nb[j].mac, mac, 6) == 0)
+                break;
+        if (j == n) {
+            if (run_ip("replace", &pin_ll[i], mac) == 0)
+                logmsg("📌 pinned %s to %02x:%02x:%02x:%02x:%02x:%02x", ntop(&pin_ll[i]),
                        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             else
-                logmsg("⚠️  cannot pin %s", ntop(&g));
+                logmsg("⚠️  cannot pin %s", ntop(&pin_ll[i]));
+        }
+        for (k = 0; k < ncur; k++) {
+            struct in6_addr g = cur[k].addr;
+            memcpy(g.s6_addr + 8, pin_ll[i].s6_addr + 8, 8);
+            for (j = 0; j < nrt; j++)
+                if (memcmp(&rt[j].dst, &g, 16) == 0 && memcmp(&rt[j].via, &pin_ll[i], 16) == 0)
+                    break;
+            if (j < nrt)
+                continue;
+            if (run_route("replace", &g, &pin_ll[i]) == 0)
+                logmsg("🧭 routed %s via %s", ntop(&g), ntop(&pin_ll[i]));
+            else
+                logmsg("⚠️  cannot route %s", ntop(&g));
         }
     }
     return learnt;
