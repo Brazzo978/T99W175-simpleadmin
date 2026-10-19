@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   ChevronsUpDown,
+  KeyRound,
   Loader2,
   LogOut,
   Moon,
@@ -15,6 +16,7 @@ import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 import { logout } from "@/hooks/use-auth";
 import { useSessionInfo } from "@/components/auth/session-context";
+import { ChangePasswordDialog } from "@/components/auth/change-password-dialog";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { reconnectNetwork, rebootModem } from "@/lib/modem-actions";
 
@@ -65,6 +67,7 @@ export function NavUser({
 
   const [rebootDialogOpen, setRebootDialogOpen] = useState(false);
   const [reconnectDialogOpen, setReconnectDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [rebooting, setRebooting] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
 
@@ -172,6 +175,10 @@ export function NavUser({
                   <Moon className="hidden dark:block" />
                   Toggle Theme
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPasswordDialogOpen(true)}>
+                  <KeyRound />
+                  {t("actions.change_password")}
+                </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -200,6 +207,12 @@ export function NavUser({
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
+
+      <ChangePasswordDialog
+        open={passwordDialogOpen}
+        onOpenChange={setPasswordDialogOpen}
+        username={displayName}
+      />
 
       <AlertDialog open={reconnectDialogOpen} onOpenChange={(open) => {
         if (!reconnecting) setReconnectDialogOpen(open);

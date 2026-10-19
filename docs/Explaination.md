@@ -114,7 +114,7 @@ Session and accounts:
 - `authenticate`: checks username/password against `credentials.txt` and opens a session cookie; refuses with 423 while the GUI is locked.
 - `session_status`: reports whether the browser is logged in, its role, and the GUI lock state.
 - `logout`: invalidates the session and expires the cookie.
-- `manage_credentials`: admin management of the accounts in `credentials.txt` (SHA-512 crypt hashes).
+- `manage_credentials`: admin management of the accounts in `credentials.txt` (SHA-512 crypt hashes). Its `change_own_password` action is open to every role: it changes the session's own password once `current_password` matches (the Next.js user menu uses it).
 - `credentials.txt` / `credentials.stock`: accounts (`username:role:password`) and the shipped default (`admin:admin:admin`, to change); `install.sh` keeps the existing `credentials.txt` and hashes any plaintext password in it.
 - `login_config`: reads `SIMPLEADMIN_ENABLE_LOGIN` for the front end.
 - `gui_toggle`: locks or unlocks the GUI with `SIMPLEADMIN_GUI_TOGGLE_KEY` (see the README).

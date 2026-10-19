@@ -15,6 +15,17 @@
     "change_display_name": "Change Display Name",
     "change_password": "Change Password"
   },
+  "change_password": {
+    "description": "New password for {{username}}. Sessions already open stay signed in.",
+    "current": "Current password",
+    "new": "New password",
+    "confirm": "Confirm new password",
+    "mismatch": "The two passwords do not match.",
+    "wrong_current": "The current password is incorrect.",
+    "success": "Password changed",
+    "failed": "Unable to change the password.",
+    "unreachable": "Modem unreachable."
+  },
   "state": {
     "loading": "Loading…",
     "saving": "Saving…",

@@ -15,6 +15,17 @@
     "change_display_name": "Modifica nome visualizzato",
     "change_password": "Cambia password"
   },
+  "change_password": {
+    "description": "Nuova password per {{username}}. Le sessioni già aperte restano attive.",
+    "current": "Password attuale",
+    "new": "Nuova password",
+    "confirm": "Conferma la nuova password",
+    "mismatch": "Le due password non coincidono.",
+    "wrong_current": "La password attuale non è corretta.",
+    "success": "Password cambiata",
+    "failed": "Impossibile cambiare la password.",
+    "unreachable": "Modem non raggiungibile."
+  },
   "state": {
     "loading": "Caricamento…",
     "saving": "Salvataggio…",
