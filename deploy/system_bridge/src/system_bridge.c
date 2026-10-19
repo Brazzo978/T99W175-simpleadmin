@@ -9,7 +9,8 @@
  *   UIM  card and slot status (SIM state, active slot, ICCID), IMSI (EF_IMSI)
  *   WDS  APN of profile 1
  *   TS   temperature sensors
- * System data comes from /proc and /sys; connectivity from ICMP echo and DNS
+ * System data comes from /proc, /sys, uname and statvfs (/data), the age of
+ * the data session from rtnetlink; connectivity from ICMP echo and DNS
  * queries to the targets in simpleadmin.conf.
  *
  * The modem is only polled while a WebSocket client is connected: radio
@@ -41,10 +42,14 @@
 #include <netinet/ip_icmp.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
+#include <sys/utsname.h>
 #include <ifaddrs.h>
 #include <strings.h>
 #include <net/if.h>
 #include <linux/qrtr.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include <sys/file.h>
 #include <libgen.h>
 
@@ -512,6 +517,10 @@ static struct {
     char eth_speed[16], eth_duplex[16];
     char wan_ip[48], dns[2][48];
     uint64_t cpu_prev_total, cpu_prev_idle;
+    char hostname[65], kernel[65];
+    int data_fs_ok;                      /* /data (UBIFS usrfs), KiB */
+    uint64_t data_total_kb, data_used_kb, data_avail_kb;
+    long conn_up_s;                      /* -1: no data session */
 } sys;
 
 static int read_file(const char *path, char *buf, size_t cap) {
@@ -560,8 +569,85 @@ static void wan_ip(void) {
     }
 }
 
+/* Seconds since the data session came up: the age of the address the
+   network gave the cellular interface. The kernel stamps every address with
+   its creation time (IFA_CACHEINFO cstamp, hundredths of a second since
+   boot, counted in jiffies like CLOCK_MONOTONIC), and netmgr adds it when
+   the call comes up and removes it when the call drops, so the age survives
+   a restart of this daemon. Preference: a routable IPv4 on rmnet*, else a
+   global IPv6 there (IPv6-only call), else any IPv4 (IP passthrough keeps
+   only a link-local on rmnet). -1 without a data session. */
+static long conn_uptime(void) {
+    int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
+    if (fd < 0) return -1;
+    struct { struct nlmsghdr nh; struct ifaddrmsg ifa; } req;
+    memset(&req, 0, sizeof(req));
+    req.nh.nlmsg_len = sizeof(req);
+    req.nh.nlmsg_type = RTM_GETADDR;
+    req.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+    req.nh.nlmsg_seq = 1;
+    req.ifa.ifa_family = AF_UNSPEC;
+    struct sockaddr_nl to = { .nl_family = AF_NETLINK };
+    if (sendto(fd, &req, sizeof(req), 0, (struct sockaddr *)&to, sizeof(to)) < 0) { close(fd); return -1; }
+    long cstamp[3] = { -1, -1, -1 };     /* hundredths, by preference */
+    static uint32_t buf[4096];           /* 16 KiB, netlink-aligned */
+    for (int done = 0; !done; ) {
+        struct pollfd p = { fd, POLLIN, 0 };
+        if (poll(&p, 1, 200) <= 0) break;
+        ssize_t n = recv(fd, buf, sizeof(buf), 0);
+        if (n <= 0) break;
+        for (size_t o = 0; o + sizeof(struct nlmsghdr) <= (size_t)n; ) {
+            struct nlmsghdr *h = (struct nlmsghdr *)((char *)buf + o);
+            if (h->nlmsg_len < sizeof(*h) || o + h->nlmsg_len > (size_t)n) break;
+            o += NLMSG_ALIGN(h->nlmsg_len);
+            if (h->nlmsg_type == NLMSG_DONE || h->nlmsg_type == NLMSG_ERROR) { done = 1; break; }
+            if (h->nlmsg_type != RTM_NEWADDR || h->nlmsg_len < NLMSG_LENGTH(sizeof(struct ifaddrmsg))) continue;
+            struct ifaddrmsg *ifa = NLMSG_DATA(h);
+            char name[IF_NAMESIZE];
+            if (!if_indextoname(ifa->ifa_index, name) || strncmp(name, "rmnet", 5)) continue;
+            const uint8_t *addr = NULL;
+            long cs = -1;
+            for (size_t ao = NLMSG_LENGTH(sizeof(struct ifaddrmsg)); ao + sizeof(struct rtattr) <= h->nlmsg_len; ) {
+                struct rtattr *a = (struct rtattr *)((char *)h + ao);
+                if (a->rta_len < sizeof(*a) || ao + a->rta_len > h->nlmsg_len) break;
+                ao += RTA_ALIGN(a->rta_len);
+                if ((a->rta_type == IFA_ADDRESS || a->rta_type == IFA_LOCAL) && !addr) addr = RTA_DATA(a);
+                if (a->rta_type == IFA_CACHEINFO && RTA_PAYLOAD(a) >= sizeof(struct ifa_cacheinfo))
+                    cs = (long)((struct ifa_cacheinfo *)RTA_DATA(a))->cstamp;
+            }
+            if (!addr || cs < 0) continue;
+            int rank;
+            if (ifa->ifa_family == AF_INET) rank = (addr[0] == 169 && addr[1] == 254) ? 2 : 0;
+            else if (ifa->ifa_family == AF_INET6 && ifa->ifa_scope == RT_SCOPE_UNIVERSE) rank = 1;
+            else continue;
+            if (cstamp[rank] < 0) cstamp[rank] = cs;
+        }
+    }
+    close(fd);
+    for (int r = 0; r < 3; r++) {
+        if (cstamp[r] < 0) continue;
+        long up = (long)(monotonic_ms() / 1000) - cstamp[r] / 100;
+        return up > 0 ? up : 0;
+    }
+    return -1;
+}
+
 static void poll_system(void) {
     char b[4096];
+    struct utsname u;
+    if (uname(&u) == 0) {
+        snprintf(sys.hostname, sizeof(sys.hostname), "%s", u.nodename);
+        snprintf(sys.kernel, sizeof(sys.kernel), "%s", u.release);
+    }
+    struct statvfs vfs;
+    sys.data_fs_ok = statvfs("/data", &vfs) == 0 && vfs.f_blocks > 0;
+    if (sys.data_fs_ok) {
+        uint64_t k = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
+        sys.data_total_kb = (uint64_t)vfs.f_blocks * k / 1024;
+        sys.data_used_kb = (uint64_t)(vfs.f_blocks - vfs.f_bfree) * k / 1024;
+        sys.data_avail_kb = (uint64_t)vfs.f_bavail * k / 1024;
+    }
+    sys.conn_up_s = conn_uptime();
     if (read_file("/proc/uptime", b, sizeof(b)) > 0) sys.uptime = strtod(b, NULL);
     if (read_file("/proc/loadavg", b, sizeof(b)) > 0) sscanf(b, "%lf %lf %lf", &sys.load[0], &sys.load[1], &sys.load[2]);
     if (read_file("/proc/stat", b, sizeof(b)) > 0) {
@@ -751,7 +837,17 @@ static size_t serialize(char *out, size_t cap) {
          sys.uptime, sys.load[0], sys.load[1], sys.load[2], sys.cpu_pct,
          sys.mem_total, used, sys.mem_total ? 100 * used / sys.mem_total : 0);
     jstr(&j, sys.eth_speed); jcat(&j, ",\"duplex\":"); jstr(&j, sys.eth_duplex);
-    jcat(&j, "}},\"net\":{\"wan_ip\":"); jstr(&j, sys.wan_ip);
+    jcat(&j, "},\"hostname\":"); jstr(&j, sys.hostname);
+    jcat(&j, ",\"kernel\":"); jstr(&j, sys.kernel);
+    if (sys.data_fs_ok)
+        jcat(&j, ",\"data_fs\":{\"total_kb\":%llu,\"used_kb\":%llu,\"avail_kb\":%llu}",
+             (unsigned long long)sys.data_total_kb, (unsigned long long)sys.data_used_kb,
+             (unsigned long long)sys.data_avail_kb);
+    else
+        jcat(&j, ",\"data_fs\":null");
+    jcat(&j, "},\"net\":{\"wan_ip\":"); jstr(&j, sys.wan_ip);
+    if (sys.conn_up_s >= 0) jcat(&j, ",\"conn_uptime_s\":%ld", sys.conn_up_s);
+    else jcat(&j, ",\"conn_uptime_s\":null");
     jcat(&j, ",\"dns\":["); jstr(&j, sys.dns[0]); if (sys.dns[1][0]) { jcat(&j, ","); jstr(&j, sys.dns[1]); }
     jcat(&j, "],\"apn\":"); jstr(&j, md.apn);
 

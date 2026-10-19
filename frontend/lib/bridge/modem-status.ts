@@ -254,7 +254,7 @@ export function buildModemStatus(
       memory_used_mb: Math.round((system?.sys.mem_used_kb ?? 0) / 1024),
       memory_total_mb: Math.round((system?.sys.mem_total_kb ?? 0) / 1024),
       uptime_seconds: Math.floor(system?.sys.uptime_s ?? 0),
-      conn_uptime_seconds: 0,
+      conn_uptime_seconds: system?.net.conn_uptime_s ?? 0,
       firmware: text(modem?.firmware),
       build_date: "",
       manufacturer: text(modem?.manufacturer),

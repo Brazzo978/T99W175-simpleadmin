@@ -92,7 +92,7 @@ const DeviceMetricsComponent = ({
     resetCounter,
   } = useDataUsed();
 
-  // /usrdata partition usage — sourced from the poller cache via modem-subsys
+  // /data partition usage — from system_bridge via modem-subsys
   const { data: subsysData } = useModemSubsys();
   const storageTotalKb = subsysData?.storage?.total_kb ?? 0;
   const storageUsedKb = subsysData?.storage?.used_kb ?? 0;
@@ -208,7 +208,7 @@ const DeviceMetricsComponent = ({
             )}
           </div>
 
-          {/* Storage (/usrdata partition) */}
+          {/* Storage (/data partition) */}
           <Separator />
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">

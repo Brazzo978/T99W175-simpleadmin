@@ -8,8 +8,9 @@ import type { AboutDeviceData } from "@/types/about-device";
 // =============================================================================
 // useAboutDevice — device identity and addresses
 // =============================================================================
-// Identity and WAN address come live from system_bridge; the LAN address is
-// read once from the get_lanip CGI (mobileap configuration).
+// Identity, hostname, kernel and WAN address come live from system_bridge;
+// the LAN address is read once from the get_lanip CGI (mobileap
+// configuration).
 // =============================================================================
 
 const LANIP_ENDPOINT = "/cgi-bin/get_lanip";
@@ -85,7 +86,11 @@ export function useAboutDevice(): UseAboutDeviceReturn {
         public_ipv4: "",
         public_ipv6: "",
       },
-      system: { hostname: "", kernel_version: "", openwrt_version: "" },
+      system: {
+        hostname: system?.sys.hostname ?? "",
+        kernel_version: system?.sys.kernel ?? "",
+        openwrt_version: "",
+      },
     };
   }, [system, lanIp]);
 

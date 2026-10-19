@@ -235,9 +235,17 @@ export interface SystemSnapshot {
     mem_used_kb: number;
     mem_pct: number;
     eth?: { speed: string; duplex: string };
+    hostname?: string;
+    /** Kernel release (uname -r) */
+    kernel?: string;
+    /** /data (UBIFS usrfs, where SimpleAdmin keeps its binaries), KiB */
+    data_fs?: { total_kb: number; used_kb: number; avail_kb: number } | null;
   };
   net: {
     wan_ip?: string;
+    /** Seconds since the data session came up (age of the WWAN address),
+     *  null without a data session */
+    conn_uptime_s?: number | null;
     dns?: string[];
     apn?: string;
   };
