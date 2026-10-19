@@ -59,7 +59,10 @@ const navigation: { groupKey: string; items: NavItem[] }[] = [
         t_key: "band_locking",
         url: "/cellular/band-locking",
         icon: SignalIcon,
-        items: [{ t_key: "cell_locking", url: "/cellular/cell-locking" }],
+        items: [
+          { t_key: "cell_locking", url: "/cellular/cell-locking" },
+          { t_key: "frequency_calculator", url: "/cellular/frequency-calculator" },
+        ],
       },
       { t_key: "sms_center", url: "/cellular/sms", icon: MessageCircleIcon },
       { t_key: "esim", url: "/cellular/esim", icon: CreditCardIcon },

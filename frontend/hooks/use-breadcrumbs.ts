@@ -49,6 +49,13 @@ const TRAILS: Record<string, Trail> = {
       { key: 'items.cell_locking', href: '/cellular/cell-locking' },
     ],
   },
+  '/cellular/frequency-calculator': {
+    ...CELLULAR,
+    items: [
+      { key: 'items.band_locking', href: '/cellular/band-locking' },
+      { key: 'items.frequency_calculator', href: '/cellular/frequency-calculator' },
+    ],
+  },
   '/cellular/sms': { ...CELLULAR, items: [{ key: 'items.sms_center', href: '/cellular/sms' }] },
   '/cellular/esim': { ...CELLULAR, items: [{ key: 'items.esim', href: '/cellular/esim' }] },
   '/network/settings': {

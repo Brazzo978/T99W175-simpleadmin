@@ -29,6 +29,10 @@ pages removed from `frontend/` are re-imported from there when ported.
   abnormal RRC transitions; PCell band/cell, SCell set and 5G NR leg changes
   between radio snapshots; internet lost/restored and high latency from the
   system_bridge checks.
+- Antenna Statistics (per-chain live values and statistics over the radio
+  history), Antenna Alignment (three slots of five samples, recommendation)
+  and the Frequency Calculator (EARFCN/NR-ARFCN ↔ frequency and band), ported
+  from QManager onto the bridges (2026-10-19).
 
 ### Next
 - [ ] Page strings are English only: move them to `locales/` (en, it).
@@ -53,8 +57,11 @@ pages removed from `frontend/` are re-imported from there when ported.
       still wanted.
 - [ ] Watchdog with 4 tiers (COPS → CFUN → SIM switch → reboot) and rate
       limit, replacing `connection_watchdog`.
-- [ ] Antenna statistics and alignment pages (per-chain RSRP/SINR from DIAG),
-      EARFCN/ARFCN frequency calculator (frontend only).
+- [ ] Antenna Statistics, Antenna Alignment and Frequency Calculator are
+      built (2026-10-19); check them on the modem: `rx_diversity` against
+      the chains that report, NR per-chain SNR (`snr_rx`, not seen so far),
+      an alignment recording under QMI fallback (2 s polls), and the
+      calculator's band tables against the serving carriers.
 - [ ] Per-SIM profiles (APN + TTL) applied on SIM change.
 - [ ] Persistent data counter (rmnet bytes across reboots) in system_bridge
       (`hooks/use-data-used.ts`).
