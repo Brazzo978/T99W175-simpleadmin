@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { PageShell } from "@/components/page-shell";
 import {
@@ -68,19 +69,19 @@ function NumberField({
 /** Same rule as cgi-bin/set_connection_config. */
 const PROBE_URL = /^http:\/\/[A-Za-z0-9.-]+(:[0-9]{1,5})?(\/[A-Za-z0-9._~/?=%-]*)?$/;
 
+/** The first problem in the form, as a key of the monitoring namespace. */
 function validateChecks(c: ConnectionChecks): string | null {
   const url = c.httpProbe.trim();
-  if (url && !PROBE_URL.test(url))
-    return "Captive portal probe: an http:// URL (letters, digits and . _ ~ / ? = % - only), or empty to disable it.";
+  if (url && !PROBE_URL.test(url)) return "checks.errors.http_probe";
   if (!Number.isInteger(c.httpProbeTimeout) || c.httpProbeTimeout < 1 || c.httpProbeTimeout > 9)
-    return "Probe timeout: 1 to 9 seconds.";
+    return "checks.errors.probe_timeout";
   const bg = c.bgCheckInterval;
-  if (!Number.isInteger(bg) || bg < 10 || bg > 600 || bg % 10)
-    return "Background check interval: 10 to 600 seconds, in steps of 10.";
+  if (!Number.isInteger(bg) || bg < 10 || bg > 600 || bg % 10) return "checks.errors.bg_interval";
   return null;
 }
 
 function ConnectionChecksCard() {
+  const { t } = useTranslation("monitoring");
   const { checks, isSaving, save } = useConnectionChecks();
   const [draft, setDraft] = useState<ConnectionChecks | null>(null);
   const { saved, markSaved } = useSaveFlash();
@@ -90,13 +91,13 @@ function ConnectionChecksCard() {
     if (!form) return;
     const problem = validateChecks(form);
     if (problem) {
-      toast.error(problem);
+      toast.error(t(problem));
       return;
     }
     const result = await save({ ...form, httpProbe: form.httpProbe.trim() });
     if (result.ok) {
       markSaved();
-      toast.success("Connectivity checks saved");
+      toast.success(t("checks.saved"));
       setDraft(null);
     } else toast.error(result.message);
   };
@@ -104,13 +105,8 @@ function ConnectionChecksCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Connectivity Checks</CardTitle>
-        <CardDescription>
-          What the dashboard&apos;s internet status tests: pings, DNS lookups
-          written as server:domain, and an http:// URL that must answer 204
-          No Content (anything else means a captive portal; empty disables it).
-          They run every 10 seconds while a page is open.
-        </CardDescription>
+        <CardTitle>{t("checks.title")}</CardTitle>
+        <CardDescription>{t("checks.description")}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {!form ? (
@@ -118,7 +114,7 @@ function ConnectionChecksCard() {
         ) : (
           <>
             <div className="grid gap-2">
-              <Label htmlFor="chk-ping">Ping targets</Label>
+              <Label htmlFor="chk-ping">{t("checks.ping_targets")}</Label>
               <Input
                 id="chk-ping"
                 value={form.pingTargets}
@@ -126,7 +122,7 @@ function ConnectionChecksCard() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="chk-dns">DNS tests</Label>
+              <Label htmlFor="chk-dns">{t("checks.dns_tests")}</Label>
               <Input
                 id="chk-dns"
                 value={form.dnsTests}
@@ -135,17 +131,17 @@ function ConnectionChecksCard() {
             </div>
             <div className="grid gap-4 @md/main:grid-cols-[1fr_10rem]">
               <div className="grid gap-2">
-                <Label htmlFor="chk-http">Captive portal probe</Label>
+                <Label htmlFor="chk-http">{t("checks.http_probe")}</Label>
                 <Input
                   id="chk-http"
-                  placeholder="Disabled"
+                  placeholder={t("checks.http_probe_placeholder")}
                   value={form.httpProbe}
                   onChange={(e) => setDraft({ ...form, httpProbe: e.target.value })}
                 />
               </div>
               <NumberField
                 id="chk-http-timeout"
-                label="Probe timeout"
+                label={t("checks.probe_timeout")}
                 suffix="s"
                 value={form.httpProbeTimeout}
                 onChange={(v) => setDraft({ ...form, httpProbeTimeout: v })}
@@ -153,9 +149,9 @@ function ConnectionChecksCard() {
             </div>
             <NumberField
               id="chk-bg-interval"
-              label="Background check interval"
+              label={t("checks.bg_interval")}
               suffix="s"
-              description="How often the pings run while no page is open (10 to 600, in steps of 10), and the step of the 24-hour latency history. They use mobile data: about 3 MB a day at 10 s, 0.5 MB a day at 60 s."
+              description={t("checks.bg_interval_hint")}
               value={form.bgCheckInterval}
               onChange={(v) => setDraft({ ...form, bgCheckInterval: v })}
             />
@@ -164,7 +160,7 @@ function ConnectionChecksCard() {
       </CardContent>
       <CardFooter className="justify-end">
         <SaveButton
-          label="Save"
+          label={t("common:actions.save")}
           isSaving={isSaving}
           saved={saved}
           disabled={!draft || isSaving}
@@ -176,6 +172,7 @@ function ConnectionChecksCard() {
 }
 
 export default function WatchdogComponent() {
+  const { t } = useTranslation("monitoring");
   const wd = useWatchdog();
   const activity = useWatchdogEvents(true);
   const log = useWatchdogLog(true);
@@ -188,8 +185,8 @@ export default function WatchdogComponent() {
 
   return (
     <PageShell
-      title="Connection Monitoring"
-      description="How the connection is tested, and how the watchdog brings it back: re-registration, radio restart, the other SIM, reboot."
+      title={t("page.title")}
+      description={t("page.description")}
     >
       <ConnectivityStatusCard />
 
@@ -216,8 +213,8 @@ export default function WatchdogComponent() {
 
       <Card className="@3xl/main:col-span-2">
         <CardHeader>
-          <CardTitle>Watchdog Log</CardTitle>
-          <CardDescription>/tmp/connection-watchdog.log, refreshed every 3 seconds.</CardDescription>
+          <CardTitle>{t("log.title")}</CardTitle>
+          <CardDescription>{t("log.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           {log.error ? (
@@ -227,7 +224,7 @@ export default function WatchdogComponent() {
               ref={logRef}
               className="bg-muted h-[28rem] overflow-auto rounded-md p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap"
             >
-              {log.text || "The log is empty."}
+              {log.text || t("log.empty")}
             </pre>
           )}
         </CardContent>

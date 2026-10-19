@@ -1,6 +1,8 @@
 "use client";
 
+import type { TFunction } from "i18next";
 import { TriangleAlertIcon } from "lucide-react";
+import { Trans, useTranslation } from "react-i18next";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,31 +28,34 @@ import type { HttpProbe, SystemSnapshot } from "@/types/bridge";
 
 type Conn = SystemSnapshot["conn"];
 
+// Labels are keys of the monitoring namespace.
 const STATUS: Record<string, { label: string; cls: string }> = {
-  ok: { label: "Online", cls: "bg-success/15 text-success border-success/30" },
-  warning: { label: "Degraded", cls: "bg-warning/15 text-warning border-warning/30" },
-  error: { label: "Offline", cls: "bg-destructive/15 text-destructive border-destructive/30" },
-  pending: { label: "Checking", cls: "bg-muted text-muted-foreground" },
+  ok: { label: "connectivity.badge.online", cls: "bg-success/15 text-success border-success/30" },
+  warning: { label: "connectivity.badge.degraded", cls: "bg-warning/15 text-warning border-warning/30" },
+  error: {
+    label: "connectivity.badge.offline",
+    cls: "bg-destructive/15 text-destructive border-destructive/30",
+  },
+  pending: { label: "connectivity.badge.checking", cls: "bg-muted text-muted-foreground" },
 };
 
-const REASONS: Record<string, string> = {
-  dns: "name not resolved",
-  connect: "no connection",
-  timeout: "no answer in time",
-  malformed: "not an HTTP answer",
-  url: "the URL is not http://",
-};
+/** Failure reasons the bridge reports; any other is shown as it came. */
+const REASONS = new Set(["dns", "connect", "timeout", "malformed", "url"]);
 
-function probeText(p: HttpProbe): string {
+function probeText(t: TFunction, p: HttpProbe): string {
   switch (p.status) {
     case "ok":
-      return `HTTP ${p.code} in ${p.time} ms`;
+      return t("connectivity.probe.ok", { code: p.code, time: p.time });
     case "portal":
-      return `HTTP ${p.code} instead of 204`;
-    case "failed":
-      return `Failed: ${REASONS[p.reason ?? ""] ?? p.reason ?? "unknown"}`;
+      return t("connectivity.probe.portal", { code: p.code });
+    case "failed": {
+      const reason = REASONS.has(p.reason ?? "")
+        ? t(`connectivity.reason.${p.reason}`)
+        : (p.reason ?? t("connectivity.reason.unknown"));
+      return t("connectivity.probe.failed", { reason });
+    }
     default:
-      return "Pending";
+      return t("connectivity.pending");
   }
 }
 
@@ -70,20 +75,25 @@ function Row({ label, value, tone }: { label: string; value: string; tone?: "bad
 }
 
 function PortalAlert({ conn }: { conn: Conn }) {
+  const { t } = useTranslation("monitoring");
   const p = conn.http;
   if (!conn.portal || !p) return null;
   return (
     <Alert className="border-warning/30 bg-warning/10 text-warning">
       <TriangleAlertIcon />
-      <AlertTitle>Captive portal detected</AlertTitle>
+      <AlertTitle>{t("connectivity.portal_alert.title")}</AlertTitle>
       <AlertDescription className="text-foreground/80">
         <p>
-          {p.url} answered with HTTP {p.code}
-          {p.location ? <> and a redirect to <span className="break-all font-mono">{p.location}</span></> : null}
-          {" "}instead of 204 No Content: the network is intercepting web traffic
-          with a login, billing or activation page. Open any http:// site from a
-          device on the LAN to see it; until it is accepted, data may be blocked
-          or limited.
+          {p.location ? (
+            <Trans
+              t={t}
+              i18nKey="connectivity.portal_alert.body_redirect"
+              values={{ url: p.url, code: p.code, location: p.location }}
+              components={{ location: <span className="break-all font-mono" /> }}
+            />
+          ) : (
+            t("connectivity.portal_alert.body", { url: p.url, code: p.code })
+          )}
         </p>
       </AlertDescription>
     </Alert>
@@ -91,6 +101,7 @@ function PortalAlert({ conn }: { conn: Conn }) {
 }
 
 export default function ConnectivityStatusCard() {
+  const { t } = useTranslation("monitoring");
   const { system } = useBridgeState();
   const conn = system?.conn;
   const status = conn ? STATUS[conn.status] ?? STATUS.pending : null;
@@ -98,15 +109,12 @@ export default function ConnectivityStatusCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Connectivity Status</CardTitle>
-        <CardDescription>
-          The last round of checks; system_bridge runs one every 10 seconds
-          while a page is open (only the pings otherwise).
-        </CardDescription>
+        <CardTitle>{t("connectivity.title")}</CardTitle>
+        <CardDescription>{t("connectivity.description")}</CardDescription>
         {status && (
           <CardAction>
             <Badge variant="outline" className={status.cls}>
-              {conn?.portal ? "Captive portal" : status.label}
+              {conn?.portal ? t("connectivity.badge.portal") : t(status.label)}
             </Badge>
           </CardAction>
         )}
@@ -121,13 +129,13 @@ export default function ConnectivityStatusCard() {
               {(conn.ping?.results ?? []).map((r) => (
                 <Row
                   key={`ping-${r.host}`}
-                  label={`Ping ${r.host}`}
+                  label={t("connectivity.ping", { host: r.host })}
                   value={
                     r.status === "ok"
                       ? `${Math.round(r.time ?? 0)} ms`
                       : r.status === "failed"
-                        ? "No answer"
-                        : "Pending"
+                        ? t("connectivity.no_answer")
+                        : t("connectivity.pending")
                   }
                   tone={r.status === "failed" ? "bad" : undefined}
                 />
@@ -135,16 +143,24 @@ export default function ConnectivityStatusCard() {
               {(conn.dns?.results ?? []).map((r) => (
                 <Row
                   key={`dns-${r.server}-${r.domain}`}
-                  label={`DNS ${r.domain} via ${r.server}`}
+                  label={t("connectivity.dns", { domain: r.domain, server: r.server })}
                   value={
-                    r.status === "ok" ? "Resolved" : r.status === "failed" ? "Failed" : "Pending"
+                    r.status === "ok"
+                      ? t("connectivity.resolved")
+                      : r.status === "failed"
+                        ? t("connectivity.failed")
+                        : t("connectivity.pending")
                   }
                   tone={r.status === "failed" ? "bad" : undefined}
                 />
               ))}
               <Row
-                label={conn.http ? `HTTP ${conn.http.url}` : "Captive portal probe"}
-                value={conn.http ? probeText(conn.http) : "Disabled"}
+                label={
+                  conn.http
+                    ? t("connectivity.http", { url: conn.http.url })
+                    : t("connectivity.http_probe")
+                }
+                value={conn.http ? probeText(t, conn.http) : t("connectivity.disabled")}
                 tone={
                   conn.http?.status === "portal"
                     ? "warn"

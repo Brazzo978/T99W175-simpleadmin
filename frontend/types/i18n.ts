@@ -23,7 +23,8 @@ export type Namespace =
   | "credentials"
   | "tailscale"
   | "terminal"
-  | "about";
+  | "about"
+  | "monitoring";
 
 export interface LanguageMeta {
   code: LanguageCode;

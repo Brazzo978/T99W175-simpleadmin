@@ -1,0 +1,233 @@
+{
+  "page": {
+    "title": "Monitoraggio connessione",
+    "description": "Come viene verificata la connessione e come il watchdog la ripristina: nuova registrazione, riavvio della radio, l'altra SIM, riavvio del modem."
+  },
+  "connectivity": {
+    "title": "Stato della connettività",
+    "description": "L'ultimo giro di controlli; system_bridge ne esegue uno ogni 10 secondi mentre una pagina è aperta (altrimenti solo i ping).",
+    "badge": {
+      "online": "Online",
+      "degraded": "Degradata",
+      "offline": "Offline",
+      "checking": "Verifica in corso",
+      "portal": "Captive portal"
+    },
+    "ping": "Ping {{host}}",
+    "dns": "DNS {{domain}} tramite {{server}}",
+    "http": "HTTP {{url}}",
+    "http_probe": "Sonda captive portal",
+    "no_answer": "Nessuna risposta",
+    "resolved": "Risolto",
+    "failed": "Non riuscito",
+    "pending": "In attesa",
+    "disabled": "Disattivata",
+    "probe": {
+      "ok": "HTTP {{code}} in {{time}} ms",
+      "portal": "HTTP {{code}} invece di 204",
+      "failed": "Non riuscita: {{reason}}"
+    },
+    "reason": {
+      "dns": "nome non risolto",
+      "connect": "nessuna connessione",
+      "timeout": "nessuna risposta in tempo",
+      "malformed": "non è una risposta HTTP",
+      "url": "l'URL non è http://",
+      "unknown": "motivo sconosciuto"
+    },
+    "portal_alert": {
+      "title": "Captive portal rilevato",
+      "body": "{{url}} ha risposto con HTTP {{code}} invece di 204 No Content: la rete intercetta il traffico web con una pagina di accesso, di pagamento o di attivazione. Apri un sito http:// qualsiasi da un dispositivo della LAN per vederla; finché non viene accettata, i dati potrebbero essere bloccati o limitati.",
+      "body_redirect": "{{url}} ha risposto con HTTP {{code}} e un reindirizzamento a <location>{{location}}</location> invece di 204 No Content: la rete intercetta il traffico web con una pagina di accesso, di pagamento o di attivazione. Apri un sito http:// qualsiasi da un dispositivo della LAN per vederla; finché non viene accettata, i dati potrebbero essere bloccati o limitati."
+    }
+  },
+  "checks": {
+    "title": "Controlli di connettività",
+    "description": "Cosa verifica lo stato di Internet della dashboard: ping, risoluzioni DNS scritte come server:dominio e un URL http:// che deve rispondere 204 No Content (qualsiasi altra risposta indica un captive portal; vuoto lo disattiva). Vengono eseguiti ogni 10 secondi mentre una pagina è aperta.",
+    "ping_targets": "Destinazioni dei ping",
+    "dns_tests": "Test DNS",
+    "http_probe": "Sonda captive portal",
+    "http_probe_placeholder": "Disattivata",
+    "probe_timeout": "Timeout della sonda",
+    "bg_interval": "Intervallo dei controlli in background",
+    "bg_interval_hint": "Ogni quanto vengono eseguiti i ping mentre nessuna pagina è aperta (da 10 a 600, a passi di 10), e il passo della cronologia della latenza di 24 ore. Consumano dati mobili: circa 3 MB al giorno a 10 s, 0,5 MB al giorno a 60 s.",
+    "saved": "Controlli di connettività salvati",
+    "errors": {
+      "http_probe": "Sonda captive portal: un URL http:// (solo lettere, cifre e . _ ~ / ? = % -), oppure vuoto per disattivarla.",
+      "probe_timeout": "Timeout della sonda: da 1 a 9 secondi.",
+      "bg_interval": "Intervallo dei controlli in background: da 10 a 600 secondi, a passi di 10."
+    }
+  },
+  "latency": {
+    "title": "Latenza, ultime 24 ore",
+    "description_one": "Tempo medio di ping delle destinazioni qui sopra, per intervalli di {{count}} minuto. system_bridge conserva un campione ogni {{every}}, l'intervallo dei controlli in background, anche quando nessuna pagina è aperta.",
+    "description_other": "Tempo medio di ping delle destinazioni qui sopra, per intervalli di {{count}} minuti. system_bridge conserva un campione ogni {{every}}, l'intervallo dei controlli in background, anche quando nessuna pagina è aperta.",
+    "no_samples": "Ancora nessun campione.",
+    "average_rtt": "RTT medio",
+    "lost": "{{loss}}% persi",
+    "average": "Media",
+    "loss": "Perdita",
+    "covered": "Periodo coperto"
+  },
+  "duration": {
+    "minutes_one": "{{count}} minuto",
+    "minutes_other": "{{count}} minuti",
+    "seconds_one": "{{count}} secondo",
+    "seconds_other": "{{count}} secondi",
+    "span_minutes": "{{minutes}} min",
+    "span_hours": "{{hours}} h",
+    "span_hours_minutes": "{{hours}} h {{minutes}} min"
+  },
+  "tier": {
+    "1": "Nuova registrazione",
+    "2": "Riavvio della radio",
+    "3": "Cambio SIM",
+    "4": "Riavvio",
+    "fallback": "ripristino"
+  },
+  "event": {
+    "offline": "Connessione persa",
+    "reregister": "Nuova registrazione",
+    "radio_restart": "Riavvio della radio",
+    "sim_switch": "Cambio SIM",
+    "reboot": "Riavvio",
+    "restored": "Connessione ripristinata",
+    "no_effect": "Nessun effetto",
+    "rate_limit": "Limite dei ripristini",
+    "exhausted": "Sequenza esaurita",
+    "sim_revert": "SIM originale"
+  },
+  "result": {
+    "ok": "Ripristinata",
+    "done": "Eseguito",
+    "failed": "Non riuscito",
+    "warning": "Offline",
+    "skipped": "Saltato"
+  },
+  "state": {
+    "disabled": "Disattivato",
+    "online": "Online",
+    "failed_checks_one": "{{count}} controllo fallito",
+    "failed_checks_other": "{{count}} controlli falliti",
+    "recovering": "Livello {{tier}}: {{name}}",
+    "reverting": "Prova della SIM originale",
+    "paused": "In pausa",
+    "not_running": "Non in esecuzione"
+  },
+  "status": {
+    "title": "Stato del watchdog",
+    "description": "Cosa sta facendo ora il watchdog, aggiornato ogni 5 secondi.",
+    "checks": "Controlli della connessione",
+    "failed_in_row_one": "{{count}} fallito di fila (interviene a {{threshold}})",
+    "failed_in_row_other": "{{count}} falliti di fila (interviene a {{threshold}})",
+    "passing": "Superati",
+    "recovery": "Ripristino",
+    "recovering": "Livello {{tier}}, in attesa della connessione",
+    "reverting": "Di nuovo sulla SIM {{slot}}, verifica in corso",
+    "idle": "Inattivo",
+    "actions_hour": "Azioni nell'ultima ora",
+    "reboots_day": "Riavvii nelle ultime 24 ore",
+    "used_of_max": "{{used}} su {{max}}",
+    "failover": "Failover SIM",
+    "failover_on": "Sulla SIM {{slot}}",
+    "failover_since": "Sulla SIM {{slot}} dalle {{since}}",
+    "failover_revert": "Sulla SIM {{slot}} dalle {{since}}, di nuovo sulla SIM {{original}} alle {{at}}",
+    "none": "Nessuno"
+  },
+  "activity": {
+    "title": "Attività di ripristino",
+    "description": "Ogni passo compiuto dal watchdog, dal più recente (in memoria fino al prossimo riavvio).",
+    "refresh": "Aggiorna l'attività di ripristino",
+    "event": "Evento",
+    "detail": "Dettaglio",
+    "time": "Ora",
+    "tier": "livello {{tier}}",
+    "empty_title": "Ancora nessuna attività di ripristino",
+    "empty_description": "I passi di ripristino compaiono qui quando il watchdog interviene su un'interruzione.",
+    "page": "Pagina {{page}} di {{count}}",
+    "previous_page": "Pagina precedente",
+    "next_page": "Pagina successiva"
+  },
+  "settings": {
+    "title": "Impostazioni del watchdog",
+    "description": "Quando la connessione si considera persa, e la sequenza di ripristino che segue: dal passo più delicato fino al riavvio. Le modifiche hanno effetto appena salvate.",
+    "tabs": {
+      "detection": "Rilevamento",
+      "recovery": "Ripristino",
+      "limits": "Limiti"
+    },
+    "has_errors": "Contiene errori",
+    "enabled": "Watchdog attivo",
+    "targets": "Destinazioni dei ping",
+    "targets_hint": "Indirizzi IPv4 separati da virgole: un controllo è superato quando almeno uno risponde.",
+    "fail_count": "Controlli falliti prima di intervenire",
+    "check_interval": "Intervallo dei controlli",
+    "ping_timeout": "Timeout del ping",
+    "boot_grace": "Attesa dopo l'avvio",
+    "boot_grace_hint": "Nessun ripristino nei primi secondi dopo un avvio.",
+    "recovery_intro": "Provati in ordine. Ogni passo attende il suo tempo di assestamento perché la connessione torni, prima che parta il successivo; i passi disattivati vengono saltati.",
+    "tier_aria": "Livello {{index}}: {{name}}",
+    "settle_time": "Tempo di assestamento",
+    "tier1": {
+      "name": "Nuova registrazione alla rete",
+      "description": "Distacco e nuovo aggancio alla rete; un operatore scelto manualmente viene mantenuto."
+    },
+    "tier2": {
+      "name": "Riavvio della radio",
+      "description": "RF spenta, poi riaccesa. La SIM resta alimentata.",
+      "attempts": "Riavvii della radio",
+      "attempts_hint": "Prima di passare al passo successivo.",
+      "delay": "Radio spenta per"
+    },
+    "tier3": {
+      "name": "Passaggio all'altra SIM",
+      "description": "Mantenuto solo se la SIM nell'altro slot risponde READY; uno slot vuoto viene ignorato per 6 ore.",
+      "original_sim": "SIM originale",
+      "revert_timer": "Riprovala più tardi",
+      "revert_never": "Resta sull'altra SIM",
+      "revert_timer_hint": "Dopo un po' torna alla SIM originale; se è ancora offline, si ripassa all'altra SIM.",
+      "revert_never_hint": "Finché non torni indietro da Impostazioni rete mobile.",
+      "revert_after": "Riprova la SIM originale dopo"
+    },
+    "tier4": {
+      "name": "Riavvio del modem",
+      "description": "L'ultima risorsa, entro il limite giornaliero di riavvii."
+    },
+    "max_hour": "Azioni di ripristino all'ora",
+    "max_hour_hint": "Conta ogni livello; oltre il limite il watchdog si limita a osservare.",
+    "max_day": "Riavvii ogni 24 ore",
+    "max_day_hint": "Il conteggio sopravvive ai riavvii.",
+    "cooldown": "Pausa tra due sequenze",
+    "cooldown_hint": "Dopo la fine di una sequenza, prima che ne possa partire un'altra.",
+    "discard": "Scarta",
+    "saved_running": "Watchdog salvato e in esecuzione",
+    "saved_stopped": "Watchdog salvato e fermato",
+    "errors": {
+      "targets": "Inserisci uno o più indirizzi IPv4, separati da virgole.",
+      "fail_count": "Controlli falliti prima di intervenire: da 1 a 120.",
+      "check_interval": "Intervallo dei controlli: da 1 a 60 secondi.",
+      "ping_timeout": "Timeout del ping: da 1 a 60 secondi.",
+      "boot_grace": "Attesa dopo l'avvio: da 0 a 3600 secondi.",
+      "settle_10_600": "Tempo di assestamento: da 10 a 600 secondi.",
+      "cfun_delay": "Radio spenta per: da 1 a 120 secondi.",
+      "cfun_attempts": "Riavvii della radio: da 1 a 120.",
+      "settle_30_900": "Tempo di assestamento: da 30 a 900 secondi.",
+      "revert_after": "Ritorno alla SIM originale dopo un tempo da 5 a 1440 minuti.",
+      "cooldown": "Pausa: da 0 a 3600 secondi.",
+      "max_hour": "Azioni all'ora: da 1 a 60.",
+      "max_day": "Riavvii al giorno: da 1 a 24.",
+      "no_tier": "Attiva almeno un livello di ripristino."
+    }
+  },
+  "log": {
+    "title": "Log del watchdog",
+    "description": "/tmp/connection-watchdog.log, aggiornato ogni 3 secondi.",
+    "empty": "Il log è vuoto."
+  },
+  "errors": {
+    "config_read_failed": "Impossibile leggere la configurazione del watchdog",
+    "activity_read_failed": "Impossibile leggere l'attività del watchdog",
+    "log_read_failed": "Impossibile leggere il log",
+    "save_failed": "Salvataggio non riuscito"
+  }
+}

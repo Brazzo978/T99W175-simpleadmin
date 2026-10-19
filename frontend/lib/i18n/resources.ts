@@ -16,6 +16,7 @@ import enCredentials from "@/locales/en/credentials.json";
 import enTailscale from "@/locales/en/tailscale.json";
 import enTerminal from "@/locales/en/terminal.json";
 import enAbout from "@/locales/en/about.json";
+import enMonitoring from "@/locales/en/monitoring.json";
 import itCommon from "@/locales/it/common.json";
 import itSidebar from "@/locales/it/sidebar.json";
 import itDashboard from "@/locales/it/dashboard.json";
@@ -34,6 +35,7 @@ import itCredentials from "@/locales/it/credentials.json";
 import itTailscale from "@/locales/it/tailscale.json";
 import itTerminal from "@/locales/it/terminal.json";
 import itAbout from "@/locales/it/about.json";
+import itMonitoring from "@/locales/it/monitoring.json";
 
 // Static resources for i18next. Every bundled language declares every
 // namespace: one per page (or page group), plus common, sidebar and
@@ -59,6 +61,7 @@ export const resources = {
     tailscale: enTailscale,
     terminal: enTerminal,
     about: enAbout,
+    monitoring: enMonitoring,
   },
   it: {
     common: itCommon,
@@ -79,6 +82,7 @@ export const resources = {
     tailscale: itTailscale,
     terminal: itTerminal,
     about: itAbout,
+    monitoring: itMonitoring,
   },
 } as const;
 
@@ -102,4 +106,5 @@ export const ALL_NAMESPACES = [
   "tailscale",
   "terminal",
   "about",
+  "monitoring",
 ] as const;

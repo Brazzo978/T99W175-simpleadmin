@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { authFetch } from "@/lib/auth-fetch";
+import { msg, translate, type Msg } from "@/lib/i18n/message";
 
 // =============================================================================
 // useWatchdog — connection watchdog configuration, activity and log
@@ -116,6 +119,12 @@ const LOG_REFRESH_MS = 3000;
 const EVENTS_LIMIT = 50;
 const EVENTS_REFRESH_MS = 5000;
 
+/** An error as the CGI wrote it, or our own text translated at render. */
+type ErrorText = string | Msg | null;
+
+const errorText = (t: TFunction, error: ErrorText): string | null =>
+  error === null ? null : typeof error === "string" ? error : translate(t, error);
+
 const num = (value: unknown, fallback: number) => {
   const n = Number(value);
   return value !== null && value !== "" && Number.isFinite(n) ? n : fallback;
@@ -151,10 +160,11 @@ function parseConfig(json: Record<string, unknown>): WatchdogConfig {
 }
 
 export function useWatchdog() {
+  const { t } = useTranslation("monitoring");
   const [config, setConfig] = useState<WatchdogConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorText>(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -173,7 +183,7 @@ export function useWatchdog() {
       setConfig(parseConfig(json));
       setError(null);
     } catch {
-      if (mounted.current) setError("Unable to read the watchdog configuration");
+      if (mounted.current) setError(msg("monitoring:errors.config_read_failed"));
     } finally {
       if (mounted.current) setIsLoading(false);
     }
@@ -199,19 +209,20 @@ export function useWatchdog() {
       if (mounted.current) setConfig(parseConfig(json));
       return { ok: true };
     } catch {
-      return { ok: false, message: "Modem unreachable" };
+      return { ok: false, message: t("common:at.unreachable") };
     } finally {
       if (mounted.current) setIsSaving(false);
     }
-  }, []);
+  }, [t]);
 
-  return { config, isLoading, isSaving, error, save, reload: load };
+  return { config, isLoading, isSaving, error: errorText(t, error), save, reload: load };
 }
 
 /** Recovery activity and live state, refreshed while `active`. */
 export function useWatchdogEvents(active: boolean) {
+  const { t } = useTranslation("monitoring");
   const [runtime, setRuntime] = useState<WatchdogRuntime | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorText>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const mounted = useRef(true);
 
@@ -235,7 +246,7 @@ export function useWatchdogEvents(active: boolean) {
       setError(null);
     } catch (err) {
       if (mounted.current) {
-        setError(err instanceof Error ? err.message : "Unable to read the watchdog activity");
+        setError(err instanceof Error ? err.message : msg("monitoring:errors.activity_read_failed"));
       }
     } finally {
       if (mounted.current) setIsRefreshing(false);
@@ -253,13 +264,14 @@ export function useWatchdogEvents(active: boolean) {
     };
   }, [active, refresh]);
 
-  return { runtime, error, isRefreshing, refresh };
+  return { runtime, error: errorText(t, error), isRefreshing, refresh };
 }
 
 /** Tail of the watchdog log, refreshed while `active`. */
 export function useWatchdogLog(active: boolean) {
+  const { t } = useTranslation("monitoring");
   const [text, setText] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorText>(null);
 
   useEffect(() => {
     if (!active) return;
@@ -275,7 +287,9 @@ export function useWatchdogLog(active: boolean) {
         setText(json.content || "");
         setError(null);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Unable to read the log");
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : msg("monitoring:errors.log_read_failed"));
+        }
       }
     };
     tick();
@@ -286,7 +300,7 @@ export function useWatchdogLog(active: boolean) {
     };
   }, [active]);
 
-  return { text, error };
+  return { text, error: errorText(t, error) };
 }
 
 export interface ConnectionChecks {
@@ -308,6 +322,7 @@ export interface ConnectionChecks {
  * them from simpleadmin.conf): get_connection_config / set_connection_config.
  */
 export function useConnectionChecks() {
+  const { t } = useTranslation("monitoring");
   const [checks, setChecks] = useState<ConnectionChecks | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -341,15 +356,17 @@ export function useConnectionChecks() {
         body: JSON.stringify(next),
       });
       const json = await resp.json();
-      if (json.status !== "success") return { ok: false, message: json.message || "Save failed" };
+      if (json.status !== "success") {
+        return { ok: false, message: json.message || t("errors.save_failed") };
+      }
       setChecks(next);
       return { ok: true };
     } catch {
-      return { ok: false, message: "Modem unreachable" };
+      return { ok: false, message: t("common:at.unreachable") };
     } finally {
       setIsSaving(false);
     }
-  }, []);
+  }, [t]);
 
   return { checks, isSaving, save };
 }

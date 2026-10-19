@@ -1,0 +1,233 @@
+{
+  "page": {
+    "title": "Connection Monitoring",
+    "description": "How the connection is tested, and how the watchdog brings it back: re-registration, radio restart, the other SIM, reboot."
+  },
+  "connectivity": {
+    "title": "Connectivity Status",
+    "description": "The last round of checks; system_bridge runs one every 10 seconds while a page is open (only the pings otherwise).",
+    "badge": {
+      "online": "Online",
+      "degraded": "Degraded",
+      "offline": "Offline",
+      "checking": "Checking",
+      "portal": "Captive portal"
+    },
+    "ping": "Ping {{host}}",
+    "dns": "DNS {{domain}} via {{server}}",
+    "http": "HTTP {{url}}",
+    "http_probe": "Captive portal probe",
+    "no_answer": "No answer",
+    "resolved": "Resolved",
+    "failed": "Failed",
+    "pending": "Pending",
+    "disabled": "Disabled",
+    "probe": {
+      "ok": "HTTP {{code}} in {{time}} ms",
+      "portal": "HTTP {{code}} instead of 204",
+      "failed": "Failed: {{reason}}"
+    },
+    "reason": {
+      "dns": "name not resolved",
+      "connect": "no connection",
+      "timeout": "no answer in time",
+      "malformed": "not an HTTP answer",
+      "url": "the URL is not http://",
+      "unknown": "unknown"
+    },
+    "portal_alert": {
+      "title": "Captive portal detected",
+      "body": "{{url}} answered with HTTP {{code}} instead of 204 No Content: the network is intercepting web traffic with a login, billing or activation page. Open any http:// site from a device on the LAN to see it; until it is accepted, data may be blocked or limited.",
+      "body_redirect": "{{url}} answered with HTTP {{code}} and a redirect to <location>{{location}}</location> instead of 204 No Content: the network is intercepting web traffic with a login, billing or activation page. Open any http:// site from a device on the LAN to see it; until it is accepted, data may be blocked or limited."
+    }
+  },
+  "checks": {
+    "title": "Connectivity Checks",
+    "description": "What the dashboard's internet status tests: pings, DNS lookups written as server:domain, and an http:// URL that must answer 204 No Content (anything else means a captive portal; empty disables it). They run every 10 seconds while a page is open.",
+    "ping_targets": "Ping targets",
+    "dns_tests": "DNS tests",
+    "http_probe": "Captive portal probe",
+    "http_probe_placeholder": "Disabled",
+    "probe_timeout": "Probe timeout",
+    "bg_interval": "Background check interval",
+    "bg_interval_hint": "How often the pings run while no page is open (10 to 600, in steps of 10), and the step of the 24-hour latency history. They use mobile data: about 3 MB a day at 10 s, 0.5 MB a day at 60 s.",
+    "saved": "Connectivity checks saved",
+    "errors": {
+      "http_probe": "Captive portal probe: an http:// URL (letters, digits and . _ ~ / ? = % - only), or empty to disable it.",
+      "probe_timeout": "Probe timeout: 1 to 9 seconds.",
+      "bg_interval": "Background check interval: 10 to 600 seconds, in steps of 10."
+    }
+  },
+  "latency": {
+    "title": "Latency, Last 24 Hours",
+    "description_one": "Average ping time of the targets above per {{count}} minute. system_bridge keeps one sample every {{every}}, the background check interval, also while no page is open.",
+    "description_other": "Average ping time of the targets above per {{count}} minutes. system_bridge keeps one sample every {{every}}, the background check interval, also while no page is open.",
+    "no_samples": "No samples yet.",
+    "average_rtt": "Average RTT",
+    "lost": "{{loss}}% lost",
+    "average": "Average",
+    "loss": "Loss",
+    "covered": "Covered"
+  },
+  "duration": {
+    "minutes_one": "{{count}} minute",
+    "minutes_other": "{{count}} minutes",
+    "seconds_one": "{{count}} second",
+    "seconds_other": "{{count}} seconds",
+    "span_minutes": "{{minutes}} min",
+    "span_hours": "{{hours}} h",
+    "span_hours_minutes": "{{hours}} h {{minutes}} min"
+  },
+  "tier": {
+    "1": "Re-registration",
+    "2": "Radio restart",
+    "3": "SIM switch",
+    "4": "Reboot",
+    "fallback": "recovery"
+  },
+  "event": {
+    "offline": "Connection lost",
+    "reregister": "Re-registration",
+    "radio_restart": "Radio restart",
+    "sim_switch": "SIM switch",
+    "reboot": "Reboot",
+    "restored": "Connection restored",
+    "no_effect": "No effect",
+    "rate_limit": "Recovery limit",
+    "exhausted": "Ladder exhausted",
+    "sim_revert": "Original SIM"
+  },
+  "result": {
+    "ok": "Restored",
+    "done": "Done",
+    "failed": "Failed",
+    "warning": "Offline",
+    "skipped": "Skipped"
+  },
+  "state": {
+    "disabled": "Disabled",
+    "online": "Online",
+    "failed_checks_one": "{{count}} failed check",
+    "failed_checks_other": "{{count}} failed checks",
+    "recovering": "Tier {{tier}}: {{name}}",
+    "reverting": "Trying the original SIM",
+    "paused": "Paused",
+    "not_running": "Not running"
+  },
+  "status": {
+    "title": "Watchdog Status",
+    "description": "What the watchdog is doing now, refreshed every 5 seconds.",
+    "checks": "Connection checks",
+    "failed_in_row_one": "{{count}} failed in a row (acts at {{threshold}})",
+    "failed_in_row_other": "{{count}} failed in a row (acts at {{threshold}})",
+    "passing": "Passing",
+    "recovery": "Recovery",
+    "recovering": "Tier {{tier}}, waiting for the connection",
+    "reverting": "Back on SIM {{slot}}, checking",
+    "idle": "Idle",
+    "actions_hour": "Actions in the last hour",
+    "reboots_day": "Reboots in 24 hours",
+    "used_of_max": "{{used}} of {{max}}",
+    "failover": "SIM failover",
+    "failover_on": "On SIM {{slot}}",
+    "failover_since": "On SIM {{slot}} since {{since}}",
+    "failover_revert": "On SIM {{slot}} since {{since}}, SIM {{original}} again at {{at}}",
+    "none": "None"
+  },
+  "activity": {
+    "title": "Recovery Activity",
+    "description": "Every step the watchdog took, newest first (kept in memory until the next reboot).",
+    "refresh": "Refresh recovery activity",
+    "event": "Event",
+    "detail": "Detail",
+    "time": "Time",
+    "tier": "tier {{tier}}",
+    "empty_title": "No recovery activity yet",
+    "empty_description": "Recovery steps appear here when the watchdog acts on an outage.",
+    "page": "Page {{page}} of {{count}}",
+    "previous_page": "Previous page",
+    "next_page": "Next page"
+  },
+  "settings": {
+    "title": "Watchdog Settings",
+    "description": "When the connection counts as lost, and the recovery ladder that follows: from the gentlest step to a reboot. Takes effect as soon as it is saved.",
+    "tabs": {
+      "detection": "Detection",
+      "recovery": "Recovery",
+      "limits": "Limits"
+    },
+    "has_errors": "Has errors",
+    "enabled": "Watchdog enabled",
+    "targets": "Ping targets",
+    "targets_hint": "IPv4 addresses, comma separated: a check passes when any of them answers.",
+    "fail_count": "Failed checks before acting",
+    "check_interval": "Check interval",
+    "ping_timeout": "Ping timeout",
+    "boot_grace": "Boot grace",
+    "boot_grace_hint": "No recovery in the first seconds after a boot.",
+    "recovery_intro": "Tried in order. Each step waits its settle time for the connection to come back before the next one runs; disabled steps are skipped.",
+    "tier_aria": "Tier {{index}}: {{name}}",
+    "settle_time": "Settle time",
+    "tier1": {
+      "name": "Re-register to the network",
+      "description": "Detach and attach again; a manually chosen operator is kept."
+    },
+    "tier2": {
+      "name": "Restart the radio",
+      "description": "RF off, then on again. The SIM stays powered.",
+      "attempts": "Radio restarts",
+      "attempts_hint": "Before moving to the next step.",
+      "delay": "Radio off for"
+    },
+    "tier3": {
+      "name": "Switch to the other SIM",
+      "description": "Kept only when the SIM in the other slot answers READY; an empty slot is left alone for 6 hours.",
+      "original_sim": "Original SIM",
+      "revert_timer": "Try it again later",
+      "revert_never": "Stay on the other SIM",
+      "revert_timer_hint": "Back to the original SIM after a while; if it is still offline, the other SIM returns.",
+      "revert_never_hint": "Until you switch back in Cellular Settings.",
+      "revert_after": "Try the original SIM after"
+    },
+    "tier4": {
+      "name": "Reboot the modem",
+      "description": "The last resort, within the daily reboot limit."
+    },
+    "max_hour": "Recovery actions per hour",
+    "max_hour_hint": "Every tier counts; beyond it the watchdog only watches.",
+    "max_day": "Reboots per 24 hours",
+    "max_day_hint": "Counted across reboots.",
+    "cooldown": "Cooldown between ladders",
+    "cooldown_hint": "After a ladder ends, before another may start.",
+    "discard": "Discard",
+    "saved_running": "Watchdog saved and running",
+    "saved_stopped": "Watchdog saved and stopped",
+    "errors": {
+      "targets": "Enter one or more IPv4 targets, comma separated.",
+      "fail_count": "Failed checks before acting: 1 to 120.",
+      "check_interval": "Check interval: 1 to 60 seconds.",
+      "ping_timeout": "Ping timeout: 1 to 60 seconds.",
+      "boot_grace": "Boot grace: 0 to 3600 seconds.",
+      "settle_10_600": "Settle time: 10 to 600 seconds.",
+      "cfun_delay": "Radio off time: 1 to 120 seconds.",
+      "cfun_attempts": "Radio restarts: 1 to 120.",
+      "settle_30_900": "Settle time: 30 to 900 seconds.",
+      "revert_after": "Switch back after 5 to 1440 minutes.",
+      "cooldown": "Cooldown: 0 to 3600 seconds.",
+      "max_hour": "Actions per hour: 1 to 60.",
+      "max_day": "Reboots per day: 1 to 24.",
+      "no_tier": "Enable at least one recovery tier."
+    }
+  },
+  "log": {
+    "title": "Watchdog Log",
+    "description": "/tmp/connection-watchdog.log, refreshed every 3 seconds.",
+    "empty": "The log is empty."
+  },
+  "errors": {
+    "config_read_failed": "Unable to read the watchdog configuration",
+    "activity_read_failed": "Unable to read the watchdog activity",
+    "log_read_failed": "Unable to read the log",
+    "save_failed": "Save failed"
+  }
+}

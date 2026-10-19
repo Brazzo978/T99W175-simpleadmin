@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import {
   Card,
@@ -33,10 +35,6 @@ import { useBridgeState } from "@/hooks/use-bridge";
 
 const BUCKET_MS = 5 * 60 * 1000;
 
-const chartConfig = {
-  latency: { label: "Average RTT", color: "var(--chart-1)" },
-} satisfies ChartConfig;
-
 interface Point {
   time: string;
   latency: number | null;
@@ -50,24 +48,34 @@ function clock(ms: number) {
   });
 }
 
-function span(ms: number) {
+function span(t: TFunction, ms: number) {
   const min = Math.round(ms / 60000);
-  if (min < 60) return `${min} min`;
+  if (min < 60) return t("duration.span_minutes", { minutes: min });
   const h = Math.floor(min / 60);
-  return min % 60 ? `${h} h ${min % 60} min` : `${h} h`;
+  return min % 60
+    ? t("duration.span_hours_minutes", { hours: h, minutes: min % 60 })
+    : t("duration.span_hours", { hours: h });
 }
 
 /** "10 seconds", "1 minute", "1 minute 30 seconds" */
-function every(sec: number) {
+function every(t: TFunction, sec: number) {
   const min = Math.floor(sec / 60);
   const s = sec % 60;
   const parts = [];
-  if (min) parts.push(`${min} minute${min > 1 ? "s" : ""}`);
-  if (s || !min) parts.push(`${s} second${s === 1 ? "" : "s"}`);
+  if (min) parts.push(t("duration.minutes", { count: min }));
+  if (s || !min) parts.push(t("duration.seconds", { count: s }));
   return parts.join(" ");
 }
 
 export default function LatencyHistoryCard() {
+  const { t } = useTranslation("monitoring");
+  const chartConfig = useMemo(
+    () =>
+      ({
+        latency: { label: t("latency.average_rtt"), color: "var(--chart-1)" },
+      }) satisfies ChartConfig,
+    [t],
+  );
   const { latency24h } = useBridgeState();
   const stepSec = latency24h.intervalSec || 60;
   const bucketMs = Math.max(BUCKET_MS, Math.ceil((stepSec * 1000) / BUCKET_MS) * BUCKET_MS);
@@ -103,30 +111,28 @@ export default function LatencyHistoryCard() {
       summary: {
         avg: okCount ? Math.round(okSum / okCount) : null,
         loss: Math.round(((n - okCount) / n) * 100),
-        covered: span(n * step),
+        coveredMs: n * step,
       },
     };
   }, [latency24h, stepSec, bucketMs]);
 
   const footer = [
-    { label: "Average", value: summary?.avg != null ? `${summary.avg} ms` : "-" },
-    { label: "Loss", value: summary ? `${summary.loss}%` : "-" },
-    { label: "Covered", value: summary?.covered ?? "-" },
+    { label: t("latency.average"), value: summary?.avg != null ? `${summary.avg} ms` : "-" },
+    { label: t("latency.loss"), value: summary ? `${summary.loss}%` : "-" },
+    { label: t("latency.covered"), value: summary ? span(t, summary.coveredMs) : "-" },
   ];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Latency, Last 24 Hours</CardTitle>
+        <CardTitle>{t("latency.title")}</CardTitle>
         <CardDescription>
-          Average ping time of the targets above per {bucketMs / 60000} minutes.
-          system_bridge keeps one sample every {every(stepSec)}, the background
-          check interval, also while no page is open.
+          {t("latency.description", { count: bucketMs / 60000, every: every(t, stepSec) })}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {points.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No samples yet.</p>
+          <p className="text-sm text-muted-foreground">{t("latency.no_samples")}</p>
         ) : (
           <ChartContainer config={chartConfig} className="h-56 w-full">
             <LineChart accessibilityLayer data={points} margin={{ left: 0, right: 12 }}>
@@ -151,11 +157,11 @@ export default function LatencyHistoryCard() {
                     labelFormatter={(value) => `${value}`}
                     formatter={(value, _name, item) => (
                       <div className="flex w-full items-baseline justify-between gap-4">
-                        <span className="text-muted-foreground">Average RTT</span>
+                        <span className="text-muted-foreground">{t("latency.average_rtt")}</span>
                         <span className="font-mono font-medium tabular-nums text-foreground">
                           {value} ms
                           {(item.payload as Point).loss
-                            ? `, ${(item.payload as Point).loss}% lost`
+                            ? `, ${t("latency.lost", { loss: (item.payload as Point).loss })}`
                             : ""}
                         </span>
                       </div>

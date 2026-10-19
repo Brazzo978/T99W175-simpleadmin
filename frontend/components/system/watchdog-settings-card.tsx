@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import type { TFunction } from "i18next";
 import { PowerIcon, RadioIcon, RefreshCwIcon, ArrowLeftRightIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,34 +61,35 @@ const FIELD_TAB: Partial<Record<FieldKey, Tab>> = {
   maxRebootsPerDay: "limits",
 };
 
+// The message of each range is a key of the monitoring namespace.
 const RANGES: [FieldKey, number, number, string][] = [
-  ["failCount", 1, 120, "Failed checks before acting: 1 to 120."],
-  ["checkInterval", 1, 60, "Check interval: 1 to 60 seconds."],
-  ["pingTimeoutSec", 1, 60, "Ping timeout: 1 to 60 seconds."],
-  ["bootGrace", 0, 3600, "Boot grace: 0 to 3600 seconds."],
-  ["tier1Settle", 10, 600, "Settle time: 10 to 600 seconds."],
-  ["tier2Settle", 10, 600, "Settle time: 10 to 600 seconds."],
-  ["cfunDelay", 1, 120, "Radio off time: 1 to 120 seconds."],
-  ["cfunMaxAttempts", 1, 120, "Radio restarts: 1 to 120."],
-  ["tier3Settle", 30, 900, "Settle time: 30 to 900 seconds."],
-  ["simRevertAfter", 300, 86400, "Switch back after 5 to 1440 minutes."],
-  ["recoveryCooldown", 0, 3600, "Cooldown: 0 to 3600 seconds."],
-  ["maxRecoveriesPerHour", 1, 60, "Actions per hour: 1 to 60."],
-  ["maxRebootsPerDay", 1, 24, "Reboots per day: 1 to 24."],
+  ["failCount", 1, 120, "settings.errors.fail_count"],
+  ["checkInterval", 1, 60, "settings.errors.check_interval"],
+  ["pingTimeoutSec", 1, 60, "settings.errors.ping_timeout"],
+  ["bootGrace", 0, 3600, "settings.errors.boot_grace"],
+  ["tier1Settle", 10, 600, "settings.errors.settle_10_600"],
+  ["tier2Settle", 10, 600, "settings.errors.settle_10_600"],
+  ["cfunDelay", 1, 120, "settings.errors.cfun_delay"],
+  ["cfunMaxAttempts", 1, 120, "settings.errors.cfun_attempts"],
+  ["tier3Settle", 30, 900, "settings.errors.settle_30_900"],
+  ["simRevertAfter", 300, 86400, "settings.errors.revert_after"],
+  ["recoveryCooldown", 0, 3600, "settings.errors.cooldown"],
+  ["maxRecoveriesPerHour", 1, 60, "settings.errors.max_hour"],
+  ["maxRebootsPerDay", 1, 24, "settings.errors.max_day"],
 ];
 
-function validate(c: WatchdogConfig): Errors {
+function validate(c: WatchdogConfig, t: TFunction): Errors {
   const errors: Errors = {};
-  const targets = c.targets.split(",").map((t) => t.trim()).filter(Boolean);
+  const targets = c.targets.split(",").map((s) => s.trim()).filter(Boolean);
   if (!targets.length || !targets.every(isValidIp)) {
-    errors.targets = "Enter one or more IPv4 targets, comma separated.";
+    errors.targets = t("settings.errors.targets");
   }
   for (const [key, min, max, message] of RANGES) {
     const v = c[key] as number;
-    if (!Number.isInteger(v) || v < min || v > max) errors[key] = message;
+    if (!Number.isInteger(v) || v < min || v > max) errors[key] = t(message);
   }
   if (c.enabled && !c.tier1Enabled && !c.tier2Enabled && !c.tier3Enabled && !c.tier4Enabled) {
-    errors.tier1Enabled = "Enable at least one recovery tier.";
+    errors.tier1Enabled = t("settings.errors.no_tier");
   }
   return errors;
 }
@@ -167,6 +170,7 @@ function LadderStep({
   isLast?: boolean;
   children?: React.ReactNode;
 }) {
+  const { t } = useTranslation("monitoring");
   return (
     <li className={cn("flex gap-3", !isLast && "pb-6")}>
       <div className="flex flex-col items-center">
@@ -216,7 +220,11 @@ function LadderStep({
               {command}
             </code>
           </div>
-          <Switch checked={enabled} onCheckedChange={onToggle} aria-label={`Tier ${index}: ${name}`} />
+          <Switch
+            checked={enabled}
+            onCheckedChange={onToggle}
+            aria-label={t("settings.tier_aria", { index, name })}
+          />
         </div>
         {enabled && children && (
           <div className="mt-3 grid grid-cols-1 gap-4 @sm/card:grid-cols-2">{children}</div>
@@ -237,6 +245,7 @@ export function WatchdogSettingsCard({
   isSaving: boolean;
   onSave: (next: WatchdogConfig) => Promise<SaveResult>;
 }) {
+  const { t } = useTranslation("monitoring");
   const [draft, setDraft] = useState<WatchdogConfig | null>(null);
   const [tab, setTab] = useState<Tab>("detection");
   const [showErrors, setShowErrors] = useState(false);
@@ -245,13 +254,13 @@ export function WatchdogSettingsCard({
 
   const form = draft ?? config;
   const update = (patch: Partial<WatchdogConfig>) => form && setDraft({ ...form, ...patch });
-  const errors: Errors = form && showErrors ? validate(form) : {};
-  const tabHasError = (t: Tab) =>
-    (Object.keys(errors) as FieldKey[]).some((k) => FIELD_TAB[k] === t);
+  const errors: Errors = form && showErrors ? validate(form, t) : {};
+  const tabHasError = (tabId: Tab) =>
+    (Object.keys(errors) as FieldKey[]).some((k) => FIELD_TAB[k] === tabId);
 
   const handleSave = async () => {
     if (!form) return;
-    const found = validate(form);
+    const found = validate(form, t);
     const first = (Object.keys(found) as FieldKey[])[0];
     if (first) {
       setShowErrors(true);
@@ -261,34 +270,33 @@ export function WatchdogSettingsCard({
     setSaveError(null);
     const normalized = {
       ...form,
-      targets: form.targets.split(",").map((t) => t.trim()).filter(Boolean).join(","),
+      targets: form.targets.split(",").map((s) => s.trim()).filter(Boolean).join(","),
     };
     const result = await onSave(normalized);
     if (result.ok) {
       markSaved();
-      toast.success(normalized.enabled ? "Watchdog saved and running" : "Watchdog saved and stopped");
+      toast.success(normalized.enabled ? t("settings.saved_running") : t("settings.saved_stopped"));
       setDraft(null);
       setShowErrors(false);
     } else {
-      setSaveError(result.message || "Save failed");
+      setSaveError(result.message || t("errors.save_failed"));
     }
   };
 
-  const tabLabel = (t: Tab, label: string) => (
-    <TabsTrigger value={t} className="gap-1.5">
+  const tabLabel = (tabId: Tab, label: string) => (
+    <TabsTrigger value={tabId} className="gap-1.5">
       {label}
-      {tabHasError(t) && <span aria-label="Has errors" className="bg-destructive size-1.5 rounded-full" />}
+      {tabHasError(tabId) && (
+        <span aria-label={t("settings.has_errors")} className="bg-destructive size-1.5 rounded-full" />
+      )}
     </TabsTrigger>
   );
 
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Watchdog Settings</CardTitle>
-        <CardDescription>
-          When the connection counts as lost, and the recovery ladder that follows: from the
-          gentlest step to a reboot. Takes effect as soon as it is saved.
-        </CardDescription>
+        <CardTitle>{t("settings.title")}</CardTitle>
+        <CardDescription>{t("settings.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading || !form ? (
@@ -299,14 +307,14 @@ export function WatchdogSettingsCard({
         ) : (
           <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
             <TabsList className="w-full">
-              {tabLabel("detection", "Detection")}
-              {tabLabel("recovery", "Recovery")}
-              {tabLabel("limits", "Limits")}
+              {tabLabel("detection", t("settings.tabs.detection"))}
+              {tabLabel("recovery", t("settings.tabs.recovery"))}
+              {tabLabel("limits", t("settings.tabs.limits"))}
             </TabsList>
 
             <TabsContent value="detection" className="mt-5 grid gap-5">
               <Field orientation="horizontal" className="justify-between">
-                <FieldLabel htmlFor="wd-enabled">Watchdog enabled</FieldLabel>
+                <FieldLabel htmlFor="wd-enabled">{t("settings.enabled")}</FieldLabel>
                 <Switch
                   id="wd-enabled"
                   checked={form.enabled}
@@ -314,7 +322,7 @@ export function WatchdogSettingsCard({
                 />
               </Field>
               <Field data-invalid={!!errors.targets}>
-                <FieldLabel htmlFor="wd-targets">Ping targets</FieldLabel>
+                <FieldLabel htmlFor="wd-targets">{t("settings.targets")}</FieldLabel>
                 <Input
                   id="wd-targets"
                   value={form.targets}
@@ -324,22 +332,20 @@ export function WatchdogSettingsCard({
                 {errors.targets ? (
                   <FieldError>{errors.targets}</FieldError>
                 ) : (
-                  <FieldDescription>
-                    IPv4 addresses, comma separated: a check passes when any of them answers.
-                  </FieldDescription>
+                  <FieldDescription>{t("settings.targets_hint")}</FieldDescription>
                 )}
               </Field>
               <div className="grid grid-cols-1 gap-4 @sm/card:grid-cols-2">
                 <NumField
                   id="wd-fail"
-                  label="Failed checks before acting"
+                  label={t("settings.fail_count")}
                   value={form.failCount}
                   error={errors.failCount}
                   onChange={(v) => update({ failCount: v })}
                 />
                 <NumField
                   id="wd-interval"
-                  label="Check interval"
+                  label={t("settings.check_interval")}
                   suffix="s"
                   value={form.checkInterval}
                   error={errors.checkInterval}
@@ -347,7 +353,7 @@ export function WatchdogSettingsCard({
                 />
                 <NumField
                   id="wd-timeout"
-                  label="Ping timeout"
+                  label={t("settings.ping_timeout")}
                   suffix="s"
                   value={form.pingTimeoutSec}
                   error={errors.pingTimeoutSec}
@@ -355,35 +361,32 @@ export function WatchdogSettingsCard({
                 />
                 <NumField
                   id="wd-grace"
-                  label="Boot grace"
+                  label={t("settings.boot_grace")}
                   suffix="s"
                   value={form.bootGrace}
                   error={errors.bootGrace}
-                  description="No recovery in the first seconds after a boot."
+                  description={t("settings.boot_grace_hint")}
                   onChange={(v) => update({ bootGrace: v })}
                 />
               </div>
             </TabsContent>
 
             <TabsContent value="recovery" className="mt-5">
-              <p className="text-muted-foreground mb-4 text-xs">
-                Tried in order. Each step waits its settle time for the connection to come back
-                before the next one runs; disabled steps are skipped.
-              </p>
+              <p className="text-muted-foreground mb-4 text-xs">{t("settings.recovery_intro")}</p>
               {errors.tier1Enabled && <FieldError className="mb-4">{errors.tier1Enabled}</FieldError>}
               <ol>
                 <LadderStep
                   index={1}
                   icon={<RefreshCwIcon className="size-4" />}
-                  name="Re-register to the network"
-                  description="Detach and attach again; a manually chosen operator is kept."
+                  name={t("settings.tier1.name")}
+                  description={t("settings.tier1.description")}
                   command="AT+COPS=2 → AT+COPS=0"
                   enabled={form.tier1Enabled}
                   onToggle={(v) => update({ tier1Enabled: v })}
                 >
                   <NumField
                     id="wd-t1-settle"
-                    label="Settle time"
+                    label={t("settings.settle_time")}
                     suffix="s"
                     value={form.tier1Settle}
                     error={errors.tier1Settle}
@@ -393,15 +396,15 @@ export function WatchdogSettingsCard({
                 <LadderStep
                   index={2}
                   icon={<RadioIcon className="size-4" />}
-                  name="Restart the radio"
-                  description="RF off, then on again. The SIM stays powered."
+                  name={t("settings.tier2.name")}
+                  description={t("settings.tier2.description")}
                   command="AT+CFUN=4 → AT+CFUN=1"
                   enabled={form.tier2Enabled}
                   onToggle={(v) => update({ tier2Enabled: v })}
                 >
                   <NumField
                     id="wd-t2-settle"
-                    label="Settle time"
+                    label={t("settings.settle_time")}
                     suffix="s"
                     value={form.tier2Settle}
                     error={errors.tier2Settle}
@@ -409,15 +412,15 @@ export function WatchdogSettingsCard({
                   />
                   <NumField
                     id="wd-t2-attempts"
-                    label="Radio restarts"
+                    label={t("settings.tier2.attempts")}
                     value={form.cfunMaxAttempts}
                     error={errors.cfunMaxAttempts}
-                    description="Before moving to the next step."
+                    description={t("settings.tier2.attempts_hint")}
                     onChange={(v) => update({ cfunMaxAttempts: v })}
                   />
                   <NumField
                     id="wd-t2-delay"
-                    label="Radio off for"
+                    label={t("settings.tier2.delay")}
                     suffix="s"
                     value={form.cfunDelay}
                     error={errors.cfunDelay}
@@ -427,22 +430,22 @@ export function WatchdogSettingsCard({
                 <LadderStep
                   index={3}
                   icon={<ArrowLeftRightIcon className="size-4" />}
-                  name="Switch to the other SIM"
-                  description="Kept only when the SIM in the other slot answers READY; an empty slot is left alone for 6 hours."
+                  name={t("settings.tier3.name")}
+                  description={t("settings.tier3.description")}
                   command="AT^SWITCH_SLOT=0|1"
                   enabled={form.tier3Enabled}
                   onToggle={(v) => update({ tier3Enabled: v })}
                 >
                   <NumField
                     id="wd-t3-settle"
-                    label="Settle time"
+                    label={t("settings.settle_time")}
                     suffix="s"
                     value={form.tier3Settle}
                     error={errors.tier3Settle}
                     onChange={(v) => update({ tier3Settle: v })}
                   />
                   <Field>
-                    <FieldLabel htmlFor="wd-t3-revert">Original SIM</FieldLabel>
+                    <FieldLabel htmlFor="wd-t3-revert">{t("settings.tier3.original_sim")}</FieldLabel>
                     <Select
                       value={form.simRevert}
                       onValueChange={(v) => update({ simRevert: v as SimRevertPolicy })}
@@ -451,20 +454,20 @@ export function WatchdogSettingsCard({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="timer">Try it again later</SelectItem>
-                        <SelectItem value="never">Stay on the other SIM</SelectItem>
+                        <SelectItem value="timer">{t("settings.tier3.revert_timer")}</SelectItem>
+                        <SelectItem value="never">{t("settings.tier3.revert_never")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FieldDescription>
                       {form.simRevert === "timer"
-                        ? "Back to the original SIM after a while; if it is still offline, the other SIM returns."
-                        : "Until you switch back in Cellular Settings."}
+                        ? t("settings.tier3.revert_timer_hint")
+                        : t("settings.tier3.revert_never_hint")}
                     </FieldDescription>
                   </Field>
                   {form.simRevert === "timer" && (
                     <NumField
                       id="wd-t3-revert-after"
-                      label="Try the original SIM after"
+                      label={t("settings.tier3.revert_after")}
                       suffix="min"
                       scale={60}
                       value={form.simRevertAfter}
@@ -476,8 +479,8 @@ export function WatchdogSettingsCard({
                 <LadderStep
                   index={4}
                   icon={<PowerIcon className="size-4" />}
-                  name="Reboot the modem"
-                  description="The last resort, within the daily reboot limit."
+                  name={t("settings.tier4.name")}
+                  description={t("settings.tier4.description")}
                   command="reboot"
                   caution
                   isLast
@@ -490,27 +493,27 @@ export function WatchdogSettingsCard({
             <TabsContent value="limits" className="mt-5 grid grid-cols-1 gap-4 @sm/card:grid-cols-2">
               <NumField
                 id="wd-max-hour"
-                label="Recovery actions per hour"
+                label={t("settings.max_hour")}
                 value={form.maxRecoveriesPerHour}
                 error={errors.maxRecoveriesPerHour}
-                description="Every tier counts; beyond it the watchdog only watches."
+                description={t("settings.max_hour_hint")}
                 onChange={(v) => update({ maxRecoveriesPerHour: v })}
               />
               <NumField
                 id="wd-max-day"
-                label="Reboots per 24 hours"
+                label={t("settings.max_day")}
                 value={form.maxRebootsPerDay}
                 error={errors.maxRebootsPerDay}
-                description="Counted across reboots."
+                description={t("settings.max_day_hint")}
                 onChange={(v) => update({ maxRebootsPerDay: v })}
               />
               <NumField
                 id="wd-cooldown"
-                label="Cooldown between ladders"
+                label={t("settings.cooldown")}
                 suffix="s"
                 value={form.recoveryCooldown}
                 error={errors.recoveryCooldown}
-                description="After a ladder ends, before another may start."
+                description={t("settings.cooldown_hint")}
                 onChange={(v) => update({ recoveryCooldown: v })}
               />
             </TabsContent>
@@ -535,10 +538,10 @@ export function WatchdogSettingsCard({
           }}
           disabled={!draft || isSaving}
         >
-          Discard
+          {t("settings.discard")}
         </Button>
         <SaveButton
-          label="Save"
+          label={t("common:actions.save")}
           isSaving={isSaving}
           saved={saved}
           disabled={!draft || isSaving}
