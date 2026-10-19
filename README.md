@@ -302,7 +302,7 @@ installs are removed.
 | What | Source in this repo | On the modem |
 |---|---|---|
 | Web UI | `deploy/www/` plus `deploy/www-nextjs/` (default) or `deploy/www-alpine/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
-| `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled) |
+| `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled); system_bridge's data counter in `/data/simpleadmin/data_usage` |
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
 | DHCP guard | `deploy/dhcp-guard/` | `/opt/scripts/dhcp-guard/dhcp-guard`, run every minute by `dhcp-guard.timer` (see below) |
@@ -340,7 +340,7 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 | SMS Center | inbox, send, delete | `+CMGL`, `send_sms` |
 | eSIM | profiles, download (QR), notifications | euicc-client API |
 | Local Network | LAN, DHCP, DMZ, IP passthrough, WAN, TTL | `network_settings`, `set_ttl` |
-| Connection Monitoring | connectivity checks, watchdog, its log | `*_connection_config`, `connection_watchdog` |
+| Connection Monitoring | live check results with captive portal warning, checks (ping, DNS, HTTP probe), latency of the last 24 hours, watchdog, its log | WebSocket, `*_connection_config`, `connection_watchdog` |
 | Tailscale VPN, AT Terminal, Credentials | as named | `tailscale`, `user_atcommand`, `manage_credentials` |
 | System | scheduled reboot, IMEI, eSIM manager, factory reset | `reboot_schedule`, `^NV=550`, `toggle_esim`, `factory_reset` |
 
@@ -367,9 +367,37 @@ WebSockets, without polling AT commands:
 - **`system_bridge`** (port 9002) uses QMI over QRTR for what DIAG does not
   carry: NR SINR, temperatures, SIM state and slot, IMEI/IMSI/ICCID,
   firmware, operator, APN; it also reports uptime, CPU, memory, link speed,
-  WAN address and the ping/DNS connectivity checks of `simpleadmin.conf`.
-  When `diag_bridge` is not connected, its QMI radio data (serving cells,
-  per-chain RSRP, active SCells) takes over.
+  hostname, kernel, `/data` usage, WAN address, the age of the data session
+  (the kernel's creation time of the WWAN address), the persistent data
+  counter and the connectivity checks of `simpleadmin.conf` (ping, DNS and a
+  captive portal probe). When `diag_bridge` is not connected, its QMI radio
+  data (serving cells, per-chain RSRP, active SCells) takes over.
+
+`system_bridge` keeps working while nobody is connected, for three things:
+the ping round every 10 s (pings only; DNS and the HTTP probe run while a
+page is open), a QMI signal sample every 10 s, and the data counter. A new
+client first gets a `history` message with the last 24 hours of ping
+latency and 30 minutes of signal, so the dashboard charts and the 24-hour
+latency chart of *Connection Monitoring* start full; the browser then keeps
+sampling as before. The background pings cost about 3 MB of mobile data a
+day.
+
+The captive portal probe fetches `SIMPLEADMIN_HTTP_PROBE`
+(`http://connectivitycheck.gstatic.com/generate_204` by default, empty
+disables it) with a plain HTTP/1.1 request and expects `204 No Content`; a
+redirect or a page means a login, billing or activation page intercepts web
+traffic: the internet status turns to *Carrier Limited* on the dashboard and
+*Connection Monitoring* says what answered.
+
+The data counter adds up the `rmnet_ipa0` byte counters (every data call,
+IPv4 and IPv6) across reboots, interface re-creations and 4 GiB wraps, saved
+to `/data/simpleadmin/data_usage` every 10 minutes and on stop; the reset
+button calls `cgi-bin/reset_data_usage`. It does not see what the IPA
+hardware forwards between the LAN and the modem without the kernel: read on
+the modem, `rmnet_ipa0` was exactly the sum of the `rmnet_dataN` counters
+plus the 8-byte QMAP header of each packet, so no offloaded byte is folded
+into it, and LAN traffic taking the offload path is missing from the total
+(see `TODO.md`).
 
 Signal Details names the radio source: **DIAG**, or **QMI** when
 `diag_bridge` is down, with the DIAG-only details (DL/UL rows, per-chain SINR,
@@ -395,7 +423,7 @@ while a page is open, and counts a change once it has held for a few
 snapshots. LTE SCells come from the RRC configuration (or QMI):
 this firmware does not always measure them, so their RSRP/SINR can be
 missing. Both sockets close while the tab is hidden, and the bridges only
-poll the modem while someone is connected.
+poll the modem for their snapshots while someone is connected.
 
 `system_bridge` is also the AT client: `/usr/bin/atcli_smd8` links to it
 (the firmware's client is kept as `/usr/bin/atcli_smd8.real`). It takes an
