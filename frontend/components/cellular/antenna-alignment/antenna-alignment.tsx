@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { PageShell } from "@/components/page-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBridgeState, useNow } from "@/hooks/use-bridge";
@@ -10,6 +11,7 @@ import { AlignmentMeterCard } from "./alignment-meter";
 import { AntennaChainCard } from "./antenna-card";
 
 export default function AntennaAlignmentComponent() {
+  const { t } = useTranslation("antenna");
   const state = useBridgeState();
   const now = useNow();
   const { snapshot } = useMemo(() => pickRadio(state, now), [state, now]);
@@ -18,8 +20,8 @@ export default function AntennaAlignmentComponent() {
 
   return (
     <PageShell
-      title="Antenna Alignment"
-      description="Record antenna angles or positions and compare them: each recording averages five seconds of the serving cells' RSRP and SINR, and the best one is recommended. The cards below show what each receive chain sees live."
+      title={t("alignment.page.title")}
+      description={t("alignment.page.description")}
     >
       {!started && !snapshot ? (
         <>
@@ -36,8 +38,8 @@ export default function AntennaAlignmentComponent() {
               className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive @3xl/main:col-span-2"
             >
               {linked
-                ? "The modem reports no serving cell right now. Recording waits until it has one."
-                : "No live radio data: the bridges are not connected. Recording waits until data comes back."}
+                ? t("alignment.no_serving_cell_alert")
+                : t("alignment.no_data_alert")}
             </div>
           )}
           <AlignmentMeterCard snapshot={snapshot} history={state.radioHistory} />

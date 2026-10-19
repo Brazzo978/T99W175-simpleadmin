@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { RadioTowerIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { getValueColorClass } from "@/components/dashboard/signal-card-utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,6 +39,7 @@ import {
 } from "@/types/modem-status";
 import {
   CHAINS,
+  CHAIN_NAME_KEYS,
   activeChains,
   chainStats,
   chainValue,
@@ -66,11 +68,14 @@ export interface CellMetric {
 
 /** The card a RAT gets when the modem has no cell of it. */
 export function NoCellCard({ title, rat }: { title: string; rat: Rat }) {
+  const { t } = useTranslation("antenna");
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>Per-chain RSRP and {rat === "nr" ? "SNR" : "SINR"}.</CardDescription>
+        <CardDescription>
+          {t("statistics.no_cell.description", { metric: rat === "nr" ? "SNR" : "SINR" })}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Empty className="border bg-muted/30">
@@ -78,11 +83,15 @@ export function NoCellCard({ title, rat }: { title: string; rat: Rat }) {
             <EmptyMedia variant="icon">
               <RadioTowerIcon />
             </EmptyMedia>
-            <EmptyTitle>{rat === "nr" ? "No 5G cell" : "No LTE cell"}</EmptyTitle>
+            <EmptyTitle>
+              {rat === "nr"
+                ? t("statistics.no_cell.title_nr")
+                : t("statistics.no_cell.title_lte")}
+            </EmptyTitle>
             <EmptyDescription className="max-w-xs text-pretty">
               {rat === "nr"
-                ? "Chains appear while the modem uses a 5G NR cell (NSA or SA)."
-                : "Chains appear while the modem is attached to an LTE cell."}
+                ? t("statistics.no_cell.hint_nr")
+                : t("statistics.no_cell.hint_lte")}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -111,6 +120,7 @@ export function LiveChainsCard({
   metrics: CellMetric[];
   footnote?: string;
 }) {
+  const { t } = useTranslation("antenna");
   // A RAT whose chains never carry SINR/SNR gets RSRP rows only.
   const hasSinr = CHAINS.some((_, i) => chainValue(sinr, i) !== null);
   return (
@@ -120,7 +130,10 @@ export function LiveChainsCard({
         <CardDescription>{description}</CardDescription>
         <CardAction>
           <Badge variant="outline" className="tabular-nums">
-            {activeChains(mask)} of 4 chains
+            {t("statistics.live.chains_badge", {
+              active: activeChains(mask),
+              total: CHAINS.length,
+            })}
           </Badge>
         </CardAction>
       </CardHeader>
@@ -133,12 +146,17 @@ export function LiveChainsCard({
         <div className="grid gap-3 @xl/card:grid-cols-2">
           {CHAINS.map((port, i) => {
             const active = isChainActive(mask, i);
-            const name = `${port.name} (${port.rx})`;
+            const portName = t(CHAIN_NAME_KEYS[i]);
+            const name = `${portName} (${port.rx})`;
             return (
               <div
                 key={port.rx}
                 role="group"
-                aria-label={`${name}, ${active ? "in use" : "not used"}`}
+                aria-label={
+                  active
+                    ? t("statistics.live.chain_in_use_aria", { name })
+                    : t("statistics.live.chain_not_used_aria", { name })
+                }
                 className={cn(
                   "grid content-start gap-2 rounded-lg border p-3 transition-opacity",
                   !active && "opacity-60",
@@ -146,7 +164,7 @@ export function LiveChainsCard({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-baseline gap-1.5">
-                    <span className="font-medium">{port.name}</span>
+                    <span className="font-medium">{portName}</span>
                     <span className="text-xs text-muted-foreground">{port.rx}</span>
                   </span>
                   <ChainStatusBadge active={active} />
@@ -192,6 +210,7 @@ export function ChainStatsCard({
   rat: Rat;
   samples: RadioSample[];
 }) {
+  const { t } = useTranslation("antenna");
   const [metric, setMetric] = useState<ChainMetric>("rsrp");
   const sinrLabel = rat === "nr" ? "SNR" : "SINR";
   const def =
@@ -207,17 +226,15 @@ export function ChainStatsCard({
   const emptyHint =
     metric === "sinr"
       ? rat === "nr"
-        ? " Not every firmware logs the per-chain SNR."
-        : " Per-chain SINR comes from DIAG only."
+        ? t("statistics.stats.empty_hint_nr")
+        : t("statistics.stats.empty_hint_lte")
       : "";
   return (
     <Card className="@container/card">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>
-          {def.label} of each chain over the window, {cellSamples} sample
-          {cellSamples === 1 ? "" : "s"}: the bar spans the 10th to 90th
-          percentile, the tick marks the median.
+          {t("statistics.stats.description", { metric: def.label, count: cellSamples })}
         </CardDescription>
         <CardAction>
           <ToggleGroup
@@ -226,7 +243,7 @@ export function ChainStatsCard({
             size="sm"
             value={metric}
             onValueChange={(v) => v && setMetric(v as ChainMetric)}
-            aria-label={`${title} metric`}
+            aria-label={t("statistics.stats.metric_aria", { title })}
           >
             <ToggleGroupItem value="rsrp" className="px-2.5">
               RSRP
@@ -240,20 +257,22 @@ export function ChainStatsCard({
       <CardContent className="grid gap-4">
         {reported.length === 0 ? (
           <div className="flex h-40 items-center justify-center rounded-lg border bg-muted/30 px-4 text-center text-sm text-muted-foreground">
-            No per-chain {def.label} samples in this window.{emptyHint}
+            {t("statistics.stats.empty", { metric: def.label })}
+            {emptyHint ? ` ${emptyHint}` : ""}
           </div>
         ) : (
           <>
             <div className="grid gap-2">
               {chains.map((c) => {
                 const port = CHAINS[c.index];
-                const name = `${port.name} (${port.rx})`;
+                const portName = t(CHAIN_NAME_KEYS[c.index]);
+                const name = `${portName} (${port.rx})`;
                 return (
                   <div
                     key={port.rx}
                     className="grid grid-cols-[5.5rem_1fr_4.5rem] items-center gap-3 text-sm"
                   >
-                    <span className="truncate text-muted-foreground">{port.name}</span>
+                    <span className="truncate text-muted-foreground">{portName}</span>
                     {c.summary ? (
                       <RangeStrip
                         summary={c.summary}
@@ -263,7 +282,9 @@ export function ChainStatsCard({
                         name={name}
                       />
                     ) : (
-                      <span className="text-xs text-muted-foreground">Not reported</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t("statistics.stats.not_reported")}
+                      </span>
                     )}
                     <span className="text-right tabular-nums">
                       {c.summary ? c.summary.median.toFixed(1) : "—"}
@@ -278,19 +299,25 @@ export function ChainStatsCard({
                   <span>{def.unit}</span>
                   <span>{domain[1]}</span>
                 </span>
-                <span className="text-right">median</span>
+                <span className="text-right">{t("statistics.stats.median")}</span>
               </div>
             </div>
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="h-8 text-xs">Chain</TableHead>
-                  <TableHead className="h-8 text-right text-xs">Mean</TableHead>
-                  <TableHead className="hidden h-8 text-right text-xs @sm/card:table-cell">
-                    Std dev
+                  <TableHead className="h-8 text-xs">{t("statistics.stats.chain")}</TableHead>
+                  <TableHead className="h-8 text-right text-xs">
+                    {t("statistics.stats.mean")}
                   </TableHead>
-                  <TableHead className="h-8 text-right text-xs">vs Main</TableHead>
-                  <TableHead className="h-8 text-right text-xs">Seen</TableHead>
+                  <TableHead className="hidden h-8 text-right text-xs @sm/card:table-cell">
+                    {t("statistics.stats.std_dev")}
+                  </TableHead>
+                  <TableHead className="h-8 text-right text-xs">
+                    {t("statistics.stats.vs_main")}
+                  </TableHead>
+                  <TableHead className="h-8 text-right text-xs">
+                    {t("statistics.stats.seen")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -300,7 +327,7 @@ export function ChainStatsCard({
                   return (
                     <TableRow key={port.rx}>
                       <TableCell className="py-1.5">
-                        {port.name}{" "}
+                        {t(CHAIN_NAME_KEYS[c.index])}{" "}
                         <span className="text-xs text-muted-foreground">{port.rx}</span>
                       </TableCell>
                       <TableCell
@@ -316,7 +343,9 @@ export function ChainStatsCard({
                       </TableCell>
                       <TableCell className="py-1.5 text-right tabular-nums">
                         {c.index === 0 ? (
-                          <span className="text-muted-foreground">ref</span>
+                          <span className="text-muted-foreground">
+                            {t("statistics.stats.ref")}
+                          </span>
                         ) : c.vsMain !== null ? (
                           signed(c.vsMain)
                         ) : (
@@ -332,9 +361,7 @@ export function ChainStatsCard({
               </TableBody>
             </Table>
             <p className="text-xs text-muted-foreground">
-              Values in {def.unit}. vs Main is the mean gap to the Main chain
-              over the samples where both report; Seen is the share of the
-              window&apos;s samples in which the chain reported.
+              {t("statistics.stats.footnote", { unit: def.unit })}
             </p>
           </>
         )}

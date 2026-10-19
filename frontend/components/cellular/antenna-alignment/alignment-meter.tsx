@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import type { TFunction } from "i18next";
+import { Trans, useTranslation } from "react-i18next";
 import {
   CheckCircle2Icon,
   CircleDotIcon,
@@ -69,6 +71,15 @@ interface RecorderState extends StoredAlignment {
 
 const slotLabel = (s: StoredAlignment, slot: number) =>
   s.labels[s.antennaType][slot].trim() || DEFAULT_LABELS[s.antennaType][slot];
+
+/** A slot label as shown: the default position names ("Position A", kept
+ *  in English in storage) in the current language, a typed label as is. */
+function labelText(t: TFunction<"antenna">, label: string): string {
+  const i = DEFAULT_LABELS.omni.indexOf(label);
+  return i < 0
+    ? label
+    : t("alignment.default_position", { letter: String.fromCharCode(65 + i) });
+}
 
 function useRecorder() {
   const [state, setState] = useState<RecorderState>(() => ({
@@ -212,15 +223,16 @@ function RatBars({
 }
 
 function LivePreview({ snapshot }: { snapshot: DiagSnapshot | null }) {
+  const { t } = useTranslation("antenna");
   const pcell = snapshot?.lte.find((c) => !c.is_scell);
   const nr = snapshot?.nr[0];
   return (
     <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
       <p className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-        Live signal
+        {t("alignment.live.title")}
       </p>
       {!pcell && !nr ? (
-        <p className="text-sm text-muted-foreground">Waiting for a serving cell.</p>
+        <p className="text-sm text-muted-foreground">{t("alignment.live.waiting")}</p>
       ) : (
         <div className="grid gap-4 @xl/card:grid-cols-2">
           {pcell && (
@@ -250,6 +262,7 @@ function chainLine(values: ChainValues): string {
 }
 
 function RecordedRat({ rat, reading }: { rat: RatKey; reading: RatReading }) {
+  const { t } = useTranslation("antenna");
   return (
     <div className="grid gap-1.5">
       <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
@@ -258,7 +271,7 @@ function RecordedRat({ rat, reading }: { rat: RatKey; reading: RatReading }) {
       </span>
       <RatBars rat={rat} rsrp={reading.rsrp} sinr={reading.sinr} />
       <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
-        Chains {chainLine(reading.rsrp_rx)} dBm
+        {t("alignment.chains_line", { values: chainLine(reading.rsrp_rx) })}
       </span>
     </div>
   );
@@ -293,19 +306,24 @@ function SlotRegion({
   onCancel: () => void;
   onClear: () => void;
 }) {
+  const { t } = useTranslation("antenna");
   const shown = recording ? recording.label : label;
   const status = isRecording
-    ? "recording"
+    ? t("alignment.slot.status_recording")
     : recording
       ? isBest
-        ? "recorded, best result"
-        : "recorded"
-      : "not recorded";
+        ? t("alignment.slot.status_best")
+        : t("alignment.slot.status_recorded")
+      : t("alignment.slot.status_not_recorded");
   const Icon = antennaType === "directional" ? CompassIcon : MapPinIcon;
   return (
     <div
       role="region"
-      aria-label={`Slot ${index + 1}: ${shown || DEFAULT_LABELS[antennaType][index]}, ${status}`}
+      aria-label={t("alignment.slot.aria", {
+        index: index + 1,
+        label: labelText(t, shown || DEFAULT_LABELS[antennaType][index]),
+        status,
+      })}
       className={cn(
         "relative grid content-start gap-3 rounded-xl border p-4 transition-colors",
         isRecording && "border-info/40 bg-info/5",
@@ -316,19 +334,23 @@ function SlotRegion({
         <div className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2">
           <Badge className="gap-1">
             <TrophyIcon className="size-3" />
-            Best
+            {t("alignment.slot.best")}
           </Badge>
         </div>
       )}
       <div className="flex items-center gap-2">
         <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         <Input
-          value={shown}
+          value={labelText(t, shown)}
           onChange={(e) => onLabel(e.target.value)}
           disabled={isRecording || recording !== null}
           className="h-8 px-2 text-sm font-medium"
-          placeholder={DEFAULT_LABELS[antennaType][index]}
-          aria-label={`Slot ${index + 1} ${antennaType === "directional" ? "angle" : "position"}`}
+          placeholder={labelText(t, DEFAULT_LABELS[antennaType][index])}
+          aria-label={
+            antennaType === "directional"
+              ? t("alignment.slot.angle_aria", { index: index + 1 })
+              : t("alignment.slot.position_aria", { index: index + 1 })
+          }
           maxLength={32}
         />
         {recording && !isRecording && (
@@ -336,7 +358,7 @@ function SlotRegion({
             variant="ghost"
             size="icon-sm"
             className="shrink-0 text-muted-foreground hover:text-destructive"
-            aria-label={`Clear ${recording.label}`}
+            aria-label={t("alignment.slot.clear_aria", { label: labelText(t, recording.label) })}
             onClick={onClear}
           >
             <Trash2Icon />
@@ -350,7 +372,10 @@ function SlotRegion({
             <div className="flex items-center gap-2">
               <Loader2Icon className="size-4 animate-spin text-info" aria-hidden />
               <span className="text-xs text-muted-foreground tabular-nums">
-                Sample {Math.min(collected + 1, SAMPLES_PER_RECORDING)} of {SAMPLES_PER_RECORDING}
+                {t("alignment.slot.sample_progress", {
+                  current: Math.min(collected + 1, SAMPLES_PER_RECORDING),
+                  total: SAMPLES_PER_RECORDING,
+                })}
               </span>
             </div>
             <div className="flex gap-1.5" aria-hidden>
@@ -366,7 +391,7 @@ function SlotRegion({
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={onCancel}>
-            Cancel
+            {t("common:actions.cancel")}
           </Button>
         </div>
       )}
@@ -378,11 +403,16 @@ function SlotRegion({
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <CheckCircle2Icon className="size-3 text-success" aria-hidden />
-              Recorded {timeTick(recording.ts)}
+              {t("alignment.slot.recorded_at", { time: timeTick(recording.ts) })}
             </span>
             {score !== null && (
               <span className="tabular-nums">
-                Score <span className="font-semibold text-foreground">{score.toFixed(0)}</span> / 100
+                <Trans
+                  t={t}
+                  i18nKey="alignment.slot.score"
+                  values={{ score: score.toFixed(0) }}
+                  components={{ value: <span className="font-semibold text-foreground" /> }}
+                />
               </span>
             )}
           </div>
@@ -393,10 +423,14 @@ function SlotRegion({
         <div className="grid gap-3">
           <div className="flex items-center justify-center gap-2 py-3">
             <CircleDotIcon className="size-4 text-muted-foreground/50" aria-hidden />
-            <span className="text-xs text-muted-foreground">Not recorded</span>
+            <span className="text-xs text-muted-foreground">
+              {t("alignment.slot.not_recorded")}
+            </span>
           </div>
           <Button size="sm" onClick={onRecord} disabled={!canRecord}>
-            Record {antennaType === "directional" ? "angle" : "position"}
+            {antennaType === "directional"
+              ? t("alignment.slot.record_angle")
+              : t("alignment.slot.record_position")}
           </Button>
         </div>
       )}
@@ -415,6 +449,7 @@ export function AlignmentMeterCard({
   snapshot: DiagSnapshot | null;
   history: RadioSample[];
 }) {
+  const { t } = useTranslation("antenna");
   const { state, start, cancel, clear, reset, setType, setLabel } = useRecorder();
   const { antennaType, labels, slots, active } = state;
   const collected = active
@@ -430,14 +465,37 @@ export function AlignmentMeterCard({
     cmp.best !== null && cmp.second !== null
       ? Math.round(cmp.scores[cmp.best]!) - Math.round(cmp.scores[cmp.second]!)
       : null;
+  const advice = [
+    margin !== null && cmp.second !== null
+      ? t(`alignment.recommendation.highest_${noun}_ahead`, {
+          count: margin,
+          label: labelText(t, slots[cmp.second]!.label),
+        })
+      : t(`alignment.recommendation.highest_${noun}`),
+    margin !== null && margin < 3 ? t("alignment.recommendation.within_noise") : null,
+    cmp.mixedCells ? t("alignment.recommendation.mixed_cells") : null,
+    recorded < SLOT_COUNT
+      ? t("alignment.recommendation.remaining", { count: SLOT_COUNT - recorded })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const basis = cmp.basis
+    .map(({ rat, sinr }) =>
+      t(sinr ? "alignment.basis.rsrp_sinr" : "alignment.basis.rsrp", {
+        rat: rat === "lte" ? "LTE" : "5G",
+      }),
+    )
+    .join(", ");
 
   return (
     <Card className="@container/card @3xl/main:col-span-2">
       <CardHeader>
-        <CardTitle>Alignment Meter</CardTitle>
+        <CardTitle>{t("alignment.meter.title")}</CardTitle>
         <CardDescription>
-          Record three {noun}s to find the best {antennaType === "directional" ? "aim" : "placement"}.
-          Each recording averages {SAMPLES_PER_RECORDING} one-second samples of the serving cells.
+          {antennaType === "directional"
+            ? t("alignment.meter.description_directional", { samples: SAMPLES_PER_RECORDING })
+            : t("alignment.meter.description_omni", { samples: SAMPLES_PER_RECORDING })}
         </CardDescription>
         {mode && (
           <CardAction>
@@ -446,7 +504,11 @@ export function AlignmentMeterCard({
         )}
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Alignment meter">
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="toolbar"
+          aria-label={t("alignment.meter.toolbar_aria")}
+        >
           <ToggleGroup
             type="single"
             variant="outline"
@@ -454,15 +516,15 @@ export function AlignmentMeterCard({
             value={antennaType}
             onValueChange={(v) => v && setType(v as AntennaType)}
             disabled={active !== null}
-            aria-label="Antenna type"
+            aria-label={t("alignment.meter.antenna_type_aria")}
           >
             <ToggleGroupItem value="directional" className="px-3">
               <CompassIcon />
-              Directional
+              {t("alignment.meter.directional")}
             </ToggleGroupItem>
             <ToggleGroupItem value="omni" className="px-3">
               <MapPinIcon />
-              Omni
+              {t("alignment.meter.omni")}
             </ToggleGroupItem>
           </ToggleGroup>
           <Button
@@ -473,7 +535,7 @@ export function AlignmentMeterCard({
             disabled={active !== null || recorded === 0}
           >
             <RotateCcwIcon />
-            Reset
+            {t("alignment.meter.reset")}
           </Button>
         </div>
 
@@ -515,24 +577,10 @@ export function AlignmentMeterCard({
                 <TrophyIcon className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
                 <div className="grid gap-1">
                   <p className="text-sm font-semibold">
-                    Recommended: <span className="text-primary">{best.label}</span>
+                    {t("alignment.recommendation.label")}{" "}
+                    <span className="text-primary">{labelText(t, best.label)}</span>
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    This {noun} scored highest
-                    {margin !== null && cmp.second !== null
-                      ? `, ${margin} point${margin === 1 ? "" : "s"} ahead of ${slots[cmp.second]!.label}`
-                      : ""}
-                    .
-                    {margin !== null && margin < 3
-                      ? " The gap is within normal signal fluctuation: record again to confirm."
-                      : ""}
-                    {cmp.mixedCells
-                      ? " The slots were recorded on different serving cells, so part of the difference comes from the cell, not the antenna."
-                      : ""}
-                    {recorded < SLOT_COUNT
-                      ? ` Record the remaining ${SLOT_COUNT - recorded} slot${SLOT_COUNT - recorded > 1 ? "s" : ""} for a fuller comparison.`
-                      : ""}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{advice}</p>
                 </div>
               </div>
             </motion.div>
@@ -546,17 +594,16 @@ export function AlignmentMeterCard({
               className="text-sm text-muted-foreground"
             >
               {recorded >= 2
-                ? "The recorded slots share no measurement to compare."
-                : `Record at least two ${noun}s to get a recommendation.`}
+                ? t("alignment.hint.no_common")
+                : t(`alignment.hint.record_two_${noun}`)}
             </motion.p>
           )}
         </AnimatePresence>
 
         <p className="text-xs text-muted-foreground">
-          Score 0 to 100: 60% RSRP (−140 to −44 dBm) and 40% SINR (−20 to 30 dB),
-          averaged over what every recorded slot measured
-          {cmp.basis ? ` (now: ${cmp.basis})` : ""}. Chains lists the RSRP of Main,
-          Diversity, MIMO 3 and MIMO 4.
+          {basis
+            ? t("alignment.footer.score_basis", { basis })
+            : t("alignment.footer.score")}
         </p>
       </CardContent>
     </Card>

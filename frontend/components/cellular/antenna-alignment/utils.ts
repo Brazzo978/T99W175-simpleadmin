@@ -125,8 +125,9 @@ export interface SlotComparison {
   best: number | null;
   /** Runner-up, to say how clear the win is */
   second: number | null;
-  /** What the score was computed on, e.g. "LTE RSRP and SINR, 5G RSRP" */
-  basis: string;
+  /** What the score was computed on: per RAT, RSRP and whether SINR too
+   *  (shown as "LTE RSRP and SINR, 5G RSRP"); empty when nothing compares */
+  basis: { rat: RatKey; sinr: boolean }[];
   /** A compared RAT was recorded on different serving cells */
   mixedCells: boolean;
 }
@@ -160,9 +161,7 @@ export function compareSlots(slots: (Recording | null)[]): SlotComparison {
     scores,
     best: enough ? ranked[0] : null,
     second: enough ? ranked[1] : null,
-    basis: rats
-      .map(({ rat, sinr }) => `${rat === "lte" ? "LTE" : "5G"} RSRP${sinr ? " and SINR" : ""}`)
-      .join(", "),
+    basis: rats,
     mixedCells: rats.some(
       ({ rat }) => new Set(recorded.map((i) => slots[i]![rat]!.cell)).size > 1,
     ),

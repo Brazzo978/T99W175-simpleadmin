@@ -16,6 +16,23 @@ import { summarize, type Rat, type Summary } from "../signal/metrics";
 
 export const CHAINS = ANTENNA_PORTS;
 
+/** Keys of the chain names ("Main", "Diversity", ...) in the antenna
+ *  namespace, in CHAINS order. */
+export const CHAIN_NAME_KEYS = [
+  "chains.name.main",
+  "chains.name.diversity",
+  "chains.name.mimo3",
+  "chains.name.mimo4",
+] as const;
+
+/** Keys of what each chain does, in CHAINS order. */
+export const CHAIN_ROLE_KEYS = [
+  "chains.role.main",
+  "chains.role.diversity",
+  "chains.role.mimo3",
+  "chains.role.mimo4",
+] as const;
+
 /** Above this RSRP gap one chain is clearly weaker than the others: a loose
  *  connector, a damaged cable or an antenna element facing elsewhere. */
 export const SPREAD_UNEVEN_DB = 6;

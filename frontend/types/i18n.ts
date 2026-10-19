@@ -9,7 +9,8 @@ export type Namespace =
   | "common"
   | "sidebar"
   | "dashboard"
-  | "signal";
+  | "signal"
+  | "antenna";
 
 export interface LanguageMeta {
   code: LanguageCode;

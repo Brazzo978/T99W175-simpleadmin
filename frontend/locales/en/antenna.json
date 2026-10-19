@@ -1,0 +1,150 @@
+{
+  "chains": {
+    "name": {
+      "main": "Main",
+      "diversity": "Diversity",
+      "mimo3": "MIMO 3",
+      "mimo4": "MIMO 4"
+    },
+    "role": {
+      "main": "Primary receive chain",
+      "diversity": "Diversity receive chain",
+      "mimo3": "First MIMO receive chain",
+      "mimo4": "Second MIMO receive chain"
+    },
+    "in_use": "In use",
+    "not_used": "Not used",
+    "spread": {
+      "text": "RSRP spread <value>{{spread}} dB</value>, strongest {{best}}, weakest {{worst}}",
+      "uneven": "Uneven",
+      "balanced": "Balanced"
+    },
+    "range": {
+      "aria": "{{name}}: median {{median}}, 10th to 90th percentile {{p10}} to {{p90}}",
+      "median": "Median {{value}}",
+      "p10_p90": "P10 to P90 {{p10}} to {{p90}}",
+      "min_max": "Min {{min}}, max {{max}}",
+      "samples_one": "{{count}} sample",
+      "samples_other": "{{count}} samples"
+    }
+  },
+  "statistics": {
+    "page": {
+      "title": "Antenna Statistics",
+      "description": "Each receive chain of the LTE primary cell and of the 5G cell: which ones the modem uses, their live RSRP and SINR, and how they spread over the last minutes. Which connector feeds which chain depends on the band."
+    },
+    "lte_title": "LTE Primary Cell",
+    "nr_nsa_title": "5G NSA Cell",
+    "nr_primary_title": "5G Primary Cell",
+    "nr_title": "5G NR Cell",
+    "lte_description": "Band {{band}} · EARFCN {{earfcn}} · PCI {{pci}}",
+    "nr_description": "NR-ARFCN {{arfcn}} · PCI {{pci}}",
+    "nr_description_band": "Band n{{band}} · NR-ARFCN {{arfcn}} · PCI {{pci}}",
+    "snr_best": "SNR (best)",
+    "rrc_report_age": "RRC report, {{age}} s ago",
+    "qmi_footnote": "QMI reports the per-chain RSRP only: the per-chain SINR needs diag_bridge.",
+    "no_nr_chain_snr": "No per-chain SNR reported: not every firmware logs it. The cell SINR comes from QMI or the last RRC measurement report.",
+    "lte_stats_title": "LTE chain statistics",
+    "nr_stats_title": "5G chain statistics",
+    "no_cell": {
+      "description": "Per-chain RSRP and {{metric}}.",
+      "title_lte": "No LTE cell",
+      "title_nr": "No 5G cell",
+      "hint_lte": "Chains appear while the modem is attached to an LTE cell.",
+      "hint_nr": "Chains appear while the modem uses a 5G NR cell (NSA or SA)."
+    },
+    "live": {
+      "chains_badge": "{{active}} of {{total}} chains",
+      "chain_in_use_aria": "{{name}}, in use",
+      "chain_not_used_aria": "{{name}}, not used"
+    },
+    "stats": {
+      "description_one": "{{metric}} of each chain over the window, {{count}} sample: the bar spans the 10th to 90th percentile, the tick marks the median.",
+      "description_other": "{{metric}} of each chain over the window, {{count}} samples: the bar spans the 10th to 90th percentile, the tick marks the median.",
+      "metric_aria": "{{title}} metric",
+      "empty": "No per-chain {{metric}} samples in this window.",
+      "empty_hint_nr": "Not every firmware logs the per-chain SNR.",
+      "empty_hint_lte": "Per-chain SINR comes from DIAG only.",
+      "not_reported": "Not reported",
+      "median": "median",
+      "chain": "Chain",
+      "mean": "Mean",
+      "std_dev": "Std dev",
+      "vs_main": "vs Main",
+      "seen": "Seen",
+      "ref": "ref",
+      "footnote": "Values in {{unit}}. vs Main is the mean gap to the Main chain over the samples where both report; Seen is the share of the window's samples in which the chain reported."
+    }
+  },
+  "alignment": {
+    "page": {
+      "title": "Antenna Alignment",
+      "description": "Record antenna angles or positions and compare them: each recording averages five seconds of the serving cells' RSRP and SINR, and the best one is recommended. The cards below show what each receive chain sees live."
+    },
+    "no_serving_cell_alert": "The modem reports no serving cell right now. Recording waits until it has one.",
+    "no_data_alert": "No live radio data: the bridges are not connected. Recording waits until data comes back.",
+    "chain_card": {
+      "not_used": "not used",
+      "no_serving_cell": "No serving cell."
+    },
+    "default_position": "Position {{letter}}",
+    "live": {
+      "title": "Live signal",
+      "waiting": "Waiting for a serving cell."
+    },
+    "chains_line": "Chains {{values}} dBm",
+    "slot": {
+      "aria": "Slot {{index}}: {{label}}, {{status}}",
+      "status_recording": "recording",
+      "status_best": "recorded, best result",
+      "status_recorded": "recorded",
+      "status_not_recorded": "not recorded",
+      "best": "Best",
+      "angle_aria": "Slot {{index}} angle",
+      "position_aria": "Slot {{index}} position",
+      "clear_aria": "Clear {{label}}",
+      "sample_progress": "Sample {{current}} of {{total}}",
+      "recorded_at": "Recorded {{time}}",
+      "score": "Score <value>{{score}}</value> / 100",
+      "not_recorded": "Not recorded",
+      "record_angle": "Record angle",
+      "record_position": "Record position"
+    },
+    "meter": {
+      "title": "Alignment Meter",
+      "description_directional": "Record three angles to find the best aim. Each recording averages {{samples}} one-second samples of the serving cells.",
+      "description_omni": "Record three positions to find the best placement. Each recording averages {{samples}} one-second samples of the serving cells.",
+      "toolbar_aria": "Alignment meter",
+      "antenna_type_aria": "Antenna type",
+      "directional": "Directional",
+      "omni": "Omni",
+      "reset": "Reset"
+    },
+    "recommendation": {
+      "label": "Recommended:",
+      "highest_angle": "This angle scored highest.",
+      "highest_position": "This position scored highest.",
+      "highest_angle_ahead_one": "This angle scored highest, {{count}} point ahead of {{label}}.",
+      "highest_angle_ahead_other": "This angle scored highest, {{count}} points ahead of {{label}}.",
+      "highest_position_ahead_one": "This position scored highest, {{count}} point ahead of {{label}}.",
+      "highest_position_ahead_other": "This position scored highest, {{count}} points ahead of {{label}}.",
+      "within_noise": "The gap is within normal signal fluctuation: record again to confirm.",
+      "mixed_cells": "The slots were recorded on different serving cells, so part of the difference comes from the cell, not the antenna.",
+      "remaining_one": "Record the remaining {{count}} slot for a fuller comparison.",
+      "remaining_other": "Record the remaining {{count}} slots for a fuller comparison."
+    },
+    "hint": {
+      "no_common": "The recorded slots share no measurement to compare.",
+      "record_two_angle": "Record at least two angles to get a recommendation.",
+      "record_two_position": "Record at least two positions to get a recommendation."
+    },
+    "basis": {
+      "rsrp": "{{rat}} RSRP",
+      "rsrp_sinr": "{{rat}} RSRP and SINR"
+    },
+    "footer": {
+      "score": "Score 0 to 100: 60% RSRP (−140 to −44 dBm) and 40% SINR (−20 to 30 dB), averaged over what every recorded slot measured. Chains lists the RSRP of Main, Diversity, MIMO 3 and MIMO 4.",
+      "score_basis": "Score 0 to 100: 60% RSRP (−140 to −44 dBm) and 40% SINR (−20 to 30 dB), averaged over what every recorded slot measured (now: {{basis}}). Chains lists the RSRP of Main, Diversity, MIMO 3 and MIMO 4."
+    }
+  }
+}

@@ -1,0 +1,150 @@
+{
+  "chains": {
+    "name": {
+      "main": "Principale",
+      "diversity": "Diversità",
+      "mimo3": "MIMO 3",
+      "mimo4": "MIMO 4"
+    },
+    "role": {
+      "main": "Catena di ricezione principale",
+      "diversity": "Catena di ricezione in diversità",
+      "mimo3": "Prima catena di ricezione MIMO",
+      "mimo4": "Seconda catena di ricezione MIMO"
+    },
+    "in_use": "In uso",
+    "not_used": "Non usata",
+    "spread": {
+      "text": "Scarto RSRP <value>{{spread}} dB</value>, più forte {{best}}, più debole {{worst}}",
+      "uneven": "Sbilanciato",
+      "balanced": "Bilanciato"
+    },
+    "range": {
+      "aria": "{{name}}: mediana {{median}}, dal 10° al 90° percentile da {{p10}} a {{p90}}",
+      "median": "Mediana {{value}}",
+      "p10_p90": "P10–P90 da {{p10}} a {{p90}}",
+      "min_max": "Min {{min}}, max {{max}}",
+      "samples_one": "{{count}} campione",
+      "samples_other": "{{count}} campioni"
+    }
+  },
+  "statistics": {
+    "page": {
+      "title": "Statistiche dell'antenna",
+      "description": "Ogni catena di ricezione della cella primaria LTE e della cella 5G: quali usa il modem, il loro RSRP e SINR in tempo reale e come si distribuiscono negli ultimi minuti. Quale connettore alimenta quale catena dipende dalla banda."
+    },
+    "lte_title": "Cella primaria LTE",
+    "nr_nsa_title": "Cella 5G NSA",
+    "nr_primary_title": "Cella primaria 5G",
+    "nr_title": "Cella 5G NR",
+    "lte_description": "Banda {{band}} · EARFCN {{earfcn}} · PCI {{pci}}",
+    "nr_description": "NR-ARFCN {{arfcn}} · PCI {{pci}}",
+    "nr_description_band": "Banda n{{band}} · NR-ARFCN {{arfcn}} · PCI {{pci}}",
+    "snr_best": "SNR (migliore)",
+    "rrc_report_age": "Report RRC, {{age}} s fa",
+    "qmi_footnote": "QMI riporta solo l'RSRP per catena: il SINR per catena richiede diag_bridge.",
+    "no_nr_chain_snr": "Nessun SNR per catena riportato: non tutti i firmware lo registrano. Il SINR della cella viene da QMI o dall'ultimo report di misura RRC.",
+    "lte_stats_title": "Statistiche delle catene LTE",
+    "nr_stats_title": "Statistiche delle catene 5G",
+    "no_cell": {
+      "description": "RSRP e {{metric}} per catena.",
+      "title_lte": "Nessuna cella LTE",
+      "title_nr": "Nessuna cella 5G",
+      "hint_lte": "Le catene compaiono quando il modem è agganciato a una cella LTE.",
+      "hint_nr": "Le catene compaiono quando il modem usa una cella 5G NR (NSA o SA)."
+    },
+    "live": {
+      "chains_badge": "{{active}} di {{total}} catene",
+      "chain_in_use_aria": "{{name}}, in uso",
+      "chain_not_used_aria": "{{name}}, non usata"
+    },
+    "stats": {
+      "description_one": "{{metric}} di ogni catena nella finestra, {{count}} campione: la barra va dal 10° al 90° percentile, la tacca indica la mediana.",
+      "description_other": "{{metric}} di ogni catena nella finestra, {{count}} campioni: la barra va dal 10° al 90° percentile, la tacca indica la mediana.",
+      "metric_aria": "{{title}}: metrica",
+      "empty": "Nessun campione di {{metric}} per catena in questa finestra.",
+      "empty_hint_nr": "Non tutti i firmware registrano l'SNR per catena.",
+      "empty_hint_lte": "Il SINR per catena arriva solo da DIAG.",
+      "not_reported": "Nessun valore",
+      "median": "mediana",
+      "chain": "Catena",
+      "mean": "Media",
+      "std_dev": "Dev. std",
+      "vs_main": "vs Principale",
+      "seen": "Presenza",
+      "ref": "rif.",
+      "footnote": "Valori in {{unit}}. vs Principale è lo scarto medio dalla catena Principale nei campioni in cui entrambe riportano un valore; Presenza è la quota dei campioni della finestra in cui la catena ha riportato un valore."
+    }
+  },
+  "alignment": {
+    "page": {
+      "title": "Allineamento dell'antenna",
+      "description": "Registra angoli o posizioni dell'antenna e confrontali: ogni registrazione fa la media di cinque secondi di RSRP e SINR delle celle serventi e viene consigliata la migliore. Le schede qui sotto mostrano in tempo reale cosa riceve ogni catena."
+    },
+    "no_serving_cell_alert": "Al momento il modem non riporta nessuna cella servente. La registrazione attende finché non ne ha una.",
+    "no_data_alert": "Nessun dato radio in tempo reale: i bridge non sono connessi. La registrazione attende il ritorno dei dati.",
+    "chain_card": {
+      "not_used": "non usata",
+      "no_serving_cell": "Nessuna cella servente."
+    },
+    "default_position": "Posizione {{letter}}",
+    "live": {
+      "title": "Segnale in tempo reale",
+      "waiting": "In attesa di una cella servente."
+    },
+    "chains_line": "Catene {{values}} dBm",
+    "slot": {
+      "aria": "Slot {{index}}: {{label}}, {{status}}",
+      "status_recording": "registrazione in corso",
+      "status_best": "registrato, risultato migliore",
+      "status_recorded": "registrato",
+      "status_not_recorded": "non registrato",
+      "best": "Migliore",
+      "angle_aria": "Angolo dello slot {{index}}",
+      "position_aria": "Posizione dello slot {{index}}",
+      "clear_aria": "Cancella {{label}}",
+      "sample_progress": "Campione {{current}} di {{total}}",
+      "recorded_at": "Registrato alle {{time}}",
+      "score": "Punteggio <value>{{score}}</value> / 100",
+      "not_recorded": "Non registrato",
+      "record_angle": "Registra angolo",
+      "record_position": "Registra posizione"
+    },
+    "meter": {
+      "title": "Misuratore di allineamento",
+      "description_directional": "Registra tre angoli per trovare il puntamento migliore. Ogni registrazione fa la media di {{samples}} campioni da un secondo delle celle serventi.",
+      "description_omni": "Registra tre posizioni per trovare il collocamento migliore. Ogni registrazione fa la media di {{samples}} campioni da un secondo delle celle serventi.",
+      "toolbar_aria": "Misuratore di allineamento",
+      "antenna_type_aria": "Tipo di antenna",
+      "directional": "Direttiva",
+      "omni": "Omni",
+      "reset": "Azzera"
+    },
+    "recommendation": {
+      "label": "Consigliato:",
+      "highest_angle": "Questo angolo ha il punteggio più alto.",
+      "highest_position": "Questa posizione ha il punteggio più alto.",
+      "highest_angle_ahead_one": "Questo angolo ha il punteggio più alto, con {{count}} punto di vantaggio su {{label}}.",
+      "highest_angle_ahead_other": "Questo angolo ha il punteggio più alto, con {{count}} punti di vantaggio su {{label}}.",
+      "highest_position_ahead_one": "Questa posizione ha il punteggio più alto, con {{count}} punto di vantaggio su {{label}}.",
+      "highest_position_ahead_other": "Questa posizione ha il punteggio più alto, con {{count}} punti di vantaggio su {{label}}.",
+      "within_noise": "Lo scarto rientra nella normale fluttuazione del segnale: registra di nuovo per conferma.",
+      "mixed_cells": "Gli slot sono stati registrati su celle serventi diverse, quindi parte della differenza dipende dalla cella e non dall'antenna.",
+      "remaining_one": "Registra lo slot rimanente per un confronto più completo.",
+      "remaining_other": "Registra i {{count}} slot rimanenti per un confronto più completo."
+    },
+    "hint": {
+      "no_common": "Gli slot registrati non hanno misure in comune da confrontare.",
+      "record_two_angle": "Registra almeno due angoli per ottenere un consiglio.",
+      "record_two_position": "Registra almeno due posizioni per ottenere un consiglio."
+    },
+    "basis": {
+      "rsrp": "RSRP {{rat}}",
+      "rsrp_sinr": "RSRP e SINR {{rat}}"
+    },
+    "footer": {
+      "score": "Punteggio da 0 a 100: 60% RSRP (da −140 a −44 dBm) e 40% SINR (da −20 a 30 dB), in media su ciò che ogni slot registrato ha misurato. La riga Catene riporta l'RSRP di Principale, Diversità, MIMO 3 e MIMO 4.",
+      "score_basis": "Punteggio da 0 a 100: 60% RSRP (da −140 a −44 dBm) e 40% SINR (da −20 a 30 dB), in media su ciò che ogni slot registrato ha misurato (ora: {{basis}}). La riga Catene riporta l'RSRP di Principale, Diversità, MIMO 3 e MIMO 4."
+    }
+  }
+}

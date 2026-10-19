@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardAction,
@@ -13,6 +14,8 @@ import type { ChainValues, DiagSnapshot } from "@/types/bridge";
 import { RSRP_THRESHOLDS, SINR_THRESHOLDS } from "@/types/modem-status";
 import {
   CHAINS,
+  CHAIN_NAME_KEYS,
+  CHAIN_ROLE_KEYS,
   chainMask,
   chainValue,
   isChainActive,
@@ -23,13 +26,6 @@ import {
   RSRP_RANGE,
   SINR_RANGE,
 } from "../antenna/chain-meters";
-
-const DESCRIPTIONS = [
-  "Primary receive chain",
-  "Diversity receive chain",
-  "First MIMO receive chain",
-  "Second MIMO receive chain",
-];
 
 function RatSection({
   title,
@@ -46,14 +42,17 @@ function RatSection({
   sinr: ChainValues | undefined;
   sinrLabel: "SINR" | "SNR";
 }) {
-  const name = `${CHAINS[index].name} (${CHAINS[index].rx})`;
+  const { t } = useTranslation("antenna");
+  const name = `${t(CHAIN_NAME_KEYS[index])} (${CHAINS[index].rx})`;
   // The SINR/SNR row only where the RAT reports it for some chain.
   const hasSinr = CHAINS.some((_, i) => chainValue(sinr, i) !== null);
   return (
     <div className={cn("grid gap-2 rounded-lg border p-3 transition-opacity", !active && "opacity-60")}>
       <span className="text-xs font-medium text-muted-foreground">
         {title}
-        {!active && <span className="font-normal"> · not used</span>}
+        {!active && (
+          <span className="font-normal"> · {t("alignment.chain_card.not_used")}</span>
+        )}
       </span>
       <ChainMeter
         label="RSRP"
@@ -85,6 +84,7 @@ export function AntennaChainCard({
   index: number;
   snapshot: DiagSnapshot | null;
 }) {
+  const { t } = useTranslation("antenna");
   const port = CHAINS[index];
   const pcell = snapshot?.lte.find((c) => !c.is_scell);
   const nr = snapshot?.nr[0];
@@ -97,9 +97,9 @@ export function AntennaChainCard({
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>{port.name}</CardTitle>
+        <CardTitle>{t(CHAIN_NAME_KEYS[index])}</CardTitle>
         <CardDescription>
-          {port.rx} · {DESCRIPTIONS[index]}
+          {port.rx} · {t(CHAIN_ROLE_KEYS[index])}
         </CardDescription>
         <CardAction>
           <ChainStatusBadge active={lteActive || nrActive} />
@@ -107,7 +107,9 @@ export function AntennaChainCard({
       </CardHeader>
       <CardContent className="grid gap-3">
         {!pcell && !nr && (
-          <p className="text-sm text-muted-foreground">No serving cell.</p>
+          <p className="text-sm text-muted-foreground">
+            {t("alignment.chain_card.no_serving_cell")}
+          </p>
         )}
         {pcell && (
           <RatSection
