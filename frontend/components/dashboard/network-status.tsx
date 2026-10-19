@@ -177,6 +177,21 @@ function buildInternetBadge(
         state,
         tooltip: null,
       };
+    case "limited": {
+      // system_bridge's captive portal probe got a redirect or a page.
+      const code = c?.limited_reason ?? null;
+      return {
+        cls: "bg-warning/15 text-warning hover:bg-warning/20 border-warning/30",
+        label: t("network.internet_limited"),
+        state,
+        tooltip:
+          code === null
+            ? t("network.internet_tooltip.limited_intercept")
+            : code >= 300 && code < 400
+              ? t("network.internet_tooltip.limited_redirect", { code })
+              : t("network.internet_tooltip.limited_http", { code }),
+      };
+    }
     case "disconnected":
       return {
         cls: "bg-destructive/15 text-destructive hover:bg-destructive/20 border-destructive/30",
@@ -337,6 +352,8 @@ const NetworkStatusComponent = ({
                     </span>
                   ) : b.state === "disconnected" ? (
                     <span className="inline-flex size-2 rounded-full shrink-0 bg-destructive" />
+                  ) : b.state === "limited" ? (
+                    <span className="inline-flex size-2 rounded-full shrink-0 bg-warning" />
                   ) : (
                     <span className="inline-flex size-2 rounded-full shrink-0 bg-muted-foreground" />
                   );

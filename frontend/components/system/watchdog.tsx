@@ -27,6 +27,7 @@ import {
   type WatchdogConfig,
 } from "@/hooks/use-watchdog";
 import { isValidIp } from "@/lib/ipv4";
+import ConnectivityStatusCard from "./connectivity-status";
 import LatencyHistoryCard from "./latency-history";
 
 function validate(c: WatchdogConfig): string | null {
@@ -70,6 +71,18 @@ function NumberField({
   );
 }
 
+/** Same rule as cgi-bin/set_connection_config. */
+const PROBE_URL = /^http:\/\/[A-Za-z0-9.-]+(:[0-9]{1,5})?(\/[A-Za-z0-9._~/?=%-]*)?$/;
+
+function validateChecks(c: ConnectionChecks): string | null {
+  const url = c.httpProbe.trim();
+  if (url && !PROBE_URL.test(url))
+    return "Captive portal probe: an http:// URL (letters, digits and . _ ~ / ? = % - only), or empty to disable it.";
+  if (!Number.isInteger(c.httpProbeTimeout) || c.httpProbeTimeout < 1 || c.httpProbeTimeout > 9)
+    return "Probe timeout: 1 to 9 seconds.";
+  return null;
+}
+
 function ConnectionChecksCard() {
   const { checks, isSaving, save } = useConnectionChecks();
   const [draft, setDraft] = useState<ConnectionChecks | null>(null);
@@ -77,7 +90,12 @@ function ConnectionChecksCard() {
 
   const handleSave = async () => {
     if (!form) return;
-    const result = await save(form);
+    const problem = validateChecks(form);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+    const result = await save({ ...form, httpProbe: form.httpProbe.trim() });
     if (result.ok) {
       toast.success("Connectivity checks saved");
       setDraft(null);
@@ -89,8 +107,9 @@ function ConnectionChecksCard() {
       <CardHeader>
         <CardTitle>Connectivity Checks</CardTitle>
         <CardDescription>
-          What the dashboard&apos;s internet status tests: pings, and DNS lookups
-          written as server:domain.
+          What the dashboard&apos;s internet status tests: pings, DNS lookups
+          written as server:domain, and an http:// URL that must answer 204
+          No Content (anything else means a captive portal; empty disables it).
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -112,6 +131,24 @@ function ConnectionChecksCard() {
                 id="chk-dns"
                 value={form.dnsTests}
                 onChange={(e) => setDraft({ ...form, dnsTests: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-4 @md/main:grid-cols-[1fr_10rem]">
+              <div className="grid gap-2">
+                <Label htmlFor="chk-http">Captive portal probe</Label>
+                <Input
+                  id="chk-http"
+                  placeholder="Disabled"
+                  value={form.httpProbe}
+                  onChange={(e) => setDraft({ ...form, httpProbe: e.target.value })}
+                />
+              </div>
+              <NumberField
+                id="chk-http-timeout"
+                label="Probe timeout"
+                suffix="s"
+                value={form.httpProbeTimeout}
+                onChange={(v) => setDraft({ ...form, httpProbeTimeout: v })}
               />
             </div>
           </>
@@ -163,6 +200,8 @@ export default function WatchdogComponent() {
       title="Connection Monitoring"
       description="How the connection is tested, and what the watchdog does when it fails: restart the radio or the modem."
     >
+      <ConnectivityStatusCard />
+
       <ConnectionChecksCard />
 
       <LatencyHistoryCard />

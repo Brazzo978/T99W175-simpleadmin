@@ -171,6 +171,7 @@ export function buildModemStatus(
 
   const cellState: ConnectionState = registered ? "connected" : "searching";
   const recent = state.latencyHistory.slice(-LATENCY_WINDOW);
+  const portal = system?.conn.portal ? system.conn.http : null;
   const latency = stats(recent);
   const ping = system?.conn.ping;
   const lossSamples = recent.length;
@@ -288,14 +289,16 @@ export function buildModemStatus(
       history_interval_sec: Math.round(state.latencyIntervalSec),
       history_size: recent.length,
       during_recovery: false,
-      state:
-        conn === "connected"
+      state: portal
+        ? "limited"
+        : conn === "connected"
           ? "connected"
           : conn === "disconnected"
             ? "disconnected"
             : "unknown",
       last_family: ping ? (ping.passed > 0 ? "ipv4" : "none") : null,
-      limited_reason: null,
+      // The HTTP code the captive portal probe got instead of 204.
+      limited_reason: portal?.code ?? null,
       down_reason: null,
       streak_limited: 0,
       profile: "standard",

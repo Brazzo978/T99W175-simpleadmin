@@ -377,7 +377,7 @@ export function worstSignalQuality(...qualities: SignalQuality[]): SignalQuality
 
 /** Daemon's authoritative tri-state connectivity outcome (from qmanager_ping.json's `connectivity` field).
     Post ICMP-port there is no "limited" (carrier-intercept) outcome — an ICMP ping either answers or it doesn't. */
-export type PingTriState = "connected" | "disconnected" | "unknown";
+export type PingTriState = "connected" | "limited" | "disconnected" | "unknown";
 
 /** User-selectable preset for high_latency / high_packet_loss event thresholds. */
 export type QualityPreset = "standard" | "tolerant" | "very-tolerant";

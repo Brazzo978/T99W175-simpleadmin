@@ -17,19 +17,25 @@ if [ -f "$CONFIG_FILE" ]; then
     . "$CONFIG_FILE"
 fi
 
-# Get values with defaults
+# Get values with defaults (an empty HTTP probe is "disabled", not unset)
 PING_TARGETS="${SIMPLEADMIN_PING_TARGETS:-8.8.8.8,1.1.1.1}"
 DNS_TESTS="${SIMPLEADMIN_DNS_TESTS:-8.8.8.8:www.google.com,1.1.1.1:www.google.com}"
+HTTP_PROBE="${SIMPLEADMIN_HTTP_PROBE-http://connectivitycheck.gstatic.com/generate_204}"
+HTTP_PROBE_TIMEOUT="${SIMPLEADMIN_HTTP_PROBE_TIMEOUT:-5}"
+case "$HTTP_PROBE_TIMEOUT" in ''|*[!0-9]*) HTTP_PROBE_TIMEOUT=5 ;; esac
 
 # Escape values for JSON
 PING_TARGETS_JSON=$(echo "$PING_TARGETS" | sed 's/"/\\"/g')
 DNS_TESTS_JSON=$(echo "$DNS_TESTS" | sed 's/"/\\"/g')
+HTTP_PROBE_JSON=$(echo "$HTTP_PROBE" | sed 's/"/\\"/g')
 
 # Build response
 response="{
   \"status\": \"success\",
   \"pingTargets\": \"$PING_TARGETS_JSON\",
-  \"dnsTests\": \"$DNS_TESTS_JSON\"
+  \"dnsTests\": \"$DNS_TESTS_JSON\",
+  \"httpProbe\": \"$HTTP_PROBE_JSON\",
+  \"httpProbeTimeout\": $HTTP_PROBE_TIMEOUT
 }"
 
 send_json_response 200 "$response"

@@ -28,12 +28,31 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
         PING_TARGETS=$(echo "$POST_DATA" | grep -o '"pingTargets":"[^"]*"' | cut -d'"' -f4)
         DNS_TESTS=$(echo "$POST_DATA" | grep -o '"dnsTests":"[^"]*"' | cut -d'"' -f4)
 
+        # The captive portal probe is optional in the request (older pages
+        # do not send it): absent keeps the current value, empty disables.
+        HAS_HTTP_PROBE=0
+        if echo "$POST_DATA" | grep -q '"httpProbe"'; then
+            HAS_HTTP_PROBE=1
+            HTTP_PROBE=$(echo "$POST_DATA" | grep -o '"httpProbe":"[^"]*"' | cut -d'"' -f4 || true)
+        fi
+        HTTP_PROBE_TIMEOUT=$(echo "$POST_DATA" | grep -o '"httpProbeTimeout":[0-9]*' | cut -d: -f2 || true)
+
         # Both values land inside double quotes in a file every CGI sources,
         # so allow only host/IP characters: no $, `, \, ", | or spaces.
         PING_TARGETS="${PING_TARGETS// /}"
         DNS_TESTS="${DNS_TESTS// /}"
         if ! [[ "$PING_TARGETS" =~ ^[A-Za-z0-9.:,_-]*$ ]] || ! [[ "$DNS_TESTS" =~ ^[A-Za-z0-9.:,_-]*$ ]]; then
             send_json_response 400 '{"status":"error","message":"Ping targets and DNS tests may only contain letters, digits and . : , _ -"}'
+            exit 0
+        fi
+        # The probe URL also goes through sed below: no & or | either.
+        if [ "$HAS_HTTP_PROBE" = 1 ] && [ -n "$HTTP_PROBE" ] &&
+           ! [[ "$HTTP_PROBE" =~ ^http://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/?=%-]*)?$ ]]; then
+            send_json_response 400 '{"status":"error","message":"The captive portal probe must be an http:// URL (letters, digits and . _ ~ / ? = % - only), or empty"}'
+            exit 0
+        fi
+        if [ -n "$HTTP_PROBE_TIMEOUT" ] && ! [[ "$HTTP_PROBE_TIMEOUT" =~ ^[1-9]$ ]]; then
+            send_json_response 400 '{"status":"error","message":"The probe timeout must be 1 to 9 seconds"}'
             exit 0
         fi
 
@@ -60,6 +79,25 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
             echo "" >> "$CONFIG_FILE"
             echo "# DNS tests: comma-separated list of server:domain pairs for DNS resolution tests" >> "$CONFIG_FILE"
             echo "SIMPLEADMIN_DNS_TESTS=\"$DNS_TESTS\"" >> "$CONFIG_FILE"
+        fi
+
+        if [ "$HAS_HTTP_PROBE" = 1 ]; then
+            if grep -q "^SIMPLEADMIN_HTTP_PROBE=" "$CONFIG_FILE"; then
+                sed -i "s|^SIMPLEADMIN_HTTP_PROBE=.*|SIMPLEADMIN_HTTP_PROBE=\"$HTTP_PROBE\"|" "$CONFIG_FILE"
+            else
+                echo "" >> "$CONFIG_FILE"
+                echo "# Captive portal probe: an http:// URL that answers 204; empty disables it" >> "$CONFIG_FILE"
+                echo "SIMPLEADMIN_HTTP_PROBE=\"$HTTP_PROBE\"" >> "$CONFIG_FILE"
+            fi
+        fi
+
+        if [ -n "$HTTP_PROBE_TIMEOUT" ]; then
+            if grep -q "^SIMPLEADMIN_HTTP_PROBE_TIMEOUT=" "$CONFIG_FILE"; then
+                sed -i "s|^SIMPLEADMIN_HTTP_PROBE_TIMEOUT=.*|SIMPLEADMIN_HTTP_PROBE_TIMEOUT=$HTTP_PROBE_TIMEOUT|" "$CONFIG_FILE"
+            else
+                echo "# Seconds the probe may take, 1 to 9." >> "$CONFIG_FILE"
+                echo "SIMPLEADMIN_HTTP_PROBE_TIMEOUT=$HTTP_PROBE_TIMEOUT" >> "$CONFIG_FILE"
+            fi
         fi
 
         send_json_response 200 '{"status":"success","message":"Configuration updated successfully"}'

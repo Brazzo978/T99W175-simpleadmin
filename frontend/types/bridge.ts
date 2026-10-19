@@ -225,6 +225,22 @@ export interface QmiRadio {
 }
 
 export type CheckStatus = "ok" | "warning" | "error";
+/** One check of the last round; pending: not run yet (or not in that round) */
+export type CheckResult = "ok" | "failed" | "pending";
+
+/** system_bridge's HTTP probe of the last full check round. */
+export interface HttpProbe {
+  url: string;
+  /** ok: 204 (or an empty 200); portal: any other answer; failed: none */
+  status: "ok" | "portal" | "failed" | "pending";
+  /** HTTP status code and time to the answer (ms), when there was one */
+  code?: number;
+  time?: number;
+  /** Why it failed: dns, connect, timeout, malformed, url */
+  reason?: string;
+  /** Redirect target of a portal */
+  location?: string;
+}
 
 /**
  * system_bridge's one-time message to a new client, sent before its first
@@ -287,7 +303,8 @@ export interface SystemSnapshot {
     resets: number;
   };
   conn: {
-    status: CheckStatus;
+    /** pending: no round has finished yet */
+    status: CheckStatus | "pending";
     pending: boolean;
     /** Check rounds recorded in the bridge's latency history; a new value
      *  means a new round finished (one sample) */
@@ -296,13 +313,19 @@ export interface SystemSnapshot {
       total: number;
       passed: number;
       avg_ms: number | null;
-      results: { host: string; status: CheckStatus; time: number | null }[];
+      /** time (ms) only when the target answered */
+      results: { host: string; status: CheckResult; time?: number }[];
     };
     dns?: {
       total: number;
       passed: number;
-      results: { server: string; domain: string; status: CheckStatus }[];
+      results: { server: string; domain: string; status: CheckResult }[];
     };
+    /** Captive portal probe; null when disabled in simpleadmin.conf */
+    http?: HttpProbe | null;
+    /** The probe met a captive, billing or activation page (status is
+     *  then "warning") */
+    portal?: boolean;
   };
   modem: {
     manufacturer?: string;

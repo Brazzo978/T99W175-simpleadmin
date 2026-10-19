@@ -10,8 +10,9 @@
  *   WDS  APN of profile 1
  *   TS   temperature sensors
  * System data comes from /proc, /sys, uname and statvfs (/data), the age of
- * the data session from rtnetlink; connectivity from ICMP echo and DNS
- * queries to the targets in simpleadmin.conf.
+ * the data session from rtnetlink; connectivity from ICMP echo, DNS
+ * queries and an HTTP captive portal probe to the targets in
+ * simpleadmin.conf.
  *
  * While a WebSocket client is connected the modem is polled for the
  * snapshot pushed every 2 s: radio every 2 s, serving system / CA /
@@ -48,6 +49,9 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/utsname.h>
+#include <sys/time.h>
+#include <sys/wait.h>
+#include <netdb.h>
 #include <ifaddrs.h>
 #include <strings.h>
 #include <net/if.h>
@@ -871,12 +875,13 @@ static void data_reset(void) {
 /* ============= CONNECTIVITY ============= */
 
 /* The checks run in rounds every CONN_MS, with or without clients: pings
-   only while nobody is connected (they feed the latency history), pings and
-   DNS while someone is. `state` is the round in flight, `shown` the last
-   finished round, which is what the snapshot publishes. */
+   only while nobody is connected (they feed the latency history), pings,
+   DNS and the captive portal probe while someone is. `state` is the round
+   in flight, `shown` the last finished round, which is what the snapshot
+   publishes. */
 struct ping_target { char host[64]; struct in_addr addr; int state, shown; double ms, shown_ms; uint16_t seq; uint64_t sent_ms; };
 struct dns_target { char server[64], domain[128]; int state, shown; uint16_t id; uint64_t sent_ms; int fd; };
-enum { CK_IDLE, CK_WAIT, CK_OK, CK_FAILED };
+enum { CK_IDLE, CK_WAIT, CK_OK, CK_FAILED, CK_PORTAL };
 
 static struct ping_target pings[MAX_TARGETS];
 static struct dns_target dnss[MAX_TARGETS];
@@ -886,6 +891,45 @@ static uint16_t echo_id;
 static time_t conf_mtime;
 static int round_open, round_full;   /* a round is in flight; it runs DNS too */
 static uint64_t round_start_ms;
+
+/* Captive portal probe (SIMPLEADMIN_HTTP_PROBE, empty disables it): an
+   http:// URL that answers 204 No Content. A redirect, or any other answer
+   but a 200 with an empty body, means something on the path intercepts web
+   traffic: a captive, billing or activation page. No answer is a failed
+   check like a lost ping. */
+#define HTTP_PROBE_DEFAULT "http://connectivitycheck.gstatic.com/generate_204"
+struct http_result { int state, code, ms; char reason[12], location[160]; };
+static struct {
+    char url[256], host[128], path[256];
+    uint16_t port;
+    int timeout_s;                   /* SIMPLEADMIN_HTTP_PROBE_TIMEOUT, 1..9 */
+    int url_ok;
+    struct http_result live, shown;
+    pid_t pid;                       /* the child doing the request */
+    int fd;                          /* its pipe, -1 when none */
+    uint64_t sent_ms;
+} hp = { .pid = -1, .fd = -1, .timeout_s = 5 };
+
+/* "http://host[:port][/path]" into hp. */
+static int http_parse_url(void) {
+    const char *h = hp.url + 7;
+    if (strncmp(hp.url, "http://", 7)) return -1;
+    size_t hl = strcspn(h, ":/?");
+    if (!hl || hl >= sizeof(hp.host)) return -1;
+    memcpy(hp.host, h, hl);
+    hp.host[hl] = 0;
+    h += hl;
+    hp.port = 80;
+    if (*h == ':') {
+        char *end;
+        long v = strtol(h + 1, &end, 10);
+        if (v < 1 || v > 65535 || end == h + 1) return -1;
+        hp.port = (uint16_t)v;
+        h = end;
+    }
+    snprintf(hp.path, sizeof(hp.path), "%s%s", *h == '/' ? "" : "/", h);
+    return 0;
+}
 
 /* Latency history: the average RTT of every round of the last 24 h, in ms,
    -1 when no target answered. 17 KiB. */
@@ -903,19 +947,31 @@ static void lat_push(int ms) {
     conn_seq++;
 }
 
-/* SIMPLEADMIN_PING_TARGETS="a,b" and SIMPLEADMIN_DNS_TESTS="server:domain,..." */
+/* SIMPLEADMIN_PING_TARGETS="a,b", SIMPLEADMIN_DNS_TESTS="server:domain,...",
+   SIMPLEADMIN_HTTP_PROBE="http://..." and SIMPLEADMIN_HTTP_PROBE_TIMEOUT=s */
 static void load_conf(void) {
     struct stat st;
     if (stat(conf_file, &st) == 0 && st.st_mtime == conf_mtime && (npings || ndns)) return;
     conf_mtime = st.st_mtime;
     char ping_list[256] = "8.8.8.8,1.1.1.1", dns_list[512] = "8.8.8.8:www.google.com,1.1.1.1:www.google.com";
     char b[8192];
+    snprintf(hp.url, sizeof(hp.url), "%s", HTTP_PROBE_DEFAULT);
+    hp.timeout_s = 5;
     if (read_file(conf_file, b, sizeof(b)) > 0) {
         for (char *line = strtok(b, "\n"); line; line = strtok(NULL, "\n")) {
             if (!strncmp(line, "SIMPLEADMIN_PING_TARGETS=", 25)) sscanf(line + 25, "\"%255[^\"]\"", ping_list);
             if (!strncmp(line, "SIMPLEADMIN_DNS_TESTS=", 22)) sscanf(line + 22, "\"%511[^\"]\"", dns_list);
+            if (!strncmp(line, "SIMPLEADMIN_HTTP_PROBE=", 23)) {
+                hp.url[0] = 0;          /* present but empty: disabled */
+                if (line[23] == '"') sscanf(line + 23, "\"%255[^\"]\"", hp.url);
+                else sscanf(line + 23, "%255s", hp.url);
+            }
+            if (!strncmp(line, "SIMPLEADMIN_HTTP_PROBE_TIMEOUT=", 31))
+                hp.timeout_s = atoi(line + 31 + (line[31] == '"'));
         }
     }
+    if (hp.timeout_s < 1 || hp.timeout_s > 9) hp.timeout_s = 5;
+    hp.url_ok = hp.url[0] && http_parse_url() == 0;
     npings = ndns = 0;
     for (char *t = strtok(ping_list, ","); t && npings < MAX_TARGETS; t = strtok(NULL, ",")) {
         while (*t == ' ') t++;
@@ -940,6 +996,146 @@ static uint16_t icmp_checksum(const void *data, size_t len) {
     if (len & 1) sum += (uint32_t)p[len - 1] << 8;
     while (sum >> 16) sum = (sum & 0xffff) + (sum >> 16);
     return htons((uint16_t)~sum);
+}
+
+static int write_all(int fd, const char *b, size_t n);
+
+/* Value of a response header (case-insensitive name with its colon), NULL
+   when absent. hend: the blank line ending the headers. */
+static const char *http_header(const char *rsp, const char *hend, const char *name) {
+    size_t nl = strlen(name);
+    for (const char *l = strstr(rsp, "\r\n"); l && l < hend; l = strstr(l + 2, "\r\n"))
+        if (!strncasecmp(l + 2, name, nl)) {
+            const char *v = l + 2 + nl;
+            while (*v == ' ') v++;
+            return v;
+        }
+    return NULL;
+}
+
+/* The probe runs in a child, so a slow resolver or server never stalls the
+   main loop: one HTTP/1.1 GET over IPv4, the name resolved by getaddrinfo
+   (the modem's resolver). The answer goes to the pipe as one line:
+   "<ok|dns|connect|timeout|malformed> <code> <ms> <body bytes, -1 unknown>
+   <Location or ->". */
+static void http_child(int wfd) {
+    for (int fd = 3; fd < 1024; fd++) if (fd != wfd) close(fd);
+    signal(SIGALRM, SIG_DFL);
+    alarm((unsigned)hp.timeout_s + 1);       /* the parent kills it anyway */
+    uint64_t t0 = monotonic_ms();
+    const char *reason = "dns";
+    int code = 0;
+    long body = -1;
+    char loc[160] = "-", port[8];
+    snprintf(port, sizeof(port), "%u", hp.port);
+    struct addrinfo hints, *ai = NULL;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    if (getaddrinfo(hp.host, port, &hints, &ai) == 0 && ai) {
+        reason = "connect";
+        int s = socket(AF_INET, SOCK_STREAM, 0);
+        struct timeval tv = { hp.timeout_s, 0 };
+        if (s >= 0) {
+            setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));   /* connect too */
+            setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        }
+        if (s >= 0 && connect(s, ai->ai_addr, ai->ai_addrlen) == 0) {
+            reason = "timeout";
+            char req[640], hosthdr[136];
+            if (hp.port == 80) snprintf(hosthdr, sizeof(hosthdr), "%s", hp.host);
+            else snprintf(hosthdr, sizeof(hosthdr), "%s:%u", hp.host, hp.port);
+            int n = snprintf(req, sizeof(req), "GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: SimpleAdmin\r\n"
+                                               "Accept: */*\r\nConnection: close\r\n\r\n", hp.path, hosthdr);
+            static char rsp[4096];
+            size_t len = 0;
+            int major, minor;
+            const char *hend = NULL;
+            if (n > 0 && (size_t)n < sizeof(req) && write_all(s, req, (size_t)n) == 0) {
+                /* Until the headers are in, and for a 200 without a length
+                   the start of a body, which tells a page from nothing. */
+                for (;;) {
+                    ssize_t r = read(s, rsp + len, sizeof(rsp) - 1 - len);
+                    if (r <= 0) break;
+                    len += (size_t)r;
+                    rsp[len] = 0;
+                    if (!(hend = strstr(rsp, "\r\n\r\n"))) { if (len >= sizeof(rsp) - 1) break; continue; }
+                    if (sscanf(rsp, "HTTP/%d.%d %d", &major, &minor, &code) != 3 || code != 200 ||
+                        hend + 4 < rsp + len || http_header(rsp, hend, "Content-Length:") || len >= sizeof(rsp) - 1)
+                        break;
+                }
+            }
+            if (len && sscanf(rsp, "HTTP/%d.%d %d", &major, &minor, &code) == 3) {
+                reason = "ok";
+                if (!hend) hend = rsp + len;            /* cut short: headers so far */
+                else body = (long)(len - (size_t)(hend + 4 - rsp));
+                const char *v = http_header(rsp, hend, "Content-Length:");
+                if (v) body = strtol(v, NULL, 10);
+                if ((v = http_header(rsp, hend, "Location:"))) {
+                    size_t k = 0;
+                    for (; v[k] > ' ' && v[k] < 0x7f && k + 1 < sizeof(loc); k++) loc[k] = v[k];
+                    if (k) loc[k] = 0;
+                }
+            } else if (len) {
+                reason = "malformed";
+            }
+        }
+        if (s >= 0) close(s);
+        freeaddrinfo(ai);
+    }
+    dprintf(wfd, "%s %d %llu %ld %s\n", reason, code, (unsigned long long)(monotonic_ms() - t0), body, loc);
+    _exit(0);
+}
+
+static void http_stop(void) {
+    if (hp.fd >= 0) { close(hp.fd); hp.fd = -1; }
+    if (hp.pid > 0) { kill(hp.pid, SIGKILL); waitpid(hp.pid, NULL, 0); hp.pid = -1; }
+}
+
+static void http_start(void) {
+    http_stop();
+    memset(&hp.live, 0, sizeof(hp.live));
+    hp.live.state = CK_FAILED;
+    if (!hp.url_ok) { snprintf(hp.live.reason, sizeof(hp.live.reason), "url"); return; }
+    snprintf(hp.live.reason, sizeof(hp.live.reason), "internal");
+    int p[2];
+    if (pipe(p) < 0) return;
+    pid_t pid = fork();
+    if (pid < 0) { close(p[0]); close(p[1]); return; }
+    if (pid == 0) { close(p[0]); http_child(p[1]); }
+    close(p[1]);
+    fcntl(p[0], F_SETFL, O_NONBLOCK);
+    fcntl(p[0], F_SETFD, FD_CLOEXEC);
+    hp.pid = pid;
+    hp.fd = p[0];
+    hp.sent_ms = monotonic_ms();
+    hp.live.state = CK_WAIT;
+}
+
+/* The child's line: 204, or 200 with an empty body, is the open internet;
+   any other answer an interception. */
+static void http_read(void) {
+    char b[256];
+    ssize_t n = read(hp.fd, b, sizeof(b) - 1);
+    if (n < 0 && (errno == EAGAIN || errno == EINTR)) return;
+    struct http_result *h = &hp.live;
+    h->state = CK_FAILED;
+    snprintf(h->reason, sizeof(h->reason), "timeout");    /* killed by its alarm */
+    if (n > 0) {
+        b[n] = 0;
+        char reason[12], loc[160];
+        unsigned long long ms;
+        long body;
+        int code;
+        if (sscanf(b, "%11s %d %llu %ld %159s", reason, &code, &ms, &body, loc) == 5) {
+            snprintf(h->reason, sizeof(h->reason), "%s", reason);
+            h->code = code;
+            h->ms = (int)ms;
+            snprintf(h->location, sizeof(h->location), "%s", strcmp(loc, "-") ? loc : "");
+            if (!strcmp(reason, "ok")) h->state = code == 204 || (code == 200 && body == 0) ? CK_OK : CK_PORTAL;
+        }
+    }
+    http_stop();
 }
 
 static void conn_start(int full) {
@@ -986,6 +1182,12 @@ static void conn_start(int full) {
                     sendto(d->fd, q, n, 0, (struct sockaddr *)&to, sizeof(to)) > 0) ? CK_WAIT : CK_FAILED;
         d->sent_ms = now;
     }
+    if (full && hp.url[0]) {
+        http_start();
+    } else {
+        http_stop();
+        memset(&hp.live, 0, sizeof(hp.live));       /* CK_IDLE */
+    }
 }
 
 static void icmp_read(void) {
@@ -1026,16 +1228,23 @@ static void conn_expire(int force) {
             dnss[i].state = CK_FAILED;
             if (dnss[i].fd >= 0) { close(dnss[i].fd); dnss[i].fd = -1; }
         }
+    if (hp.live.state == CK_WAIT && (force || now - hp.sent_ms > (uint64_t)hp.timeout_s * 1000 + 500)) {
+        http_stop();
+        hp.live.state = CK_FAILED;
+        snprintf(hp.live.reason, sizeof(hp.live.reason), "timeout");
+    }
 }
 
 /* Once nothing is in flight the round's results are published and its
-   average RTT goes into the latency history. A round without DNS leaves
-   the DNS results unknown rather than showing old ones. */
+   average RTT goes into the latency history. A round without DNS and probe
+   leaves their results unknown rather than showing old ones. */
 static void conn_finish(void) {
     if (!round_open) return;
     for (int i = 0; i < npings; i++) if (pings[i].state == CK_WAIT) return;
     for (int i = 0; i < ndns; i++) if (dnss[i].state == CK_WAIT) return;
+    if (hp.live.state == CK_WAIT) return;
     round_open = 0;
+    hp.shown = hp.live;
     int pass = 0;
     double sum = 0;
     for (int i = 0; i < npings; i++) {
@@ -1169,8 +1378,9 @@ static size_t serialize(char *out, size_t cap) {
 
     /* Connectivity: the last finished round, same shape as cgi-bin/get_ping.
        The status counts the checks that ran: all passed "ok", some
-       "warning", none "error", "pending" before any finished. seq counts
-       the rounds in the latency history. */
+       "warning", none "error", "pending" before any finished; a captive
+       portal makes it "warning" with portal true whatever the rest says.
+       seq counts the rounds in the latency history. */
     int pass_p = 0, pass_d = 0, done = 0, pending = 0, nt = 0;
     double sum = 0;
     for (int i = 0; i < npings; i++) {
@@ -1181,9 +1391,17 @@ static size_t serialize(char *out, size_t cap) {
         if (dnss[i].shown == CK_OK) pass_d++;
         if (dnss[i].shown == CK_IDLE) pending++; else done++;
     }
-    const char *status = !done ? "pending" : pass_p + pass_d == done ? "ok" : pass_p + pass_d ? "warning" : "error";
-    jcat(&j, "},\"conn\":{\"status\":\"%s\",\"pending\":%s,\"seq\":%u,\"ping\":{\"total\":%d,\"passed\":%d,\"avg_ms\":",
-         status, pending ? "true" : "false", conn_seq, npings, pass_p);
+    const struct http_result *h = &hp.shown;
+    int pass_h = 0, portal = hp.url[0] && h->state == CK_PORTAL;
+    if (hp.url[0]) {
+        if (h->state == CK_OK) pass_h = 1;
+        if (h->state == CK_IDLE) pending++; else done++;
+    }
+    int pass = pass_p + pass_d + pass_h;
+    const char *status = !done ? "pending" : portal ? "warning" : pass == done ? "ok" : pass ? "warning" : "error";
+    jcat(&j, "},\"conn\":{\"status\":\"%s\",\"pending\":%s,\"portal\":%s,\"seq\":%u,"
+             "\"ping\":{\"total\":%d,\"passed\":%d,\"avg_ms\":",
+         status, pending ? "true" : "false", portal ? "true" : "false", conn_seq, npings, pass_p);
     if (nt) jcat(&j, "%.1f", sum / nt); else jcat(&j, "null");
     jcat(&j, ",\"results\":[");
     for (int i = 0; i < npings; i++) {
@@ -1198,7 +1416,19 @@ static size_t serialize(char *out, size_t cap) {
         jcat(&j, ",\"domain\":"); jstr(&j, dnss[i].domain);
         jcat(&j, ",\"status\":\"%s\"}", dnss[i].shown == CK_OK ? "ok" : dnss[i].shown == CK_FAILED ? "failed" : "pending");
     }
-    jcat(&j, "]}}");
+    jcat(&j, "]},\"http\":");
+    if (hp.url[0]) {
+        jcat(&j, "{\"url\":"); jstr(&j, hp.url);
+        jcat(&j, ",\"status\":\"%s\"", h->state == CK_OK ? "ok" : h->state == CK_PORTAL ? "portal"
+                                       : h->state == CK_FAILED ? "failed" : "pending");
+        if (h->state == CK_OK || h->state == CK_PORTAL) jcat(&j, ",\"code\":%d,\"time\":%d", h->code, h->ms);
+        if (h->state == CK_FAILED) { jcat(&j, ",\"reason\":"); jstr(&j, h->reason); }
+        if (h->state == CK_PORTAL && h->location[0]) { jcat(&j, ",\"location\":"); jstr(&j, h->location); }
+        jcat(&j, "}");
+    } else {
+        jcat(&j, "null");
+    }
+    jcat(&j, "}");
 
     /* Modem identity, SIM, network. */
     jcat(&j, ",\"modem\":{\"manufacturer\":"); jstr(&j, md.manufacturer);
@@ -1405,7 +1635,7 @@ static void usage(const char *prog) {
                     "  -1        print one JSON snapshot on stdout and exit\n"
                     "  -p PORT   WebSocket port (default %d)\n"
                     "  -i IFACE  accept clients only on IFACE (e.g. bridge0)\n"
-                    "  -C CONF   simpleadmin.conf with the ping/DNS targets (default %s)\n"
+                    "  -C CONF   simpleadmin.conf with the ping/DNS/HTTP targets (default %s)\n"
                     "  -D FILE   persistent data counter (default %s; SIGUSR1 zeroes it)\n",
             prog, WS_PORT_DEFAULT, CONF_FILE_DEFAULT, DATA_FILE_DEFAULT);
 }
@@ -1444,15 +1674,18 @@ int main(int argc, char **argv) {
         data_sample();      /* shown, not saved */
         poll_identity(); poll_serving(); poll_radio(); poll_system();
         conn_start(1);
-        uint64_t until = monotonic_ms() + DNS_TIMEOUT_MS + 100;
+        uint64_t wait_ms = (uint64_t)hp.timeout_s * 1000 + 500;
+        uint64_t until = monotonic_ms() + (wait_ms > DNS_TIMEOUT_MS ? wait_ms : DNS_TIMEOUT_MS) + 100;
         while (round_open && monotonic_ms() < until) {
-            struct pollfd p[1 + MAX_TARGETS];
+            struct pollfd p[2 + MAX_TARGETS];
             int n = 0;
             if (icmp_fd >= 0) { p[n].fd = icmp_fd; p[n++].events = POLLIN; }
             for (int i = 0; i < ndns; i++) if (dnss[i].fd >= 0) { p[n].fd = dnss[i].fd; p[n++].events = POLLIN; }
+            if (hp.fd >= 0) { p[n].fd = hp.fd; p[n++].events = POLLIN; }
             if (poll(p, (nfds_t)n, 100) > 0) {
                 if (icmp_fd >= 0 && (p[0].revents & POLLIN)) icmp_read();
                 for (int i = 0; i < ndns; i++) if (dnss[i].fd >= 0) dns_read(&dnss[i]);
+                if (hp.fd >= 0 && (p[n - 1].revents & (POLLIN | POLLHUP))) http_read();
             }
             conn_expire(0);
             conn_finish();
@@ -1481,7 +1714,7 @@ int main(int argc, char **argv) {
     int had_clients = 0;
     ws_on_open = send_history;
     while (running) {
-        struct pollfd fds[2 + WS_MAX_CLIENTS + WS_MAX_PENDING + MAX_TARGETS];
+        struct pollfd fds[3 + WS_MAX_CLIENTS + WS_MAX_PENDING + MAX_TARGETS];
         int nfds = 0, base_clients, base_pending, base_dns;
         fds[nfds].fd = ws_listen_fd; fds[nfds++].events = POLLIN;
         int icmp_slot = -1;
@@ -1494,6 +1727,8 @@ int main(int argc, char **argv) {
         for (int i = 0; i < pp; i++) { fds[nfds].fd = ws_pending[i].fd; fds[nfds++].events = POLLIN; }
         base_dns = nfds;
         for (int i = 0; i < ndns; i++) { fds[nfds].fd = dnss[i].fd; fds[nfds++].events = dnss[i].fd >= 0 ? POLLIN : 0; }
+        int http_slot = -1;
+        if (hp.fd >= 0) { http_slot = nfds; fds[nfds].fd = hp.fd; fds[nfds++].events = POLLIN; }
 
         int pr = poll(fds, (nfds_t)nfds, 200);
         if (pr < 0 && errno != EINTR) break;
@@ -1506,6 +1741,7 @@ int main(int argc, char **argv) {
             if (icmp_slot >= 0 && (fds[icmp_slot].revents & POLLIN)) icmp_read();
             for (int i = 0; i < ndns; i++)
                 if (dnss[i].fd >= 0 && (fds[base_dns + i].revents & POLLIN)) dns_read(&dnss[i]);
+            if (http_slot >= 0 && hp.fd >= 0 && (fds[http_slot].revents & (POLLIN | POLLHUP))) http_read();
         }
         ws_pending_expire();
         conn_expire(0);
@@ -1559,6 +1795,7 @@ int main(int argc, char **argv) {
         }
     }
     ws_stop();
+    http_stop();
     data_sample();
     data_save();
     unlink("/run/system_bridge.pid");

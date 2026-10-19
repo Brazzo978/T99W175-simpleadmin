@@ -130,6 +130,10 @@ export interface ConnectionChecks {
   pingTargets: string;
   /** Comma-separated server:domain DNS lookups */
   dnsTests: string;
+  /** Captive portal probe: an http:// URL answering 204; empty disables it */
+  httpProbe: string;
+  /** Seconds the probe may take, 1 to 9 */
+  httpProbeTimeout: number;
 }
 
 /**
@@ -146,7 +150,12 @@ export function useConnectionChecks() {
       .then((r) => r.json())
       .then((json) => {
         if (!cancelled && json.status === "success") {
-          setChecks({ pingTargets: json.pingTargets || "", dnsTests: json.dnsTests || "" });
+          setChecks({
+            pingTargets: json.pingTargets || "",
+            dnsTests: json.dnsTests || "",
+            httpProbe: typeof json.httpProbe === "string" ? json.httpProbe : "",
+            httpProbeTimeout: Number(json.httpProbeTimeout) || 5,
+          });
         }
       })
       .catch(() => {});
