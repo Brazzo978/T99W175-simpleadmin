@@ -174,8 +174,9 @@ success=false
 cms_error=""
 
 while [ $attempt -le $max_attempts ]; do
-    result=$(send_sms "$phone_number" "$message_encoded" 2>&1)
-    exit_code=$?
+    # set -e would end the script on a failed send, before any answer
+    exit_code=0
+    result=$(send_sms "$phone_number" "$message_encoded" 2>&1) || exit_code=$?
 
     # Check for CMS ERROR
     if echo "$result" | grep -q "+CMS ERROR"; then
@@ -184,10 +185,15 @@ while [ $attempt -le $max_attempts ]; do
         break
     fi
 
-    # Check for OK or CMGS (message sent)
-    if echo "$result" | grep -qE "(OK|>|\+CMGS:)"; then
+    # +CMGS: <mr> is the network's acknowledgement; the "> " prompt and a
+    # bare OK are not
+    if echo "$result" | grep -q "+CMGS:"; then
         success=true
         exit_code=0
+        break
+    fi
+    # past the prompt the text went out: a retry could send it twice
+    if echo "$result" | grep -q "> "; then
         break
     fi
 
@@ -207,7 +213,7 @@ if [ -n "$cms_error" ]; then
     payload=$(cat <<EOF
 {
   "success":false,
-  "message":"SMS sending failed",
+  "message":"SMS sending failed (+CMS ERROR: $cms_error)",
   "error_code":"$cms_error",
   "output":"$escaped_output",
   "attempts":$attempt
