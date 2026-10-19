@@ -1,4 +1,4 @@
-# Dependencies and build output (published to deploy/www-app by build.sh)
+# Dependencies and build output (published to deploy/www-nextjs by build.sh)
 /node_modules
 /.next/
 /out/

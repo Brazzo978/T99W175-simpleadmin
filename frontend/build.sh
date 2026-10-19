@@ -17,6 +17,16 @@ if [ "${1:-}" = "--install" ] || [ ! -d node_modules ]; then
   npm ci --no-audit --no-fund
 fi
 
+# Stamp read by install.sh (sources newer than it mean a stale build). It
+# describes the sources, so it is taken before the build and the publish,
+# which rewrite deploy/www-nextjs (and next may touch tsconfig.json):
+# -dirty means frontend/ differs from the commit (changes or new files that
+# are not ignored); changes elsewhere in the repository do not count.
+build=$(git describe --always --tags 2>/dev/null) || build=unknown
+if [ "$build" != unknown ] && [ -n "$(git status --porcelain -- .)" ]; then
+  build="$build-dirty"
+fi
+
 echo "🏗️  Building the static export"
 rm -rf .next out
 npx next build
@@ -25,9 +35,7 @@ echo "📤 Publishing to deploy/www-nextjs"
 rm -rf "$DEST"
 mkdir -p "$DEST"
 cp -R out/. "$DEST/"
-# Stamp read by install.sh: sources newer than it mean a stale build.
-git describe --always --dirty --tags 2>/dev/null > "$DEST/BUILD" ||
-  echo unknown > "$DEST/BUILD"
+printf '%s\n' "$build" > "$DEST/BUILD"
 
 files=$(find "$DEST" -type f | wc -l)
 size=$(du -sk "$DEST" | cut -f1)
