@@ -35,10 +35,15 @@ Installed on 2026-10-19 at 18:55 with a full `./install.sh`.
       (24 h chart in Connection Monitoring)
 - [x] Captive-portal probe (`SIMPLEADMIN_HTTP_PROBE`, "Carrier Limited")
 - [x] Merged on `Beta`
-- [ ] Decide: background pings every 10 s while no page is open cost about
-      3 MB of mobile data a day (90 MB a month on the backup SIM); every
-      60 s would be about 0.5 MB, but the 24 h history then has 1-minute
-      resolution (bridge and store rework)
+- [x] Background check interval `SIMPLEADMIN_BG_CHECK_INTERVAL` (default
+      60 s, 10 to 600 in steps of 10, Connection Monitoring check settings):
+      one ping round per interval without clients (about 0.5 MB a day
+      instead of 3 MB), every 10 s with a page open; the 24 h history keeps
+      one slot per interval (average of its rounds, restarted when the
+      interval changes); the dashboard's live latency stays per 10 s round
+- [ ] Verify on the modem: rounds once a minute with no page open
+      (`system_bridge -d` or the `rmnet` counters), the 24 h chart at 1-minute
+      slots, a new interval saved from Connection Monitoring restarting it
 - [x] Live: hostname, kernel, data session age (reset to 0 by the data
       reconnect at 18:59 and growing since), history sent first on connect,
       probe answering `ok` (204)
