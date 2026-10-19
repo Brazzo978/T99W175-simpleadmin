@@ -31,8 +31,9 @@ SIMPLEADMIN_CSRF_CHECK=1
 # behave as unauthenticated.
 SIMPLEADMIN_GUI_LOCKED=0
 
-# Pre-shared key required by /cgi-bin/gui_toggle?key=... (or ?k=...).
-SIMPLEADMIN_GUI_TOGGLE_KEY=""
+# The pre-shared key of /cgi-bin/gui_toggle?key=...&mode=toggle|lock|unlock
+# is not set here: this file is served to anyone who asks for it. It is the
+# single line of /data/simpleadmin/gui_toggle.key on the modem (see README).
 
 # Page shown while locked.
 SIMPLEADMIN_GUI_LOCK_PAGE="/webguioff.html"
@@ -51,6 +52,7 @@ SIMPLEADMIN_ESIM_BASE_URL="http://localhost:8080/api/v1"
 - Accounts with the `user` role can only send read-only AT commands (queries, test commands, identification and the output-format settings the dashboard needs).
 - Every account, read-only ones included, can change its own password from the user menu of the Next.js interface, which asks for the current one; the Credentials page (admins only) sets the password of any account.
 - With `SIMPLEADMIN_ENABLE_LOGIN=0` every CGI endpoint runs with administrator rights for anyone who can reach the modem; `SIMPLEADMIN_CSRF_CHECK=1` keeps other websites from driving it through the browser, but it does not replace a password.
+- busybox httpd serves every file of the web root without a session, `config/simpleadmin.conf` included, so it holds no secret; the front-ends read its settings through CGIs that check the session. The GUI toggle key lives in `/data/simpleadmin/gui_toggle.key`, outside the web root.
 
 Check [docs/Explaination.md](docs/Explaination.md) for file-by-file behavior, request flows, and how each page uses the CGI helpers.
 For the dedicated Tailscale integration documentation, see [docs/Tailscale.md](docs/Tailscale.md).
@@ -65,9 +67,18 @@ How it works:
 - No extra "delay": the lock status is returned by the existing `/cgi-bin/session_status` request the UI already performs.
 
 ### Enable it
-1. Set a strong key in `deploy/www/config/simpleadmin.conf`:
-   - `SIMPLEADMIN_GUI_TOGGLE_KEY="use_a_long_random_string_here"`
-2. Deploy files to the modem (see Installation).
+The key is the single line of `/data/simpleadmin/gui_toggle.key` on the
+modem, outside the web root (anything under `/WEBSERVER/www` can be
+downloaded without logging in). Without that file `gui_toggle` is off.
+
+```bash
+ssh root@192.168.225.1 '(umask 077; printf "%s\n" "use_a_long_random_string_here" > /data/simpleadmin/gui_toggle.key)'
+```
+
+Installs older than this kept the key as `SIMPLEADMIN_GUI_TOGGLE_KEY` in
+`config/simpleadmin.conf`: `./install.sh` moves a key still set there into
+the file (unless it already holds one) and removes the line. A factory reset
+from the System page deletes the file.
 
 ### Use it (the "special link")
 - Lock:
@@ -79,7 +90,7 @@ How it works:
 
 Notes:
 - The key is in the URL: it can end up in browser history, screenshots, and (depending on server setup) logs. Use a long random key and only on trusted networks.
-- If you lose the key, you can unlock by setting `SIMPLEADMIN_GUI_LOCKED=0` in `deploy/www/config/simpleadmin.conf` (or redeploying the stock config).
+- If you lose the key, read it from `/data/simpleadmin/gui_toggle.key` over SSH, or unlock by setting `SIMPLEADMIN_GUI_LOCKED=0` in `/WEBSERVER/www/config/simpleadmin.conf` (or redeploying the stock config).
 
 ---
 
@@ -220,8 +231,10 @@ In this order; each step reports `unchanged` when there is nothing to do.
 2. **Web UI**: stages the new web root next to `/WEBSERVER/www`, keeps every
    `simpleadmin.conf` value already set (new keys get their default) and the
    existing `cgi-bin/credentials.txt` (plaintext passwords become SHA-512
-   crypt), applies `--login`/`--esim`, then stops `qcmap_httpd`, swaps the
-   tree and starts it again; on failure the previous UI is put back.
+   crypt), moves a GUI toggle key still set in `simpleadmin.conf` to
+   `/data/simpleadmin/gui_toggle.key`, applies `--login`/`--esim`, then
+   stops `qcmap_httpd`, swaps the tree and starts it again; on failure the
+   previous UI is put back.
    With `--onlywww` the installer stops here.
 3. **Tools in `/data/simpleadmin`**: `curl` and `jq` with their libraries
    (wrappers in `/usr/bin`, the firmware's `libcurl` untouched) and

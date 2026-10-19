@@ -44,16 +44,17 @@ fi
 mode="$(get_qs_param "mode" 2>/dev/null || true)"
 mode="${mode:-toggle}"
 
-if [ -z "${SIMPLEADMIN_GUI_TOGGLE_KEY:-}" ]; then
+toggle_key="$(gui_toggle_key)"
+if [ -z "$toggle_key" ]; then
     echo "Status: 500 Internal Server Error"
     echo "Content-type: text/plain"
     echo "Cache-Control: no-store"
     echo
-    echo "GUI toggle key is not configured (SIMPLEADMIN_GUI_TOGGLE_KEY)."
+    echo "GUI toggle key is not configured ($GUI_TOGGLE_KEY_FILE)."
     exit 0
 fi
 
-if [ -z "$key" ] || [ "$key" != "$SIMPLEADMIN_GUI_TOGGLE_KEY" ]; then
+if [ -z "$key" ] || [ "$key" != "$toggle_key" ]; then
     echo "Status: 403 Forbidden"
     echo "Content-type: text/plain"
     echo "Cache-Control: no-store"

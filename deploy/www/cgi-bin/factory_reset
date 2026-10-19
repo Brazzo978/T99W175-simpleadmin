@@ -196,6 +196,16 @@ restore_system_files() {
         SYSTEM_RESTORED="false"
     fi
 
+    # The GUI toggle key is kept outside the web root; the default is none.
+    if [ -e "$GUI_TOGGLE_KEY_FILE" ]; then
+        if ! rm -f "$GUI_TOGGLE_KEY_FILE"; then
+            log_action "WARNING: Failed to remove the GUI toggle key"
+            SYSTEM_RESTORED="false"
+        else
+            log_action "Removed the GUI toggle key"
+        fi
+    fi
+
 }
 
 # Function to clear SSH keys

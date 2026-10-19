@@ -19,7 +19,6 @@ fi
 
 SIMPLEADMIN_ENABLE_LOGIN="${SIMPLEADMIN_ENABLE_LOGIN:-1}"
 SIMPLEADMIN_GUI_LOCKED="${SIMPLEADMIN_GUI_LOCKED:-0}"
-SIMPLEADMIN_GUI_TOGGLE_KEY="${SIMPLEADMIN_GUI_TOGGLE_KEY:-}"
 SIMPLEADMIN_GUI_LOCK_PAGE="${SIMPLEADMIN_GUI_LOCK_PAGE:-/webguioff.html}"
 
 SIMPLEADMIN_CSRF_CHECK="${SIMPLEADMIN_CSRF_CHECK:-1}"
@@ -70,6 +69,19 @@ login_is_disabled() {
 
 gui_is_locked() {
     is_truthy "${SIMPLEADMIN_GUI_LOCKED:-0}"
+}
+
+# The key of cgi-bin/gui_toggle lives outside the web root: busybox httpd
+# serves every file under it without a session, config/simpleadmin.conf
+# included. One line, taken as it is; no file or an empty one means no key.
+GUI_TOGGLE_KEY_FILE="${SIMPLEADMIN_GUI_TOGGLE_KEY_FILE:-/data/simpleadmin/gui_toggle.key}"
+
+gui_toggle_key() {
+    local key=""
+    if [ -r "$GUI_TOGGLE_KEY_FILE" ]; then
+        IFS= read -r key < "$GUI_TOGGLE_KEY_FILE" || true
+    fi
+    printf '%s' "${key%$'\r'}"
 }
 
 status_text() {

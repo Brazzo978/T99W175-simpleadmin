@@ -734,11 +734,12 @@ function cellLocking() {
     
     async getEsimManagerStatus() {
       try {
-        const response = await fetch('/config/simpleadmin.conf');
-        const text = await response.text();
-        const match = text.match(/SIMPLEADMIN_ENABLE_ESIM=([01])/);
-        if (match) {
-          this.esimManagerEnabled = match[1] === '1';
+        // SIMPLEADMIN_ENABLE_ESIM, through the session-checked CGI rather
+        // than the configuration file itself.
+        const response = await fetch('/cgi-bin/esim_config', { cache: 'no-store' });
+        const result = await response.json();
+        if (result && result.success && result.data) {
+          this.esimManagerEnabled = Number(result.data.enabled) === 1;
         }
       } catch (error) {
         console.error('Failed to get eSIM manager status:', error);

@@ -15,6 +15,8 @@
 # Layout on the modem:
 #   /WEBSERVER/www                   web UI; simpleadmin.conf values and
 #                                    cgi-bin/credentials.txt survive updates
+#   /data/simpleadmin/gui_toggle.key key of cgi-bin/gui_toggle, outside the
+#                                    web root (httpd serves all of it)
 #   /data/simpleadmin/{bin,lib}      diag_bridge, system_bridge, ra-guard, curl, jq, modem_config (UBIFS
 #                                    usrfs, the root filesystem has only a few
 #                                    MB free), reached through /usr/bin
@@ -31,6 +33,7 @@ SA_ONLY_WWW="${SA_ONLY_WWW:-0}"
 SA_UI="${SA_UI:-nextjs}"
 WEB=/WEBSERVER/www
 BASE=/data/simpleadmin
+GUI_KEY_FILE="$BASE/gui_toggle.key"
 UNIT_DIR=/lib/systemd/system
 UNITS="crontab ttl-override connection-watchdog euicc diag_bridge system_bridge ra-guard"
 WARNINGS=0
@@ -218,6 +221,34 @@ remove "$WEB.new" "$WEB.old"
 cp -R "$SRC/www" "$WEB.new"
 info "📦 new tree staged in $WEB.new"
 conf="$WEB.new/config/simpleadmin.conf"
+# The key of cgi-bin/gui_toggle used to be SIMPLEADMIN_GUI_TOGGLE_KEY in
+# simpleadmin.conf, which busybox httpd serves to anyone: it now lives in
+# $GUI_KEY_FILE, outside the web root. A key still set in the modem's
+# configuration (or in the payload's) moves there, unless the file already
+# holds one, and the line never reaches the new web root. The value is read
+# the way the CGIs read it, by sourcing the file.
+for f in "$WEB/config/simpleadmin.conf" "$conf"; do
+  [ -f "$f" ] || continue
+  toggle_key="$(sh -c '. "$1" >/dev/null 2>&1; printf "%s" "${SIMPLEADMIN_GUI_TOGGLE_KEY:-}"' \
+    sh "$f")" || toggle_key=""
+  [ -n "$toggle_key" ] || continue
+  if [ -s "$GUI_KEY_FILE" ]; then
+    info "🗝️  GUI toggle key of $f dropped: $GUI_KEY_FILE already holds one"
+  else
+    mkdir -p "$BASE"
+    (umask 077 && printf '%s\n' "$toggle_key" > "$GUI_KEY_FILE.new")
+    mv -f "$GUI_KEY_FILE.new" "$GUI_KEY_FILE"
+    ok "🗝️  GUI toggle key moved from simpleadmin.conf to $GUI_KEY_FILE"
+  fi
+done
+toggle_key=""
+sed -i '/^SIMPLEADMIN_GUI_TOGGLE_KEY=/d' "$conf"
+if [ -s "$GUI_KEY_FILE" ]; then
+  chmod 600 "$GUI_KEY_FILE"
+  ok "🗝️  GUI toggle key set ($GUI_KEY_FILE)"
+else
+  info "🗝️  no GUI toggle key: cgi-bin/gui_toggle is off"
+fi
 if [ -f "$WEB/config/simpleadmin.conf" ]; then
   # Keep the values already set on this modem for every key the new file
   # still has; new keys get the shipped default. Values go through ENVIRON:
@@ -225,6 +256,8 @@ if [ -f "$WEB/config/simpleadmin.conf" ]; then
   kept=0
   for line in $(grep -E '^[A-Z_]+=' "$WEB/config/simpleadmin.conf" | sed 's/=.*//'); do
     key="$line"
+    # Moved to $GUI_KEY_FILE above.
+    [ "$key" = SIMPLEADMIN_GUI_TOGGLE_KEY ] && continue
     if grep -q "^$key=" "$conf"; then
       K="$key" V="$(sed -n "s/^$key=//p" "$WEB/config/simpleadmin.conf" | head -1)" awk \
         'index($0, ENVIRON["K"] "=") == 1 { print ENVIRON["K"] "=" ENVIRON["V"]; next } { print }' \

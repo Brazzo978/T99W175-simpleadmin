@@ -12,9 +12,9 @@ SIMPLEADMIN_CSRF_CHECK=1
 # CGI endpoints will behave as unauthenticated.
 SIMPLEADMIN_GUI_LOCKED=0
 
-# Pre-shared key to toggle GUI lock via /cgi-bin/gui_toggle?key=... (or ?k=...).
-# Example: /cgi-bin/gui_toggle?key=YOUR_KEY&mode=toggle|lock|unlock
-SIMPLEADMIN_GUI_TOGGLE_KEY=""
+# The pre-shared key of /cgi-bin/gui_toggle?key=...&mode=toggle|lock|unlock
+# is not set here: this file is served to anyone who asks for it. It is the
+# single line of /data/simpleadmin/gui_toggle.key on the modem (see README).
 
 # Page shown while locked.
 SIMPLEADMIN_GUI_LOCK_PAGE="/webguioff.html"
