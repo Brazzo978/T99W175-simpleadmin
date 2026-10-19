@@ -1,16 +1,107 @@
 {
-  "known_sims": {
-    "row_label": "Known SIMs",
-    "info_aria": "Known SIMs info",
-    "tooltip": "QManager remembers the SIMs it has seen, so it only alerts you when a genuinely new SIM is inserted. Clearing forgets every SIM except the one currently inserted.",
-    "remembered_count_one": "{{count}} SIM",
-    "remembered_count_other": "{{count}} SIMs",
-    "clear_button": "Clear",
-    "clear_dialog_title": "Clear known SIMs?",
-    "clear_dialog_description": "This forgets every SIM QManager has seen, except the one currently inserted — so your active SIM won't be flagged as new. Previously-used SIMs will alert again the next time they are inserted.",
-    "clear_dialog_confirm": "Clear",
-    "clear_dialog_clearing": "Clearing…",
-    "toast_cleared": "Known SIMs cleared",
-    "toast_clear_failed": "Failed to clear known SIMs"
+  "page": {
+    "title": "System",
+    "description": "Scheduled reboot, modem identity, optional services and factory reset."
+  },
+  "enabled": "Enabled",
+  "reboot": {
+    "title": "Scheduled Reboot",
+    "active": "Active: {{schedule}}",
+    "none": "No reboot scheduled.",
+    "mode_interval": "Every N hours",
+    "mode_schedule": "At a set time",
+    "hours_between": "Hours between reboots",
+    "interval_daily": "24 (daily, at midnight)",
+    "frequency": "Frequency",
+    "frequencies": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly"
+    },
+    "day": "Day",
+    "day_of_month": "Day of month",
+    "time": "Time",
+    "weekdays": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    },
+    "weekdays_inline": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    },
+    "describe": {
+      "midnight": "Every day at midnight",
+      "every_hours_one": "Every hour from midnight",
+      "every_hours_other": "Every {{count}} hours from midnight",
+      "every_hours_uneven_one": "Every hour from midnight, then again at midnight",
+      "every_hours_uneven_other": "Every {{count}} hours from midnight, then again at midnight",
+      "weekly": "Every {{day}} at {{time}}",
+      "monthly": "Day {{day}} of every month at {{time}}",
+      "daily": "Every day at {{time}}"
+    },
+    "validation": {
+      "interval": "Choose an interval that divides the day: 1, 2, 3, 4, 6, 8, 12 or 24 hours.",
+      "time": "Choose a valid time.",
+      "day_of_month": "The day of the month must be 1 to 31."
+    },
+    "toast": {
+      "removed": "Scheduled reboot removed",
+      "remove_failed": "Unable to remove the schedule",
+      "saved": "Reboot scheduled: {{schedule}}",
+      "save_failed": "Unable to save the schedule"
+    }
+  },
+  "imei": {
+    "current": "Current: {{imei}}",
+    "new": "New IMEI",
+    "luhn_mismatch": "The check digit does not match (Luhn): this is not a valid IMEI.",
+    "change": "Change IMEI",
+    "invalid": "The IMEI must be 15 digits with a valid check digit",
+    "clear_failed": "Unable to clear the IMEI",
+    "write_failed": "Unable to write the IMEI",
+    "restart_refused": "Restart refused",
+    "dialog": {
+      "warning_title": "Legal warning",
+      "warning_description": "Changing the IMEI is illegal in many countries. Only restore the original IMEI of this device; you are responsible for its use.",
+      "confirm_title": "Write IMEI {{imei}}?",
+      "confirm_description": "The modem identity changes after the next restart. Note the current IMEI before continuing.",
+      "written_title": "IMEI written",
+      "written_description": "Restart the modem now to use the new IMEI?",
+      "later": "Later",
+      "understand": "I understand",
+      "write": "Write",
+      "restart": "Restart"
+    }
+  },
+  "esim": {
+    "title": "eSIM Manager",
+    "description": "Runs the local euicc-client service behind the eSIM page (profiles on SIM 2).",
+    "client_missing": "The euicc-client is not installed ({{path}}), so the eSIM manager cannot be enabled. It is not part of SimpleAdmin: copy it to the modem as described in docs/Enable_New_feature.md.",
+    "toast": {
+      "enabled": "eSIM manager enabled",
+      "disabled": "eSIM manager disabled",
+      "failed": "Unable to change the eSIM manager"
+    }
+  },
+  "factory_reset": {
+    "title": "Factory Reset",
+    "description": "Removes band and cell locks, sets automatic network mode, restores the LAN, firewall and IPA configuration, the system and web passwords and simpleadmin.conf, then reboots.",
+    "button": "Factory Reset",
+    "failed": "Factory reset failed",
+    "dialog": {
+      "title": "Reset to factory defaults?",
+      "description": "Every setting listed above is lost and the modem reboots. Afterwards it answers at 192.168.225.1 with the default credentials.",
+      "confirm": "Reset"
+    }
   }
 }

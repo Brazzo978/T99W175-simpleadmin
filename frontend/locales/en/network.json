@@ -1,0 +1,75 @@
+{
+  "page": {
+    "title": "Local Network",
+    "description_short": "LAN addressing, DHCP, DMZ, IP passthrough and TTL.",
+    "description": "LAN addressing, DHCP, DMZ, IP passthrough and TTL. Network changes take effect after a modem restart."
+  },
+  "enabled": "Enabled",
+  "lan": {
+    "description": "Address of the modem on the local network.",
+    "ip_address": "IP address",
+    "subnet_mask": "Subnet mask"
+  },
+  "dhcp": {
+    "title": "DHCP Server",
+    "description": "Addresses handed out to LAN clients.",
+    "range_start": "Range start",
+    "range_end": "Range end",
+    "lease": "Lease (seconds)"
+  },
+  "passthrough": {
+    "title": "IP Passthrough",
+    "description": "Hands the mobile WAN address to one LAN device (bridge mode). The device must use DHCP.",
+    "client": "Client",
+    "choose_device": "Choose a device",
+    "other_mac": "Other MAC address…",
+    "mac_address": "MAC address"
+  },
+  "dmz": {
+    "description": "Forwards every unsolicited inbound connection to one LAN host.",
+    "host_ip": "Host IP"
+  },
+  "mobile": {
+    "title": "Mobile Connection",
+    "description": "How the modem brings up the data connection.",
+    "auto_connect": "Connect automatically",
+    "roaming": "Allow roaming"
+  },
+  "ttl": {
+    "title": "TTL Override",
+    "description": "Rewrites the IPv4 TTL of outgoing packets. Applied at once, no restart.",
+    "value": "TTL value",
+    "apply": "Apply TTL",
+    "out_of_range": "TTL must be between 1 and 255",
+    "set": "TTL override set to {{value}}",
+    "disabled": "TTL override disabled"
+  },
+  "actions": {
+    "save": "Save Network Settings",
+    "discard": "Discard Changes"
+  },
+  "restart_dialog": {
+    "title": "Settings saved. Restart now?",
+    "description": "The new network settings take effect after a modem restart. LAN clients may need to renew their address afterwards.",
+    "later": "Later",
+    "restart": "Restart Now"
+  },
+  "errors": {
+    "read_failed": "Unable to read the network settings",
+    "save_failed": "Save failed",
+    "restart_refused": "Restart refused"
+  },
+  "validation": {
+    "lan_ip_invalid": "Enter a valid LAN IP address.",
+    "lan_ip_reserved": "The LAN IP cannot be the network or broadcast address of its subnet.",
+    "lease_invalid": "The lease time must be a positive number of seconds.",
+    "dmz_invalid": "Enter a valid DMZ host, other than the modem.",
+    "dmz_subnet": "The DMZ host must be in the LAN subnet.",
+    "passthrough_mac": "IP passthrough needs the client MAC (AA:BB:CC:DD:EE:FF).",
+    "dhcp_range_invalid": "Enter a valid DHCP range.",
+    "dhcp_range_subnet": "The DHCP range must be in the LAN subnet.",
+    "dhcp_range_order": "The DHCP range start must be lower than its end.",
+    "dhcp_range_reserved": "The DHCP range cannot include the network or broadcast address.",
+    "dhcp_range_modem": "The DHCP range cannot include the modem address."
+  }
+}

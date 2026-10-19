@@ -1,0 +1,47 @@
+{
+  "page": {
+    "title": "Informazioni sul dispositivo",
+    "description": "Identità del dispositivo, indirizzi di rete e informazioni di sistema."
+  },
+  "device_info": {
+    "title": "Dati del dispositivo",
+    "description": "Identità del modem e dettagli di sistema.",
+    "load_failed": "Impossibile caricare le informazioni sul dispositivo",
+    "lan_read_failed": "Impossibile leggere l'indirizzo LAN",
+    "modem_alt": "Modem {{model}}",
+    "modem_alt_generic": "Modem",
+    "sections": {
+      "device": "Dispositivo",
+      "system": "Sistema"
+    },
+    "rows": {
+      "manufacturer": "Produttore",
+      "model": "Modello",
+      "firmware": "Firmware",
+      "build_date": "Data di build",
+      "imei": "IMEI",
+      "release_lte": "Release 3GPP (LTE)",
+      "release_nr5g": "Release 3GPP (NR5G)",
+      "hostname": "Hostname",
+      "system_version": "Versione di sistema",
+      "kernel_version": "Versione del kernel"
+    }
+  },
+  "simpleadmin": {
+    "title": "Informazioni su Simple T99",
+    "description": "Interfaccia di gestione per il modem Foxconn T99W175.",
+    "logo_alt": "Logo di Simple T99",
+    "intro": "Simple T99 (SimpleAdmin) gira sul modem che gestisce. I dati radio in tempo reale arrivano dall'interfaccia DIAG di Qualcomm e da QMI attraverso due piccoli bridge, così la dashboard aperta non pesa quasi nulla sul modem.",
+    "credits": "Questa interfaccia è basata su <link>QManager</link> di DrDolomite, usato con licenza MIT e la condizione Commons Clause: non può essere venduto.",
+    "version": "Versione",
+    "network": "Rete",
+    "rows": {
+      "device_ip": "IP del dispositivo",
+      "lan_gateway": "Gateway LAN",
+      "wan_ipv4": "IPv4 WWAN",
+      "wan_ipv6": "IPv6 WWAN",
+      "public_ipv4": "IPv4 pubblico",
+      "public_ipv6": "IPv6 pubblico"
+    }
+  }
+}

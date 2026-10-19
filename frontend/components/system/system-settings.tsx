@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AlertTriangleIcon, RotateCcwIcon, SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/page-shell";
@@ -36,8 +37,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useBridgeState } from "@/hooks/use-bridge";
-import { sendAt } from "@/lib/at";
+import { atMessage, sendAt } from "@/lib/at";
 import { authFetch } from "@/lib/auth-fetch";
+import { translate } from "@/lib/i18n/message";
 import { imeiNvPayload, validateImei } from "@/lib/imei-utils";
 import { rebootModem } from "@/lib/modem-actions";
 import {
@@ -48,6 +50,7 @@ import {
   describeSchedule,
   parseSchedule,
   validateSchedule,
+  weekdayKey,
   type RebootForm,
 } from "@/lib/reboot-schedule";
 
@@ -59,6 +62,7 @@ const goToRebootPage = () => {
 // --- Scheduled reboot --------------------------------------------------------
 
 function ScheduledRebootCard() {
+  const { t } = useTranslation("system-settings");
   const [saved, setSaved] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [form, setForm] = useState<RebootForm>(DEFAULT_REBOOT_FORM);
@@ -96,20 +100,20 @@ function ScheduledRebootCard() {
     if (!enabled) {
       if (await post({ action: "delete" })) {
         setSaved("");
-        toast.success("Scheduled reboot removed");
-      } else toast.error("Unable to remove the schedule");
+        toast.success(t("reboot.toast.removed"));
+      } else toast.error(t("reboot.toast.remove_failed"));
       return;
     }
     const problem = validateSchedule(form);
     if (problem) {
-      toast.error(problem);
+      toast.error(translate(t, problem));
       return;
     }
     const line = buildSchedule(form);
     if (await post({ schedule: line })) {
       setSaved(line);
-      toast.success(`Reboot scheduled: ${describeSchedule(form)}`);
-    } else toast.error("Unable to save the schedule");
+      toast.success(t("reboot.toast.saved", { schedule: translate(t, describeSchedule(form)) }));
+    } else toast.error(t("reboot.toast.save_failed"));
   };
 
   const current = saved ? parseSchedule(saved) : null;
@@ -117,13 +121,13 @@ function ScheduledRebootCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Scheduled Reboot</CardTitle>
+        <CardTitle>{t("reboot.title")}</CardTitle>
         <CardDescription>
           {saved === null
-            ? "Loading…"
+            ? t("common:state.loading")
             : current
-              ? `Active: ${describeSchedule(current)}`
-              : "No reboot scheduled."}
+              ? t("reboot.active", { schedule: translate(t, describeSchedule(current)) })
+              : t("reboot.none")}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -132,7 +136,7 @@ function ScheduledRebootCard() {
         ) : (
           <>
             <div className="flex items-center justify-between">
-              <Label htmlFor="reboot-enabled">Enabled</Label>
+              <Label htmlFor="reboot-enabled">{t("enabled")}</Label>
               <Switch id="reboot-enabled" checked={enabled} onCheckedChange={setEnabled} />
             </div>
             {enabled && (
@@ -144,12 +148,12 @@ function ScheduledRebootCard() {
                   onValueChange={(v) => v && setForm({ ...form, mode: v as RebootForm["mode"] })}
                   className="justify-start"
                 >
-                  <ToggleGroupItem value="interval" className="px-4">Every N hours</ToggleGroupItem>
-                  <ToggleGroupItem value="schedule" className="px-4">At a set time</ToggleGroupItem>
+                  <ToggleGroupItem value="interval" className="px-4">{t("reboot.mode_interval")}</ToggleGroupItem>
+                  <ToggleGroupItem value="schedule" className="px-4">{t("reboot.mode_schedule")}</ToggleGroupItem>
                 </ToggleGroup>
                 {form.mode === "interval" ? (
                   <div className="grid gap-2">
-                    <Label>Hours between reboots</Label>
+                    <Label>{t("reboot.hours_between")}</Label>
                     <Select
                       value={String(form.intervalHours)}
                       onValueChange={(v) => setForm({ ...form, intervalHours: Number(v) })}
@@ -158,7 +162,7 @@ function ScheduledRebootCard() {
                       <SelectContent>
                         {INTERVAL_HOURS.map((h) => (
                           <SelectItem key={h} value={String(h)}>
-                            {h === 24 ? "24 (daily, at midnight)" : String(h)}
+                            {h === 24 ? t("reboot.interval_daily") : String(h)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -167,22 +171,22 @@ function ScheduledRebootCard() {
                 ) : (
                   <div className="grid gap-4 @md/main:grid-cols-3">
                     <div className="grid gap-2">
-                      <Label>Frequency</Label>
+                      <Label>{t("reboot.frequency")}</Label>
                       <Select
                         value={form.frequency}
                         onValueChange={(v) => setForm({ ...form, frequency: v as RebootForm["frequency"] })}
                       >
                         <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="daily">{t("reboot.frequencies.daily")}</SelectItem>
+                          <SelectItem value="weekly">{t("reboot.frequencies.weekly")}</SelectItem>
+                          <SelectItem value="monthly">{t("reboot.frequencies.monthly")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     {form.frequency === "weekly" && (
                       <div className="grid gap-2">
-                        <Label>Day</Label>
+                        <Label>{t("reboot.day")}</Label>
                         <Select
                           value={String(form.dayOfWeek)}
                           onValueChange={(v) => setForm({ ...form, dayOfWeek: Number(v) })}
@@ -190,7 +194,7 @@ function ScheduledRebootCard() {
                           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {WEEKDAYS.map((day, i) => (
-                              <SelectItem key={day} value={String(i)}>{day}</SelectItem>
+                              <SelectItem key={day} value={String(i)}>{t(weekdayKey(i))}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -198,7 +202,7 @@ function ScheduledRebootCard() {
                     )}
                     {form.frequency === "monthly" && (
                       <div className="grid gap-2">
-                        <Label htmlFor="reboot-dom">Day of month</Label>
+                        <Label htmlFor="reboot-dom">{t("reboot.day_of_month")}</Label>
                         <Input
                           id="reboot-dom"
                           inputMode="numeric"
@@ -208,7 +212,7 @@ function ScheduledRebootCard() {
                       </div>
                     )}
                     <div className="grid gap-2">
-                      <Label htmlFor="reboot-time">Time</Label>
+                      <Label htmlFor="reboot-time">{t("reboot.time")}</Label>
                       <Input
                         id="reboot-time"
                         type="time"
@@ -226,7 +230,7 @@ function ScheduledRebootCard() {
       <CardFooter>
         <Button onClick={save} disabled={busy || saved === null}>
           <SaveIcon />
-          Save
+          {t("common:actions.save")}
         </Button>
       </CardFooter>
     </Card>
@@ -236,6 +240,7 @@ function ScheduledRebootCard() {
 // --- IMEI ----------------------------------------------------------------------
 
 function ImeiCard() {
+  const { t } = useTranslation("system-settings");
   const { system } = useBridgeState();
   const current = system?.modem.imei ?? "";
   const [value, setValue] = useState("");
@@ -250,14 +255,14 @@ function ImeiCard() {
     // Checked again here: the NV item is cleared first, so a bad value must
     // never reach that point.
     if (!validateImei(digits) || digits === current) {
-      toast.error("The IMEI must be 15 digits with a valid check digit");
+      toast.error(t("imei.invalid"));
       return;
     }
     setBusy(true);
     try {
       const clear = await sendAt("AT^NV=550,0");
       if (!clear.ok) {
-        toast.error(clear.message || "Unable to clear the IMEI");
+        toast.error(atMessage(t, clear) || t("imei.clear_failed"));
         return;
       }
       // The modem needs a moment between the two NV writes.
@@ -265,7 +270,7 @@ function ImeiCard() {
       const payload = imeiNvPayload(digits);
       const set = await sendAt(`AT^NV=550,${payload.split(",").length},"${payload}"`);
       if (!set.ok) {
-        toast.error(set.message || "Unable to write the IMEI");
+        toast.error(atMessage(t, set) || t("imei.write_failed"));
         return;
       }
       setStep("reboot");
@@ -278,10 +283,10 @@ function ImeiCard() {
     <Card>
       <CardHeader>
         <CardTitle>IMEI</CardTitle>
-        <CardDescription>Current: {current || "…"}</CardDescription>
+        <CardDescription>{t("imei.current", { imei: current || "…" })}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-2">
-        <Label htmlFor="imei">New IMEI</Label>
+        <Label htmlFor="imei">{t("imei.new")}</Label>
         <Input
           id="imei"
           inputMode="numeric"
@@ -291,14 +296,12 @@ function ImeiCard() {
           onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))}
         />
         {digits.length === 15 && !luhnOk && (
-          <p className="text-sm text-destructive">
-            The check digit does not match (Luhn): this is not a valid IMEI.
-          </p>
+          <p className="text-sm text-destructive">{t("imei.luhn_mismatch")}</p>
         )}
       </CardContent>
       <CardFooter>
         <Button variant="outline" disabled={!writable || busy} onClick={() => setStep("warning")}>
-          Change IMEI
+          {t("imei.change")}
         </Button>
       </CardFooter>
 
@@ -306,18 +309,24 @@ function ImeiCard() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {step === "warning" ? "Legal warning" : step === "confirm" ? `Write IMEI ${digits}?` : "IMEI written"}
+              {step === "warning"
+                ? t("imei.dialog.warning_title")
+                : step === "confirm"
+                  ? t("imei.dialog.confirm_title", { imei: digits })
+                  : t("imei.dialog.written_title")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {step === "warning"
-                ? "Changing the IMEI is illegal in many countries. Only restore the original IMEI of this device; you are responsible for its use."
+                ? t("imei.dialog.warning_description")
                 : step === "confirm"
-                  ? "The modem identity changes after the next restart. Note the current IMEI before continuing."
-                  : "Restart the modem now to use the new IMEI?"}
+                  ? t("imei.dialog.confirm_description")
+                  : t("imei.dialog.written_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>{step === "reboot" ? "Later" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>
+              {step === "reboot" ? t("imei.dialog.later") : t("common:actions.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={busy}
@@ -328,11 +337,15 @@ function ImeiCard() {
                 else {
                   const r = await rebootModem();
                   if (r.ok) goToRebootPage();
-                  else toast.error(r.message || "Restart refused");
+                  else toast.error(atMessage(t, r) || t("imei.restart_refused"));
                 }
               }}
             >
-              {step === "warning" ? "I understand" : step === "confirm" ? "Write" : "Restart"}
+              {step === "warning"
+                ? t("imei.dialog.understand")
+                : step === "confirm"
+                  ? t("imei.dialog.write")
+                  : t("imei.dialog.restart")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -344,6 +357,7 @@ function ImeiCard() {
 // --- eSIM manager ----------------------------------------------------------------
 
 function EsimToggleCard() {
+  const { t } = useTranslation("system-settings");
   const [state, setState] = useState<{
     enabled: boolean;
     clientInstalled: boolean;
@@ -380,9 +394,9 @@ function EsimToggleCard() {
       }
       if (!json.ok) throw new Error(json.message);
       setState({ ...state, enabled: value });
-      toast.success(value ? "eSIM manager enabled" : "eSIM manager disabled");
+      toast.success(value ? t("esim.toast.enabled") : t("esim.toast.disabled"));
     } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : "Unable to change the eSIM manager");
+      toast.error(err instanceof Error && err.message ? err.message : t("esim.toast.failed"));
     } finally {
       setBusy(false);
     }
@@ -394,14 +408,12 @@ function EsimToggleCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>eSIM Manager</CardTitle>
-        <CardDescription>
-          Runs the local euicc-client service behind the eSIM page (profiles on SIM 2).
-        </CardDescription>
+        <CardTitle>{t("esim.title")}</CardTitle>
+        <CardDescription>{t("esim.description")}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
         <div className="flex items-center justify-between">
-          <Label htmlFor="esim-enabled">Enabled</Label>
+          <Label htmlFor="esim-enabled">{t("enabled")}</Label>
           <Switch
             id="esim-enabled"
             checked={state?.enabled ?? false}
@@ -415,11 +427,7 @@ function EsimToggleCard() {
             className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning"
           >
             <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
-            <span>
-              The euicc-client is not installed ({state.clientPath}), so the eSIM manager
-              cannot be enabled. It is not part of SimpleAdmin: copy it to the modem as
-              described in docs/Enable_New_feature.md.
-            </span>
+            <span>{t("esim.client_missing", { path: state.clientPath })}</span>
           </div>
         )}
       </CardContent>
@@ -430,6 +438,7 @@ function EsimToggleCard() {
 // --- Factory reset ---------------------------------------------------------------
 
 function FactoryResetCard() {
+  const { t } = useTranslation("system-settings");
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -444,7 +453,7 @@ function FactoryResetCard() {
       if (json.status !== "success") throw new Error(json.message);
       goToRebootPage();
     } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : "Factory reset failed");
+      toast.error(err instanceof Error && err.message ? err.message : t("factory_reset.failed"));
       setBusy(false);
       setConfirm(false);
     }
@@ -453,17 +462,13 @@ function FactoryResetCard() {
   return (
     <Card className="border-destructive/40">
       <CardHeader>
-        <CardTitle>Factory Reset</CardTitle>
-        <CardDescription>
-          Removes band and cell locks, sets automatic network mode, restores the
-          LAN, firewall and IPA configuration, the system and web passwords and
-          simpleadmin.conf, then reboots.
-        </CardDescription>
+        <CardTitle>{t("factory_reset.title")}</CardTitle>
+        <CardDescription>{t("factory_reset.description")}</CardDescription>
       </CardHeader>
       <CardFooter>
         <Button variant="destructive" onClick={() => setConfirm(true)} disabled={busy}>
           <RotateCcwIcon />
-          Factory Reset
+          {t("factory_reset.button")}
         </Button>
       </CardFooter>
       <AlertDialog open={confirm} onOpenChange={(open) => !busy && setConfirm(open)}>
@@ -471,15 +476,12 @@ function FactoryResetCard() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangleIcon className="size-5 text-destructive" />
-              Reset to factory defaults?
+              {t("factory_reset.dialog.title")}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Every setting listed above is lost and the modem reboots. Afterwards
-              it answers at 192.168.225.1 with the default credentials.
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t("factory_reset.dialog.description")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={busy}
@@ -488,7 +490,7 @@ function FactoryResetCard() {
                 reset();
               }}
             >
-              Reset
+              {t("factory_reset.dialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -498,11 +500,9 @@ function FactoryResetCard() {
 }
 
 export default function SystemSettingsComponent() {
+  const { t } = useTranslation("system-settings");
   return (
-    <PageShell
-      title="System"
-      description="Scheduled reboot, modem identity, optional services and factory reset."
-    >
+    <PageShell title={t("page.title")} description={t("page.description")}>
       <ScheduledRebootCard />
       <ImeiCard />
       <EsimToggleCard />

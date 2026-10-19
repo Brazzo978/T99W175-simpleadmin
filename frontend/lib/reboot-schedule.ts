@@ -7,6 +7,8 @@
 // divides 24: */5 fires at 20:00 and again four hours later at 00:00.
 // =============================================================================
 
+import { msg, type Msg } from "@/lib/i18n/message";
+
 export type RebootFrequency = "daily" | "weekly" | "monthly";
 
 export interface RebootForm {
@@ -42,6 +44,13 @@ export const WEEKDAYS = [
   "Saturday",
 ];
 
+/** Translation key of a weekday (cron day of week): in a list, or inline
+ *  in a sentence (lower case in Italian). */
+export function weekdayKey(day: number, inline = false): string {
+  const name = (WEEKDAYS[day] ?? WEEKDAYS[0]).toLowerCase();
+  return `system-settings:reboot.${inline ? "weekdays_inline" : "weekdays"}.${name}`;
+}
+
 export function parseSchedule(line: string): RebootForm | null {
   const parts = line.trim().split(/\s+/);
   if (parts.length < 6) return null;
@@ -65,16 +74,17 @@ export function parseSchedule(line: string): RebootForm | null {
   return form;
 }
 
-export function validateSchedule(form: RebootForm): string | null {
+/** Why the form cannot be saved (a translatable message), or null. */
+export function validateSchedule(form: RebootForm): Msg | null {
   if (form.mode === "interval") {
     return (INTERVAL_HOURS as readonly number[]).includes(form.intervalHours)
       ? null
-      : "Choose an interval that divides the day: 1, 2, 3, 4, 6, 8, 12 or 24 hours.";
+      : msg("system-settings:reboot.validation.interval");
   }
   const [h, m] = form.time.split(":").map(Number);
-  if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return "Choose a valid time.";
+  if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return msg("system-settings:reboot.validation.time");
   if (form.frequency === "monthly" && !(form.dayOfMonth >= 1 && form.dayOfMonth <= 31)) {
-    return "The day of the month must be 1 to 31.";
+    return msg("system-settings:reboot.validation.day_of_month");
   }
   return null;
 }
@@ -89,15 +99,21 @@ export function buildSchedule(form: RebootForm): string {
   return `${minute} ${hour} ${dom} * ${dow} reboot`;
 }
 
-export function describeSchedule(form: RebootForm): string {
+/** The schedule in words, as a translatable message. */
+export function describeSchedule(form: RebootForm): Msg {
+  const key = (name: string) => `system-settings:reboot.describe.${name}`;
   if (form.mode === "interval") {
-    if (form.intervalHours === 24) return "Every day at midnight";
+    if (form.intervalHours === 24) return msg(key("midnight"));
     // A schedule saved by an older interface may not divide the day.
     return 24 % form.intervalHours === 0
-      ? `Every ${form.intervalHours} hours from midnight`
-      : `Every ${form.intervalHours} hours from midnight, then again at midnight`;
+      ? msg(key("every_hours"), { count: form.intervalHours })
+      : msg(key("every_hours_uneven"), { count: form.intervalHours });
   }
-  if (form.frequency === "weekly") return `Every ${WEEKDAYS[form.dayOfWeek]} at ${form.time}`;
-  if (form.frequency === "monthly") return `Day ${form.dayOfMonth} of every month at ${form.time}`;
-  return `Every day at ${form.time}`;
+  if (form.frequency === "weekly") {
+    return msg(key("weekly"), { day: msg(weekdayKey(form.dayOfWeek, true)), time: form.time });
+  }
+  if (form.frequency === "monthly") {
+    return msg(key("monthly"), { day: form.dayOfMonth, time: form.time });
+  }
+  return msg(key("daily"), { time: form.time });
 }

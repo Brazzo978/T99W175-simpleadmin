@@ -10,6 +10,9 @@ import enCellular from "@/locales/en/cellular.json";
 import enSimProfiles from "@/locales/en/sim-profiles.json";
 import enSms from "@/locales/en/sms.json";
 import enEsim from "@/locales/en/esim.json";
+import enNetwork from "@/locales/en/network.json";
+import enSystemSettings from "@/locales/en/system-settings.json";
+import enAbout from "@/locales/en/about.json";
 import itCommon from "@/locales/it/common.json";
 import itSidebar from "@/locales/it/sidebar.json";
 import itDashboard from "@/locales/it/dashboard.json";
@@ -22,6 +25,9 @@ import itCellular from "@/locales/it/cellular.json";
 import itSimProfiles from "@/locales/it/sim-profiles.json";
 import itSms from "@/locales/it/sms.json";
 import itEsim from "@/locales/it/esim.json";
+import itNetwork from "@/locales/it/network.json";
+import itSystemSettings from "@/locales/it/system-settings.json";
+import itAbout from "@/locales/it/about.json";
 
 // Static resources for i18next. Every bundled language declares every
 // namespace: one per page (or page group), plus common, sidebar and
@@ -41,6 +47,9 @@ export const resources = {
     "sim-profiles": enSimProfiles,
     sms: enSms,
     esim: enEsim,
+    network: enNetwork,
+    "system-settings": enSystemSettings,
+    about: enAbout,
   },
   it: {
     common: itCommon,
@@ -55,6 +64,9 @@ export const resources = {
     "sim-profiles": itSimProfiles,
     sms: itSms,
     esim: itEsim,
+    network: itNetwork,
+    "system-settings": itSystemSettings,
+    about: itAbout,
   },
 } as const;
 
@@ -72,4 +84,7 @@ export const ALL_NAMESPACES = [
   "sim-profiles",
   "sms",
   "esim",
+  "network",
+  "system-settings",
+  "about",
 ] as const;

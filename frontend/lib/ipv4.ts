@@ -1,5 +1,7 @@
 // IPv4 and MAC helpers for the network forms.
 
+import { msg, type Msg } from "@/lib/i18n/message";
+
 const IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 
 export function isValidIp(value: string): boolean {
@@ -50,21 +52,22 @@ export function subnetBounds(ip: string, mask: string): { network: number; broad
   return { network, broadcast: (network | (~m >>> 0)) >>> 0 };
 }
 
-/** Why a DHCP range cannot be used on this LAN, or null when it can. */
-export function dhcpRangeProblem(ip: string, mask: string, start: string, end: string): string | null {
-  if (!isValidIp(start) || !isValidIp(end)) return "Enter a valid DHCP range.";
+/** Why a DHCP range cannot be used on this LAN (a translatable message), or
+ *  null when it can. */
+export function dhcpRangeProblem(ip: string, mask: string, start: string, end: string): Msg | null {
+  if (!isValidIp(start) || !isValidIp(end)) return msg("network:validation.dhcp_range_invalid");
   if (!sameSubnet(ip, start, mask) || !sameSubnet(ip, end, mask)) {
-    return "The DHCP range must be in the LAN subnet.";
+    return msg("network:validation.dhcp_range_subnet");
   }
   const s = ipToNumber(start);
   const e = ipToNumber(end);
-  if (s > e) return "The DHCP range start must be lower than its end.";
+  if (s > e) return msg("network:validation.dhcp_range_order");
   const { network, broadcast } = subnetBounds(ip, mask);
   if (s === network || e === broadcast) {
-    return "The DHCP range cannot include the network or broadcast address.";
+    return msg("network:validation.dhcp_range_reserved");
   }
   const own = ipToNumber(ip);
-  if (own >= s && own <= e) return "The DHCP range cannot include the modem address.";
+  if (own >= s && own <= e) return msg("network:validation.dhcp_range_modem");
   return null;
 }
 

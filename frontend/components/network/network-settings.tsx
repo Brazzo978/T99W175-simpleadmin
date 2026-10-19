@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { AlertCircleIcon, RotateCcwIcon, SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/page-shell";
@@ -46,19 +48,26 @@ import {
   subnetBounds,
   suggestDhcpRange,
 } from "@/lib/ipv4";
+import { atMessage } from "@/lib/at";
+import { msg, translate, type Msg } from "@/lib/i18n/message";
 import { rebootModem } from "@/lib/modem-actions";
 
 const MANUAL_MAC = "__manual__";
 
-function validate(c: NetworkConfig): string[] {
-  const errors: string[] = [];
+/** A form problem: ours to translate, or the CGI's own text. */
+type Problem = Msg | string;
+
+const problemText = (t: TFunction, p: Problem) => (typeof p === "string" ? p : translate(t, p));
+
+function validate(c: NetworkConfig): Problem[] {
+  const errors: Problem[] = [];
   if (!isValidIp(c.ipAddress)) {
-    errors.push("Enter a valid LAN IP address.");
+    errors.push(msg("network:validation.lan_ip_invalid"));
   } else {
     const { network, broadcast } = subnetBounds(c.ipAddress, c.subnetMask);
     const own = ipToNumber(c.ipAddress);
     if (own === network || own === broadcast) {
-      errors.push("The LAN IP cannot be the network or broadcast address of its subnet.");
+      errors.push(msg("network:validation.lan_ip_reserved"));
     }
   }
   if (c.dhcpEnabled) {
@@ -68,18 +77,18 @@ function validate(c: NetworkConfig): string[] {
     if (problem) errors.push(problem);
     const lease = Number(c.dhcpLease);
     if (!Number.isInteger(lease) || lease <= 0) {
-      errors.push("The lease time must be a positive number of seconds.");
+      errors.push(msg("network:validation.lease_invalid"));
     }
   }
   if (c.dmzEnabled) {
     if (!isValidIp(c.dmzIp) || c.dmzIp === "0.0.0.0" || c.dmzIp === c.ipAddress) {
-      errors.push("Enter a valid DMZ host, other than the modem.");
+      errors.push(msg("network:validation.dmz_invalid"));
     } else if (!sameSubnet(c.ipAddress, c.dmzIp, c.subnetMask)) {
-      errors.push("The DMZ host must be in the LAN subnet.");
+      errors.push(msg("network:validation.dmz_subnet"));
     }
   }
   if (c.bridgeEnabled && !isValidMac(c.bridgeMac)) {
-    errors.push("IP passthrough needs the client MAC (AA:BB:CC:DD:EE:FF).");
+    errors.push(msg("network:validation.passthrough_mac"));
   }
   return errors;
 }
@@ -120,13 +129,14 @@ function SwitchRow({
 }
 
 export default function NetworkSettingsComponent() {
+  const { t } = useTranslation("network");
   const net = useNetworkSettings();
   const { config, ttl, clients, isLoading, isSaving } = net;
 
   const [draft, setDraft] = useState<NetworkConfig | null>(null);
   const [rangeEdited, setRangeEdited] = useState(false);
   const [macChoice, setMacChoice] = useState<string | null>(null);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Problem[]>([]);
   const [askRestart, setAskRestart] = useState(false);
   const [ttlValue, setTtlValue] = useState<string | null>(null);
 
@@ -165,7 +175,7 @@ export default function NetworkSettingsComponent() {
     if (problems.length) return;
     const result = await net.save(form);
     if (!result.ok) {
-      setErrors([result.message || "Save failed"]);
+      setErrors([result.message || msg("network:errors.save_failed")]);
       return;
     }
     setDraft(null);
@@ -178,7 +188,7 @@ export default function NetworkSettingsComponent() {
     setAskRestart(false);
     const result = await rebootModem();
     if (!result.ok) {
-      toast.error(result.message || "Restart refused");
+      toast.error(atMessage(t, result) || t("errors.restart_refused"));
       return;
     }
     sessionStorage.setItem("qm_rebooting", "1");
@@ -188,19 +198,19 @@ export default function NetworkSettingsComponent() {
   const applyTtl = async (enabled: boolean) => {
     const value = enabled ? Number(ttlValue ?? (ttl?.value || 64)) : 0;
     if (enabled && (!Number.isInteger(value) || value < 1 || value > 255)) {
-      toast.error("TTL must be between 1 and 255");
+      toast.error(t("ttl.out_of_range"));
       return;
     }
     const result = await net.setTtlValue(value);
     if (result.ok) {
-      toast.success(enabled ? `TTL override set to ${value}` : "TTL override disabled");
+      toast.success(enabled ? t("ttl.set", { value }) : t("ttl.disabled"));
       setTtlValue(null);
     } else toast.error(result.message);
   };
 
   if (isLoading || !form) {
     return (
-      <PageShell title="Local Network" description="LAN addressing, DHCP, DMZ, IP passthrough and TTL.">
+      <PageShell title={t("page.title")} description={t("page.description_short")}>
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-56 w-full rounded-xl" />
         ))}
@@ -209,17 +219,14 @@ export default function NetworkSettingsComponent() {
   }
 
   return (
-    <PageShell
-      title="Local Network"
-      description="LAN addressing, DHCP, DMZ, IP passthrough and TTL. Network changes take effect after a modem restart."
-    >
+    <PageShell title={t("page.title")} description={t("page.description")}>
       <Card>
         <CardHeader>
           <CardTitle>LAN</CardTitle>
-          <CardDescription>Address of the modem on the local network.</CardDescription>
+          <CardDescription>{t("lan.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 @md/main:grid-cols-2">
-          <Field label="IP address" htmlFor="lan-ip">
+          <Field label={t("lan.ip_address")} htmlFor="lan-ip">
             <Input
               id="lan-ip"
               value={form.ipAddress}
@@ -227,7 +234,7 @@ export default function NetworkSettingsComponent() {
               onChange={(e) => update({ ipAddress: e.target.value })}
             />
           </Field>
-          <Field label="Subnet mask">
+          <Field label={t("lan.subnet_mask")}>
             <Select value={form.subnetMask} onValueChange={(v) => update({ subnetMask: v })}>
               <SelectTrigger className="w-full">
                 <SelectValue />
@@ -246,20 +253,20 @@ export default function NetworkSettingsComponent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>DHCP Server</CardTitle>
-          <CardDescription>Addresses handed out to LAN clients.</CardDescription>
+          <CardTitle>{t("dhcp.title")}</CardTitle>
+          <CardDescription>{t("dhcp.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <SwitchRow
             id="dhcp"
-            label="Enabled"
+            label={t("enabled")}
             checked={form.dhcpEnabled}
             disabled={form.bridgeEnabled}
             onChange={(v) => update({ dhcpEnabled: v })}
           />
           {form.dhcpEnabled && (
             <div className="grid gap-4 @md/main:grid-cols-3">
-              <Field label="Range start" htmlFor="dhcp-start">
+              <Field label={t("dhcp.range_start")} htmlFor="dhcp-start">
                 <Input
                   id="dhcp-start"
                   value={form.dhcpStart}
@@ -269,7 +276,7 @@ export default function NetworkSettingsComponent() {
                   }}
                 />
               </Field>
-              <Field label="Range end" htmlFor="dhcp-end">
+              <Field label={t("dhcp.range_end")} htmlFor="dhcp-end">
                 <Input
                   id="dhcp-end"
                   value={form.dhcpEnd}
@@ -279,7 +286,7 @@ export default function NetworkSettingsComponent() {
                   }}
                 />
               </Field>
-              <Field label="Lease (seconds)" htmlFor="dhcp-lease">
+              <Field label={t("dhcp.lease")} htmlFor="dhcp-lease">
                 <Input
                   id="dhcp-lease"
                   inputMode="numeric"
@@ -294,16 +301,13 @@ export default function NetworkSettingsComponent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>IP Passthrough</CardTitle>
-          <CardDescription>
-            Hands the mobile WAN address to one LAN device (bridge mode). The
-            device must use DHCP.
-          </CardDescription>
+          <CardTitle>{t("passthrough.title")}</CardTitle>
+          <CardDescription>{t("passthrough.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <SwitchRow
             id="bridge"
-            label="Enabled"
+            label={t("enabled")}
             checked={form.bridgeEnabled}
             onChange={(v) =>
               update(v ? { bridgeEnabled: true, dhcpEnabled: true } : { bridgeEnabled: false, bridgeMac: "" })
@@ -311,7 +315,7 @@ export default function NetworkSettingsComponent() {
           />
           {form.bridgeEnabled && (
             <div className="grid gap-4 @md/main:grid-cols-2">
-              <Field label="Client">
+              <Field label={t("passthrough.client")}>
                 <Select
                   value={shownMacChoice}
                   onValueChange={(v) => {
@@ -320,7 +324,7 @@ export default function NetworkSettingsComponent() {
                   }}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Choose a device" />
+                    <SelectValue placeholder={t("passthrough.choose_device")} />
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((c) => (
@@ -328,12 +332,12 @@ export default function NetworkSettingsComponent() {
                         {c.mac} ({c.ips.join(", ")})
                       </SelectItem>
                     ))}
-                    <SelectItem value={MANUAL_MAC}>Other MAC address…</SelectItem>
+                    <SelectItem value={MANUAL_MAC}>{t("passthrough.other_mac")}</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
               {shownMacChoice === MANUAL_MAC && (
-                <Field label="MAC address" htmlFor="bridge-mac">
+                <Field label={t("passthrough.mac_address")} htmlFor="bridge-mac">
                   <Input
                     id="bridge-mac"
                     placeholder="AA:BB:CC:DD:EE:FF"
@@ -351,17 +355,17 @@ export default function NetworkSettingsComponent() {
       <Card>
         <CardHeader>
           <CardTitle>DMZ</CardTitle>
-          <CardDescription>Forwards every unsolicited inbound connection to one LAN host.</CardDescription>
+          <CardDescription>{t("dmz.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <SwitchRow
             id="dmz"
-            label="Enabled"
+            label={t("enabled")}
             checked={form.dmzEnabled}
             onChange={(v) => update({ dmzEnabled: v, dmzIp: v ? form.dmzIp : "" })}
           />
           {form.dmzEnabled && (
-            <Field label="Host IP" htmlFor="dmz-ip">
+            <Field label={t("dmz.host_ip")} htmlFor="dmz-ip">
               <Input id="dmz-ip" value={form.dmzIp} onChange={(e) => update({ dmzIp: e.target.value })} />
             </Field>
           )}
@@ -370,19 +374,19 @@ export default function NetworkSettingsComponent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Mobile Connection</CardTitle>
-          <CardDescription>How the modem brings up the data connection.</CardDescription>
+          <CardTitle>{t("mobile.title")}</CardTitle>
+          <CardDescription>{t("mobile.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <SwitchRow
             id="autoconnect"
-            label="Connect automatically"
+            label={t("mobile.auto_connect")}
             checked={form.autoConnect}
             onChange={(v) => update({ autoConnect: v })}
           />
           <SwitchRow
             id="roaming"
-            label="Allow roaming"
+            label={t("mobile.roaming")}
             checked={form.roamingEnabled}
             onChange={(v) => update({ roamingEnabled: v })}
           />
@@ -397,20 +401,18 @@ export default function NetworkSettingsComponent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>TTL Override</CardTitle>
-          <CardDescription>
-            Rewrites the IPv4 TTL of outgoing packets. Applied at once, no restart.
-          </CardDescription>
+          <CardTitle>{t("ttl.title")}</CardTitle>
+          <CardDescription>{t("ttl.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <SwitchRow
             id="ttl"
-            label="Enabled"
+            label={t("enabled")}
             checked={ttl?.enabled ?? false}
             disabled={isSaving}
             onChange={(v) => applyTtl(v)}
           />
-          <Field label="TTL value" htmlFor="ttl-value">
+          <Field label={t("ttl.value")} htmlFor="ttl-value">
             <Input
               id="ttl-value"
               inputMode="numeric"
@@ -425,7 +427,7 @@ export default function NetworkSettingsComponent() {
             onClick={() => applyTtl(true)}
             disabled={isSaving || ttlValue === null}
           >
-            Apply TTL
+            {t("ttl.apply")}
           </Button>
         </CardFooter>
       </Card>
@@ -438,16 +440,17 @@ export default function NetworkSettingsComponent() {
           >
             <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
             <ul className="grid gap-1">
-              {errors.map((e) => (
-                <li key={e}>{e}</li>
-              ))}
+              {errors.map((e) => {
+                const text = problemText(t, e);
+                return <li key={text}>{text}</li>;
+              })}
             </ul>
           </div>
         )}
         <div className="flex flex-wrap gap-2">
           <Button onClick={handleSave} disabled={!dirty || isSaving}>
             <SaveIcon />
-            Save Network Settings
+            {t("actions.save")}
           </Button>
           <Button
             variant="outline"
@@ -460,7 +463,7 @@ export default function NetworkSettingsComponent() {
             }}
           >
             <RotateCcwIcon />
-            Discard Changes
+            {t("actions.discard")}
           </Button>
         </div>
       </div>
@@ -468,16 +471,13 @@ export default function NetworkSettingsComponent() {
       <AlertDialog open={askRestart} onOpenChange={setAskRestart}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Settings saved. Restart now?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The new network settings take effect after a modem restart. LAN
-              clients may need to renew their address afterwards.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("restart_dialog.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("restart_dialog.description")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Later</AlertDialogCancel>
+            <AlertDialogCancel>{t("restart_dialog.later")}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={restartNow}>
-              Restart Now
+              {t("restart_dialog.restart")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

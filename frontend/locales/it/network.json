@@ -1,0 +1,75 @@
+{
+  "page": {
+    "title": "Rete locale",
+    "description_short": "Indirizzi LAN, DHCP, DMZ, IP passthrough e TTL.",
+    "description": "Indirizzi LAN, DHCP, DMZ, IP passthrough e TTL. Le modifiche alla rete hanno effetto dopo un riavvio del modem."
+  },
+  "enabled": "Attivo",
+  "lan": {
+    "description": "Indirizzo del modem nella rete locale.",
+    "ip_address": "Indirizzo IP",
+    "subnet_mask": "Subnet mask"
+  },
+  "dhcp": {
+    "title": "Server DHCP",
+    "description": "Indirizzi assegnati ai client della LAN.",
+    "range_start": "Inizio intervallo",
+    "range_end": "Fine intervallo",
+    "lease": "Lease (secondi)"
+  },
+  "passthrough": {
+    "title": "IP passthrough",
+    "description": "Assegna l'indirizzo WAN mobile a un solo dispositivo della LAN (modalità bridge). Il dispositivo deve usare il DHCP.",
+    "client": "Client",
+    "choose_device": "Scegli un dispositivo",
+    "other_mac": "Altro indirizzo MAC…",
+    "mac_address": "Indirizzo MAC"
+  },
+  "dmz": {
+    "description": "Inoltra ogni connessione in ingresso non richiesta a un solo host della LAN.",
+    "host_ip": "IP dell'host"
+  },
+  "mobile": {
+    "title": "Connessione mobile",
+    "description": "Come il modem attiva la connessione dati.",
+    "auto_connect": "Connetti automaticamente",
+    "roaming": "Consenti il roaming"
+  },
+  "ttl": {
+    "title": "Override del TTL",
+    "description": "Riscrive il TTL IPv4 dei pacchetti in uscita. Si applica subito, senza riavvio.",
+    "value": "Valore TTL",
+    "apply": "Applica TTL",
+    "out_of_range": "Il TTL deve essere compreso tra 1 e 255",
+    "set": "Override del TTL impostato a {{value}}",
+    "disabled": "Override del TTL disattivato"
+  },
+  "actions": {
+    "save": "Salva impostazioni di rete",
+    "discard": "Annulla modifiche"
+  },
+  "restart_dialog": {
+    "title": "Impostazioni salvate. Riavviare ora?",
+    "description": "Le nuove impostazioni di rete hanno effetto dopo un riavvio del modem. In seguito i client della LAN potrebbero dover rinnovare il proprio indirizzo.",
+    "later": "Più tardi",
+    "restart": "Riavvia ora"
+  },
+  "errors": {
+    "read_failed": "Impossibile leggere le impostazioni di rete",
+    "save_failed": "Salvataggio non riuscito",
+    "restart_refused": "Riavvio rifiutato"
+  },
+  "validation": {
+    "lan_ip_invalid": "Inserisci un indirizzo IP LAN valido.",
+    "lan_ip_reserved": "L'IP LAN non può essere l'indirizzo di rete o di broadcast della sua subnet.",
+    "lease_invalid": "La durata del lease deve essere un numero positivo di secondi.",
+    "dmz_invalid": "Inserisci un host DMZ valido, diverso dal modem.",
+    "dmz_subnet": "L'host DMZ deve trovarsi nella subnet della LAN.",
+    "passthrough_mac": "L'IP passthrough richiede il MAC del client (AA:BB:CC:DD:EE:FF).",
+    "dhcp_range_invalid": "Inserisci un intervallo DHCP valido.",
+    "dhcp_range_subnet": "L'intervallo DHCP deve trovarsi nella subnet della LAN.",
+    "dhcp_range_order": "L'inizio dell'intervallo DHCP deve essere inferiore alla fine.",
+    "dhcp_range_reserved": "L'intervallo DHCP non può includere l'indirizzo di rete o di broadcast.",
+    "dhcp_range_modem": "L'intervallo DHCP non può includere l'indirizzo del modem."
+  }
+}

@@ -1,6 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Card,
   CardContent,
@@ -37,37 +39,38 @@ interface DeviceInformationCardProps {
   onRetry: () => void;
 }
 
-function buildSections(data: AboutDeviceData): DataSection[] {
+function buildSections(data: AboutDeviceData, t: TFunction): DataSection[] {
+  const row = (key: string) => t(`device_info.rows.${key}`);
   return [
     {
-      title: "Device",
+      title: t("device_info.sections.device"),
       rows: [
-        { label: "Manufacturer", value: data.device.manufacturer },
-        { label: "Model", value: data.device.model },
-        { label: "Firmware", value: data.device.firmware },
-        { label: "Build Date", value: data.device.build_date },
-        { label: "IMEI", value: data.device.imei, mono: true },
+        { label: row("manufacturer"), value: data.device.manufacturer },
+        { label: row("model"), value: data.device.model },
+        { label: row("firmware"), value: data.device.firmware },
+        { label: row("build_date"), value: data.device.build_date },
+        { label: row("imei"), value: data.device.imei, mono: true },
         {
-          label: "3GPP Release (LTE)",
+          label: row("release_lte"),
           value: data.threeGppRelease.lte,
         },
         {
-          label: "3GPP Release (NR5G)",
+          label: row("release_nr5g"),
           value: data.threeGppRelease.nr5g,
         },
       ],
     },
     {
-      title: "System",
+      title: t("device_info.sections.system"),
       rows: [
-        { label: "Hostname", value: data.system.hostname },
+        { label: row("hostname"), value: data.system.hostname },
         {
-          label: "System Version",
+          label: row("system_version"),
           value: data.system.openwrt_version,
           mono: true,
         },
         {
-          label: "Kernel Version",
+          label: row("kernel_version"),
           value: data.system.kernel_version,
           mono: true,
         },
@@ -79,15 +82,14 @@ function buildSections(data: AboutDeviceData): DataSection[] {
 // ─── Loading skeleton ────────────────────────────────────────────────────────
 
 function DeviceInformationSkeleton() {
+  const { t } = useTranslation("about");
   return (
     <Card className="@container/card">
       <CardHeader>
         <CardTitle className="text-2xl font-semibold">
-          Device Information
+          {t("device_info.title")}
         </CardTitle>
-        <CardDescription>
-          Modem identity and system details.
-        </CardDescription>
+        <CardDescription>{t("device_info.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-center mb-8">
@@ -114,6 +116,7 @@ const DeviceInformationCard = ({
   error,
   onRetry,
 }: DeviceInformationCardProps) => {
+  const { t } = useTranslation("about");
   if (isLoading) {
     return <DeviceInformationSkeleton />;
   }
@@ -122,22 +125,20 @@ const DeviceInformationCard = ({
     <Card className="@container/card">
       <CardHeader>
         <CardTitle className="text-2xl font-semibold">
-          Device Information
+          {t("device_info.title")}
         </CardTitle>
-        <CardDescription>
-          Modem identity and system details.
-        </CardDescription>
+        <CardDescription>{t("device_info.description")}</CardDescription>
       </CardHeader>
       <CardContent aria-live="polite">
         {error ? (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Failed to load device information</AlertTitle>
+            <AlertTitle>{t("device_info.load_failed")}</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
               <span>{error}</span>
               <Button variant="outline" size="sm" onClick={onRetry}>
                 <RefreshCcw className="size-3.5 mr-1.5" />
-                Retry
+                {t("common:actions.retry")}
               </Button>
             </AlertDescription>
           </Alert>
@@ -153,14 +154,18 @@ const DeviceInformationCard = ({
               <div className="size-44 bg-primary/15 rounded-full p-4 flex items-center justify-center">
                 <img
                   src="/simple-t99-icon.png"
-                  alt={data.device.model ? `${data.device.model} modem` : "Modem"}
+                  alt={
+                    data.device.model
+                      ? t("device_info.modem_alt", { model: data.device.model })
+                      : t("device_info.modem_alt_generic")
+                  }
                   className="size-full drop-shadow-md object-contain"
                 />
               </div>
             </motion.div>
 
             {/* Data sections */}
-            {buildSections(data).map((section) => (
+            {buildSections(data, t).map((section) => (
               <div key={section.title}>
                 <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                   {section.title}

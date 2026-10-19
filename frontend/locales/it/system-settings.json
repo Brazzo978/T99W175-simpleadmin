@@ -1,16 +1,107 @@
 {
-  "known_sims": {
-    "row_label": "SIM note",
-    "info_aria": "Info SIM note",
-    "tooltip": "QManager ricorda le SIM già viste, così ti avvisa solo quando viene inserita una SIM davvero nuova. La cancellazione dimentica tutte le SIM tranne quella attualmente inserita.",
-    "remembered_count_one": "{{count}} SIM",
-    "remembered_count_other": "{{count}} SIM",
-    "clear_button": "Cancella",
-    "clear_dialog_title": "Cancellare le SIM note?",
-    "clear_dialog_description": "Verranno dimenticate tutte le SIM viste da QManager, tranne quella attualmente inserita, così la tua SIM attiva non verrà segnalata come nuova. Le SIM già usate verranno segnalate di nuovo al prossimo inserimento.",
-    "clear_dialog_confirm": "Cancella",
-    "clear_dialog_clearing": "Cancellazione…",
-    "toast_cleared": "SIM note cancellate",
-    "toast_clear_failed": "Impossibile cancellare le SIM note"
+  "page": {
+    "title": "Sistema",
+    "description": "Riavvio programmato, identità del modem, servizi opzionali e ripristino delle impostazioni di fabbrica."
+  },
+  "enabled": "Attivo",
+  "reboot": {
+    "title": "Riavvio programmato",
+    "active": "Attivo: {{schedule}}",
+    "none": "Nessun riavvio programmato.",
+    "mode_interval": "Ogni N ore",
+    "mode_schedule": "A un orario fisso",
+    "hours_between": "Ore tra un riavvio e l'altro",
+    "interval_daily": "24 (ogni giorno, a mezzanotte)",
+    "frequency": "Frequenza",
+    "frequencies": {
+      "daily": "Giornaliera",
+      "weekly": "Settimanale",
+      "monthly": "Mensile"
+    },
+    "day": "Giorno",
+    "day_of_month": "Giorno del mese",
+    "time": "Orario",
+    "weekdays": {
+      "sunday": "Domenica",
+      "monday": "Lunedì",
+      "tuesday": "Martedì",
+      "wednesday": "Mercoledì",
+      "thursday": "Giovedì",
+      "friday": "Venerdì",
+      "saturday": "Sabato"
+    },
+    "weekdays_inline": {
+      "sunday": "domenica",
+      "monday": "lunedì",
+      "tuesday": "martedì",
+      "wednesday": "mercoledì",
+      "thursday": "giovedì",
+      "friday": "venerdì",
+      "saturday": "sabato"
+    },
+    "describe": {
+      "midnight": "Ogni giorno a mezzanotte",
+      "every_hours_one": "Ogni ora a partire dalla mezzanotte",
+      "every_hours_other": "Ogni {{count}} ore a partire dalla mezzanotte",
+      "every_hours_uneven_one": "Ogni ora a partire dalla mezzanotte, poi di nuovo a mezzanotte",
+      "every_hours_uneven_other": "Ogni {{count}} ore a partire dalla mezzanotte, poi di nuovo a mezzanotte",
+      "weekly": "Ogni {{day}} alle {{time}}",
+      "monthly": "Il giorno {{day}} di ogni mese alle {{time}}",
+      "daily": "Ogni giorno alle {{time}}"
+    },
+    "validation": {
+      "interval": "Scegli un intervallo che divida la giornata: 1, 2, 3, 4, 6, 8, 12 o 24 ore.",
+      "time": "Scegli un orario valido.",
+      "day_of_month": "Il giorno del mese deve essere compreso tra 1 e 31."
+    },
+    "toast": {
+      "removed": "Riavvio programmato rimosso",
+      "remove_failed": "Impossibile rimuovere la programmazione",
+      "saved": "Riavvio programmato: {{schedule}}",
+      "save_failed": "Impossibile salvare la programmazione"
+    }
+  },
+  "imei": {
+    "current": "Attuale: {{imei}}",
+    "new": "Nuovo IMEI",
+    "luhn_mismatch": "La cifra di controllo non corrisponde (Luhn): non è un IMEI valido.",
+    "change": "Cambia IMEI",
+    "invalid": "L'IMEI deve avere 15 cifre con una cifra di controllo valida",
+    "clear_failed": "Impossibile cancellare l'IMEI",
+    "write_failed": "Impossibile scrivere l'IMEI",
+    "restart_refused": "Riavvio rifiutato",
+    "dialog": {
+      "warning_title": "Avviso legale",
+      "warning_description": "In molti Paesi cambiare l'IMEI è illegale. Ripristina solo l'IMEI originale di questo dispositivo; l'uso che ne fai è sotto la tua responsabilità.",
+      "confirm_title": "Scrivere l'IMEI {{imei}}?",
+      "confirm_description": "L'identità del modem cambia al prossimo riavvio. Annota l'IMEI attuale prima di continuare.",
+      "written_title": "IMEI scritto",
+      "written_description": "Riavviare ora il modem per usare il nuovo IMEI?",
+      "later": "Più tardi",
+      "understand": "Ho capito",
+      "write": "Scrivi",
+      "restart": "Riavvia"
+    }
+  },
+  "esim": {
+    "title": "Gestore eSIM",
+    "description": "Esegue il servizio locale euicc-client usato dalla pagina eSIM (profili sulla SIM 2).",
+    "client_missing": "L'euicc-client non è installato ({{path}}), quindi il gestore eSIM non può essere attivato. Non fa parte di SimpleAdmin: copialo sul modem come descritto in docs/Enable_New_feature.md.",
+    "toast": {
+      "enabled": "Gestore eSIM attivato",
+      "disabled": "Gestore eSIM disattivato",
+      "failed": "Impossibile modificare il gestore eSIM"
+    }
+  },
+  "factory_reset": {
+    "title": "Ripristino di fabbrica",
+    "description": "Rimuove i blocchi di banda e di cella, imposta la modalità di rete automatica, ripristina la configurazione di LAN, firewall e IPA, le password di sistema e web e simpleadmin.conf, poi riavvia il modem.",
+    "button": "Ripristino di fabbrica",
+    "failed": "Ripristino di fabbrica non riuscito",
+    "dialog": {
+      "title": "Ripristinare le impostazioni di fabbrica?",
+      "description": "Tutte le impostazioni elencate sopra vanno perse e il modem si riavvia. Dopo il riavvio risponde all'indirizzo 192.168.225.1 con le credenziali predefinite.",
+      "confirm": "Ripristina"
+    }
   }
 }

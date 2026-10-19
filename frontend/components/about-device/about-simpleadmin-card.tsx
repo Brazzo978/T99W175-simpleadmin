@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Trans, useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -24,22 +25,21 @@ interface AboutSimpleAdminCardProps {
 }
 
 const AboutSimpleAdminCard = ({ data, isLoading }: AboutSimpleAdminCardProps) => {
+  const { t } = useTranslation("about");
   const networkRows = [
-    { label: "Device IP", value: data?.network.device_ip },
-    { label: "LAN Gateway", value: data?.network.lan_gateway },
-    { label: "WWAN IPv4", value: data?.network.wan_ipv4 },
-    { label: "WWAN IPv6", value: data?.network.wan_ipv6 },
-    { label: "Public IPv4", value: data?.network.public_ipv4 },
-    { label: "Public IPv6", value: data?.network.public_ipv6 },
+    { label: t("simpleadmin.rows.device_ip"), value: data?.network.device_ip },
+    { label: t("simpleadmin.rows.lan_gateway"), value: data?.network.lan_gateway },
+    { label: t("simpleadmin.rows.wan_ipv4"), value: data?.network.wan_ipv4 },
+    { label: t("simpleadmin.rows.wan_ipv6"), value: data?.network.wan_ipv6 },
+    { label: t("simpleadmin.rows.public_ipv4"), value: data?.network.public_ipv4 },
+    { label: t("simpleadmin.rows.public_ipv6"), value: data?.network.public_ipv6 },
   ];
 
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle className="text-2xl font-semibold">About Simple T99</CardTitle>
-        <CardDescription>
-          Management interface for the Foxconn T99W175 modem.
-        </CardDescription>
+        <CardTitle className="text-2xl font-semibold">{t("simpleadmin.title")}</CardTitle>
+        <CardDescription>{t("simpleadmin.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-6">
@@ -47,7 +47,7 @@ const AboutSimpleAdminCard = ({ data, isLoading }: AboutSimpleAdminCardProps) =>
           <div className="flex items-center justify-center">
             <Image
               src={SimpleT99Icon}
-              alt="Simple T99 Logo"
+              alt={t("simpleadmin.logo_alt")}
               className="size-24"
               priority
             />
@@ -56,23 +56,23 @@ const AboutSimpleAdminCard = ({ data, isLoading }: AboutSimpleAdminCardProps) =>
           {/* Description */}
           <div className="grid gap-y-4">
             <p className="text-sm text-muted-foreground text-pretty leading-relaxed font-medium">
-              Simple T99 (SimpleAdmin) runs on the modem it manages. Live
-              radio data comes from the Qualcomm DIAG interface and QMI
-              through two small bridges, so the dashboard costs the modem
-              almost nothing while it is open.
+              {t("simpleadmin.intro")}
             </p>
             <p className="text-sm text-muted-foreground text-pretty leading-relaxed">
-              This interface is based on{" "}
-              <a
-                href="https://github.com/dr-dolomite/QManager-RM520N"
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-2"
-              >
-                QManager
-              </a>{" "}
-              by DrDolomite, used under the MIT License with the Commons
-              Clause condition: it may not be sold.
+              <Trans
+                t={t}
+                i18nKey="simpleadmin.credits"
+                components={{
+                  link: (
+                    <a
+                      href="https://github.com/dr-dolomite/QManager-RM520N"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline underline-offset-2"
+                    />
+                  ),
+                }}
+              />
             </p>
           </div>
 
@@ -84,7 +84,7 @@ const AboutSimpleAdminCard = ({ data, isLoading }: AboutSimpleAdminCardProps) =>
             <dl className="grid divide-y divide-border border-y border-border">
               <div className="flex items-center justify-between py-2">
                 <dt className="text-sm font-semibold text-muted-foreground">
-                  Version
+                  {t("simpleadmin.version")}
                 </dt>
                 <dd className="text-sm font-semibold tabular-nums">
                   {packageJson.version}
@@ -96,7 +96,7 @@ const AboutSimpleAdminCard = ({ data, isLoading }: AboutSimpleAdminCardProps) =>
           {/* Network info */}
           <div>
             <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Network
+              {t("simpleadmin.network")}
             </h3>
             <dl className="grid divide-y divide-border border-y border-border">
               {isLoading

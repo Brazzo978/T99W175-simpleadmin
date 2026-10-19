@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { authFetch } from "@/lib/auth-fetch";
 
 // =============================================================================
@@ -62,11 +63,14 @@ function toParams(config: NetworkConfig): URLSearchParams {
 }
 
 export function useNetworkSettings() {
+  const { t } = useTranslation("network");
   const [config, setConfig] = useState<NetworkConfig | null>(null);
   const [ttl, setTtl] = useState<TtlState | null>(null);
   const [clients, setClients] = useState<ArpClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // null: none; "": our own read failure, translated when returned; else
+  // the CGI's or the request's own text.
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
 
@@ -88,7 +92,7 @@ export function useNetworkSettings() {
       const ttlJson = await ttlResp.json().catch(() => ({}));
       const arp = await arpResp.json().catch(() => ({}));
       if (!mounted.current) return;
-      if (!net.success) throw new Error(net.message || "Unable to read the network settings");
+      if (!net.success) throw new Error(net.message || "");
       setConfig(net.data as NetworkConfig);
       setTtl({ enabled: Boolean(ttlJson.isEnabled), value: Number(ttlJson.ttl) || 0 });
       const byMac = new Map<string, string[]>();
@@ -102,7 +106,7 @@ export function useNetworkSettings() {
       setError(null);
     } catch (err) {
       if (mounted.current) {
-        setError(err instanceof Error ? err.message : "Unable to read the network settings");
+        setError(err instanceof Error ? err.message : "");
       }
     } finally {
       if (mounted.current) setIsLoading(false);
@@ -126,17 +130,17 @@ export function useNetworkSettings() {
         const json = await resp.json();
         if (!json.success) {
           const details = Array.isArray(json.errors) ? ` ${json.errors.join(" ")}` : "";
-          return { ok: false, message: (json.message || "Save failed") + details };
+          return { ok: false, message: (json.message || t("errors.save_failed")) + details };
         }
         if (mounted.current) setConfig(next);
         return { ok: true };
       } catch {
-        return { ok: false, message: "Modem unreachable" };
+        return { ok: false, message: t("common:at.unreachable") };
       } finally {
         if (mounted.current) setIsSaving(false);
       }
     },
-    [],
+    [t],
   );
 
   /** 0 disables the TTL override. Applied at once, no restart. */
@@ -151,11 +155,21 @@ export function useNetworkSettings() {
       if (mounted.current) setTtl({ enabled: value > 0, value });
       return { ok: true };
     } catch {
-      return { ok: false, message: "Modem unreachable" };
+      return { ok: false, message: t("common:at.unreachable") };
     } finally {
       if (mounted.current) setIsSaving(false);
     }
-  }, []);
+  }, [t]);
 
-  return { config, ttl, clients, isLoading, isSaving, error, refresh, save, setTtlValue };
+  return {
+    config,
+    ttl,
+    clients,
+    isLoading,
+    isSaving,
+    error: error === null ? null : error || t("errors.read_failed"),
+    refresh,
+    save,
+    setTtlValue,
+  };
 }

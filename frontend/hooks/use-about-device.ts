@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { authFetch } from "@/lib/auth-fetch";
 import { useBridgeState } from "@/hooks/use-bridge";
 import type { AboutDeviceData } from "@/types/about-device";
@@ -23,9 +24,12 @@ export interface UseAboutDeviceReturn {
 }
 
 export function useAboutDevice(): UseAboutDeviceReturn {
+  const { t } = useTranslation("about");
   const { system } = useBridgeState();
   const [lanIp, setLanIp] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  // null: none; "": our own read failure, translated when returned; else
+  // the CGI's or the request's own text.
   const [error, setError] = useState<string | null>(null);
 
   const mountedRef = useRef(true);
@@ -48,15 +52,13 @@ export function useAboutDevice(): UseAboutDeviceReturn {
         await resp.json();
       if (!mountedRef.current) return;
       if (json.status !== "ok" || !json.lanip) {
-        setError(json.message || "Failed to read the LAN address");
+        setError(json.message || "");
         return;
       }
       setLanIp(json.lanip);
     } catch (err) {
       if (!mountedRef.current) return;
-      setError(
-        err instanceof Error ? err.message : "Failed to read the LAN address",
-      );
+      setError(err instanceof Error ? err.message : "");
     } finally {
       if (mountedRef.current) setIsLoading(false);
     }
@@ -97,7 +99,7 @@ export function useAboutDevice(): UseAboutDeviceReturn {
   return {
     data,
     isLoading: isLoading && !system,
-    error,
+    error: error === null ? null : error || t("device_info.lan_read_failed"),
     refresh: fetchLanIp,
   };
 }

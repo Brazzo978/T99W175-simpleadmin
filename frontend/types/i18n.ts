@@ -17,7 +17,10 @@ export type Namespace =
   | "cellular"
   | "sim-profiles"
   | "esim"
-  | "sms";
+  | "sms"
+  | "network"
+  | "system-settings"
+  | "about";
 
 export interface LanguageMeta {
   code: LanguageCode;
