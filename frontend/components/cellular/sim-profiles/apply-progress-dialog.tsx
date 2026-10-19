@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import {
   CheckCircle2Icon,
   CircleCheckIcon,
@@ -44,19 +45,20 @@ const STEP_LABELS: Record<string, string> = {
 };
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation("sim-profiles");
   switch (status) {
     case "complete":
       return (
         <Badge variant="outline" className="bg-success/15 text-success hover:bg-success/20 border-success/30">
           <CheckCircle2Icon className="size-3" />
-          Complete
+          {t("status.complete")}
         </Badge>
       );
     case "partial":
       return (
         <Badge variant="outline" className="bg-warning/15 text-warning hover:bg-warning/20 border-warning/30">
           <TriangleAlertIcon className="size-3" />
-          Partial
+          {t("status.partial")}
         </Badge>
       );
     case "failed":
@@ -66,14 +68,14 @@ function StatusBadge({ status }: { status: string }) {
           className="bg-destructive/15 text-destructive hover:bg-destructive/20 border-destructive/30"
         >
           <XCircleIcon className="size-3" />
-          Failed
+          {t("status.failed")}
         </Badge>
       );
     default:
       return (
         <Badge variant="outline" className="bg-info/15 text-info hover:bg-info/20 border-info/30">
           <Loader2Icon className="size-3 animate-spin" />
-          Applying…
+          {t("status.applying")}
         </Badge>
       );
   }
@@ -93,6 +95,7 @@ export function ApplyProgressDialog({
   onClose: () => void;
   onRetry?: () => void;
 }) {
+  const { t } = useTranslation("sim-profiles");
   const terminal = !!state && state.status !== "applying";
   const closable = terminal || (!!error && !state);
   const steps = state?.steps ?? [];
@@ -105,7 +108,7 @@ export function ApplyProgressDialog({
       <DialogContent className="sm:max-w-md" showCloseButton={closable}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            Applying Profile
+            {t("progress.title")}
             {(state || !error) && <StatusBadge status={state?.status ?? "applying"} />}
           </DialogTitle>
           {state && (
@@ -117,7 +120,10 @@ export function ApplyProgressDialog({
                     ·
                   </span>
                   <span className="text-xs tabular-nums">
-                    Step {state.currentStep} of {state.totalSteps}
+                    {t("progress.step_of", {
+                      current: state.currentStep,
+                      total: state.totalSteps,
+                    })}
                   </span>
                 </>
               )}
@@ -143,7 +149,7 @@ export function ApplyProgressDialog({
                       {step.detail}
                     </div>
                   ) : step.status === "skipped" ? (
-                    <div className="text-muted-foreground text-xs">Unchanged</div>
+                    <div className="text-muted-foreground text-xs">{t("values.unchanged")}</div>
                   ) : null}
                 </div>
               </div>
@@ -156,8 +162,8 @@ export function ApplyProgressDialog({
                 <Loader2Icon className="text-info size-4 animate-spin" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-medium">Preparing…</div>
-                <div className="text-muted-foreground text-xs">Starting the profile apply</div>
+                <div className="font-medium">{t("progress.preparing")}</div>
+                <div className="text-muted-foreground text-xs">{t("progress.starting")}</div>
               </div>
             </div>
           </div>
@@ -167,9 +173,9 @@ export function ApplyProgressDialog({
           <div className="border-info/30 bg-info/15 text-info flex items-start gap-2 rounded-md border p-3 text-sm">
             <Loader2Icon className="mt-0.5 size-4 shrink-0 animate-spin" />
             <div className="flex-1">
-              <div>The radio is restarting to attach with the new APN.</div>
+              <div>{t("progress.radio_restarting")}</div>
               <div className="text-info/80 mt-0.5 text-xs">
-                The connection drops for about 10 to 20 seconds; this page reconnects by itself.
+                {t("progress.radio_restarting_hint")}
               </div>
             </div>
           </div>
@@ -198,11 +204,11 @@ export function ApplyProgressDialog({
           <div className="flex justify-end gap-2 pt-2">
             {canRetry && (
               <Button variant="outline" onClick={onRetry}>
-                Retry
+                {t("common:actions.retry")}
               </Button>
             )}
             <Button variant={canRetry ? "default" : "outline"} onClick={onClose}>
-              Close
+              {t("common:actions.close")}
             </Button>
           </div>
         )}

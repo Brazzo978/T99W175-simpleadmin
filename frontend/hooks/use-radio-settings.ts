@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { sendAt, type AtResult } from "@/lib/at";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
+import { atMessage, sendAt, type AtResult } from "@/lib/at";
 import {
   BAND_RESET_COMMAND,
   LTE_UNLOCK_COMMAND,
@@ -61,22 +63,27 @@ export interface ActionResult {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const fail = (result: AtResult, fallback: string): ActionResult => ({
+const fail = (t: TFunction, result: AtResult, fallback: string): ActionResult => ({
   ok: false,
-  message: result.message || fallback,
+  message: atMessage(t, result) || fallback,
 });
 
 /** The first step went through, a follow-up did not: say both. */
-const partial = (result: AtResult, context: string): ActionResult => ({
-  ok: false,
-  message: result.message ? `${context} (${result.message})` : context,
-});
+const partial = (t: TFunction, result: AtResult, context: string): ActionResult => {
+  const reason = atMessage(t, result);
+  return { ok: false, message: reason ? `${context} (${reason})` : context };
+};
 
 export function useRadioSettings() {
+  const { t } = useTranslation("cellular");
   const [data, setData] = useState<RadioSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The failed read, translated at render so the text follows the language.
+  const [readError, setReadError] = useState<AtResult | null>(null);
+  const error = readError
+    ? atMessage(t, readError) || t("radio_actions.read_failed")
+    : null;
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -90,7 +97,7 @@ export function useRadioSettings() {
     const result = await sendAt(READ_COMMAND);
     if (!mounted.current) return;
     if (!result.ok && !result.output) {
-      setError(result.message || "Unable to read the radio settings");
+      setReadError(result);
       setIsLoading(false);
       return;
     }
@@ -106,7 +113,7 @@ export function useRadioSettings() {
       lteLocks: parseLteLocks(out),
       nrLocks: parseNrLocks(out),
     });
-    setError(null);
+    setReadError(null);
     setIsLoading(false);
   }, []);
 
@@ -132,36 +139,36 @@ export function useRadioSettings() {
     (category: BandCategory, bands: number[]) =>
       run(async () => {
         const r = await sendAt(bandLockCommand(category, bands));
-        return r.ok ? { ok: true } : fail(r, "Unable to lock the bands");
+        return r.ok ? { ok: true } : fail(t, r, t("radio_actions.lock_bands_failed"));
       }),
-    [run],
+    [run, t],
   );
 
   const resetBands = useCallback(
     () =>
       run(async () => {
         const r = await sendAt(BAND_RESET_COMMAND);
-        return r.ok ? { ok: true } : fail(r, "Unable to restore the bands");
+        return r.ok ? { ok: true } : fail(t, r, t("radio_actions.restore_bands_failed"));
       }),
-    [run],
+    [run, t],
   );
 
   const setNetworkMode = useCallback(
     (value: number) =>
       run(async () => {
         const r = await sendAt(`AT^SLMODE=1,${value}`);
-        return r.ok ? { ok: true } : fail(r, "Unable to set the network mode");
+        return r.ok ? { ok: true } : fail(t, r, t("radio_actions.network_mode_failed"));
       }),
-    [run],
+    [run, t],
   );
 
   const setNr5gMode = useCallback(
     (mode: Nr5gMode) =>
       run(async () => {
         const r = await sendAt(`AT^NR5G_MODE=${mode}`);
-        return r.ok ? { ok: true } : fail(r, "Unable to set the 5G mode");
+        return r.ok ? { ok: true } : fail(t, r, t("radio_actions.nr5g_mode_failed"));
       }),
-    [run],
+    [run, t],
   );
 
   /** Switching slot resets the network mode: put the previous one back. */
@@ -170,7 +177,7 @@ export function useRadioSettings() {
       run(async () => {
         const previousMode = data?.networkMode ?? null;
         const r = await sendAt(simSlotCommand(slot));
-        if (!r.ok) return fail(r, "Unable to switch SIM");
+        if (!r.ok) return fail(t, r, t("radio_actions.switch_sim_failed"));
         await sleep(SIM_SWITCH_SETTLE_MS);
         if (previousMode === null) return { ok: true };
         let restore: AtResult = { ok: false, output: "" };
@@ -180,9 +187,9 @@ export function useRadioSettings() {
         }
         return restore.ok
           ? { ok: true }
-          : partial(restore, `SIM ${slot} is active, but restoring the network mode failed: set it again`);
+          : partial(t, restore, t("radio_actions.sim_mode_restore_failed", { slot }));
       }),
-    [run, data?.networkMode],
+    [run, data?.networkMode, t],
   );
 
   /**
@@ -196,21 +203,21 @@ export function useRadioSettings() {
     (apn: string, type: PdpType) =>
       run(async () => {
         const read = await sendAt("AT+CGDCONT?");
-        if (!read.ok) return fail(read, "Unable to read the APN profiles");
+        if (!read.ok) return fail(t, read, t("radio_actions.read_apn_failed"));
         for (const ctx of parsePdpContexts(read.output)) {
           if (ctx.cid === 1) continue;
           const del = await sendAt(`AT+CGDCONT=${ctx.cid}`);
-          if (!del.ok) return fail(del, `Unable to remove APN profile ${ctx.cid}`);
+          if (!del.ok) return fail(t, del, t("radio_actions.remove_apn_failed", { cid: ctx.cid }));
         }
         const set = await sendAt(`AT+CGDCONT=1,"${type}","${apn}"`);
-        if (!set.ok) return fail(set, "Unable to set the APN");
+        if (!set.ok) return fail(t, set, t("radio_actions.set_apn_failed"));
         const off = await sendAt("AT+CFUN=4");
-        if (!off.ok) return fail(off, "Unable to turn the radio off");
+        if (!off.ok) return fail(t, off, t("radio_actions.radio_off_failed"));
         const on = await sendAt("AT+CFUN=1");
-        if (!on.ok) return fail(on, "Unable to turn the radio back on");
+        if (!on.ok) return fail(t, on, t("radio_actions.radio_on_failed"));
         return { ok: true };
       }),
-    [run],
+    [run, t],
   );
 
   /** Deletes every APN profile and restarts the modem (operator defaults). */
@@ -218,17 +225,17 @@ export function useRadioSettings() {
     setIsBusy(true);
     try {
       const read = await sendAt("AT+CGDCONT?");
-      if (!read.ok) return fail(read, "Unable to read the APN profiles");
+      if (!read.ok) return fail(t, read, t("radio_actions.read_apn_failed"));
       for (const ctx of parsePdpContexts(read.output)) {
         const del = await sendAt(`AT+CGDCONT=${ctx.cid}`);
-        if (!del.ok) return fail(del, `Unable to remove APN profile ${ctx.cid}`);
+        if (!del.ok) return fail(t, del, t("radio_actions.remove_apn_failed", { cid: ctx.cid }));
       }
       const restart = await sendAt("AT+CFUN=1,1");
-      return restart.ok ? { ok: true } : fail(restart, "Unable to restart the modem");
+      return restart.ok ? { ok: true } : fail(t, restart, t("radio_actions.restart_failed"));
     } finally {
       if (mounted.current) setIsBusy(false);
     }
-  }, []);
+  }, [t]);
 
   // A cell lock pins the RAT on this firmware: SLMODE back to automatic
   // keeps the other RAT usable (same workaround as the classic page).
@@ -236,44 +243,44 @@ export function useRadioSettings() {
     (cells: LteLock[]) =>
       run(async () => {
         const r = await sendAt(lteLockCommand(cells));
-        if (!r.ok) return fail(r, "Unable to apply the LTE lock");
+        if (!r.ok) return fail(t, r, t("radio_actions.lte_lock_failed"));
         const mode = await sendAt("AT^SLMODE=1,0");
         return mode.ok
           ? { ok: true }
-          : partial(mode, "The LTE lock is set, but the network mode could not be set to automatic");
+          : partial(t, mode, t("radio_actions.lte_lock_mode_failed"));
       }),
-    [run],
+    [run, t],
   );
 
   const lockNr = useCallback(
     (lock: NrLock) =>
       run(async () => {
         const r = await sendAt(nrLockCommand(lock));
-        if (!r.ok) return fail(r, "Unable to apply the 5G SA lock");
+        if (!r.ok) return fail(t, r, t("radio_actions.nr_lock_failed"));
         const mode = await sendAt("AT^SLMODE=1,0");
         return mode.ok
           ? { ok: true }
-          : partial(mode, "The 5G SA lock is set, but the network mode could not be set to automatic");
+          : partial(t, mode, t("radio_actions.nr_lock_mode_failed"));
       }),
-    [run],
+    [run, t],
   );
 
   const unlockLte = useCallback(
     () =>
       run(async () => {
         const r = await sendAt(LTE_UNLOCK_COMMAND);
-        return r.ok ? { ok: true } : fail(r, "Unable to remove the LTE lock");
+        return r.ok ? { ok: true } : fail(t, r, t("radio_actions.lte_unlock_failed"));
       }),
-    [run],
+    [run, t],
   );
 
   const unlockNr = useCallback(
     () =>
       run(async () => {
         const r = await sendAt(NR_UNLOCK_COMMAND);
-        return r.ok ? { ok: true } : fail(r, "Unable to remove the 5G SA lock");
+        return r.ok ? { ok: true } : fail(t, r, t("radio_actions.nr_unlock_failed"));
       }),
-    [run],
+    [run, t],
   );
 
   return {

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/page-shell";
@@ -41,7 +43,6 @@ import {
   NETWORK_MODE_BITS,
   NR5G_MODE_LABELS,
   PDP_TYPES,
-  describeNetworkMode,
   isValidApn,
   type Nr5gMode,
   type PdpType,
@@ -55,7 +56,20 @@ const RAT_OPTIONS = [
 
 type Confirm = null | "apn" | "apn-reset" | "sim";
 
+/** describeNetworkMode() of lib/radio-at.ts, in the current language. */
+function networkModeText(t: TFunction, value: number | null): string {
+  if (value === null) return t("network_mode.unknown");
+  if (value === 0) return t("network_mode.automatic");
+  const parts = [
+    value & 1 ? "3G" : "",
+    value & 2 ? "4G" : "",
+    value & 4 ? "5G" : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" + ") : t("network_mode.unknown");
+}
+
 export default function CellularSettingsComponent() {
+  const { t } = useTranslation("cellular");
   const radio = useRadioSettings();
   const { data, isLoading, isBusy } = radio;
 
@@ -79,7 +93,7 @@ export default function CellularSettingsComponent() {
   const saveMode = async (value: number) => {
     const result = await radio.setNetworkMode(value);
     if (result.ok) {
-      toast.success(`Network mode: ${describeNetworkMode(value)}`);
+      toast.success(t("network_mode.toast_set", { mode: networkModeText(t, value) }));
       setModeBits(null);
     } else toast.error(result.message);
   };
@@ -88,7 +102,7 @@ export default function CellularSettingsComponent() {
     if (!value) return;
     const mode = Number(value) as Nr5gMode;
     const result = await radio.setNr5gMode(mode);
-    if (result.ok) toast.success(`5G mode: ${NR5G_MODE_LABELS[mode]}`);
+    if (result.ok) toast.success(t("nr5g_mode.toast_set", { mode: t(`nr5g_mode.options.${mode}`) }));
     else toast.error(result.message);
   };
 
@@ -99,7 +113,7 @@ export default function CellularSettingsComponent() {
       const name = shownApn.trim();
       const result = await radio.setApn(name, shownType);
       if (result.ok) {
-        toast.success(`APN set to ${name}`);
+        toast.success(t("apn.toast_set", { apn: name }));
         setApn(null);
         setPdpType(null);
       } else toast.error(result.message);
@@ -111,7 +125,7 @@ export default function CellularSettingsComponent() {
       } else toast.error(result.message);
     } else if (action === "sim" && pendingSim) {
       const result = await radio.switchSim(pendingSim);
-      if (result.ok) toast.success(`SIM ${pendingSim} active`);
+      if (result.ok) toast.success(t("sim_slot.toast_active", { slot: pendingSim }));
       else toast.error(result.message);
       setPendingSim(null);
     }
@@ -122,15 +136,16 @@ export default function CellularSettingsComponent() {
 
   return (
     <PageShell
-      title="Cellular Settings"
-      description="Network technologies, SIM slot and the APN of the data connection."
+      title={t("page.title")}
+      description={t("page.description")}
     >
       <Card>
         <CardHeader>
-          <CardTitle>Network Mode</CardTitle>
+          <CardTitle>{t("network_mode.title")}</CardTitle>
           <CardDescription>
-            Technologies the modem may register on. Current:{" "}
-            {isLoading ? "…" : describeNetworkMode(currentMode)}
+            {t("network_mode.description", {
+              mode: isLoading ? "…" : networkModeText(t, currentMode),
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -162,25 +177,22 @@ export default function CellularSettingsComponent() {
             onClick={() => saveMode(shownBits)}
             disabled={isBusy || isLoading || shownBits === 0 || modeBits === null}
           >
-            Apply
+            {t("common:actions.apply")}
           </Button>
           <Button
             variant="outline"
             onClick={() => saveMode(0)}
             disabled={isBusy || isLoading || currentMode === 0}
           >
-            Automatic
+            {t("network_mode.automatic")}
           </Button>
         </CardFooter>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>5G Mode</CardTitle>
-          <CardDescription>
-            Whether 5G is used with an LTE anchor (NSA), standalone (SA), or
-            either.
-          </CardDescription>
+          <CardTitle>{t("nr5g_mode.title")}</CardTitle>
+          <CardDescription>{t("nr5g_mode.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -195,7 +207,7 @@ export default function CellularSettingsComponent() {
             >
               {(Object.keys(NR5G_MODE_LABELS) as unknown as Nr5gMode[]).map((mode) => (
                 <ToggleGroupItem key={mode} value={String(mode)} className="px-4">
-                  {NR5G_MODE_LABELS[mode]}
+                  {t(`nr5g_mode.options.${mode}`)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
@@ -207,10 +219,8 @@ export default function CellularSettingsComponent() {
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle>SIM Slot</CardTitle>
-              <CardDescription>
-                SIM 2 is also the eSIM. Switching restarts the registration.
-              </CardDescription>
+              <CardTitle>{t("sim_slot.title")}</CardTitle>
+              <CardDescription>{t("sim_slot.description")}</CardDescription>
             </div>
             {data && (
               <Badge
@@ -221,7 +231,7 @@ export default function CellularSettingsComponent() {
                     : "bg-warning/15 text-warning border-warning/30"
                 }
               >
-                {data.simReady ? "SIM ready" : "SIM not ready"}
+                {data.simReady ? t("sim_slot.ready") : t("sim_slot.not_ready")}
               </Badge>
             )}
           </div>
@@ -251,11 +261,8 @@ export default function CellularSettingsComponent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>APN</CardTitle>
-          <CardDescription>
-            Profile 1 carries the data connection. Saving removes the other
-            profiles and restarts the radio.
-          </CardDescription>
+          <CardTitle>{t("apn.title")}</CardTitle>
+          <CardDescription>{t("apn.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           {isLoading ? (
@@ -272,7 +279,7 @@ export default function CellularSettingsComponent() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label>PDP type</Label>
+                <Label>{t("apn.pdp_type")}</Label>
                 <Select value={shownType} onValueChange={(v) => setPdpType(v as PdpType)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -294,7 +301,7 @@ export default function CellularSettingsComponent() {
             onClick={() => setConfirm("apn")}
             disabled={isBusy || isLoading || !apnChanged || !isValidApn(shownApn.trim())}
           >
-            Save APN
+            {t("apn.save")}
           </Button>
           <Button
             variant="outline"
@@ -302,7 +309,7 @@ export default function CellularSettingsComponent() {
             disabled={isBusy || isLoading}
           >
             <RotateCcwIcon />
-            Reset APN Profiles
+            {t("apn.reset")}
           </Button>
         </CardFooter>
       </Card>
@@ -312,26 +319,28 @@ export default function CellularSettingsComponent() {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirm === "apn"
-                ? "Change the APN?"
+                ? t("confirm.apn_title")
                 : confirm === "apn-reset"
-                  ? "Reset every APN profile?"
-                  : `Switch to SIM ${pendingSim}?`}
+                  ? t("confirm.reset_title")
+                  : t("confirm.sim_title", { slot: pendingSim })}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm === "apn"
-                ? "The radio restarts to attach with the new APN: the connection drops for a few seconds."
+                ? t("confirm.apn_description")
                 : confirm === "apn-reset"
-                  ? "Every APN profile is deleted and the modem reboots; the operator defaults apply afterwards."
-                  : "The modem registers again with the other SIM: the connection drops until it is done."}
+                  ? t("confirm.reset_description")
+                  : t("confirm.sim_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingSim(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setPendingSim(null)}>
+              {t("common:actions.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               variant={confirm === "apn-reset" ? "destructive" : "default"}
               onClick={runConfirmed}
             >
-              Continue
+              {t("confirm.continue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -13,7 +13,10 @@ export type Namespace =
   | "antenna"
   | "band-locking"
   | "cell-locking"
-  | "frequency-calculator";
+  | "frequency-calculator"
+  | "cellular"
+  | "sim-profiles"
+  | "esim";
 
 export interface LanguageMeta {
   code: LanguageCode;

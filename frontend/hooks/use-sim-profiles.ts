@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { authFetch } from "@/lib/auth-fetch";
+import { msg, translate, type Msg } from "@/lib/i18n/message";
 import type { PdpType } from "@/lib/radio-at";
 
 // =============================================================================
@@ -72,7 +75,15 @@ export interface ProfileResult {
   message?: string;
 }
 
-async function post(body: Record<string, string>): Promise<ProfileResult & { json?: Record<string, unknown> }> {
+/** An error as the CGI wrote it, or our own text translated at render. */
+type ErrorText = string | Msg | null;
+
+const errorText = (t: TFunction, error: ErrorText): string | null =>
+  error === null ? null : typeof error === "string" ? error : translate(t, error);
+
+async function post(
+  body: Record<string, string>,
+): Promise<ProfileResult & { msg?: Msg; json?: Record<string, unknown> }> {
   try {
     const resp = await authFetch(ENDPOINT, {
       method: "POST",
@@ -85,13 +96,14 @@ async function post(body: Record<string, string>): Promise<ProfileResult & { jso
     }
     return { ok: true, json };
   } catch {
-    return { ok: false, message: "Modem unreachable" };
+    return { ok: false, message: "Modem unreachable", msg: msg("common:at.unreachable") };
   }
 }
 
 export function useSimProfiles() {
+  const { t } = useTranslation("sim-profiles");
   const [data, setData] = useState<SimProfilesData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorText>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const mounted = useRef(true);
 
@@ -118,7 +130,9 @@ export function useSimProfiles() {
       });
       setError(null);
     } catch (err) {
-      if (mounted.current) setError(err instanceof Error ? err.message : "Unable to read the SIM profiles");
+      if (mounted.current) {
+        setError(err instanceof Error ? err.message : msg("sim-profiles:errors.read_failed"));
+      }
     } finally {
       if (mounted.current) setIsRefreshing(false);
     }
@@ -141,21 +155,21 @@ export function useSimProfiles() {
         ttl: profile.ttl,
       });
       if (result.ok) await refresh();
-      return { ok: result.ok, message: result.message };
+      return { ok: result.ok, message: result.msg ? translate(t, result.msg) : result.message };
     },
-    [refresh],
+    [refresh, t],
   );
 
   const remove = useCallback(
     async (iccid: string): Promise<ProfileResult> => {
       const result = await post({ action: "delete", iccid });
       if (result.ok) await refresh();
-      return { ok: result.ok, message: result.message };
+      return { ok: result.ok, message: result.msg ? translate(t, result.msg) : result.message };
     },
-    [refresh],
+    [refresh, t],
   );
 
-  return { data, error, isRefreshing, refresh, save, remove };
+  return { data, error: errorText(t, error), isRefreshing, refresh, save, remove };
 }
 
 /**
@@ -163,8 +177,9 @@ export function useSimProfiles() {
  * the run; status lines of an earlier run are not shown as this one.
  */
 export function useProfileApply(onFinished?: () => void) {
+  const { t } = useTranslation("sim-profiles");
   const [state, setState] = useState<ApplyState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorText>(null);
   const [open, setOpen] = useState(false);
   const runId = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -206,7 +221,7 @@ export function useProfileApply(onFinished?: () => void) {
       const result = await post({ action: "apply", iccid });
       const id = result.json?.id;
       if (!result.ok || typeof id !== "string") {
-        setError(result.message || "Unable to start the apply");
+        setError(result.msg ?? (result.message || msg("sim-profiles:errors.apply_start_failed")));
         return;
       }
       runId.current = id;
@@ -221,5 +236,5 @@ export function useProfileApply(onFinished?: () => void) {
     setOpen(false);
   }, [stop]);
 
-  return { state, error, open, apply, close };
+  return { state, error: errorText(t, error), open, apply, close };
 }

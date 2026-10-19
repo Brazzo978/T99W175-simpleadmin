@@ -1,0 +1,115 @@
+{
+  "page": {
+    "title": "SIM Profiles",
+    "description": "APN and TTL per SIM card, applied by themselves when the active SIM changes: a swapped card, a slot switch, a watchdog failover."
+  },
+  "not_installed": {
+    "title": "SIM profiles are not installed on the modem",
+    "description": "The web UI is newer than the system scripts: run ./install.sh without --onlywww to add sim-profiles and its timer. Profiles can be edited meanwhile, but nothing applies them."
+  },
+  "values": {
+    "unchanged": "Unchanged",
+    "off": "Off",
+    "unknown": "Unknown"
+  },
+  "status": {
+    "applied": "Applied",
+    "complete": "Complete",
+    "partial": "Partial",
+    "failed": "Failed",
+    "applying": "Applying…"
+  },
+  "active": {
+    "title": "Active SIM",
+    "description": "The SIM in use now and the settings the modem runs with.",
+    "refresh_aria": "Refresh",
+    "no_sim_ready": "No SIM ready",
+    "slot": "Slot",
+    "profile": "Profile",
+    "no_profile": "No profile",
+    "apn_now": "APN now",
+    "ttl_now": "TTL now",
+    "edit": "Edit Profile",
+    "apply_now": "Apply Now",
+    "create_from_current": "Create from Current Settings"
+  },
+  "last_apply": {
+    "title": "Last Apply",
+    "description": "A new SIM gets its profile at the second check, about 30 seconds after it shows up; a watchdog switch applies it at once.",
+    "empty_title": "No profile applied since the last reboot",
+    "empty_description": "Create a profile for each SIM; it applies when that SIM becomes the active one.",
+    "profile": "Profile",
+    "why": "Why",
+    "when": "When",
+    "triggers": {
+      "manual": "applied by hand",
+      "sim_change": "SIM change",
+      "watchdog": "watchdog SIM switch"
+    },
+    "step_status": {
+      "pending": "pending",
+      "running": "running",
+      "done": "done",
+      "failed": "failed",
+      "skipped": "skipped"
+    }
+  },
+  "list": {
+    "title": "Profiles",
+    "description": "One per SIM, keyed by ICCID and kept in /data/simpleadmin/sim-profiles across updates.",
+    "add": "Add Profile",
+    "col_profile": "Profile",
+    "col_actions": "Actions",
+    "empty_title": "No SIM profiles yet",
+    "empty_description": "Start from the active SIM with Create from Current Settings, or add one for another SIM by its ICCID.",
+    "active_badge": "Active SIM",
+    "edit_aria": "Edit {{name}}",
+    "delete_aria": "Delete {{name}}"
+  },
+  "toast": {
+    "saved": "Profile \"{{name}}\" saved",
+    "deleted": "Profile \"{{name}}\" deleted"
+  },
+  "delete_dialog": {
+    "title": "Delete “{{name}}”?",
+    "description": "The modem keeps its current APN and TTL; the SIM simply gets no profile the next time it becomes active.",
+    "confirm": "Delete"
+  },
+  "apply_dialog": {
+    "title": "Apply “{{name}}” now?",
+    "other_sim": "This profile belongs to another SIM ({{profile}}): its settings go to the active one ({{active}}). ",
+    "description": "When the APN changes, the radio restarts to attach with it and the connection drops for 10 to 20 seconds. The TTL changes at once."
+  },
+  "form": {
+    "title_new": "New Profile",
+    "title_edit": "Edit Profile",
+    "description": "Applied by itself whenever this SIM becomes the active one. Empty fields leave that setting as it is.",
+    "name": "Name",
+    "active_sim": "Active SIM",
+    "iccid_hint": "The SIM this profile belongs to.",
+    "apn_hint": "Profile 1, the data connection.",
+    "pdp_type": "PDP type",
+    "ttl_hint": "Outgoing TTL and IPv6 hop limit; 0 turns the override off.",
+    "save": "Save Profile",
+    "save_failed": "Save failed",
+    "errors": {
+      "name": "1 to 32 letters, digits, spaces and . _ ( ) + -",
+      "iccid": "18 to 22 digits, as the SIM reports it",
+      "apn": "Letters, digits, dot, dash and underscore, at most 63",
+      "ttl": "0 to 255, or empty",
+      "form": "Set an APN, a TTL, or both."
+    }
+  },
+  "progress": {
+    "title": "Applying Profile",
+    "step_of": "Step {{current}} of {{total}}",
+    "preparing": "Preparing…",
+    "starting": "Starting the profile apply",
+    "radio_restarting": "The radio is restarting to attach with the new APN.",
+    "radio_restarting_hint": "The connection drops for about 10 to 20 seconds; this page reconnects by itself."
+  },
+  "errors": {
+    "read_failed": "Unable to read the SIM profiles",
+    "apply_start_failed": "Unable to start the apply"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "page": {
+    "title": "Profili SIM",
+    "description": "APN e TTL per ogni SIM, applicati da soli quando cambia la SIM attiva: una scheda sostituita, un cambio di slot, un failover del watchdog."
+  },
+  "not_installed": {
+    "title": "I profili SIM non sono installati sul modem",
+    "description": "L'interfaccia web è più recente degli script di sistema: esegui ./install.sh senza --onlywww per aggiungere sim-profiles e il suo timer. Nel frattempo puoi modificare i profili, ma nessuno li applica."
+  },
+  "values": {
+    "unchanged": "Invariato",
+    "off": "Disattivo",
+    "unknown": "Sconosciuto"
+  },
+  "status": {
+    "applied": "Applicato",
+    "complete": "Completato",
+    "partial": "Parziale",
+    "failed": "Non riuscito",
+    "applying": "Applicazione…"
+  },
+  "active": {
+    "title": "SIM attiva",
+    "description": "La SIM in uso ora e le impostazioni con cui lavora il modem.",
+    "refresh_aria": "Aggiorna",
+    "no_sim_ready": "Nessuna SIM pronta",
+    "slot": "Slot",
+    "profile": "Profilo",
+    "no_profile": "Nessun profilo",
+    "apn_now": "APN attuale",
+    "ttl_now": "TTL attuale",
+    "edit": "Modifica profilo",
+    "apply_now": "Applica ora",
+    "create_from_current": "Crea dalle impostazioni attuali"
+  },
+  "last_apply": {
+    "title": "Ultima applicazione",
+    "description": "Una nuova SIM riceve il suo profilo al secondo controllo, circa 30 secondi dopo che compare; un cambio del watchdog lo applica subito.",
+    "empty_title": "Nessun profilo applicato dall'ultimo riavvio",
+    "empty_description": "Crea un profilo per ogni SIM; si applica quando quella SIM diventa la SIM attiva.",
+    "profile": "Profilo",
+    "why": "Motivo",
+    "when": "Quando",
+    "triggers": {
+      "manual": "applicato a mano",
+      "sim_change": "cambio di SIM",
+      "watchdog": "cambio SIM del watchdog"
+    },
+    "step_status": {
+      "pending": "in attesa",
+      "running": "in corso",
+      "done": "fatto",
+      "failed": "non riuscito",
+      "skipped": "saltato"
+    }
+  },
+  "list": {
+    "title": "Profili",
+    "description": "Uno per SIM, identificato dall'ICCID e conservato in /data/simpleadmin/sim-profiles tra un aggiornamento e l'altro.",
+    "add": "Aggiungi profilo",
+    "col_profile": "Profilo",
+    "col_actions": "Azioni",
+    "empty_title": "Ancora nessun profilo SIM",
+    "empty_description": "Parti dalla SIM attiva con Crea dalle impostazioni attuali, oppure aggiungine uno per un'altra SIM tramite il suo ICCID.",
+    "active_badge": "SIM attiva",
+    "edit_aria": "Modifica {{name}}",
+    "delete_aria": "Elimina {{name}}"
+  },
+  "toast": {
+    "saved": "Profilo \"{{name}}\" salvato",
+    "deleted": "Profilo \"{{name}}\" eliminato"
+  },
+  "delete_dialog": {
+    "title": "Eliminare “{{name}}”?",
+    "description": "Il modem mantiene APN e TTL attuali; la SIM semplicemente non riceverà alcun profilo la prossima volta che diventa attiva.",
+    "confirm": "Elimina"
+  },
+  "apply_dialog": {
+    "title": "Applicare “{{name}}” ora?",
+    "other_sim": "Questo profilo appartiene a un'altra SIM ({{profile}}): le sue impostazioni vanno a quella attiva ({{active}}). ",
+    "description": "Se l'APN cambia, la radio si riavvia per agganciarsi con il nuovo APN e la connessione cade per 10-20 secondi. Il TTL cambia subito."
+  },
+  "form": {
+    "title_new": "Nuovo profilo",
+    "title_edit": "Modifica profilo",
+    "description": "Applicato da solo ogni volta che questa SIM diventa la SIM attiva. I campi vuoti lasciano invariata la relativa impostazione.",
+    "name": "Nome",
+    "active_sim": "SIM attiva",
+    "iccid_hint": "La SIM a cui appartiene questo profilo.",
+    "apn_hint": "Profilo 1, la connessione dati.",
+    "pdp_type": "Tipo PDP",
+    "ttl_hint": "TTL in uscita e hop limit IPv6; 0 disattiva la modifica.",
+    "save": "Salva profilo",
+    "save_failed": "Salvataggio non riuscito",
+    "errors": {
+      "name": "Da 1 a 32 tra lettere, cifre, spazi e . _ ( ) + -",
+      "iccid": "Da 18 a 22 cifre, come le riporta la SIM",
+      "apn": "Lettere, cifre, punto, trattino e trattino basso, al massimo 63",
+      "ttl": "Da 0 a 255, oppure vuoto",
+      "form": "Imposta un APN, un TTL o entrambi."
+    }
+  },
+  "progress": {
+    "title": "Applicazione del profilo",
+    "step_of": "Passo {{current}} di {{total}}",
+    "preparing": "Preparazione…",
+    "starting": "Avvio dell'applicazione del profilo",
+    "radio_restarting": "La radio si sta riavviando per agganciarsi con il nuovo APN.",
+    "radio_restarting_hint": "La connessione cade per circa 10-20 secondi; questa pagina si ricollega da sola."
+  },
+  "errors": {
+    "read_failed": "Impossibile leggere i profili SIM",
+    "apply_start_failed": "Impossibile avviare l'applicazione"
+  }
+}

@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { authFetch } from "@/lib/auth-fetch";
+import { msg, translate, type Msg } from "@/lib/i18n/message";
 
 // =============================================================================
 // useEsim — eSIM profiles through the euicc-client LPA service
@@ -56,7 +58,15 @@ function browserBaseUrl(configured: string): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** A failure in our own words: run() translates it. */
+class EsimError extends Error {
+  constructor(readonly msg: Msg) {
+    super(msg.key);
+  }
+}
+
 export function useEsim() {
+  const { t } = useTranslation("esim");
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [clientInstalled, setClientInstalled] = useState(true);
   const [baseUrl, setBaseUrl] = useState("");
@@ -75,7 +85,11 @@ export function useEsim() {
       body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",
     });
-    if (!resp.ok) throw new Error((await resp.text()) || `Request failed (${resp.status})`);
+    if (!resp.ok) {
+      const text = await resp.text();
+      if (text) throw new Error(text);
+      throw new EsimError(msg("esim:errors.request_failed_status", { status: resp.status }));
+    }
     return resp.json();
   }, []);
 
@@ -136,12 +150,13 @@ export function useEsim() {
         await action();
         return null;
       } catch (err) {
-        return err instanceof Error ? err.message : "Request failed";
+        if (err instanceof EsimError) return translate(t, err.msg);
+        return err instanceof Error ? err.message : t("errors.request_failed");
       } finally {
         setBusy(null);
       }
     },
-    [],
+    [t],
   );
 
   const enableProfile = (iccid: string) =>
@@ -214,7 +229,10 @@ export function useEsim() {
         body: JSON.stringify(cfg),
       });
       const json = await resp.json();
-      if (!json.ok) throw new Error(json.message || "Unable to save");
+      if (!json.ok) {
+        if (json.message) throw new Error(json.message);
+        throw new EsimError(msg("esim:errors.save_failed"));
+      }
       setServerConfig(cfg);
       await sleep(2000);
       await bootstrap();

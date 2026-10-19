@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import {
   AlertCircleIcon,
   CardSimIcon,
@@ -61,19 +63,16 @@ import {
 import { PDP_TYPES, type PdpType } from "@/lib/radio-at";
 import { cn } from "@/lib/utils";
 
-const TRIGGERS: Record<string, string> = {
-  manual: "applied by hand",
-  sim_change: "SIM change",
-  watchdog: "watchdog SIM switch",
-};
+/** Why the last apply ran: keys under last_apply.triggers */
+const TRIGGERS = new Set(["manual", "sim_change", "watchdog"]);
 
 const PDP_LABELS: Record<string, string> = { IP: "IPv4", IPV6: "IPv6", IPV4V6: "IPv4v6" };
 
-const ttlText = (ttl: string | number) =>
-  ttl === "" ? "Unchanged" : String(ttl) === "0" ? "Off" : String(ttl);
+const ttlText = (t: TFunction, ttl: string | number) =>
+  ttl === "" ? t("values.unchanged") : String(ttl) === "0" ? t("values.off") : String(ttl);
 
-const apnText = (apn: string, pdp: string) =>
-  apn ? `${apn} (${PDP_LABELS[pdp] ?? pdp})` : "Unchanged";
+const apnText = (t: TFunction, apn: string, pdp: string) =>
+  apn ? `${apn} (${PDP_LABELS[pdp] ?? pdp})` : t("values.unchanged");
 
 const shortIccid = (iccid: string) => `…${iccid.slice(-4)}`;
 
@@ -93,11 +92,12 @@ const BADGE = {
 } as const;
 
 function ApplyBadge({ state }: { state: ApplyState }) {
+  const { t } = useTranslation("sim-profiles");
   if (state.status === "complete") {
     return (
       <Badge variant="outline" className={BADGE.success}>
         <CheckCircle2Icon className="size-3" />
-        Applied
+        {t("status.applied")}
       </Badge>
     );
   }
@@ -105,7 +105,7 @@ function ApplyBadge({ state }: { state: ApplyState }) {
     return (
       <Badge variant="outline" className={BADGE.warning}>
         <TriangleAlertIcon className="size-3" />
-        Partial
+        {t("status.partial")}
       </Badge>
     );
   }
@@ -113,13 +113,13 @@ function ApplyBadge({ state }: { state: ApplyState }) {
     return (
       <Badge variant="outline" className={BADGE.destructive}>
         <XCircleIcon className="size-3" />
-        Failed
+        {t("status.failed")}
       </Badge>
     );
   }
   return (
     <Badge variant="outline" className="bg-info/15 text-info hover:bg-info/20 border-info/30">
-      Applying…
+      {t("status.applying")}
     </Badge>
   );
 }
@@ -142,6 +142,7 @@ const emptyDraft = (iccid = ""): ProfileDraft => ({
 });
 
 export default function SimProfilesComponent() {
+  const { t } = useTranslation("sim-profiles");
   const sp = useSimProfiles();
   const applier = useProfileApply(() => sp.refresh());
   const [form, setForm] = useState<{ key: number; initial: ProfileDraft; editing?: string } | null>(null);
@@ -177,7 +178,7 @@ export default function SimProfilesComponent() {
     const target = toDelete;
     setToDelete(null);
     const result = await sp.remove(target.iccid);
-    if (result.ok) toast.success(`Profile "${target.name}" deleted`);
+    if (result.ok) toast.success(t("toast.deleted", { name: target.name }));
     else toast.error(result.message);
   };
 
@@ -192,26 +193,22 @@ export default function SimProfilesComponent() {
 
   return (
     <PageShell
-      title="SIM Profiles"
-      description="APN and TTL per SIM card, applied by themselves when the active SIM changes: a swapped card, a slot switch, a watchdog failover."
+      title={t("page.title")}
+      description={t("page.description")}
     >
       {data && !data.installed && (
         <Card className="@3xl/main:col-span-2">
           <CardHeader>
-            <CardTitle>SIM profiles are not installed on the modem</CardTitle>
-            <CardDescription>
-              The web UI is newer than the system scripts: run ./install.sh without --onlywww to
-              add sim-profiles and its timer. Profiles can be edited meanwhile, but nothing applies
-              them.
-            </CardDescription>
+            <CardTitle>{t("not_installed.title")}</CardTitle>
+            <CardDescription>{t("not_installed.description")}</CardDescription>
           </CardHeader>
         </Card>
       )}
 
       <Card className="@container/card">
         <CardHeader>
-          <CardTitle>Active SIM</CardTitle>
-          <CardDescription>The SIM in use now and the settings the modem runs with.</CardDescription>
+          <CardTitle>{t("active.title")}</CardTitle>
+          <CardDescription>{t("active.description")}</CardDescription>
           <CardAction>
             <Button
               variant="outline"
@@ -219,7 +216,7 @@ export default function SimProfilesComponent() {
               className="size-8"
               onClick={() => sp.refresh()}
               disabled={sp.isRefreshing}
-              aria-label="Refresh"
+              aria-label={t("active.refresh_aria")}
             >
               <RefreshCwIcon className={cn("size-4", sp.isRefreshing && "animate-spin motion-reduce:animate-none")} />
             </Button>
@@ -243,12 +240,12 @@ export default function SimProfilesComponent() {
           ) : (
             <div className="divide-y rounded-lg border px-4">
               <Row label="ICCID" mono>
-                {activeIccid || (data.installed ? "No SIM ready" : "Unknown")}
+                {activeIccid || (data.installed ? t("active.no_sim_ready") : t("values.unknown"))}
               </Row>
-              <Row label="Slot">
-                {active?.slot ? (active.slot === 2 ? "SIM 2 / eSIM" : "SIM 1") : "Unknown"}
+              <Row label={t("active.slot")}>
+                {active?.slot ? (active.slot === 2 ? "SIM 2 / eSIM" : "SIM 1") : t("values.unknown")}
               </Row>
-              <Row label="Profile">
+              <Row label={t("active.profile")}>
                 {activeProfile ? (
                   <Badge variant="outline" className={BADGE.success}>
                     <CheckCircle2Icon className="size-3" />
@@ -257,12 +254,16 @@ export default function SimProfilesComponent() {
                 ) : (
                   <Badge variant="outline" className={BADGE.muted}>
                     <MinusCircleIcon className="size-3" />
-                    No profile
+                    {t("active.no_profile")}
                   </Badge>
                 )}
               </Row>
-              <Row label="APN now">{data.current ? apnText(data.current.apn, data.current.pdpType) : "Unknown"}</Row>
-              <Row label="TTL now">{data.current ? ttlText(data.current.ttl) : "Unknown"}</Row>
+              <Row label={t("active.apn_now")}>
+                {data.current ? apnText(t, data.current.apn, data.current.pdpType) : t("values.unknown")}
+              </Row>
+              <Row label={t("active.ttl_now")}>
+                {data.current ? ttlText(t, data.current.ttl) : t("values.unknown")}
+              </Row>
             </div>
           )}
         </CardContent>
@@ -275,17 +276,17 @@ export default function SimProfilesComponent() {
                 disabled={!data}
               >
                 <PencilIcon />
-                Edit Profile
+                {t("active.edit")}
               </Button>
               <Button onClick={() => setToApply(activeProfile)} disabled={busy || !data?.installed}>
                 <PlayIcon />
-                Apply Now
+                {t("active.apply_now")}
               </Button>
             </>
           ) : (
             <Button onClick={fromCurrent} disabled={!activeIccid}>
               <CopyPlusIcon />
-              Create from Current Settings
+              {t("active.create_from_current")}
             </Button>
           )}
         </CardFooter>
@@ -293,11 +294,8 @@ export default function SimProfilesComponent() {
 
       <Card className="@container/card">
         <CardHeader>
-          <CardTitle>Last Apply</CardTitle>
-          <CardDescription>
-            A new SIM gets its profile at the second check, about 30 seconds after it shows up; a
-            watchdog switch applies it at once.
-          </CardDescription>
+          <CardTitle>{t("last_apply.title")}</CardTitle>
+          <CardDescription>{t("last_apply.description")}</CardDescription>
           {last && (
             <CardAction>
               <ApplyBadge state={last} />
@@ -314,18 +312,20 @@ export default function SimProfilesComponent() {
           ) : !last ? (
             <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-8 text-center">
               <CardSimIcon className="text-muted-foreground size-8" />
-              <p className="text-sm font-medium">No profile applied since the last reboot</p>
+              <p className="text-sm font-medium">{t("last_apply.empty_title")}</p>
               <p className="text-muted-foreground max-w-xs text-xs">
-                Create a profile for each SIM; it applies when that SIM becomes the active one.
+                {t("last_apply.empty_description")}
               </p>
             </div>
           ) : (
             <div className="divide-y rounded-lg border px-4">
-              <Row label="Profile">
+              <Row label={t("last_apply.profile")}>
                 {last.name || "—"} <span className="text-muted-foreground font-mono text-xs">{shortIccid(last.iccid)}</span>
               </Row>
-              <Row label="Why">{TRIGGERS[last.trigger] ?? last.trigger}</Row>
-              <Row label="When">{last.started ? formatTime(last.started) : "—"}</Row>
+              <Row label={t("last_apply.why")}>
+                {TRIGGERS.has(last.trigger) ? t(`last_apply.triggers.${last.trigger}`) : last.trigger}
+              </Row>
+              <Row label={t("last_apply.when")}>{last.started ? formatTime(last.started) : "—"}</Row>
               {last.steps.map((step) => (
                 <Row key={step.name} label={step.name === "apn" ? "APN" : "TTL"}>
                   <span
@@ -335,7 +335,8 @@ export default function SimProfilesComponent() {
                     )}
                     title={step.detail}
                   >
-                    {step.detail || step.status}
+                    {step.detail ||
+                      t(`last_apply.step_status.${step.status}`, { defaultValue: step.status })}
                   </span>
                 </Row>
               ))}
@@ -347,14 +348,12 @@ export default function SimProfilesComponent() {
 
       <Card className="@container/card @3xl/main:col-span-2">
         <CardHeader>
-          <CardTitle>Profiles</CardTitle>
-          <CardDescription>
-            One per SIM, keyed by ICCID and kept in /data/simpleadmin/sim-profiles across updates.
-          </CardDescription>
+          <CardTitle>{t("list.title")}</CardTitle>
+          <CardDescription>{t("list.description")}</CardDescription>
           <CardAction>
             <Button variant="outline" onClick={() => openForm(emptyDraft(activeProfile ? "" : activeIccid))}>
               <PlusIcon />
-              Add Profile
+              {t("list.add")}
             </Button>
           </CardAction>
         </CardHeader>
@@ -363,10 +362,10 @@ export default function SimProfilesComponent() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableHead>Profile</TableHead>
+                  <TableHead>{t("list.col_profile")}</TableHead>
                   <TableHead className="hidden @md/card:table-cell">APN</TableHead>
                   <TableHead className="hidden @md/card:table-cell">TTL</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">{t("list.col_actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -392,10 +391,9 @@ export default function SimProfilesComponent() {
                     <TableCell colSpan={4} className="py-10">
                       <div className="flex flex-col items-center gap-2 text-center">
                         <CardSimIcon className="text-muted-foreground size-8" />
-                        <p className="text-sm font-medium">No SIM profiles yet</p>
+                        <p className="text-sm font-medium">{t("list.empty_title")}</p>
                         <p className="text-muted-foreground max-w-sm text-xs whitespace-normal">
-                          Start from the active SIM with Create from Current Settings, or add one for
-                          another SIM by its ICCID.
+                          {t("list.empty_description")}
                         </p>
                       </div>
                     </TableCell>
@@ -409,17 +407,17 @@ export default function SimProfilesComponent() {
                           {p.iccid === activeIccid && (
                             <Badge variant="outline" className={BADGE.success}>
                               <CheckCircle2Icon className="size-3" />
-                              Active SIM
+                              {t("list.active_badge")}
                             </Badge>
                           )}
                         </div>
                         <div className="text-muted-foreground font-mono text-xs">{p.iccid}</div>
                         <div className="text-muted-foreground mt-1 text-xs @md/card:hidden">
-                          APN {apnText(p.apn, p.pdpType)} · TTL {ttlText(p.ttl)}
+                          APN {apnText(t, p.apn, p.pdpType)} · TTL {ttlText(t, p.ttl)}
                         </div>
                       </TableCell>
-                      <TableCell className="hidden align-top @md/card:table-cell">{apnText(p.apn, p.pdpType)}</TableCell>
-                      <TableCell className="hidden align-top tabular-nums @md/card:table-cell">{ttlText(p.ttl)}</TableCell>
+                      <TableCell className="hidden align-top @md/card:table-cell">{apnText(t, p.apn, p.pdpType)}</TableCell>
+                      <TableCell className="hidden align-top tabular-nums @md/card:table-cell">{ttlText(t, p.ttl)}</TableCell>
                       <TableCell className="align-top">
                         <div className="flex justify-end gap-1">
                           <Button
@@ -429,12 +427,12 @@ export default function SimProfilesComponent() {
                             disabled={busy || !data.installed}
                           >
                             <PlayIcon />
-                            Apply
+                            {t("common:actions.apply")}
                           </Button>
                           <Button
                             size="icon"
                             variant="ghost"
-                            aria-label={`Edit ${p.name}`}
+                            aria-label={t("list.edit_aria", { name: p.name })}
                             onClick={() => openForm({ ...p }, p.iccid)}
                           >
                             <PencilIcon />
@@ -442,7 +440,7 @@ export default function SimProfilesComponent() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            aria-label={`Delete ${p.name}`}
+                            aria-label={t("list.delete_aria", { name: p.name })}
                             onClick={() => setToDelete(p)}
                           >
                             <Trash2Icon />
@@ -468,7 +466,7 @@ export default function SimProfilesComponent() {
           activeIccid={activeIccid || undefined}
           onSave={async (draft, previous) => {
             const result = await sp.save(draft, previous);
-            if (result.ok) toast.success(`Profile "${draft.name}" saved`);
+            if (result.ok) toast.success(t("toast.saved", { name: draft.name }));
             return result;
           }}
         />
@@ -477,16 +475,13 @@ export default function SimProfilesComponent() {
       <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete &ldquo;{toDelete?.name}&rdquo;?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The modem keeps its current APN and TTL; the SIM simply gets no profile the next time
-              it becomes active.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("delete_dialog.title", { name: toDelete?.name })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("delete_dialog.description")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={handleDelete}>
-              Delete
+              {t("delete_dialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -495,18 +490,20 @@ export default function SimProfilesComponent() {
       <AlertDialog open={!!toApply} onOpenChange={(o) => !o && setToApply(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Apply &ldquo;{toApply?.name}&rdquo; now?</AlertDialogTitle>
+            <AlertDialogTitle>{t("apply_dialog.title", { name: toApply?.name })}</AlertDialogTitle>
             <AlertDialogDescription>
               {toApply && activeIccid && toApply.iccid !== activeIccid
-                ? `This profile belongs to another SIM (${shortIccid(toApply.iccid)}): its settings go to the active one (${shortIccid(activeIccid)}). `
+                ? t("apply_dialog.other_sim", {
+                    profile: shortIccid(toApply.iccid),
+                    active: shortIccid(activeIccid),
+                  })
                 : ""}
-              When the APN changes, the radio restarts to attach with it and the connection drops for
-              10 to 20 seconds. The TTL changes at once.
+              {t("apply_dialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleApply}>Apply</AlertDialogAction>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleApply}>{t("common:actions.apply")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

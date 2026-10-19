@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   DownloadIcon,
   PencilIcon,
@@ -54,10 +55,17 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useEsim, type EsimServerConfig } from "@/hooks/use-esim";
 
+/** A QR code failure: `key` is under download.qr_errors. */
+class QrError extends Error {
+  constructor(readonly key: string) {
+    super(key);
+  }
+}
+
 /** "LPA:1$smdp$matching-id[$confirmation-code]" */
 function parseLpa(text: string) {
   const match = text.trim().match(/^LPA:1\$([^$]+)\$([^$]+)(?:\$([^$]+))?$/);
-  if (!match) throw new Error("Not an eSIM QR code (expected LPA:1$server$id)");
+  if (!match) throw new QrError("not_lpa");
   return { smdp: match[1], matching_id: match[2], confirmation_code: match[3] ?? "" };
 }
 
@@ -71,16 +79,16 @@ function readQr(file: File): Promise<string> {
       canvas.height = img.height;
       const ctx = canvas.getContext("2d");
       URL.revokeObjectURL(url);
-      if (!ctx) return reject(new Error("Canvas unavailable"));
+      if (!ctx) return reject(new QrError("canvas"));
       ctx.drawImage(img, 0, 0);
       const data = ctx.getImageData(0, 0, img.width, img.height);
       const code = jsQR(data.data, data.width, data.height);
       if (code) resolve(code.data);
-      else reject(new Error("No QR code found in the image"));
+      else reject(new QrError("no_qr"));
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Unable to load the image"));
+      reject(new QrError("load_image"));
     };
     img.src = url;
   });
@@ -90,6 +98,7 @@ const report = (error: string | null, success: string) =>
   error ? toast.error(error) : toast.success(success);
 
 export default function EsimComponent() {
+  const { t } = useTranslation("esim");
   const esim = useEsim();
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({ smdp: "", matching_id: "", confirmation_code: "", auto_confirm: true });
@@ -100,21 +109,19 @@ export default function EsimComponent() {
   if (esim.enabled === false || !esim.clientInstalled) {
     const missing = !esim.clientInstalled;
     return (
-      <PageShell title="eSIM" description="eSIM profiles on SIM 2.">
+      <PageShell title={t("page.title")} description={t("page.description_off")}>
         <Card className="col-span-full">
           <CardHeader>
             <CardTitle>
-              {missing ? "The euicc-client is not installed" : "eSIM management is off"}
+              {missing ? t("off.missing_title") : t("off.disabled_title")}
             </CardTitle>
             <CardDescription>
-              {missing
-                ? "eSIM profiles are managed by the euicc-client LPA server, which is not part of SimpleAdmin. Copy it to /home/root/euicc-sd-client with its client.yaml (docs/Enable_New_feature.md), then enable the eSIM manager in System."
-                : "Turn on the eSIM manager in System to start the euicc-client service."}
+              {missing ? t("off.missing_description") : t("off.disabled_description")}
             </CardDescription>
           </CardHeader>
           <CardFooter>
             <Button asChild variant="outline">
-              <a href="/system/settings/">Open System</a>
+              <a href="/system/settings/">{t("off.open_system")}</a>
             </Button>
           </CardFooter>
         </Card>
@@ -127,15 +134,15 @@ export default function EsimComponent() {
 
   return (
     <PageShell
-      title="eSIM"
-      description="Download, switch and remove eSIM profiles through the local euicc-client service."
+      title={t("page.title")}
+      description={t("page.description")}
     >
       <Card className="col-span-full">
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle>Profiles</CardTitle>
-              <CardDescription>EID: {esim.eid ?? "—"}</CardDescription>
+              <CardTitle>{t("profiles.title")}</CardTitle>
+              <CardDescription>{t("profiles.eid", { eid: esim.eid ?? "—" })}</CardDescription>
             </div>
             {esim.healthy !== null && (
               <Badge
@@ -146,7 +153,7 @@ export default function EsimComponent() {
                     : "bg-destructive/15 text-destructive border-destructive/30"
                 }
               >
-                {esim.healthy ? "euicc-client online" : "euicc-client offline"}
+                {esim.healthy ? t("profiles.online") : t("profiles.offline")}
               </Badge>
             )}
           </div>
@@ -156,19 +163,18 @@ export default function EsimComponent() {
             <Skeleton className="h-32 w-full" />
           ) : !esim.healthy ? (
             <p className="text-sm text-muted-foreground">
-              No answer from {esim.baseUrl}. Check that the euicc-client service is running
-              and that SIM 2 holds an eUICC.
+              {t("profiles.no_answer", { url: esim.baseUrl })}
             </p>
           ) : esim.profiles.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No profiles on the eUICC yet.</p>
+            <p className="text-sm text-muted-foreground">{t("profiles.empty")}</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Profile</TableHead>
+                  <TableHead>{t("profiles.col_profile")}</TableHead>
                   <TableHead>ICCID</TableHead>
-                  <TableHead>State</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t("profiles.col_state")}</TableHead>
+                  <TableHead className="text-right">{t("profiles.col_actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -181,7 +187,7 @@ export default function EsimComponent() {
                     <TableCell className="font-mono text-xs">{p.iccid}</TableCell>
                     <TableCell>
                       <Badge variant={p.enabled ? "default" : "secondary"}>
-                        {p.enabled ? "Enabled" : "Disabled"}
+                        {p.enabled ? t("profiles.enabled") : t("profiles.disabled")}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -193,17 +199,17 @@ export default function EsimComponent() {
                           onClick={async () =>
                             report(
                               p.enabled ? await esim.disableProfile(p.iccid) : await esim.enableProfile(p.iccid),
-                              p.enabled ? "Profile disabled" : "Profile enabled",
+                              p.enabled ? t("profiles.toast_disabled") : t("profiles.toast_enabled"),
                             )
                           }
                         >
                           <PowerIcon />
-                          {p.enabled ? "Disable" : "Enable"}
+                          {p.enabled ? t("profiles.disable") : t("profiles.enable")}
                         </Button>
                         <Button
                           size="icon"
                           variant="ghost"
-                          aria-label="Rename"
+                          aria-label={t("profiles.rename_aria")}
                           disabled={busy}
                           onClick={() => setNickname({ iccid: p.iccid, value: p.profile_nickname ?? "" })}
                         >
@@ -212,7 +218,7 @@ export default function EsimComponent() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          aria-label="Delete"
+                          aria-label={t("profiles.delete_aria")}
                           disabled={busy || p.enabled}
                           onClick={() => setToDelete(p.iccid)}
                         >
@@ -229,29 +235,27 @@ export default function EsimComponent() {
         <CardFooter>
           <Button variant="outline" disabled={busy || !esim.healthy} onClick={() => esim.refresh().catch(() => {})}>
             <RefreshCwIcon />
-            Refresh
+            {t("profiles.refresh")}
           </Button>
         </CardFooter>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Download Profile</CardTitle>
-          <CardDescription>
-            From the activation code of your operator, typed or read from the QR code image.
-          </CardDescription>
+          <CardTitle>{t("download.title")}</CardTitle>
+          <CardDescription>{t("download.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="smdp">SM-DP+ address</Label>
+            <Label htmlFor="smdp">{t("download.smdp")}</Label>
             <Input id="smdp" value={form.smdp} onChange={(e) => setForm({ ...form, smdp: e.target.value })} />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="matching">Matching ID</Label>
+            <Label htmlFor="matching">{t("download.matching_id")}</Label>
             <Input id="matching" value={form.matching_id} onChange={(e) => setForm({ ...form, matching_id: e.target.value })} />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="ccode">Confirmation code (optional)</Label>
+            <Label htmlFor="ccode">{t("download.confirmation_code")}</Label>
             <Input id="ccode" value={form.confirmation_code} onChange={(e) => setForm({ ...form, confirmation_code: e.target.value })} />
           </div>
           <div className="flex items-center gap-2">
@@ -260,7 +264,7 @@ export default function EsimComponent() {
               checked={form.auto_confirm}
               onCheckedChange={(v) => setForm({ ...form, auto_confirm: v === true })}
             />
-            <Label htmlFor="autoconfirm">Confirm the download automatically</Label>
+            <Label htmlFor="autoconfirm">{t("download.auto_confirm")}</Label>
           </div>
           <input
             ref={fileRef}
@@ -273,9 +277,15 @@ export default function EsimComponent() {
               if (!file) return;
               try {
                 setForm({ ...form, ...parseLpa(await readQr(file)) });
-                toast.success("QR code read");
+                toast.success(t("download.toast_qr_read"));
               } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Unable to read the QR code");
+                toast.error(
+                  err instanceof QrError
+                    ? t(`download.qr_errors.${err.key}`)
+                    : err instanceof Error
+                      ? err.message
+                      : t("download.qr_errors.failed"),
+                );
               }
             }}
           />
@@ -290,30 +300,28 @@ export default function EsimComponent() {
                 confirmation_code: form.confirmation_code.trim(),
                 auto_confirm: form.auto_confirm,
               });
-              report(error, "Profile downloaded");
+              report(error, t("download.toast_downloaded"));
               if (!error) setForm({ ...form, confirmation_code: "" });
             }}
           >
             <DownloadIcon />
-            {esim.busy === "download" ? "Downloading…" : "Download"}
+            {esim.busy === "download" ? t("download.downloading") : t("download.button")}
           </Button>
           <Button variant="outline" onClick={() => fileRef.current?.click()}>
             <QrCodeIcon />
-            Read QR Image
+            {t("download.read_qr")}
           </Button>
         </CardFooter>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Notifications</CardTitle>
-          <CardDescription>
-            Pending reports to the operator after installs, switches and deletions.
-          </CardDescription>
+          <CardTitle>{t("notifications.title")}</CardTitle>
+          <CardDescription>{t("notifications.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           {esim.notifications.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pending notifications.</p>
+            <p className="text-sm text-muted-foreground">{t("notifications.empty")}</p>
           ) : (
             <div className="grid gap-2">
               {esim.notifications.map((n) => (
@@ -333,20 +341,26 @@ export default function EsimComponent() {
                       variant="outline"
                       disabled={busy}
                       onClick={async () =>
-                        report(await esim.processNotification(n.iccid, n.sequence_number, true), "Notification sent")
+                        report(
+                          await esim.processNotification(n.iccid, n.sequence_number, true),
+                          t("notifications.toast_sent"),
+                        )
                       }
                     >
-                      Send
+                      {t("notifications.send")}
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
                       disabled={busy}
                       onClick={async () =>
-                        report(await esim.removeNotification(n.iccid, n.sequence_number), "Notification removed")
+                        report(
+                          await esim.removeNotification(n.iccid, n.sequence_number),
+                          t("notifications.toast_removed"),
+                        )
                       }
                     >
-                      Remove
+                      {t("notifications.remove")}
                     </Button>
                   </div>
                 </div>
@@ -356,11 +370,19 @@ export default function EsimComponent() {
         </CardContent>
         {esim.notifications.length > 0 && (
           <CardFooter className="flex gap-2">
-            <Button variant="outline" disabled={busy} onClick={async () => report(await esim.processAll(), "All notifications sent")}>
-              Send All
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={async () => report(await esim.processAll(), t("notifications.toast_all_sent"))}
+            >
+              {t("notifications.send_all")}
             </Button>
-            <Button variant="ghost" disabled={busy} onClick={async () => report(await esim.removeAll(), "All notifications removed")}>
-              Remove All
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={async () => report(await esim.removeAll(), t("notifications.toast_all_removed"))}
+            >
+              {t("notifications.remove_all")}
             </Button>
           </CardFooter>
         )}
@@ -368,10 +390,8 @@ export default function EsimComponent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>euicc-client</CardTitle>
-          <CardDescription>
-            The IMEI it reports and the SIM slot of the eUICC. Saving restarts the service.
-          </CardDescription>
+          <CardTitle>{t("server.title")}</CardTitle>
+          <CardDescription>{t("server.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           {!server ? (
@@ -389,7 +409,7 @@ export default function EsimComponent() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label>eUICC slot</Label>
+                <Label>{t("server.slot")}</Label>
                 <ToggleGroup
                   type="single"
                   variant="outline"
@@ -407,7 +427,7 @@ export default function EsimComponent() {
                   checked={server.refresh}
                   onCheckedChange={(v) => setServerDraft({ ...server, refresh: v === true })}
                 />
-                <Label htmlFor="esim-refresh">Refresh eSIM data automatically</Label>
+                <Label htmlFor="esim-refresh">{t("server.refresh")}</Label>
               </div>
             </>
           )}
@@ -419,11 +439,11 @@ export default function EsimComponent() {
             onClick={async () => {
               if (!serverDraft) return;
               const error = await esim.saveServerConfig(serverDraft);
-              report(error, "euicc-client restarted with the new settings");
+              report(error, t("server.toast_saved"));
               if (!error) setServerDraft(null);
             }}
           >
-            Save
+            {t("common:actions.save")}
           </Button>
         </CardFooter>
       </Card>
@@ -431,7 +451,7 @@ export default function EsimComponent() {
       <Dialog open={nickname !== null} onOpenChange={(open) => !open && setNickname(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Profile name</DialogTitle>
+            <DialogTitle>{t("nickname.title")}</DialogTitle>
           </DialogHeader>
           <Input
             autoFocus
@@ -439,17 +459,19 @@ export default function EsimComponent() {
             onChange={(e) => nickname && setNickname({ ...nickname, value: e.target.value })}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNickname(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setNickname(null)}>
+              {t("common:actions.cancel")}
+            </Button>
             <Button
               disabled={busy}
               onClick={async () => {
                 if (!nickname) return;
                 const error = await esim.setNickname(nickname.iccid, nickname.value.trim());
-                report(error, "Name saved");
+                report(error, t("nickname.toast_saved"));
                 if (!error) setNickname(null);
               }}
             >
-              Save
+              {t("common:actions.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -458,23 +480,22 @@ export default function EsimComponent() {
       <AlertDialog open={toDelete !== null} onOpenChange={(open) => !open && setToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this profile?</AlertDialogTitle>
+            <AlertDialogTitle>{t("delete_dialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {toDelete} is removed from the eUICC. Getting it back usually needs a new
-              activation code from the operator.
+              {t("delete_dialog.description", { iccid: toDelete })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={async () => {
                 const iccid = toDelete;
                 setToDelete(null);
-                if (iccid) report(await esim.deleteProfile(iccid), "Profile deleted");
+                if (iccid) report(await esim.deleteProfile(iccid), t("delete_dialog.toast_deleted"));
               }}
             >
-              Delete
+              {t("delete_dialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

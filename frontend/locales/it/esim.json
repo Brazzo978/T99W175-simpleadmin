@@ -1,0 +1,89 @@
+{
+  "page": {
+    "title": "eSIM",
+    "description": "Scarica, attiva e rimuovi i profili eSIM tramite il servizio locale euicc-client.",
+    "description_off": "Profili eSIM sulla SIM 2."
+  },
+  "off": {
+    "missing_title": "euicc-client non è installato",
+    "missing_description": "I profili eSIM sono gestiti dal server LPA euicc-client, che non fa parte di SimpleAdmin. Copialo in /home/root/euicc-sd-client con il suo client.yaml (docs/Enable_New_feature.md), poi attiva il gestore eSIM in Sistema.",
+    "disabled_title": "La gestione eSIM è disattivata",
+    "disabled_description": "Attiva il gestore eSIM in Sistema per avviare il servizio euicc-client.",
+    "open_system": "Apri Sistema"
+  },
+  "profiles": {
+    "title": "Profili",
+    "eid": "EID: {{eid}}",
+    "online": "euicc-client online",
+    "offline": "euicc-client offline",
+    "no_answer": "Nessuna risposta da {{url}}. Verifica che il servizio euicc-client sia in esecuzione e che la SIM 2 contenga un eUICC.",
+    "empty": "Ancora nessun profilo sull'eUICC.",
+    "col_profile": "Profilo",
+    "col_state": "Stato",
+    "col_actions": "Azioni",
+    "enabled": "Attivo",
+    "disabled": "Disattivo",
+    "enable": "Attiva",
+    "disable": "Disattiva",
+    "rename_aria": "Rinomina",
+    "delete_aria": "Elimina",
+    "refresh": "Aggiorna",
+    "toast_enabled": "Profilo attivato",
+    "toast_disabled": "Profilo disattivato"
+  },
+  "download": {
+    "title": "Scarica profilo",
+    "description": "Dal codice di attivazione del tuo operatore, digitato o letto dall'immagine del codice QR.",
+    "smdp": "Indirizzo SM-DP+",
+    "matching_id": "Matching ID",
+    "confirmation_code": "Codice di conferma (facoltativo)",
+    "auto_confirm": "Conferma il download automaticamente",
+    "button": "Scarica",
+    "downloading": "Download in corso…",
+    "read_qr": "Leggi immagine QR",
+    "toast_qr_read": "Codice QR letto",
+    "toast_downloaded": "Profilo scaricato",
+    "qr_errors": {
+      "not_lpa": "Non è un codice QR eSIM (previsto LPA:1$server$id)",
+      "canvas": "Canvas non disponibile",
+      "no_qr": "Nessun codice QR trovato nell'immagine",
+      "load_image": "Impossibile caricare l'immagine",
+      "failed": "Impossibile leggere il codice QR"
+    }
+  },
+  "notifications": {
+    "title": "Notifiche",
+    "description": "Segnalazioni in sospeso verso l'operatore dopo installazioni, cambi ed eliminazioni.",
+    "empty": "Nessuna notifica in sospeso.",
+    "send": "Invia",
+    "remove": "Rimuovi",
+    "send_all": "Invia tutte",
+    "remove_all": "Rimuovi tutte",
+    "toast_sent": "Notifica inviata",
+    "toast_removed": "Notifica rimossa",
+    "toast_all_sent": "Tutte le notifiche inviate",
+    "toast_all_removed": "Tutte le notifiche rimosse"
+  },
+  "server": {
+    "title": "euicc-client",
+    "description": "L'IMEI che riporta e lo slot SIM dell'eUICC. Il salvataggio riavvia il servizio.",
+    "slot": "Slot eUICC",
+    "refresh": "Aggiorna automaticamente i dati eSIM",
+    "toast_saved": "euicc-client riavviato con le nuove impostazioni"
+  },
+  "nickname": {
+    "title": "Nome del profilo",
+    "toast_saved": "Nome salvato"
+  },
+  "delete_dialog": {
+    "title": "Eliminare questo profilo?",
+    "description": "{{iccid}} viene rimosso dall'eUICC. Per recuperarlo di solito serve un nuovo codice di attivazione dall'operatore.",
+    "confirm": "Elimina",
+    "toast_deleted": "Profilo eliminato"
+  },
+  "errors": {
+    "request_failed": "Richiesta non riuscita",
+    "request_failed_status": "Richiesta non riuscita ({{status}})",
+    "save_failed": "Impossibile salvare"
+  }
+}

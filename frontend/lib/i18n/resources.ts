@@ -6,6 +6,9 @@ import enAntenna from "@/locales/en/antenna.json";
 import enBandLocking from "@/locales/en/band-locking.json";
 import enCellLocking from "@/locales/en/cell-locking.json";
 import enFrequencyCalculator from "@/locales/en/frequency-calculator.json";
+import enCellular from "@/locales/en/cellular.json";
+import enSimProfiles from "@/locales/en/sim-profiles.json";
+import enEsim from "@/locales/en/esim.json";
 import itCommon from "@/locales/it/common.json";
 import itSidebar from "@/locales/it/sidebar.json";
 import itDashboard from "@/locales/it/dashboard.json";
@@ -14,6 +17,9 @@ import itAntenna from "@/locales/it/antenna.json";
 import itBandLocking from "@/locales/it/band-locking.json";
 import itCellLocking from "@/locales/it/cell-locking.json";
 import itFrequencyCalculator from "@/locales/it/frequency-calculator.json";
+import itCellular from "@/locales/it/cellular.json";
+import itSimProfiles from "@/locales/it/sim-profiles.json";
+import itEsim from "@/locales/it/esim.json";
 
 // Static resources for i18next. Every bundled language declares every
 // namespace: one per page (or page group), plus common, sidebar and
@@ -29,6 +35,9 @@ export const resources = {
     "band-locking": enBandLocking,
     "cell-locking": enCellLocking,
     "frequency-calculator": enFrequencyCalculator,
+    cellular: enCellular,
+    "sim-profiles": enSimProfiles,
+    esim: enEsim,
   },
   it: {
     common: itCommon,
@@ -39,6 +48,9 @@ export const resources = {
     "band-locking": itBandLocking,
     "cell-locking": itCellLocking,
     "frequency-calculator": itFrequencyCalculator,
+    cellular: itCellular,
+    "sim-profiles": itSimProfiles,
+    esim: itEsim,
   },
 } as const;
 
@@ -52,4 +64,7 @@ export const ALL_NAMESPACES = [
   "band-locking",
   "cell-locking",
   "frequency-calculator",
+  "cellular",
+  "sim-profiles",
+  "esim",
 ] as const;

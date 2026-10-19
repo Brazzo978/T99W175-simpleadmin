@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +26,7 @@ import { PDP_TYPES, isValidApn, type PdpType } from "@/lib/radio-at";
 
 export type ProfileDraft = Omit<SimProfile, "updated">;
 
+/** Values are keys under form.errors, translated at render. */
 type Errors = Partial<Record<keyof ProfileDraft | "form", string>>;
 
 const NAME_RE = /^[A-Za-z0-9 ._()+-]{1,32}$/;
@@ -32,11 +34,11 @@ const ICCID_RE = /^[0-9]{18,22}$/;
 
 function validate(d: ProfileDraft): Errors {
   const e: Errors = {};
-  if (!NAME_RE.test(d.name.trim())) e.name = "1 to 32 letters, digits, spaces and . _ ( ) + -";
-  if (!ICCID_RE.test(d.iccid)) e.iccid = "18 to 22 digits, as the SIM reports it";
-  if (d.apn && !isValidApn(d.apn)) e.apn = "Letters, digits, dot, dash and underscore, at most 63";
-  if (d.ttl !== "" && !(/^\d{1,3}$/.test(d.ttl) && Number(d.ttl) <= 255)) e.ttl = "0 to 255, or empty";
-  if (!d.apn && d.ttl === "") e.form = "Set an APN, a TTL, or both.";
+  if (!NAME_RE.test(d.name.trim())) e.name = "form.errors.name";
+  if (!ICCID_RE.test(d.iccid)) e.iccid = "form.errors.iccid";
+  if (d.apn && !isValidApn(d.apn)) e.apn = "form.errors.apn";
+  if (d.ttl !== "" && !(/^\d{1,3}$/.test(d.ttl) && Number(d.ttl) <= 255)) e.ttl = "form.errors.ttl";
+  if (!d.apn && d.ttl === "") e.form = "form.errors.form";
   return e;
 }
 
@@ -62,6 +64,7 @@ export function ProfileFormDialog({
   activeIccid?: string;
   onSave: (draft: ProfileDraft, previousIccid?: string) => Promise<ProfileResult>;
 }) {
+  const { t } = useTranslation("sim-profiles");
   const [draft, setDraft] = useState<ProfileDraft>(initial);
   const [showErrors, setShowErrors] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -84,7 +87,7 @@ export function ProfileFormDialog({
       markSaved();
       setTimeout(() => onOpenChange(false), 600);
     } else {
-      setSaveError(result.message || "Save failed");
+      setSaveError(result.message || t("form.save_failed"));
     }
   };
 
@@ -92,23 +95,20 @@ export function ProfileFormDialog({
     <Dialog open={open} onOpenChange={(o) => !isSaving && onOpenChange(o)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit Profile" : "New Profile"}</DialogTitle>
-          <DialogDescription>
-            Applied by itself whenever this SIM becomes the active one. Empty fields leave that
-            setting as it is.
-          </DialogDescription>
+          <DialogTitle>{editing ? t("form.title_edit") : t("form.title_new")}</DialogTitle>
+          <DialogDescription>{t("form.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="@container/card grid gap-4">
           <Field data-invalid={!!errors.name}>
-            <FieldLabel htmlFor="sp-name">Name</FieldLabel>
+            <FieldLabel htmlFor="sp-name">{t("form.name")}</FieldLabel>
             <Input
               id="sp-name"
               value={draft.name}
               aria-invalid={!!errors.name}
               onChange={(e) => update({ name: e.target.value })}
             />
-            {errors.name && <FieldError>{errors.name}</FieldError>}
+            {errors.name && <FieldError>{t(errors.name)}</FieldError>}
           </Field>
           <Field data-invalid={!!errors.iccid}>
             <FieldLabel htmlFor="sp-iccid">ICCID</FieldLabel>
@@ -127,14 +127,14 @@ export function ProfileFormDialog({
                   className="text-foreground"
                   onClick={() => update({ iccid: activeIccid })}
                 >
-                  Active SIM
+                  {t("form.active_sim")}
                 </Button>
               )}
             </div>
             {errors.iccid ? (
-              <FieldError>{errors.iccid}</FieldError>
+              <FieldError>{t(errors.iccid)}</FieldError>
             ) : (
-              <FieldDescription>The SIM this profile belongs to.</FieldDescription>
+              <FieldDescription>{t("form.iccid_hint")}</FieldDescription>
             )}
           </Field>
           <div className="grid grid-cols-1 gap-4 @sm/card:grid-cols-[2fr_1fr]">
@@ -147,21 +147,21 @@ export function ProfileFormDialog({
                 onChange={(e) => update({ apn: e.target.value.trim() })}
               />
               {errors.apn ? (
-                <FieldError>{errors.apn}</FieldError>
+                <FieldError>{t(errors.apn)}</FieldError>
               ) : (
-                <FieldDescription>Profile 1, the data connection.</FieldDescription>
+                <FieldDescription>{t("form.apn_hint")}</FieldDescription>
               )}
             </Field>
             <Field>
-              <FieldLabel htmlFor="sp-pdp">PDP type</FieldLabel>
+              <FieldLabel htmlFor="sp-pdp">{t("form.pdp_type")}</FieldLabel>
               <Select value={draft.pdpType} onValueChange={(v) => update({ pdpType: v as PdpType })}>
                 <SelectTrigger id="sp-pdp" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PDP_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {PDP_LABELS[t]}
+                  {PDP_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {PDP_LABELS[type]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -179,9 +179,9 @@ export function ProfileFormDialog({
               onChange={(e) => update({ ttl: e.target.value.replace(/\D/g, "").slice(0, 3) })}
             />
             {errors.ttl ? (
-              <FieldError>{errors.ttl}</FieldError>
+              <FieldError>{t(errors.ttl)}</FieldError>
             ) : (
-              <FieldDescription>Outgoing TTL and IPv6 hop limit; 0 turns the override off.</FieldDescription>
+              <FieldDescription>{t("form.ttl_hint")}</FieldDescription>
             )}
           </Field>
           {(errors.form || saveError) && (
@@ -189,16 +189,16 @@ export function ProfileFormDialog({
               role="alert"
               className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm"
             >
-              {errors.form ?? saveError}
+              {errors.form ? t(errors.form) : saveError}
             </div>
           )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-            Cancel
+            {t("common:actions.cancel")}
           </Button>
-          <SaveButton label="Save Profile" isSaving={isSaving} saved={saved} onClick={handleSave} />
+          <SaveButton label={t("form.save")} isSaving={isSaving} saved={saved} onClick={handleSave} />
         </DialogFooter>
       </DialogContent>
     </Dialog>

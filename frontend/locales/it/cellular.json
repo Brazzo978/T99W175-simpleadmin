@@ -1,124 +1,68 @@
 {
-  "core_settings": {
-    "apn": {
-      "page": {
-        "title": "Impostazioni APN",
-        "description": "Imposta l'APN, il protocollo IP e il contesto dati usati dalla SIM per connettersi.",
-        "error_load_title": "Impossibile caricare le impostazioni APN",
-        "error_load_description": "I valori visualizzati potrebbero essere obsoleti."
-      },
-      "card": {
-        "title": "Configurazione APN",
-        "description": "Il nome del punto di accesso usato dal modem per stabilire una connessione dati."
-      },
-      "status": {
-        "active": "Attivo",
-        "not_live": "Non attivo",
-        "carrier_default": "Predefinito operatore",
-        "network_using": "La rete sta usando: {{apn}}"
-      },
-      "save_connection_notice": "Il salvataggio interrompe brevemente la connessione cellulare durante la riconnessione del modem.",
-      "carrier_default": {
-        "button": "Usa predefinito operatore",
-        "dialog": {
-          "title": "Usare l'APN predefinito dell'operatore?",
-          "description": "Il tuo operatore sceglierà l'APN automaticamente. La connessione cellulare si interromperà brevemente durante la riconnessione del modem.",
-          "confirm": "Usa predefinito operatore",
-          "cancel": "Annulla"
-        }
-      },
-      "toast": {
-        "saved": "Impostazioni APN salvate",
-        "save_error": "Impossibile salvare le impostazioni APN",
-        "deactivated": "Ripristinato all'APN predefinito dell'operatore",
-        "deactivate_error": "Impossibile ripristinare il predefinito dell'operatore"
-      },
-      "controls_label": "Configurazione APN",
-      "managed_by_profile_fallback": "profilo SIM personalizzato attivo",
-      "list": {
-        "live": {
-          "mismatch_default": "La rete sta usando il valore predefinito dell'operatore"
-        }
-      },
-      "edit": {
-        "fields": {
-          "apn": {
-            "label": "APN *",
-            "placeholder": "fast.t-mobile.com",
-            "error_required": "L'APN è obbligatorio"
-          },
-          "pdp_type": {
-            "label": "Tipo PDP",
-            "placeholder": "Seleziona tipo PDP",
-            "aria": "Tipo PDP",
-            "options": {
-              "ipv4": "IPv4",
-              "ipv6": "IPv6",
-              "ipv4v6": "IPv4v6"
-            }
-          },
-          "modem_profile": {
-            "label": "CID",
-            "placeholder": "Seleziona CID",
-            "aria": "Contesto PDP (CID)",
-            "option_template": "CID {{cid}}",
-            "for_internet": "Internet",
-            "ims_badge": "IMS",
-            "sos_badge": "SOS"
-          }
-        },
-        "cid_confirm": {
-          "title": "Usare un contesto riservato?",
-          "description_ims": "Il CID {{cid}} è riservato dal tuo operatore per l'IMS (VoLTE / chiamate Wi-Fi). Scrivere qui un APN dati può compromettere le chiamate vocali. Continuare comunque?",
-          "description_sos": "Il CID {{cid}} è riservato alle chiamate di emergenza (SOS). Scrivere qui un APN dati può compromettere le chiamate di emergenza. Continuare comunque?",
-          "confirm": "Usa comunque",
-          "cancel": "Annulla"
-        },
-        "save_button": "Salva profilo"
-      }
-    }
+  "page": {
+    "title": "Impostazioni rete mobile",
+    "description": "Tecnologie di rete, slot SIM e APN della connessione dati."
   },
-  "custom_profiles": {
-    "form": {
-      "fields": {
-        "mno_custom": "Personalizzato"
-      },
-      "mno_hint": "Qui puoi selezionare operatori di rete mobile preconfigurati.",
-      "default_scenario_label": "Scenario predefinito",
-      "default_scenario_hint": "Viene eseguito ogni volta che nessuna finestra di pianificazione è attiva.",
-      "schedule_inline_label": "Pianificazione basata sull'orario",
-      "schedule_inline_hint": "Cambia scenario entro un massimo di due finestre giornaliere.",
-      "windows_empty": "Nessuna finestra ancora. Aggiungine una per cambiare scenario a un orario prestabilito.",
-      "windows_count": "{{count}} di {{max}} finestre",
-      "add_window": "Aggiungi finestra",
-      "scenario": {
-        "deleted_scenario": "(scenario eliminato)",
-        "create_new": "Crea un nuovo scenario",
-        "start_label": "Inizio",
-        "end_label": "Fine",
-        "block_scenario_label": "Scenario",
-        "overlap_warning": "Questa finestra si sovrappone a un'altra. In caso di sovrapposizione, vince quella più in alto.",
-        "overnight_hint": "Termina il giorno dopo",
-        "summary_line": "{{time}} → {{scenario}}",
-        "time_range": "{{start}}–{{end}}",
-        "move_up_aria": "Sposta la finestra su",
-        "move_down_aria": "Sposta la finestra giù",
-        "expand_rule_aria": "Modifica finestra",
-        "remove_block_aria": "Rimuovi finestra",
-        "block_label": "Finestra {{index}}",
-        "schedule_invalid": "Correggi le voci di pianificazione evidenziate prima di salvare.",
-        "block_errors": {
-          "invalid_start": "Inserisci un orario di inizio valido (HH:MM).",
-          "invalid_end": "Inserisci un orario di fine valido (HH:MM).",
-          "zero_length": "L'orario di inizio e di fine devono essere diversi.",
-          "no_days": "Seleziona almeno un giorno."
-        }
-      }
-    }
+  "network_mode": {
+    "title": "Modalità di rete",
+    "description": "Tecnologie su cui il modem può registrarsi. Attuale: {{mode}}",
+    "automatic": "Automatica",
+    "unknown": "Sconosciuta",
+    "toast_set": "Modalità di rete: {{mode}}"
   },
-  "scenarios": {
-    "default_balanced_name": "Equilibrato",
-    "default_gaming_name": "Gioco",
-    "default_streaming_name": "Streaming"
+  "nr5g_mode": {
+    "title": "Modalità 5G",
+    "description": "Se il 5G si usa con un ancoraggio LTE (NSA), in standalone (SA) o in entrambi i modi.",
+    "options": {
+      "0": "Automatica",
+      "1": "Solo NSA",
+      "2": "Solo SA"
+    },
+    "toast_set": "Modalità 5G: {{mode}}"
+  },
+  "sim_slot": {
+    "title": "Slot SIM",
+    "description": "La SIM 2 è anche la eSIM. Il cambio riavvia la registrazione.",
+    "ready": "SIM pronta",
+    "not_ready": "SIM non pronta",
+    "toast_active": "SIM {{slot}} attiva"
+  },
+  "apn": {
+    "title": "APN",
+    "description": "Il profilo 1 porta la connessione dati. Il salvataggio rimuove gli altri profili e riavvia la radio.",
+    "pdp_type": "Tipo PDP",
+    "save": "Salva APN",
+    "reset": "Ripristina profili APN",
+    "toast_set": "APN impostato su {{apn}}"
+  },
+  "confirm": {
+    "apn_title": "Cambiare l'APN?",
+    "apn_description": "La radio si riavvia per agganciarsi con il nuovo APN: la connessione cade per qualche secondo.",
+    "reset_title": "Ripristinare tutti i profili APN?",
+    "reset_description": "Tutti i profili APN vengono eliminati e il modem si riavvia; poi valgono le impostazioni predefinite dell'operatore.",
+    "sim_title": "Passare alla SIM {{slot}}?",
+    "sim_description": "Il modem si registra di nuovo con l'altra SIM: la connessione resta assente fino al termine.",
+    "continue": "Continua"
+  },
+  "radio_actions": {
+    "read_failed": "Impossibile leggere le impostazioni radio",
+    "lock_bands_failed": "Impossibile bloccare le bande",
+    "restore_bands_failed": "Impossibile ripristinare le bande",
+    "network_mode_failed": "Impossibile impostare la modalità di rete",
+    "nr5g_mode_failed": "Impossibile impostare la modalità 5G",
+    "switch_sim_failed": "Impossibile cambiare SIM",
+    "sim_mode_restore_failed": "La SIM {{slot}} è attiva, ma il ripristino della modalità di rete non è riuscito: impostala di nuovo",
+    "read_apn_failed": "Impossibile leggere i profili APN",
+    "remove_apn_failed": "Impossibile rimuovere il profilo APN {{cid}}",
+    "set_apn_failed": "Impossibile impostare l'APN",
+    "radio_off_failed": "Impossibile spegnere la radio",
+    "radio_on_failed": "Impossibile riaccendere la radio",
+    "restart_failed": "Impossibile riavviare il modem",
+    "lte_lock_failed": "Impossibile applicare il blocco LTE",
+    "lte_lock_mode_failed": "Il blocco LTE è impostato, ma non è stato possibile riportare la modalità di rete su automatica",
+    "nr_lock_failed": "Impossibile applicare il blocco 5G SA",
+    "nr_lock_mode_failed": "Il blocco 5G SA è impostato, ma non è stato possibile riportare la modalità di rete su automatica",
+    "lte_unlock_failed": "Impossibile rimuovere il blocco LTE",
+    "nr_unlock_failed": "Impossibile rimuovere il blocco 5G SA"
   }
 }
