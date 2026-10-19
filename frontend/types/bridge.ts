@@ -249,6 +249,21 @@ export interface SystemSnapshot {
     dns?: string[];
     apn?: string;
   };
+  /** Persistent data counter (bytes since reset_at, kept across reboots) */
+  data?: {
+    /** Kernel interface the bytes are read from */
+    counter: string;
+    /** false when the interface could not be read at the last sample */
+    ok: boolean;
+    rx: number;
+    tx: number;
+    /** Unix seconds (modem clock): last sample, last reset, last save */
+    sampled_at: number;
+    reset_at: number;
+    saved_at: number;
+    /** Counter restarts (reboot, interface re-created) since reset_at */
+    resets: number;
+  };
   conn: {
     status: CheckStatus;
     pending: boolean;

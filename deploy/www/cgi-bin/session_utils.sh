@@ -96,6 +96,7 @@ status_text() {
         405) echo "Method Not Allowed" ;;
         409) echo "Conflict" ;;
         500) echo "Internal Server Error" ;;
+        503) echo "Service Unavailable" ;;
         *) echo "OK" ;;
     esac
 }

@@ -85,7 +85,7 @@ const DeviceMetricsComponent = ({
   const isCpuHigh = cpu !== null && cpu >= CPU_WARN;
   const memPct = memTotal > 0 ? (memUsed / memTotal) * 100 : 0;
 
-  // Persistent data-usage counter — polled independently at 2 s cadence
+  // Persistent data-usage counter — system_bridge's snapshot (rmnet_ipa0)
   const {
     data: dataUsed,
     isResetting,
@@ -226,7 +226,7 @@ const DeviceMetricsComponent = ({
             )}
           </div>
 
-          {/* Data Used (persistent cumulative counter from AT+QGDCNT/QGDNRCNT) */}
+          {/* Data Used (system_bridge's persistent rmnet_ipa0 byte counter) */}
           <Separator />
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
