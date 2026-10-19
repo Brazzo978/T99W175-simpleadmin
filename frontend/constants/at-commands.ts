@@ -25,7 +25,8 @@ export const DEFAULT_AT_COMMANDS: ATCommandPreset[] = [
   { label: "5G cell lock", command: "AT^NR5G_LOCK?" },
   { label: "APN profiles", command: "AT+CGDCONT?" },
   { label: "Data connection", command: "AT+CGCONTRDP=1" },
-  { label: "Radio off", command: "AT+CFUN=0" },
+  // CFUN=4 keeps the SIM: CFUN=0 loses it until a reboot on this modem.
+  { label: "Radio off", command: "AT+CFUN=4" },
   { label: "Radio on", command: "AT+CFUN=1" },
   { label: "Reboot", command: "AT+CFUN=1,1" },
 ];

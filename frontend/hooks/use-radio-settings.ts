@@ -187,7 +187,10 @@ export function useRadioSettings() {
 
   /**
    * Profile 1 carries the data connection: the other profiles are removed,
-   * profile 1 rewritten, and the radio restarted to attach with it.
+   * profile 1 rewritten, and the radio restarted to attach with it. The
+   * restart goes through CFUN=4 (radio off, SIM kept): on this modem CFUN=0
+   * powers the SIM down and CFUN=1 does not bring it back ("SIM not
+   * inserted" until a reboot).
    */
   const setApn = useCallback(
     (apn: string, type: PdpType) =>
@@ -201,7 +204,7 @@ export function useRadioSettings() {
         }
         const set = await sendAt(`AT+CGDCONT=1,"${type}","${apn}"`);
         if (!set.ok) return fail(set, "Unable to set the APN");
-        const off = await sendAt("AT+CFUN=0");
+        const off = await sendAt("AT+CFUN=4");
         if (!off.ok) return fail(off, "Unable to turn the radio off");
         const on = await sendAt("AT+CFUN=1");
         if (!on.ok) return fail(on, "Unable to turn the radio back on");

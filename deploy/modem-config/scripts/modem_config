@@ -471,7 +471,9 @@ apn_menu() {
         echo -e "$(colorize "WARNING" yellow)"": To apply APN change you need to powercycle baseband"
         read -p "Do you want to to powercycle the baseband? (y/n): " choice
         if [[ "$choice" =~ ^[Yy]$ ]]; then
-            at_command "AT+CFUN=0" "Radio OFF" "Error turning radio OFF"
+            # CFUN=4, not 0: CFUN=0 powers the SIM down and CFUN=1 does not
+            # bring it back on this modem.
+            at_command "AT+CFUN=4" "Radio OFF" "Error turning radio OFF"
             at_command "AT+CFUN=1" "Radio ON, baseband restarted!" "Error turning radio ON"
             if [ $? -eq 0 ]; then
                 echo " "
@@ -492,9 +494,9 @@ toggle_airplane_mode() {
     echo -e "======= $(colorize "AIRPLANE MODE" white) ======="
     # Verifica stato attuale
     current=$(atcli_smd8 "AT+CFUN?")
-    status=$(echo "$current" | grep -oE '\+CFUN: [01]' | awk '{print $2}' | xargs)
-    
-    if [ "$status" = "0" ]; then
+    status=$(echo "$current" | grep -oE '\+CFUN: [014]' | awk '{print $2}' | xargs)
+
+    if [ "$status" = "0" ] || [ "$status" = "4" ]; then
         echo -e "Airplane mode is currently $(colorize "ENABLED" green)"
         echo -ne "Do you want to $(colorize "DISABLE" red) airplane mode? (y/n): " 
         read choice
@@ -509,7 +511,7 @@ toggle_airplane_mode() {
         echo -ne "Do you want to $(colorize "ENABLE" green) airplane mode? (y/n): " 
         read choice
         if [[ "$choice" =~ ^[Yy]$ ]]; then
-            at_command "AT+CFUN=0" \
+            at_command "AT+CFUN=4" \
                        "Airplane mode $(colorize "ENABLED" green)" \
                        "Error settings Airplane mode!"
             return $?

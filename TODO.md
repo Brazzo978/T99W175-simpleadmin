@@ -27,8 +27,12 @@ pages removed from `frontend/` are re-imported from there when ported.
 ### Next
 - [ ] Page strings are English only: move them to `locales/` (en, it).
 - [ ] Verify on the modem the actions not exercised yet (they send the same
-      commands as the classic pages did): band/cell lock, APN change, SIM
-      switch, SMS send/delete, IMEI write, watchdog save, eSIM download.
+      commands as the classic pages did): SIM switch, SMS send/delete, IMEI
+      write, watchdog save, eSIM download. Verified on 2026-10-19: band lock
+      and reset, LTE and NR cell lock and unlock, APN change (after moving
+      its radio restart from CFUN=0 to CFUN=4: CFUN=0 lost the SIM until a
+      reboot). Unlocking leaves `AT^SLMODE` at 1,0 (automatic), not at the
+      previous value (1,7 here).
 
 ### Features chosen from QManager (first round)
 - [ ] Network events: diag_bridge now pushes DIAG events (`rrc`, `events`)

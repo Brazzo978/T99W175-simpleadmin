@@ -1246,7 +1246,9 @@ function cellLocking() {
       }
 
       if (requiresBasebandRestart) {
-        const radioOff = await this.sendATcommand("AT+CFUN=0");
+        // CFUN=4, not 0: CFUN=0 powers the SIM down and CFUN=1 does not
+        // bring it back on this modem.
+        const radioOff = await this.sendATcommand("AT+CFUN=4");
 
         if (!radioOff.ok) {
           clearInterval(interval);
