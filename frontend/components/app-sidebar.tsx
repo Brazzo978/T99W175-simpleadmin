@@ -49,7 +49,10 @@ const navigation: { groupKey: string; items: NavItem[] }[] = [
         t_key: "signal_details",
         url: "/cellular/signal",
         icon: RadioTowerIcon,
-        items: [{ t_key: "antenna_statistics", url: "/cellular/antenna-statistics" }],
+        items: [
+          { t_key: "antenna_statistics", url: "/cellular/antenna-statistics" },
+          { t_key: "antenna_alignment", url: "/cellular/antenna-alignment" },
+        ],
       },
       { t_key: "settings", url: "/cellular/settings", icon: Settings2Icon },
       {

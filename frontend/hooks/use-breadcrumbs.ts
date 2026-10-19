@@ -33,6 +33,13 @@ const TRAILS: Record<string, Trail> = {
       { key: 'items.antenna_statistics', href: '/cellular/antenna-statistics' },
     ],
   },
+  '/cellular/antenna-alignment': {
+    ...CELLULAR,
+    items: [
+      { key: 'items.signal_details', href: '/cellular/signal' },
+      { key: 'items.antenna_alignment', href: '/cellular/antenna-alignment' },
+    ],
+  },
   '/cellular/settings': { ...CELLULAR, items: [{ key: 'items.settings', href: '/cellular/settings' }] },
   '/cellular/band-locking': { ...CELLULAR, items: [{ key: 'items.band_locking', href: '/cellular/band-locking' }] },
   '/cellular/cell-locking': {

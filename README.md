@@ -333,6 +333,7 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 | Dashboard | network, LTE/5G cells, device, latency, signal chart, recent activities | WebSockets |
 | Signal Details | aggregate DL/UL throughput with its trend, a carrier table, a radio events log (LTE RRC state, failure counters, events by category), throughput by carrier, metric trends and histograms (CQI, MCS, rank, SINR, RSRP, TX power, BLER), LTE neighbour cells, one card per carrier (per-antenna RSRP/SINR/SNR, CQI, rank, TX power, timing advance distance, DL/UL link table) and the DIAG log coverage | WebSockets |
 | Antenna Statistics | the four receive chains (Main, Diversity, MIMO 3, MIMO 4) of the LTE PCell and the 5G cell: which are in use, live RSRP and SINR/SNR, the RSRP spread between them, and per chain the distribution, mean, standard deviation and gap to the Main chain over a 1, 5 or 10 minute window | WebSockets |
+| Antenna Alignment | live RSRP/SINR of the serving cells, three slots (angles of a directional antenna or positions of an omni one) each averaging five one-second samples, a recommendation scored on RSRP and SINR, and what each receive chain sees live; slots are kept in the browser | WebSockets |
 | Cellular Settings | network mode, 5G NSA/SA, SIM slot, APN | `^SLMODE`, `^NR5G_MODE`, `^SWITCH_SLOT`, `+CGDCONT` |
 | Band Locking / Cell Locking | LTE, NSA, SA bands; LTE and 5G SA cell locks | `^BAND_PREF_EXT`, `^LTE_LOCK`, `^NR5G_LOCK` |
 | SMS Center | inbox, send, delete | `+CMGL`, `send_sms` |
