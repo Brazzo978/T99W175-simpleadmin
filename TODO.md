@@ -139,7 +139,8 @@ removed. Worked on together with the proxmox-infra session.
       `hooks/use-watchdog.ts` (the `monitoring` namespace);
       `lib/bridge/store.ts` shows no text. The event details, the status
       note and the log still come in English from the watchdog daemon
-- [ ] Check the Italian pages on the modem (switch in the user menu)
+- [x] Italian pages checked on the modem: 18 pages, no raw keys, no
+      console errors, no 4xx (2026-10-19)
 
 ## Signal Details cleanup (last, after watching it under traffic)
 Every log is subscribed and every field shown, empty or not; the "DIAG log
