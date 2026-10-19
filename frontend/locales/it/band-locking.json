@@ -1,0 +1,52 @@
+{
+  "page": {
+    "title": "Blocco delle bande",
+    "description": "Scegli quali bande può usare il modem. Il blocco si applica subito e può far cadere la connessione per qualche secondo."
+  },
+  "cards": {
+    "lte": {
+      "title": "Blocco bande LTE",
+      "description": "Bande LTE che il modem può usare.",
+      "short": "LTE"
+    },
+    "nsa_nr5g": {
+      "title": "Blocco bande NSA",
+      "description": "Bande 5G utilizzabili con un'ancora LTE (NSA).",
+      "short": "NSA"
+    },
+    "sa_nr5g": {
+      "title": "Blocco bande SA",
+      "description": "Bande 5G utilizzabili in standalone (SA).",
+      "short": "SA"
+    }
+  },
+  "card": {
+    "empty": "Il modem non riporta bande supportate per questa categoria.",
+    "badge_scenario": "Gestito da scenario",
+    "badge_all_unlocked": "Tutte sbloccate",
+    "badge_count_one": "{{locked}} / {{count}} banda",
+    "badge_count_other": "{{locked}} / {{count}} bande",
+    "applying": "Applicazione del blocco bande {{name}}…",
+    "lock_button": "Blocca le bande selezionate",
+    "unlock_all_aria": "Sblocca tutte le bande",
+    "unlock_all_title": "Sblocca tutte le bande (ripristina)",
+    "select_all": "Seleziona tutte",
+    "deselect_all": "Deseleziona tutte",
+    "toast": {
+      "select_one": "Seleziona almeno una banda da bloccare",
+      "locked": "Bande {{name}} bloccate",
+      "lock_failed": "Impossibile applicare il blocco delle bande",
+      "unlocked": "Bande {{name}} sbloccate",
+      "unlock_failed": "Impossibile sbloccare le bande"
+    }
+  },
+  "factory": {
+    "title": "Preferenze di banda di fabbrica",
+    "description": "Riporta le preferenze di banda di ogni tecnologia ai valori predefiniti del firmware.",
+    "button": "Ripristina predefinite",
+    "dialog_title": "Ripristinare le bande predefinite?",
+    "dialog_description": "Tutti i blocchi delle bande LTE e 5G vengono rimossi. La connessione può cadere per qualche secondo.",
+    "confirm": "Ripristina",
+    "toast_restored": "Preferenze di banda ripristinate"
+  }
+}

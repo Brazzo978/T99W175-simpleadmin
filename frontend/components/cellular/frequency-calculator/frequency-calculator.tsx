@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { PageShell } from "@/components/page-shell";
 import { useBridgeState, useNow } from "@/hooks/use-bridge";
 import { pickRadio } from "@/lib/bridge/radio";
@@ -21,6 +22,7 @@ import { CalculatorCard } from "./calculator-card";
 import { HistoryCard, ServingCarriersCard } from "./side-cards";
 
 export default function FrequencyCalculatorComponent() {
+  const { t } = useTranslation("frequency-calculator");
   const state = useBridgeState();
   const now = useNow();
   const { snapshot } = useMemo(() => pickRadio(state, now), [state, now]);
@@ -56,8 +58,8 @@ export default function FrequencyCalculatorComponent() {
 
   return (
     <PageShell
-      title="Frequency Calculator"
-      description="Convert between LTE EARFCN or 5G NR-ARFCN, frequency and band, in the browser. The serving carriers are one click away."
+      title={t("page.title")}
+      description={t("page.description")}
     >
       <CalculatorCard
         form={form ?? prefill ?? EMPTY_QUERY}

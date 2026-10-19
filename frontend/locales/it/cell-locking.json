@@ -1,0 +1,37 @@
+{
+  "page": {
+    "title": "Blocco della cella",
+    "description": "Mantieni il modem su celle specifiche. Un blocco errato lo lascia senza servizio: rimuovi il blocco per tornare alla selezione normale."
+  },
+  "badge": {
+    "locked": "Bloccato",
+    "not_locked": "Non bloccato"
+  },
+  "lte": {
+    "title": "Blocco cella LTE",
+    "description": "Fino a {{max}} celle, ognuna con un PCI e un EARFCN.",
+    "remove_row_aria": "Rimuovi riga",
+    "lock": "Blocca LTE",
+    "add_cell": "Aggiungi cella"
+  },
+  "nr": {
+    "title": "Blocco cella 5G SA",
+    "description": "Una cella 5G standalone: banda, spaziatura delle sottoportanti, NR-ARFCN e PCI.",
+    "band_label": "Banda (n…)",
+    "scs_label": "Spaziatura sottoportanti",
+    "lock": "Blocca 5G SA"
+  },
+  "use_serving": "Usa cella servente",
+  "unlock": "Sblocca",
+  "toast": {
+    "no_lte_serving": "Nessuna cella LTE servente al momento",
+    "no_nr_serving": "Nessuna cella 5G servente al momento",
+    "lte_row_invalid": "Ogni riga richiede un PCI (0-503) e un EARFCN",
+    "lte_none": "Inserisci almeno una cella",
+    "lte_locked_one": "LTE bloccato su {{count}} cella",
+    "lte_locked_other": "LTE bloccato su {{count}} celle",
+    "nr_invalid": "Banda, SCS, NR-ARFCN e PCI (0-1007) sono tutti obbligatori",
+    "nr_locked": "Blocco cella 5G SA applicato",
+    "unlocked": "Blocco cella rimosso"
+  }
+}

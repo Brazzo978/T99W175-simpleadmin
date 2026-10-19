@@ -10,7 +10,10 @@ export type Namespace =
   | "sidebar"
   | "dashboard"
   | "signal"
-  | "antenna";
+  | "antenna"
+  | "band-locking"
+  | "cell-locking"
+  | "frequency-calculator";
 
 export interface LanguageMeta {
   code: LanguageCode;

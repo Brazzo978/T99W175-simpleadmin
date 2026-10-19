@@ -1,6 +1,7 @@
 "use client";
 
 import { HistoryIcon, RadioTowerIcon, XIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -61,14 +62,12 @@ export function ServingCarriersCard({
   carriers: CarrierRow[];
   live: boolean;
 }) {
+  const { t } = useTranslation("frequency-calculator");
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Serving carriers</CardTitle>
-        <CardDescription>
-          Centre frequencies of every carrier in use, from the live radio data.
-          Each spans half its bandwidth either side.
-        </CardDescription>
+        <CardTitle>{t("serving.title")}</CardTitle>
+        <CardDescription>{t("serving.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         {carriers.length === 0 ? (
@@ -77,11 +76,11 @@ export function ServingCarriersCard({
               <EmptyMedia variant="icon">
                 <RadioTowerIcon />
               </EmptyMedia>
-              <EmptyTitle>{live ? "No serving cell" : "No live radio data"}</EmptyTitle>
+              <EmptyTitle>
+                {live ? t("serving.empty_no_cell_title") : t("serving.empty_no_data_title")}
+              </EmptyTitle>
               <EmptyDescription>
-                {live
-                  ? "The carriers appear while the modem is attached."
-                  : "The carriers appear once diag_bridge or system_bridge sends radio data."}
+                {live ? t("serving.empty_no_cell") : t("serving.empty_no_data")}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -89,11 +88,15 @@ export function ServingCarriersCard({
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="h-8 text-xs">Carrier</TableHead>
-                <TableHead className="h-8 text-right text-xs">Channel</TableHead>
-                <TableHead className="h-8 text-right text-xs">Downlink</TableHead>
-                <TableHead className="hidden h-8 text-right text-xs @sm/card:table-cell">Uplink</TableHead>
-                <TableHead className="hidden h-8 text-right text-xs @md/card:table-cell">Width</TableHead>
+                <TableHead className="h-8 text-xs">{t("serving.columns.carrier")}</TableHead>
+                <TableHead className="h-8 text-right text-xs">{t("serving.columns.channel")}</TableHead>
+                <TableHead className="h-8 text-right text-xs">{t("serving.columns.downlink")}</TableHead>
+                <TableHead className="hidden h-8 text-right text-xs @sm/card:table-cell">
+                  {t("serving.columns.uplink")}
+                </TableHead>
+                <TableHead className="hidden h-8 text-right text-xs @md/card:table-cell">
+                  {t("serving.columns.width")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -133,15 +136,16 @@ export function HistoryCard({
   onRemove: (id: string) => void;
   onClear: () => void;
 }) {
+  const { t } = useTranslation("frequency-calculator");
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>History</CardTitle>
-        <CardDescription>The last ten calculations, kept in this browser.</CardDescription>
+        <CardTitle>{t("history.title")}</CardTitle>
+        <CardDescription>{t("history.description")}</CardDescription>
         {entries.length > 0 && (
           <CardAction>
             <Button variant="outline" size="sm" onClick={onClear}>
-              Clear
+              {t("history.clear")}
             </Button>
           </CardAction>
         )}
@@ -153,8 +157,8 @@ export function HistoryCard({
               <EmptyMedia variant="icon">
                 <HistoryIcon />
               </EmptyMedia>
-              <EmptyTitle>No calculations yet</EmptyTitle>
-              <EmptyDescription>Each result you calculate is listed here.</EmptyDescription>
+              <EmptyTitle>{t("history.empty_title")}</EmptyTitle>
+              <EmptyDescription>{t("history.empty_description")}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (
@@ -173,7 +177,7 @@ export function HistoryCard({
                   variant="ghost"
                   size="icon-sm"
                   className="mr-1 shrink-0 text-muted-foreground"
-                  aria-label={`Remove ${e.summary}`}
+                  aria-label={t("history.remove_aria", { summary: e.summary })}
                   onClick={() => onRemove(e.id)}
                 >
                   <XIcon />

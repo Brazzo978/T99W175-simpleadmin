@@ -1,0 +1,37 @@
+{
+  "page": {
+    "title": "Cell Locking",
+    "description": "Keep the modem on specific cells. A wrong lock leaves it without service: remove the lock to get back to normal selection."
+  },
+  "badge": {
+    "locked": "Locked",
+    "not_locked": "Not locked"
+  },
+  "lte": {
+    "title": "LTE Cell Lock",
+    "description": "Up to {{max}} cells, each a PCI and an EARFCN.",
+    "remove_row_aria": "Remove row",
+    "lock": "Lock LTE",
+    "add_cell": "Add Cell"
+  },
+  "nr": {
+    "title": "5G SA Cell Lock",
+    "description": "One standalone 5G cell: band, subcarrier spacing, NR-ARFCN and PCI.",
+    "band_label": "Band (n…)",
+    "scs_label": "Subcarrier spacing",
+    "lock": "Lock 5G SA"
+  },
+  "use_serving": "Use Serving Cell",
+  "unlock": "Unlock",
+  "toast": {
+    "no_lte_serving": "No LTE serving cell right now",
+    "no_nr_serving": "No 5G serving cell right now",
+    "lte_row_invalid": "Each row needs a PCI (0-503) and an EARFCN",
+    "lte_none": "Enter at least one cell",
+    "lte_locked_one": "LTE locked to {{count}} cell",
+    "lte_locked_other": "LTE locked to {{count}} cells",
+    "nr_invalid": "Band, SCS, NR-ARFCN and PCI (0-1007) are all required",
+    "nr_locked": "5G SA cell lock applied",
+    "unlocked": "Cell lock removed"
+  }
+}

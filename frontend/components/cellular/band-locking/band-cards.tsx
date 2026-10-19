@@ -23,6 +23,7 @@ import {
   RotateCcwIcon,
   ShieldIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { formatBandName, type BandCategory } from "@/types/band-locking";
 
@@ -72,7 +73,10 @@ const BandCardsComponent = ({
   error,
   disabled = false,
 }: BandCardsProps) => {
+  const { t } = useTranslation("band-locking");
   const { saved, markSaved } = useSaveFlash();
+  // "LTE", "NSA", "SA": the category as the toasts name it
+  const name = t(`cards.${bandCategory}.short`);
 
   // --- Local checkbox state (number set for O(1) lookup) --------------------
   const [checkedBands, setCheckedBands] = useState<Set<number>>(
@@ -131,27 +135,25 @@ const BandCardsComponent = ({
   const handleLock = async () => {
     const bands = [...checkedBands].sort((a, b) => a - b);
     if (bands.length === 0) {
-      toast.error("Select at least one band to lock");
+      toast.error(t("card.toast.select_one"));
       return;
     }
 
     const success = await onLock(bands);
     if (success) {
       markSaved();
-      toast.success(
-        `${title.replace(" Locking", "")} bands locked successfully`,
-      );
+      toast.success(t("card.toast.locked", { name }));
     } else {
-      toast.error(error || "Failed to apply band lock");
+      toast.error(error || t("card.toast.lock_failed"));
     }
   };
 
   const handleUnlockAll = async () => {
     const success = await onUnlockAll();
     if (success) {
-      toast.success(`${title.replace(" Locking", "")} bands unlocked`);
+      toast.success(t("card.toast.unlocked", { name }));
     } else {
-      toast.error(error || "Failed to unlock bands");
+      toast.error(error || t("card.toast.unlock_failed"));
     }
   };
 
@@ -188,7 +190,7 @@ const BandCardsComponent = ({
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            No supported bands reported by the modem for this category.
+            {t("card.empty")}
           </p>
         </CardContent>
       </Card>
@@ -212,7 +214,7 @@ const BandCardsComponent = ({
               className="bg-info/15 text-info hover:bg-info/20 border-info/30"
             >
               <ShieldIcon className="h-3 w-3" />
-              Scenario Controlled
+              {t("card.badge_scenario")}
             </Badge>
           ) : isAllUnlocked ? (
             <Badge
@@ -220,7 +222,7 @@ const BandCardsComponent = ({
               className="bg-success/15 text-success hover:bg-success/20 border-success/30"
             >
               <LockOpenIcon className="h-3 w-3" />
-              All Unlocked
+              {t("card.badge_all_unlocked")}
             </Badge>
           ) : (
             <Badge
@@ -228,7 +230,10 @@ const BandCardsComponent = ({
               className="bg-warning/15 text-warning hover:bg-warning/20 border-warning/30"
             >
               <LockIcon className="h-3 w-3" />
-              {currentLockedBands.length} / {supportedBands.length} Bands
+              {t("card.badge_count", {
+                locked: currentLockedBands.length,
+                count: supportedBands.length,
+              })}
             </Badge>
           )}
         </div>
@@ -281,7 +286,7 @@ const BandCardsComponent = ({
 
       {/* Screen reader live region for operation results */}
       <div className="sr-only" aria-live="polite" aria-atomic="true">
-        {isLocking ? `Applying ${title.replace(" Locking", "")} band lock…` : ""}
+        {isLocking ? t("card.applying", { name }) : ""}
       </div>
 
       <CardFooter className="flex flex-wrap items-center justify-between gap-2 mt-4">
@@ -290,7 +295,7 @@ const BandCardsComponent = ({
             onClick={handleLock}
             isSaving={isLocking}
             saved={saved}
-            label="Lock Selected Bands"
+            label={t("card.lock_button")}
             disabled={isDisabled || noneSelected || !hasChanges}
           />
           <Button
@@ -298,8 +303,8 @@ const BandCardsComponent = ({
             size="icon"
             onClick={handleUnlockAll}
             disabled={isDisabled || isAllUnlocked}
-            aria-label="Unlock all bands"
-            title="Unlock all bands (reset)"
+            aria-label={t("card.unlock_all_aria")}
+            title={t("card.unlock_all_title")}
           >
             <RotateCcwIcon />
           </Button>
@@ -311,14 +316,14 @@ const BandCardsComponent = ({
             onClick={handleSelectAll}
             disabled={isDisabled}
           >
-            Select All
+            {t("card.select_all")}
           </Button>
           <Button
             variant="outline"
             onClick={handleSelectNone}
             disabled={isDisabled}
           >
-            Deselect All
+            {t("card.deselect_all")}
           </Button>
         </div>
       </CardFooter>

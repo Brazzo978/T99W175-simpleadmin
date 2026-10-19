@@ -8,6 +8,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -44,20 +45,22 @@ const toInt = (value: string) => {
 };
 
 function LockBadge({ locked }: { locked: boolean }) {
+  const { t } = useTranslation("cell-locking");
   return locked ? (
     <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30">
       <LockIcon className="size-3" />
-      Locked
+      {t("badge.locked")}
     </Badge>
   ) : (
     <Badge variant="outline" className="bg-success/15 text-success border-success/30">
       <LockOpenIcon className="size-3" />
-      Not locked
+      {t("badge.not_locked")}
     </Badge>
   );
 }
 
 export default function CellLockingComponent() {
+  const { t } = useTranslation("cell-locking");
   const radio = useRadioSettings();
   const { data: status } = useModemStatus();
   const { data, isLoading, isBusy } = radio;
@@ -71,7 +74,7 @@ export default function CellLockingComponent() {
   const fillServingLte = () => {
     const lte = status?.lte;
     if (lte?.pci == null || lte.earfcn == null) {
-      toast.error("No LTE serving cell right now");
+      toast.error(t("toast.no_lte_serving"));
       return;
     }
     setRows([{ pci: String(lte.pci), earfcn: String(lte.earfcn) }]);
@@ -80,7 +83,7 @@ export default function CellLockingComponent() {
   const fillServingNr = () => {
     const n = status?.nr;
     if (n?.pci == null || n.arfcn == null) {
-      toast.error("No 5G serving cell right now");
+      toast.error(t("toast.no_nr_serving"));
       return;
     }
     setNr((prev) => ({
@@ -98,17 +101,17 @@ export default function CellLockingComponent() {
       const pci = toInt(row.pci);
       const earfcn = toInt(row.earfcn);
       if (pci === null || pci > 503 || earfcn === null) {
-        toast.error("Each row needs a PCI (0-503) and an EARFCN");
+        toast.error(t("toast.lte_row_invalid"));
         return;
       }
       cells.push({ pci, earfcn });
     }
     if (cells.length === 0) {
-      toast.error("Enter at least one cell");
+      toast.error(t("toast.lte_none"));
       return;
     }
     const result = await radio.lockLte(cells);
-    if (result.ok) toast.success(`LTE locked to ${cells.length} cell(s)`);
+    if (result.ok) toast.success(t("toast.lte_locked", { count: cells.length }));
     else toast.error(result.message);
   };
 
@@ -118,32 +121,32 @@ export default function CellLockingComponent() {
     const arfcn = toInt(nr.arfcn);
     const pci = toInt(nr.pci);
     if (band === null || scs === null || arfcn === null || pci === null || pci > 1007) {
-      toast.error("Band, SCS, NR-ARFCN and PCI (0-1007) are all required");
+      toast.error(t("toast.nr_invalid"));
       return;
     }
     const result = await radio.lockNr({ band, scs, arfcn, pci });
-    if (result.ok) toast.success("5G SA cell lock applied");
+    if (result.ok) toast.success(t("toast.nr_locked"));
     else toast.error(result.message);
   };
 
   const unlock = async (which: "lte" | "nr") => {
     const result = which === "lte" ? await radio.unlockLte() : await radio.unlockNr();
-    if (result.ok) toast.success("Cell lock removed");
+    if (result.ok) toast.success(t("toast.unlocked"));
     else toast.error(result.message);
   };
 
   return (
     <PageShell
-      title="Cell Locking"
-      description="Keep the modem on specific cells. A wrong lock leaves it without service: remove the lock to get back to normal selection."
+      title={t("page.title")}
+      description={t("page.description")}
     >
       <Card className="@container/card">
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle>LTE Cell Lock</CardTitle>
+              <CardTitle>{t("lte.title")}</CardTitle>
               <CardDescription>
-                Up to {MAX_LTE_CELLS} cells, each a PCI and an EARFCN.
+                {t("lte.description", { max: MAX_LTE_CELLS })}
               </CardDescription>
             </div>
             {!isLoading && <LockBadge locked={lteLocked} />}
@@ -194,7 +197,7 @@ export default function CellLockingComponent() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label="Remove row"
+                      aria-label={t("lte.remove_row_aria")}
                       disabled={rows.length === 1}
                       onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
                     >
@@ -209,7 +212,7 @@ export default function CellLockingComponent() {
         <CardFooter className="flex flex-wrap gap-2">
           <Button onClick={applyLte} disabled={isBusy || isLoading}>
             <LockIcon />
-            Lock LTE
+            {t("lte.lock")}
           </Button>
           <Button
             variant="outline"
@@ -217,11 +220,11 @@ export default function CellLockingComponent() {
             disabled={rows.length >= MAX_LTE_CELLS}
           >
             <PlusIcon />
-            Add Cell
+            {t("lte.add_cell")}
           </Button>
           <Button variant="outline" onClick={fillServingLte}>
             <CrosshairIcon />
-            Use Serving Cell
+            {t("use_serving")}
           </Button>
           <Button
             variant="outline"
@@ -229,7 +232,7 @@ export default function CellLockingComponent() {
             disabled={isBusy || !lteLocked}
           >
             <LockOpenIcon />
-            Unlock
+            {t("unlock")}
           </Button>
         </CardFooter>
       </Card>
@@ -238,10 +241,8 @@ export default function CellLockingComponent() {
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle>5G SA Cell Lock</CardTitle>
-              <CardDescription>
-                One standalone 5G cell: band, subcarrier spacing, NR-ARFCN and PCI.
-              </CardDescription>
+              <CardTitle>{t("nr.title")}</CardTitle>
+              <CardDescription>{t("nr.description")}</CardDescription>
             </div>
             {!isLoading && <LockBadge locked={nrLocked} />}
           </div>
@@ -263,7 +264,7 @@ export default function CellLockingComponent() {
               )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="nr-band">Band (n…)</Label>
+                  <Label htmlFor="nr-band">{t("nr.band_label")}</Label>
                   <Input
                     id="nr-band"
                     inputMode="numeric"
@@ -272,7 +273,7 @@ export default function CellLockingComponent() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Subcarrier spacing</Label>
+                  <Label>{t("nr.scs_label")}</Label>
                   <Select value={nr.scs} onValueChange={(scs) => setNr({ ...nr, scs })}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -311,11 +312,11 @@ export default function CellLockingComponent() {
         <CardFooter className="flex flex-wrap gap-2">
           <Button onClick={applyNr} disabled={isBusy || isLoading}>
             <LockIcon />
-            Lock 5G SA
+            {t("nr.lock")}
           </Button>
           <Button variant="outline" onClick={fillServingNr}>
             <CrosshairIcon />
-            Use Serving Cell
+            {t("use_serving")}
           </Button>
           <Button
             variant="outline"
@@ -323,7 +324,7 @@ export default function CellLockingComponent() {
             disabled={isBusy || !nrLocked}
           >
             <LockOpenIcon />
-            Unlock
+            {t("unlock")}
           </Button>
         </CardFooter>
       </Card>

@@ -9,6 +9,7 @@ import {
   type CalcResult,
   type Rat,
 } from "@/lib/earfcn";
+import { msg, type Msg } from "@/lib/i18n/message";
 import type { CarrierRow } from "../signal/carriers";
 
 export type Mode = "channel" | "frequency";
@@ -23,7 +24,7 @@ export interface Query {
 
 export type Outcome =
   | { ok: true; query: Query; input: number; results: CalcResult[] }
-  | { ok: false; query: Query; error: string };
+  | { ok: false; query: Query; error: Msg };
 
 export const EMPTY_QUERY: Query = { mode: "channel", rat: "auto", value: "" };
 
@@ -43,29 +44,44 @@ export function runQuery(query: Query): Outcome {
     return {
       ok: false,
       query,
-      error: query.mode === "channel" ? "Enter an EARFCN or an NR-ARFCN." : "Enter a frequency in MHz.",
+      error: msg(
+        query.mode === "channel"
+          ? "frequency-calculator:errors.enter_channel"
+          : "frequency-calculator:errors.enter_frequency",
+      ),
     };
   }
   const v = Number(text);
   if (query.mode === "channel") {
     if (!Number.isInteger(v) || v < 0) {
-      return { ok: false, query, error: "A channel number is a whole number, 0 or more." };
+      return { ok: false, query, error: msg("frequency-calculator:errors.channel_not_integer") };
     }
     const result = calculateChannel(v, query.rat);
     if (result.matches.length === 0) {
-      const what =
-        query.rat === "auto" ? "No LTE or NR band uses channel" : `No band uses ${channelName(query.rat)}`;
-      return { ok: false, query, error: `${what} ${v}.` };
+      const error =
+        query.rat === "auto"
+          ? msg("frequency-calculator:errors.no_band_any", { value: v })
+          : msg("frequency-calculator:errors.no_band_rat", {
+              channel: channelName(query.rat),
+              value: v,
+            });
+      return { ok: false, query, error };
     }
     return { ok: true, query, input: v, results: [result] };
   }
   if (!Number.isFinite(v) || v <= 0) {
-    return { ok: false, query, error: "Enter a frequency in MHz, for example 1842.5." };
+    return { ok: false, query, error: msg("frequency-calculator:errors.frequency_invalid") };
   }
   const results = calculateFrequency(v, query.rat).filter((r) => r.matches.length > 0);
   if (results.length === 0) {
-    const what = query.rat === "auto" ? "LTE or NR" : query.rat;
-    return { ok: false, query, error: `No ${what} band covers ${v} MHz.` };
+    const error =
+      query.rat === "auto"
+        ? msg("frequency-calculator:errors.no_band_frequency_any", { value: v })
+        : msg("frequency-calculator:errors.no_band_frequency_rat", {
+            rat: query.rat,
+            value: v,
+          });
+    return { ok: false, query, error };
   }
   return { ok: true, query, input: v, results };
 }

@@ -1,0 +1,77 @@
+{
+  "page": {
+    "title": "Frequency Calculator",
+    "description": "Convert between LTE EARFCN or 5G NR-ARFCN, frequency and band, in the browser. The serving carriers are one click away."
+  },
+  "calculator": {
+    "title": "Channel calculator",
+    "description": "An EARFCN or NR-ARFCN to its frequency and bands, or a frequency to its channel numbers.",
+    "tab_channel": "Channel to frequency",
+    "tab_frequency": "Frequency to channel",
+    "input_frequency": "Frequency (MHz)",
+    "input_channel_any": "EARFCN or NR-ARFCN",
+    "rat_aria": "Radio technology",
+    "rat_auto": "Auto",
+    "rat_both": "Both",
+    "placeholder_channel": "e.g. 1850 or 643296",
+    "placeholder_frequency": "e.g. 1842.5",
+    "submit": "Calculate",
+    "serving_label": "Serving cells",
+    "footnote": "LTE: 3GPP TS 36.101 §5.7.3, 100 kHz raster. NR: TS 38.104 §5.4.2.1 global raster, one NR-ARFCN numbering for downlink and uplink. Where bands overlap every candidate is listed; the serving one is marked."
+  },
+  "result": {
+    "aria": "{{name}} result",
+    "headline_bands_one": "{{count}} band, nearest 100 kHz channel each",
+    "headline_bands_other": "{{count}} bands, nearest 100 kHz channel each",
+    "uplink_channel_badge": "Uplink channel",
+    "serving_badge": "Serving",
+    "rows": {
+      "downlink": "Downlink",
+      "uplink": "Uplink",
+      "dl_band": "DL band",
+      "dl_channels": "DL channels",
+      "ul_band": "UL band",
+      "ul_channels": "UL channels",
+      "duplex": "Duplex"
+    },
+    "no_downlink": "None, beyond the downlink range",
+    "sdl": "None, supplemental downlink",
+    "tdd_uplink": "Same as downlink (TDD)",
+    "no_uplink": "None, beyond the uplink range",
+    "duplex_below": "{{spacing}} MHz, uplink below downlink",
+    "duplex_above": "{{spacing}} MHz, uplink above downlink"
+  },
+  "errors": {
+    "enter_channel": "Enter an EARFCN or an NR-ARFCN.",
+    "enter_frequency": "Enter a frequency in MHz.",
+    "channel_not_integer": "A channel number is a whole number, 0 or more.",
+    "no_band_any": "No LTE or NR band uses channel {{value}}.",
+    "no_band_rat": "No band uses {{channel}} {{value}}.",
+    "frequency_invalid": "Enter a frequency in MHz, for example 1842.5.",
+    "no_band_frequency_any": "No LTE or NR band covers {{value}} MHz.",
+    "no_band_frequency_rat": "No {{rat}} band covers {{value}} MHz."
+  },
+  "serving": {
+    "title": "Serving carriers",
+    "description": "Centre frequencies of every carrier in use, from the live radio data. Each spans half its bandwidth either side.",
+    "empty_no_cell_title": "No serving cell",
+    "empty_no_data_title": "No live radio data",
+    "empty_no_cell": "The carriers appear while the modem is attached.",
+    "empty_no_data": "The carriers appear once diag_bridge or system_bridge sends radio data.",
+    "columns": {
+      "carrier": "Carrier",
+      "channel": "Channel",
+      "downlink": "Downlink",
+      "uplink": "Uplink",
+      "width": "Width"
+    }
+  },
+  "history": {
+    "title": "History",
+    "description": "The last ten calculations, kept in this browser.",
+    "clear": "Clear",
+    "empty_title": "No calculations yet",
+    "empty_description": "Each result you calculate is listed here.",
+    "remove_aria": "Remove {{summary}}"
+  }
+}

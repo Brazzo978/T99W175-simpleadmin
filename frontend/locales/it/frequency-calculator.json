@@ -1,0 +1,77 @@
+{
+  "page": {
+    "title": "Calcolatore di frequenza",
+    "description": "Converti tra EARFCN LTE o NR-ARFCN 5G, frequenza e banda, direttamente nel browser. Le portanti in uso sono a un clic di distanza."
+  },
+  "calculator": {
+    "title": "Calcolatore di canale",
+    "description": "Da un EARFCN o NR-ARFCN alla sua frequenza e alle sue bande, o da una frequenza ai suoi numeri di canale.",
+    "tab_channel": "Da canale a frequenza",
+    "tab_frequency": "Da frequenza a canale",
+    "input_frequency": "Frequenza (MHz)",
+    "input_channel_any": "EARFCN o NR-ARFCN",
+    "rat_aria": "Tecnologia radio",
+    "rat_auto": "Auto",
+    "rat_both": "Entrambe",
+    "placeholder_channel": "es. 1850 o 643296",
+    "placeholder_frequency": "es. 1842.5",
+    "submit": "Calcola",
+    "serving_label": "Celle serventi",
+    "footnote": "LTE: 3GPP TS 36.101 §5.7.3, raster di 100 kHz. NR: TS 38.104 §5.4.2.1, raster globale, un'unica numerazione NR-ARFCN per downlink e uplink. Dove le bande si sovrappongono sono elencati tutti i candidati; quello in uso è evidenziato."
+  },
+  "result": {
+    "aria": "Risultato {{name}}",
+    "headline_bands_one": "{{count}} banda, canale a 100 kHz più vicino",
+    "headline_bands_other": "{{count}} bande, canale a 100 kHz più vicino per ciascuna",
+    "uplink_channel_badge": "Canale uplink",
+    "serving_badge": "In uso",
+    "rows": {
+      "downlink": "Downlink",
+      "uplink": "Uplink",
+      "dl_band": "Banda DL",
+      "dl_channels": "Canali DL",
+      "ul_band": "Banda UL",
+      "ul_channels": "Canali UL",
+      "duplex": "Duplex"
+    },
+    "no_downlink": "Nessuno, fuori dall'intervallo downlink",
+    "sdl": "Nessuno, downlink supplementare",
+    "tdd_uplink": "Uguale al downlink (TDD)",
+    "no_uplink": "Nessuno, fuori dall'intervallo uplink",
+    "duplex_below": "{{spacing}} MHz, uplink sotto il downlink",
+    "duplex_above": "{{spacing}} MHz, uplink sopra il downlink"
+  },
+  "errors": {
+    "enter_channel": "Inserisci un EARFCN o un NR-ARFCN.",
+    "enter_frequency": "Inserisci una frequenza in MHz.",
+    "channel_not_integer": "Il numero di canale è un intero, 0 o maggiore.",
+    "no_band_any": "Nessuna banda LTE o NR usa il canale {{value}}.",
+    "no_band_rat": "Nessuna banda usa {{channel}} {{value}}.",
+    "frequency_invalid": "Inserisci una frequenza in MHz, ad esempio 1842.5.",
+    "no_band_frequency_any": "Nessuna banda LTE o NR copre {{value}} MHz.",
+    "no_band_frequency_rat": "Nessuna banda {{rat}} copre {{value}} MHz."
+  },
+  "serving": {
+    "title": "Portanti in uso",
+    "description": "Frequenze centrali di ogni portante in uso, dai dati radio in tempo reale. Ognuna si estende per metà della propria larghezza di banda su ciascun lato.",
+    "empty_no_cell_title": "Nessuna cella servente",
+    "empty_no_data_title": "Nessun dato radio in tempo reale",
+    "empty_no_cell": "Le portanti compaiono mentre il modem è agganciato alla rete.",
+    "empty_no_data": "Le portanti compaiono quando diag_bridge o system_bridge inviano dati radio.",
+    "columns": {
+      "carrier": "Portante",
+      "channel": "Canale",
+      "downlink": "Downlink",
+      "uplink": "Uplink",
+      "width": "Larghezza"
+    }
+  },
+  "history": {
+    "title": "Cronologia",
+    "description": "Gli ultimi dieci calcoli, salvati in questo browser.",
+    "clear": "Cancella",
+    "empty_title": "Nessun calcolo",
+    "empty_description": "Ogni risultato che calcoli compare qui.",
+    "remove_aria": "Rimuovi {{summary}}"
+  }
+}

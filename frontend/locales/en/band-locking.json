@@ -1,0 +1,52 @@
+{
+  "page": {
+    "title": "Band Locking",
+    "description": "Choose which bands the modem may use. Locking applies at once and can drop the connection for a few seconds."
+  },
+  "cards": {
+    "lte": {
+      "title": "LTE Band Locking",
+      "description": "LTE bands the modem may use.",
+      "short": "LTE"
+    },
+    "nsa_nr5g": {
+      "title": "NSA Band Locking",
+      "description": "5G bands usable with an LTE anchor (NSA).",
+      "short": "NSA"
+    },
+    "sa_nr5g": {
+      "title": "SA Band Locking",
+      "description": "5G bands usable standalone (SA).",
+      "short": "SA"
+    }
+  },
+  "card": {
+    "empty": "No supported bands reported by the modem for this category.",
+    "badge_scenario": "Scenario Controlled",
+    "badge_all_unlocked": "All Unlocked",
+    "badge_count_one": "{{locked}} / {{count}} Band",
+    "badge_count_other": "{{locked}} / {{count}} Bands",
+    "applying": "Applying {{name}} band lock…",
+    "lock_button": "Lock Selected Bands",
+    "unlock_all_aria": "Unlock all bands",
+    "unlock_all_title": "Unlock all bands (reset)",
+    "select_all": "Select All",
+    "deselect_all": "Deselect All",
+    "toast": {
+      "select_one": "Select at least one band to lock",
+      "locked": "{{name}} bands locked successfully",
+      "lock_failed": "Failed to apply band lock",
+      "unlocked": "{{name}} bands unlocked",
+      "unlock_failed": "Failed to unlock bands"
+    }
+  },
+  "factory": {
+    "title": "Factory Band Preferences",
+    "description": "Restores the band preferences of every technology to the firmware defaults.",
+    "button": "Restore Defaults",
+    "dialog_title": "Restore band defaults?",
+    "dialog_description": "Every LTE and 5G band lock is removed. The connection may drop for a few seconds.",
+    "confirm": "Restore",
+    "toast_restored": "Band preferences restored"
+  }
+}
