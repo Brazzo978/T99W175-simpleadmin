@@ -478,10 +478,11 @@ has to remove them itself (for example, a scheduler that keeps only the
 newest global address on the interface); what `ra-guard` fixes there are
 the default routes through the old gateways.
 
-`radish` also advertises from the link-local address of `bridge0` itself,
-which is random at every boot. `ra-guard` keeps it in the state file
-(`lanll`) and, after a reboot, withdraws the previous one (router lifetime
-0, no prefix) for the same week.
+`radish` also advertises from the link-local address of `bridge0` itself.
+The persistent MAC fix makes it the EUI-64 of the fixed MAC (without it, it
+was random at every boot). `ra-guard` still keeps it in the state file
+(`lanll`) and, if it ever changes, withdraws the previous one (router
+lifetime 0, no prefix) for the same week.
 
 `radish` itself is left alone: the lifetimes of the current prefix stay
 infinite, as the network sends them.

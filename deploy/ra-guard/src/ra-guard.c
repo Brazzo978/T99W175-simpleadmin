@@ -29,8 +29,9 @@
  * have to be removed on the router itself; the withdrawn default routes
  * are what ra-guard fixes there.
  *
- * radish also advertises from bridge0's own link-local address, which is
- * random at every boot. ra-guard keeps it in the state file and, when it
+ * radish also advertises from bridge0's own link-local address, which was
+ * random at every boot before the persistent MAC fix made it the EUI-64 of
+ * the fixed MAC. ra-guard keeps it in the state file and, when it
  * changes, withdraws the old one (router lifetime 0, no prefix) for the
  * same window.
  *

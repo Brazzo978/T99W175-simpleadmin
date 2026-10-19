@@ -24,7 +24,7 @@ Net effect: the upstream router sees a different MAC for the modem on every rebo
 | Stage | Mechanism | What it pins | Why |
 |---|---|---|---|
 | **1** | **udev rule + script** on `r8125` driver-add | `eth0` | Catches eth0 the instant the kernel creates it, before any userspace component touches it. |
-| **2** | **`/sbin/ifconfig` wrapper** that intercepts `bridge0 hw ether X` | `bridge0` | QCMAP's bridge MAC is set via `system("ifconfig …")`. By replacing `/sbin/ifconfig` with a tiny shell wrapper, we intercept that exact call without modifying or even touching QCMAP. |
+| **2** | **`/sbin/ifconfig` wrapper** that intercepts `bridge0 hw ether X` | `bridge0` and its IPv6 link-local | QCMAP's bridge MAC is set via `system("ifconfig …")`. By replacing `/sbin/ifconfig` with a tiny shell wrapper, we intercept that exact call without modifying or even touching QCMAP. `bridge0` is already up at that point, with a link-local derived from its random MAC that kernel 4.14 does not derive again: the wrapper replaces it with the EUI-64 link-local of the fixed MAC, so routers on the LAN see the same IPv6 gateway after every reboot. |
 
 Both stages read the SAME source of truth — `<EarlyEthMACAddr>` in `mobileap_cfg.xml` — so changing the fleet-wide MAC is just an XML edit + reboot.
 
@@ -49,7 +49,7 @@ overwritten with the wrapper). It applies at the next reboot.
 ssh root@192.168.225.1 'cat /sys/class/net/eth0/address && cat /sys/class/net/bridge0/address'
 ```
 
-Both should equal the value of `<EarlyEthMACAddr>` in `/etc/data/mobileap_cfg.xml`, and stay that value across reboots. Boot timing visible in `dmesg`:
+Both should equal the value of `<EarlyEthMACAddr>` in `/etc/data/mobileap_cfg.xml`, and stay that value across reboots; `ip -6 addr show dev bridge0` should show the matching EUI-64 link-local (`fe80::255:7bff:feb5:7df7` for `00:55:7b:b5:7d:f7`). Boot timing visible in `dmesg`:
 
 ```
 [set-eth0-mac] eth0 set to 00:55:7b:b5:7d:f7

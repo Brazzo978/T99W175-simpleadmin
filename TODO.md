@@ -77,9 +77,6 @@ this firmware sends (the "DIAG log coverage" card counts each log code).
       (`hooks/use-modem-subsys.ts`), connection uptime, LTE category.
 
 ## Other
-- [ ] `bridge0` link-local changes at every boot (derived from the random
-      MAC before persistent-mac sets the fixed one); ra-guard withdraws the
-      old one, a stable one would make that unnecessary.
 - [ ] Verify a real SMS send through `atcli_smd8 -p` (`cgi-bin/send_sms`).
 - [ ] QMI service rediscovery while Linux keeps running (a modem subsystem
       restart): `AT+CFUN=1,1` and `reboot` both restart the whole system,

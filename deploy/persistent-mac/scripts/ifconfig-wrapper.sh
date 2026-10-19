@@ -31,6 +31,27 @@ if [ -z "$BB" ]; then
     exit 127
 fi
 
+# bridge0 is already up when QCMAP sets its MAC, so its IPv6 link-local was
+# derived from the bridge's random MAC, and kernel 4.14 does not derive it
+# again when the MAC changes: it would differ at every boot, and routers on
+# the LAN would keep the previous boot's one as a default router. Replace it
+# with the EUI-64 link-local of the fixed MAC (radish, which advertises from
+# it, has not started yet at this point of the boot).
+stable_link_local() {
+    set -- $(echo "$1" | tr ':' ' ')
+    [ $# = 6 ] || return 0
+    ll=$(printf 'fe80::%x:%x:%x:%x' \
+        $(( ((0x$1 ^ 2) << 8) | 0x$2 )) $(( (0x$3 << 8) | 0xff )) \
+        $(( 0xfe00 | 0x$4 )) $(( (0x$5 << 8) | 0x$6 )))
+    command -v ip >/dev/null 2>&1 || return 0
+    ip -6 addr add "$ll/64" dev bridge0 scope link 2>/dev/null
+    for old in $(ip -6 addr show dev bridge0 scope link 2>/dev/null |
+                 awk '/inet6/ {print $2}'); do
+        [ "$old" = "$ll/64" ] || ip -6 addr del "$old" dev bridge0 2>/dev/null
+    done
+    echo "[ifconfig-wrapper] bridge0 link-local $ll" > /dev/kmsg 2>/dev/null
+}
+
 # Match the exact QCMAP signature: 4 args, "bridge0" "hw" "ether" "<MAC>"
 if [ "$1" = "bridge0" ] && [ "$2" = "hw" ] && [ "$3" = "ether" ] && [ -n "$4" ]; then
     CFG=/etc/data/mobileap_cfg.xml
@@ -40,7 +61,10 @@ if [ "$1" = "bridge0" ] && [ "$2" = "hw" ] && [ "$3" = "ether" ] && [ -n "$4" ];
         if echo "$MAC" | grep -qE "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$"; then
             # Log to kmsg if writable (silent fall-through if not)
             echo "[ifconfig-wrapper] override: $4 -> $MAC" > /dev/kmsg 2>/dev/null
-            exec "$BB" ifconfig bridge0 hw ether "$MAC"
+            "$BB" ifconfig bridge0 hw ether "$MAC"
+            rc=$?
+            [ "$rc" = 0 ] && stable_link_local "$MAC"
+            exit "$rc"
         fi
     fi
 fi
