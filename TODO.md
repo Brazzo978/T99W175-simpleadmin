@@ -71,9 +71,6 @@ this firmware sends (the "DIAG log coverage" card counts each log code).
       PCI (today a single DIAG NR cell takes it unconditionally, wrong for a
       few seconds around an NR handover); recompute `summary` after the QMI
       merge if anything starts reading it.
-- [ ] Rootfs space: www is 5.5 MB with the gzip copies and the rootfs has
-      4.9 MB free (2026-10-19); check whether busybox httpd can serve `.gz`
-      without the original.
 - [ ] `frontend/build.sh` always stamps `BUILD` as `-dirty`: it rewrites
       `deploy/www-nextjs` before running `git describe`.
 - [ ] Bump `next` past 16.0.7 (advisory concerns server features, not the

@@ -123,7 +123,12 @@ else
 fi
 rm -rf "$STAGE/www-nextjs" "$STAGE/www-alpine"
 # busybox httpd serves file.gz to browsers that accept gzip: a third of the
-# bytes on every page load, less work for the modem's single core.
+# bytes on every page load, less work for the modem's single core. It does so
+# even when file itself does not exist (directory indexes included, checked
+# on BusyBox 1.29.3), so the original is dropped: the rootfs has a few MB
+# free. Only a request without gzip would get a 404: browsers always accept
+# it, except Next.js route prefetches of a page, which ask for identity, so
+# the .html pages keep their original too (about 250 KB).
 gz_before=$(find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/config/*' \
   \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.svg' -o -name '*.json' \
      -o -name '*.txt' \) \
@@ -131,9 +136,11 @@ gz_before=$(find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/con
 find "$STAGE/www" -type f -not -path '*/cgi-bin/*' -not -path '*/config/*' \
   \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.svg' -o -name '*.json' \
      -o -name '*.txt' \) \
-  -size +1k -exec gzip -9 -n -k {} +
+  -size +1k -exec gzip -9 -n {} +
+find "$STAGE/www" -type f -name '*.html.gz' -exec sh -c \
+  'for f; do gzip -dc "$f" > "${f%.gz}"; done' sh {} +
 gz_after=$(find "$STAGE/www" -type f -name '*.gz' -printf '%s\n' | awk '{s+=$1} END {print s+0}')
-ok "🗜️  text assets precompressed: $((gz_before / 1024)) KB → $((gz_after / 1024)) KB served"
+ok "🗜️  text assets gzip-only: $((gz_before / 1024)) KB → $((gz_after / 1024)) KB on the modem"
 
 if [ "$SA_ONLY_WWW" = 0 ]; then
   # diag_bridge is a symlink into the T99W175-diag-json-bridge checkout.

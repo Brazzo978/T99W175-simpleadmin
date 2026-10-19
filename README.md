@@ -197,8 +197,9 @@ the installer before anything is copied.
    `--onlywww`); documentation and the Tailscale payload stay behind.
 2. Builds the web root: `deploy/www` (CGIs, `config/`, GUI lock page) plus
    the chosen front-end, warns when `frontend/` is newer than its build, and
-   adds a gzip copy of every text asset (busybox httpd serves it to browsers
-   that accept gzip).
+   replaces every text asset with its gzip copy (busybox httpd serves
+   `file.gz` for `file` to browsers that accept gzip); `.html` pages keep the
+   original too, for the requests that ask for identity.
 3. Adds `diag_bridge` (from the bridge repository), `system_bridge` and
    `ra-guard`, warning when a binary is missing or older than its sources, and checks
    that every module folder is there.
@@ -274,9 +275,11 @@ deploy/
   tailscale/             not pushed: the UI downloads it from GitHub
 ```
 
-Text assets (`.html`, `.css`, `.js`, ...) are installed with a gzip copy next to
-them, which busybox httpd serves to browsers that accept it (about a fifth of
-the bytes).
+Text assets (`.css`, `.js`, `.txt`, ...) are installed gzip-only: busybox
+httpd serves `file.gz` when `file` is asked for and the browser accepts gzip,
+even if `file` itself is missing (about a fifth of the bytes, and of the
+space on the root filesystem). `.html` pages are installed both ways, because
+Next.js prefetches pages without gzip.
 
 Binaries go to `/data/simpleadmin` (persistent UBIFS `usrfs`): the root
 filesystem has only a few MB free. Copies left in `/opt/simpleadmin` by older
@@ -332,8 +335,8 @@ frontend/build.sh            # npm ci on first run, next build, copy to deploy/w
 
 The output in `deploy/www-nextjs/` is versioned (like the system_bridge binary),
 so `./install.sh` needs no Node.js; it warns when the frontend sources are
-newer than the last build. About 0.8 MB gzipped is served; with the gzip
-copies the web root takes about 5 MB of the root filesystem.
+newer than the last build. About 1 MB gzipped is served, and the web root
+takes about 2 MB of the root filesystem.
 
 ## 📡 Live data: diag_bridge and system_bridge
 
