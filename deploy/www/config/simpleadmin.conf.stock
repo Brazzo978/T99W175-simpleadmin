@@ -39,3 +39,9 @@ SIMPLEADMIN_DNS_TESTS="8.8.8.8:www.google.com,1.1.1.1:www.google.com"
 SIMPLEADMIN_HTTP_PROBE="http://connectivitycheck.gstatic.com/generate_204"
 # Seconds the probe may take, 1 to 9.
 SIMPLEADMIN_HTTP_PROBE_TIMEOUT=5
+
+# Seconds between the checks while no page is open (pings only; with a page
+# open they run every 10 s), 10 to 600 in steps of 10. Also the step of the
+# 24-hour latency history. The pings use mobile data: about 3 MB a day at
+# 10 s, 0.5 MB a day at 60 s.
+SIMPLEADMIN_BG_CHECK_INTERVAL=60

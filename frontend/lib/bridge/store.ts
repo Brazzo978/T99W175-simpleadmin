@@ -6,10 +6,11 @@
 // store therefore opens the sockets only while at least one component is
 // subscribed and the tab is visible, and closes them otherwise.
 //
-// system_bridge keeps the latency of its check rounds (24 h) and QMI signal
-// samples (30 min) while nobody is connected, and sends them in a one-time
-// `history` message on connect: the store starts from them, then appends
-// its own samples as before.
+// system_bridge keeps a 24 h latency history (one slot per background check
+// interval) and QMI signal samples (30 min) while nobody is connected, and
+// sends them in a one-time `history` message on connect: the store starts
+// from them, then appends its own samples (signal), the bridge's new slots
+// (latency24h) and one live sample per check round (latencyHistory).
 //
 // Components read it through useSyncExternalStore (see hooks/use-bridge.ts):
 // every accepted message replaces the snapshot object, so React sees a new
@@ -35,6 +36,16 @@ import {
 
 export type LinkState = "idle" | "connecting" | "connected" | "disconnected";
 
+/** system_bridge's 24 h latency history (conn.hist_*), oldest first. */
+export interface LatencyHistory24h {
+  /** History step (s): the background check interval, 0 until known */
+  intervalSec: number;
+  /** Average RTT (ms) of each step's rounds, null when none had an answer */
+  rtt: (number | null)[];
+  /** Date.now() of the newest slot, 0 before the first */
+  lastAt: number;
+}
+
 export interface BridgeState {
   diag: DiagSnapshot | null;
   /** Date.now() of the last diag_bridge message, 0 before the first */
@@ -45,13 +56,15 @@ export interface BridgeState {
   systemLink: LinkState;
   /** Per-antenna signal samples, oldest first */
   signalHistory: SignalHistoryEntry[];
-  /** Average ping RTT of each check round (ms), oldest first, up to 24 h;
-   *  null for a round no target answered */
+  /** Live latency: average ping RTT of each check round (ms) while the
+   *  page is connected, oldest first; null for a round no target answered */
   latencyHistory: (number | null)[];
-  /** Seconds between latency samples, 0 until known */
+  /** Seconds between check rounds, 0 until known */
   latencyIntervalSec: number;
-  /** Date.now() of the newest latency sample, 0 before the first */
+  /** Date.now() of the newest live sample, 0 before the first */
   latencyLastAt: number;
+  /** The bridge's 24 h latency history, one slot per step */
+  latency24h: LatencyHistory24h;
   /** One radio sample per second, oldest first (Signal Details trends) */
   radioHistory: RadioSample[];
   /** First sighting of each DIAG log counter in this page session, for a
@@ -76,8 +89,13 @@ const RECONNECT_MAX_MS = 10_000;
 /** Signal history cadence and depth: 30 minutes at 10 s. */
 export const SIGNAL_HISTORY_INTERVAL_S = 10;
 const SIGNAL_HISTORY_MAX = 180;
-/** Latency samples kept: 24 h of system_bridge's 10 s check rounds. */
+/** Live latency samples kept: 24 h of system_bridge's 10 s check rounds. */
 export const LATENCY_HISTORY_MAX = 8640;
+
+/** Slots of the 24 h latency history at a step of intervalSec. */
+function latency24hMax(intervalSec: number): number {
+  return Math.round(86400 / Math.max(intervalSec, 1));
+}
 
 let state: BridgeState = {
   diag: null,
@@ -90,6 +108,7 @@ let state: BridgeState = {
   latencyHistory: [],
   latencyIntervalSec: 0,
   latencyLastAt: 0,
+  latency24h: { intervalSec: 0, rtt: [], lastAt: 0 },
   radioHistory: [],
   diagLogBase: {},
   radioEvents: [],
@@ -147,6 +166,8 @@ function mergeEvents(
 let lastLatencySampleAt = 0;
 /** conn.seq of the last latency sample taken (see onSystem) */
 let lastConnSeq: number | undefined;
+/** conn.hist_seq of the newest slot in latency24h */
+let lastHistSeq: number | undefined;
 let visibilityHooked = false;
 
 function setState(patch: Partial<BridgeState>) {
@@ -278,17 +299,33 @@ function signalEntry(row: (number | null)[], nowSec: number): SignalHistoryEntry
 /**
  * The bridge's histories replace the local ones (it kept sampling while the
  * page was closed); an empty one (bridge just restarted) leaves them as
- * they are.
+ * they are, unless its latency step differs. The live latency series is
+ * seeded from the 24 h history only when its slots are check rounds (a
+ * 10 s step); at a longer step the dashboard starts empty and fills at
+ * one sample per round.
  */
 function onHistory(history: SystemHistory) {
   const now = Date.now();
   const patch: Partial<BridgeState> = {};
   lastConnSeq = history.seq;
   const latency = history.latency;
-  if (latency) patch.latencyIntervalSec = latency.interval_s;
-  if (latency?.rtt?.length) {
-    patch.latencyHistory = latency.rtt.slice(-LATENCY_HISTORY_MAX);
-    patch.latencyLastAt = now - Math.max(latency.age_s, 0) * 1000;
+  if (latency) {
+    const step = latency.interval_s;
+    const round = latency.round_s ?? step;
+    const rtt = latency.rtt ?? [];
+    const lastAt = rtt.length ? now - Math.max(latency.age_s, 0) * 1000 : 0;
+    lastHistSeq = latency.seq;
+    if (rtt.length || step !== state.latency24h.intervalSec) {
+      patch.latency24h = { intervalSec: step, rtt: rtt.slice(-latency24hMax(step)), lastAt };
+    }
+    patch.latencyIntervalSec = round;
+    if (step !== round) {
+      patch.latencyHistory = [];
+      patch.latencyLastAt = 0;
+    } else if (rtt.length) {
+      patch.latencyHistory = rtt.slice(-LATENCY_HISTORY_MAX);
+      patch.latencyLastAt = lastAt;
+    }
   }
   const rows = history.signal?.rows ?? [];
   if (rows.length) {
@@ -304,10 +341,26 @@ function onSystem(system: SystemSnapshot) {
   const now = Date.now();
   const conn = system.conn;
   const ping = conn?.ping;
-  let { latencyHistory, latencyIntervalSec, latencyLastAt } = state;
-  // One sample per finished check round (conn.seq), at the interval the
-  // history message gave; a bridge without seq gets one per settled
-  // message and a measured interval, as before.
+  let { latencyHistory, latencyIntervalSec, latencyLastAt, latency24h } = state;
+  // 24 h history: the bridge's newest slot when hist_seq moves on; a new
+  // step means it restarted the history, which starts empty here too.
+  if (conn?.hist_seq !== undefined && conn.hist_interval_s) {
+    const step = conn.hist_interval_s;
+    if (step !== latency24h.intervalSec) {
+      latency24h = { intervalSec: step, rtt: [], lastAt: 0 };
+      lastHistSeq = conn.hist_seq;
+    } else if (conn.hist_seq !== lastHistSeq) {
+      lastHistSeq = conn.hist_seq;
+      latency24h = {
+        intervalSec: step,
+        rtt: [...latency24h.rtt, conn.hist_rtt ?? null].slice(-latency24hMax(step)),
+        lastAt: now,
+      };
+    }
+  }
+  // Live: one sample per finished check round (conn.seq), at the round
+  // interval the history message gave; a bridge without seq gets one per
+  // settled message and a measured interval, as before.
   const rounds = conn?.seq !== undefined;
   const fresh = rounds ? conn.seq !== lastConnSeq : !conn?.pending;
   if (ping && fresh) {
@@ -335,6 +388,7 @@ function onSystem(system: SystemSnapshot) {
     latencyHistory,
     latencyIntervalSec,
     latencyLastAt,
+    latency24h,
     activities: activityLog.events,
   });
   sampleSignal();

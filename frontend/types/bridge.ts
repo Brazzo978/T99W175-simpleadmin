@@ -247,13 +247,22 @@ export interface HttpProbe {
  * snapshot: what it recorded while nobody was connected. Oldest first.
  */
 export interface SystemHistory {
-  /** conn.seq of the newest latency sample */
+  /** conn.seq of the last check round */
   seq: number;
+  /** 24 h latency history: one slot per history step, which is the
+   *  background check interval (SIMPLEADMIN_BG_CHECK_INTERVAL) */
   latency: {
+    /** History step (s) */
     interval_s: number;
-    /** Age of the newest sample, -1 when there is none */
+    /** Seconds between check rounds while a client is connected (absent
+     *  from older bridges, whose step was the round) */
+    round_s?: number;
+    /** conn.hist_seq of the newest slot */
+    seq?: number;
+    /** Age of the newest slot, -1 when there is none */
     age_s: number;
-    /** Average RTT (ms) of each check round, null when no target answered */
+    /** Average RTT (ms) of the rounds of each step, null when none had an
+     *  answer */
     rtt: (number | null)[];
   };
   signal: {
@@ -306,9 +315,17 @@ export interface SystemSnapshot {
     /** pending: no round has finished yet */
     status: CheckStatus | "pending";
     pending: boolean;
-    /** Check rounds recorded in the bridge's latency history; a new value
-     *  means a new round finished (one sample) */
+    /** Check rounds finished; a new value means a new round (one live
+     *  latency sample) */
     seq?: number;
+    /** Slots closed in the 24 h latency history; a new value means a new
+     *  slot, hist_rtt */
+    hist_seq?: number;
+    /** History step (s); a change means the bridge restarted the history */
+    hist_interval_s?: number;
+    /** Newest history slot (ms), null when no round of its step had an
+     *  answer or the history is empty */
+    hist_rtt?: number | null;
     ping?: {
       total: number;
       passed: number;

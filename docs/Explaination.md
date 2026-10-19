@@ -127,7 +127,7 @@ Modem and network:
 - `get_lanip`: reads the LAN address from `/etc/data/mobileap_cfg.xml`.
 - `get_arp`: ARP table of the LAN clients.
 - `network_settings`: LAN/DHCP and IP passthrough settings in `mobileap_cfg.xml` (admin).
-- `get_connection_config` / `set_connection_config`: ping targets and DNS tests in `simpleadmin.conf`.
+- `get_connection_config` / `set_connection_config`: ping targets, DNS tests, captive portal probe and its timeout, background check interval in `simpleadmin.conf` (the last three are optional on save: absent keeps the current value).
 - `factory_reset`: restores the modem defaults and reboots (admin).
 
 Services installed by `install.sh`:

@@ -21,8 +21,9 @@ import { isSystemFresh, pickRadio, type RadioSource } from "./radio";
 
 const NO_CHAINS = [null, null, null, null];
 /** Latency samples behind the dashboard's latency card and its average,
- *  jitter and loss: the last 10 minutes of 10 s check rounds (the store
- *  keeps 24 h). */
+ *  jitter and loss: the last 10 minutes of the store's live series, one
+ *  sample per 10 s check round (the 24 h history, at the background
+ *  interval, is latency24h). */
 const LATENCY_WINDOW = 60;
 
 function popcount(mask: number): number {

@@ -21,10 +21,14 @@ import { useBridgeState } from "@/hooks/use-bridge";
 // =============================================================================
 // LatencyHistoryCard — the last 24 hours of ping rounds
 // =============================================================================
-// system_bridge pings its targets every 10 s whether or not a page is open
-// and sends the last 24 h on connect; the store keeps appending. Shown as
-// the average RTT per 5-minute bucket (a gap where no target answered for a
-// whole bucket), with the loss of each bucket in the tooltip.
+// system_bridge pings its targets whether or not a page is open (every 10 s
+// with a page open, once per background check interval without) and keeps
+// one slot per interval for 24 h: the average RTT of that interval's rounds.
+// It sends the history on connect and each new slot after (the store's
+// latency24h). Shown as the average RTT per 5-minute bucket, or per whole
+// multiple of 5 minutes at a longer interval, so no bucket is empty (a gap
+// where no target answered for a whole bucket), with the share of slots
+// without an answer in the tooltip.
 // =============================================================================
 
 const BUCKET_MS = 5 * 60 * 1000;
@@ -53,20 +57,32 @@ function span(ms: number) {
   return min % 60 ? `${h} h ${min % 60} min` : `${h} h`;
 }
 
+/** "10 seconds", "1 minute", "1 minute 30 seconds" */
+function every(sec: number) {
+  const min = Math.floor(sec / 60);
+  const s = sec % 60;
+  const parts = [];
+  if (min) parts.push(`${min} minute${min > 1 ? "s" : ""}`);
+  if (s || !min) parts.push(`${s} second${s === 1 ? "" : "s"}`);
+  return parts.join(" ");
+}
+
 export default function LatencyHistoryCard() {
-  const { latencyHistory, latencyIntervalSec, latencyLastAt } =
-    useBridgeState();
+  const { latency24h } = useBridgeState();
+  const stepSec = latency24h.intervalSec || 60;
+  const bucketMs = Math.max(BUCKET_MS, Math.ceil((stepSec * 1000) / BUCKET_MS) * BUCKET_MS);
 
   const { points, summary } = useMemo(() => {
-    const n = latencyHistory.length;
-    if (!n || !latencyLastAt) return { points: [] as Point[], summary: null };
-    const step = (latencyIntervalSec || 10) * 1000;
+    const { rtt: slots, lastAt } = latency24h;
+    const n = slots.length;
+    if (!n || !lastAt) return { points: [] as Point[], summary: null };
+    const step = stepSec * 1000;
     const buckets = new Map<number, { sum: number; ok: number; all: number }>();
     let okSum = 0;
     let okCount = 0;
-    latencyHistory.forEach((rtt, i) => {
-      const at = latencyLastAt - (n - 1 - i) * step;
-      const key = Math.floor(at / BUCKET_MS) * BUCKET_MS;
+    slots.forEach((rtt, i) => {
+      const at = lastAt - (n - 1 - i) * step;
+      const key = Math.floor(at / bucketMs) * bucketMs;
       const b = buckets.get(key) ?? { sum: 0, ok: 0, all: 0 };
       b.all++;
       if (rtt !== null) {
@@ -90,7 +106,7 @@ export default function LatencyHistoryCard() {
         covered: span(n * step),
       },
     };
-  }, [latencyHistory, latencyIntervalSec, latencyLastAt]);
+  }, [latency24h, stepSec, bucketMs]);
 
   const footer = [
     { label: "Average", value: summary?.avg != null ? `${summary.avg} ms` : "-" },
@@ -103,8 +119,9 @@ export default function LatencyHistoryCard() {
       <CardHeader>
         <CardTitle>Latency, Last 24 Hours</CardTitle>
         <CardDescription>
-          Average ping time of the targets above per 5 minutes. system_bridge
-          measures every 10 seconds, also while no page is open.
+          Average ping time of the targets above per {bucketMs / 60000} minutes.
+          system_bridge keeps one sample every {every(stepSec)}, the background
+          check interval, also while no page is open.
         </CardDescription>
       </CardHeader>
       <CardContent>

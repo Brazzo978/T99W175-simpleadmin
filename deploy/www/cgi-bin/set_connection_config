@@ -36,6 +36,8 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
             HTTP_PROBE=$(echo "$POST_DATA" | grep -o '"httpProbe":"[^"]*"' | cut -d'"' -f4 || true)
         fi
         HTTP_PROBE_TIMEOUT=$(echo "$POST_DATA" | grep -o '"httpProbeTimeout":[0-9]*' | cut -d: -f2 || true)
+        # Background check interval: optional too, absent keeps the value.
+        BG_CHECK_INTERVAL=$(echo "$POST_DATA" | grep -o '"bgCheckInterval":[0-9]*' | cut -d: -f2 || true)
 
         # Both values land inside double quotes in a file every CGI sources,
         # so allow only host/IP characters: no $, `, \, ", | or spaces.
@@ -53,6 +55,12 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
         fi
         if [ -n "$HTTP_PROBE_TIMEOUT" ] && ! [[ "$HTTP_PROBE_TIMEOUT" =~ ^[1-9]$ ]]; then
             send_json_response 400 '{"status":"error","message":"The probe timeout must be 1 to 9 seconds"}'
+            exit 0
+        fi
+        # system_bridge runs its checks in 10 s rounds: 10 to 600, whole tens.
+        if [ -n "$BG_CHECK_INTERVAL" ] && { ! [[ "$BG_CHECK_INTERVAL" =~ ^[1-9][0-9]{1,2}$ ]] ||
+           [ "$BG_CHECK_INTERVAL" -gt 600 ] || [ $((BG_CHECK_INTERVAL % 10)) -ne 0 ]; }; then
+            send_json_response 400 '{"status":"error","message":"The background check interval must be 10 to 600 seconds, in steps of 10"}'
             exit 0
         fi
 
@@ -97,6 +105,17 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
             else
                 echo "# Seconds the probe may take, 1 to 9." >> "$CONFIG_FILE"
                 echo "SIMPLEADMIN_HTTP_PROBE_TIMEOUT=$HTTP_PROBE_TIMEOUT" >> "$CONFIG_FILE"
+            fi
+        fi
+
+        if [ -n "$BG_CHECK_INTERVAL" ]; then
+            if grep -q "^SIMPLEADMIN_BG_CHECK_INTERVAL=" "$CONFIG_FILE"; then
+                sed -i "s|^SIMPLEADMIN_BG_CHECK_INTERVAL=.*|SIMPLEADMIN_BG_CHECK_INTERVAL=$BG_CHECK_INTERVAL|" "$CONFIG_FILE"
+            else
+                echo "" >> "$CONFIG_FILE"
+                echo "# Seconds between the checks while no page is open (pings only), 10 to" >> "$CONFIG_FILE"
+                echo "# 600 in steps of 10; also the step of the 24-hour latency history." >> "$CONFIG_FILE"
+                echo "SIMPLEADMIN_BG_CHECK_INTERVAL=$BG_CHECK_INTERVAL" >> "$CONFIG_FILE"
             fi
         fi
 

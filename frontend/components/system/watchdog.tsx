@@ -33,12 +33,14 @@ function NumberField({
   value,
   onChange,
   suffix,
+  description,
 }: {
   id: string;
   label: string;
   value: number;
   onChange: (v: number) => void;
   suffix?: string;
+  description?: string;
 }) {
   return (
     <div className="grid gap-2">
@@ -49,9 +51,16 @@ function NumberField({
       <Input
         id={id}
         inputMode="numeric"
+        className="tabular-nums"
         value={Number.isNaN(value) ? "" : String(value)}
+        aria-describedby={description ? `${id}-desc` : undefined}
         onChange={(e) => onChange(Number.parseInt(e.target.value, 10))}
       />
+      {description && (
+        <p id={`${id}-desc`} className="text-muted-foreground text-sm">
+          {description}
+        </p>
+      )}
     </div>
   );
 }
@@ -65,6 +74,9 @@ function validateChecks(c: ConnectionChecks): string | null {
     return "Captive portal probe: an http:// URL (letters, digits and . _ ~ / ? = % - only), or empty to disable it.";
   if (!Number.isInteger(c.httpProbeTimeout) || c.httpProbeTimeout < 1 || c.httpProbeTimeout > 9)
     return "Probe timeout: 1 to 9 seconds.";
+  const bg = c.bgCheckInterval;
+  if (!Number.isInteger(bg) || bg < 10 || bg > 600 || bg % 10)
+    return "Background check interval: 10 to 600 seconds, in steps of 10.";
   return null;
 }
 
@@ -97,6 +109,7 @@ function ConnectionChecksCard() {
           What the dashboard&apos;s internet status tests: pings, DNS lookups
           written as server:domain, and an http:// URL that must answer 204
           No Content (anything else means a captive portal; empty disables it).
+          They run every 10 seconds while a page is open.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -138,6 +151,14 @@ function ConnectionChecksCard() {
                 onChange={(v) => setDraft({ ...form, httpProbeTimeout: v })}
               />
             </div>
+            <NumberField
+              id="chk-bg-interval"
+              label="Background check interval"
+              suffix="s"
+              description="How often the pings run while no page is open (10 to 600, in steps of 10), and the step of the 24-hour latency history. They use mobile data: about 3 MB a day at 10 s, 0.5 MB a day at 60 s."
+              value={form.bgCheckInterval}
+              onChange={(v) => setDraft({ ...form, bgCheckInterval: v })}
+            />
           </>
         )}
       </CardContent>

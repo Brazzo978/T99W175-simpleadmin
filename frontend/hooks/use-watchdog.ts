@@ -298,6 +298,9 @@ export interface ConnectionChecks {
   httpProbe: string;
   /** Seconds the probe may take, 1 to 9 */
   httpProbeTimeout: number;
+  /** Seconds between the checks while no page is open (pings only), 10 to
+   *  600 in steps of 10; also the step of the 24 h latency history */
+  bgCheckInterval: number;
 }
 
 /**
@@ -319,6 +322,7 @@ export function useConnectionChecks() {
             dnsTests: json.dnsTests || "",
             httpProbe: typeof json.httpProbe === "string" ? json.httpProbe : "",
             httpProbeTimeout: Number(json.httpProbeTimeout) || 5,
+            bgCheckInterval: Number(json.bgCheckInterval) || 60,
           });
         }
       })

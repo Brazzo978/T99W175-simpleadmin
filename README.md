@@ -45,6 +45,9 @@ SIMPLEADMIN_ENABLE_ESIM=0
 # Base URL for the eSIM intermediate server (default: local euicc-client API)
 SIMPLEADMIN_ESIM_BASE_URL="http://localhost:8080/api/v1"
 ```
+  The connectivity checks (ping targets, DNS tests, captive portal probe and
+  the background check interval) live in the same file and are set from
+  *Connection Monitoring*, see [Live data](#-live-data-diag_bridge-and-system_bridge).
 ### Security notes
 
 - The default account is `admin` / `admin`: change its password after the first login. It is recreated only when no administrator account is left, and there is no default read-only account.
@@ -380,13 +383,22 @@ WebSockets, without polling AT commands:
   data (serving cells, per-chain RSRP, active SCells) takes over.
 
 `system_bridge` keeps working while nobody is connected, for three things:
-the ping round every 10 s (pings only; DNS and the HTTP probe run while a
-page is open), a QMI signal sample every 10 s, and the data counter. A new
-client first gets a `history` message with the last 24 hours of ping
-latency and 30 minutes of signal, so the dashboard charts and the 24-hour
-latency chart of *Connection Monitoring* start full; the browser then keeps
-sampling as before. The background pings cost about 3 MB of mobile data a
-day.
+the connectivity checks, a QMI signal sample every 10 s, and the data
+counter. The checks run every 10 s while a page is open (pings, DNS and the
+HTTP probe) and once per background check interval while none is (pings
+only): `SIMPLEADMIN_BG_CHECK_INTERVAL`, 60 s by default, 10 to 600 in steps
+of 10, set with the checks in *Connection Monitoring*. The background pings
+cost about 0.5 MB of mobile data a day at 60 s, 3 MB at 10 s.
+
+The 24-hour latency history keeps one slot per background interval, page
+open or not: the average RTT of the rounds of that interval (empty when
+none answered); a new interval restarts it empty. A new client first gets a
+`history` message with it and the last 30 minutes of signal, so the 24-hour
+latency chart of *Connection Monitoring* and the dashboard signal chart
+start full, then each new slot in the snapshots (`conn.hist_seq`,
+`conn.hist_rtt`). The dashboard's live latency card takes one sample per
+10 s round while the page is open; it starts from the history only at a
+10 s interval, otherwise empty.
 
 The captive portal probe fetches `SIMPLEADMIN_HTTP_PROBE`
 (`http://connectivitycheck.gstatic.com/generate_204` by default, empty

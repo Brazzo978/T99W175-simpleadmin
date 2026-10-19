@@ -23,6 +23,18 @@ DNS_TESTS="${SIMPLEADMIN_DNS_TESTS:-8.8.8.8:www.google.com,1.1.1.1:www.google.co
 HTTP_PROBE="${SIMPLEADMIN_HTTP_PROBE-http://connectivitycheck.gstatic.com/generate_204}"
 HTTP_PROBE_TIMEOUT="${SIMPLEADMIN_HTTP_PROBE_TIMEOUT:-5}"
 case "$HTTP_PROBE_TIMEOUT" in ''|*[!0-9]*) HTTP_PROBE_TIMEOUT=5 ;; esac
+# Seconds between the checks while no page is open, as system_bridge applies
+# it: 60 when absent or not a number, else rounded to 10 s, 10 to 600
+BG_CHECK_INTERVAL="${SIMPLEADMIN_BG_CHECK_INTERVAL:-60}"
+case "$BG_CHECK_INTERVAL" in
+    ''|*[!0-9]*) BG_CHECK_INTERVAL=60 ;;
+    ??????*) BG_CHECK_INTERVAL=600 ;;
+esac
+BG_CHECK_INTERVAL=$((10#$BG_CHECK_INTERVAL))
+if [ "$BG_CHECK_INTERVAL" -eq 0 ]; then BG_CHECK_INTERVAL=60; fi
+BG_CHECK_INTERVAL=$(( (BG_CHECK_INTERVAL + 5) / 10 * 10 ))
+if [ "$BG_CHECK_INTERVAL" -lt 10 ]; then BG_CHECK_INTERVAL=10; fi
+if [ "$BG_CHECK_INTERVAL" -gt 600 ]; then BG_CHECK_INTERVAL=600; fi
 
 # Escape values for JSON
 PING_TARGETS_JSON=$(echo "$PING_TARGETS" | sed 's/"/\\"/g')
@@ -35,7 +47,8 @@ response="{
   \"pingTargets\": \"$PING_TARGETS_JSON\",
   \"dnsTests\": \"$DNS_TESTS_JSON\",
   \"httpProbe\": \"$HTTP_PROBE_JSON\",
-  \"httpProbeTimeout\": $HTTP_PROBE_TIMEOUT
+  \"httpProbeTimeout\": $HTTP_PROBE_TIMEOUT,
+  \"bgCheckInterval\": $BG_CHECK_INTERVAL
 }"
 
 send_json_response 200 "$response"

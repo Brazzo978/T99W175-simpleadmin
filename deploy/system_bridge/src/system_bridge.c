@@ -18,10 +18,12 @@
  * snapshot pushed every 2 s: radio every 2 s, serving system / CA /
  * temperatures every 10 s, identity every 60 s, connectivity every 10 s.
  * Radio data here is the fallback of the dashboard: diag_bridge (port 9001)
- * is the primary radio source. With or without clients it keeps the
- * histories a new client receives at once (latency of every 10 s ping round
- * for 24 h, QMI signal every 10 s for 30 min) and the persistent data
- * counter.
+ * is the primary radio source. Without clients the connectivity checks run
+ * once per background check interval (SIMPLEADMIN_BG_CHECK_INTERVAL, 60 s
+ * by default), pings only. With or without clients it keeps the histories a
+ * new client receives at once (ping latency for 24 h, one slot per
+ * background check interval; QMI signal every 10 s for 30 min) and the
+ * persistent data counter.
  *
  * The same binary is the serialized AT client: called as atcli_smd8 (the
  * firmware's client is replaced by a link to it) or as "system_bridge at",
@@ -73,7 +75,8 @@
 #define RADIO_MS          2000
 #define SERVING_MS        10000
 #define IDENTITY_MS       60000
-#define CONN_MS           10000
+#define CONN_MS           10000  /* check rounds while a client is connected */
+#define BG_CHECK_MS       60000  /* without clients, SIMPLEADMIN_BG_CHECK_INTERVAL */
 #define SIGNAL_MS         10000
 #define PING_TIMEOUT_MS   1500
 #define DNS_TIMEOUT_MS    2000
@@ -874,10 +877,11 @@ static void data_reset(void) {
 
 /* ============= CONNECTIVITY ============= */
 
-/* The checks run in rounds every CONN_MS, with or without clients: pings
-   only while nobody is connected (they feed the latency history), pings,
-   DNS and the captive portal probe while someone is. `state` is the round
-   in flight, `shown` the last finished round, which is what the snapshot
+/* The checks run in rounds: every CONN_MS with pings, DNS and the captive
+   portal probe while someone is connected, once per background interval
+   (SIMPLEADMIN_BG_CHECK_INTERVAL) with pings only while nobody is; the
+   pings feed the latency history either way. `state` is the round in
+   flight, `shown` the last finished round, which is what the snapshot
    publishes. */
 struct ping_target { char host[64]; struct in_addr addr; int state, shown; double ms, shown_ms; uint16_t seq; uint64_t sent_ms; };
 struct dns_target { char server[64], domain[128]; int state, shown; uint16_t id; uint64_t sent_ms; int fd; };
@@ -889,8 +893,14 @@ static int npings, ndns;
 static int icmp_fd = -1;
 static uint16_t echo_id;
 static time_t conf_mtime;
+static ino_t conf_ino;
+static off_t conf_size;
+static int conf_loaded;
 static int round_open, round_full;   /* a round is in flight; it runs DNS too */
+static int round_closes;             /* it closes the history step */
 static uint64_t round_start_ms;
+static int bg_ms = BG_CHECK_MS;      /* background interval = history step */
+static uint64_t next_step;           /* end of the history step, 0: now */
 
 /* Captive portal probe (SIMPLEADMIN_HTTP_PROBE, empty disables it): an
    http:// URL that answers 204 No Content. A redirect, or any other answer
@@ -931,30 +941,70 @@ static int http_parse_url(void) {
     return 0;
 }
 
-/* Latency history: the average RTT of every round of the last 24 h, in ms,
-   -1 when no target answered. 17 KiB. */
+/* Latency history: one slot per history step (the background interval)
+   for the last 24 h, with or without clients: the average RTT, in ms, of
+   the rounds that finished in that step, -1 when none had an answer.
+   Without clients a step holds its one round; with clients the round
+   nearest the step's end (within CONN_MS / 2) closes it, so every slot
+   holds at least one round and the slots stay a step apart on average.
+   Sized for the shortest step (10 s): 17 KiB. */
 #define LAT_HISTORY  (24 * 3600 * 1000 / CONN_MS)
 static int16_t lat_hist[LAT_HISTORY];
+static int lat_cap = 24 * 3600 * 1000 / BG_CHECK_MS;   /* 24 h at the step */
 static int lat_n, lat_head;           /* head: next slot */
 static uint64_t lat_last_ms;          /* monotonic time of the newest */
-static uint32_t conn_seq;             /* rounds recorded so far */
+static uint32_t conn_seq;             /* rounds with pings finished so far */
+static uint32_t hist_seq;             /* history slots closed so far */
+static double lat_sum;                /* the step in progress: RTT sum and */
+static int lat_ok, lat_rounds;        /* rounds with an answer, all rounds */
 
-static void lat_push(int ms) {
+/* A new step restarts the history empty: slots of another length cannot
+   share the ring, and resampling would make up a resolution the old slots
+   never had (or blur the new one). hist_seq keeps counting; clients see
+   the restart in conn.hist_interval_s. The next round closes the first
+   slot. */
+static void lat_restart(int step_ms) {
+    dbg("[conn] background interval %d s: latency history restarted\n", step_ms / 1000);
+    bg_ms = step_ms;
+    lat_cap = 24 * 3600 * 1000 / step_ms;
+    lat_n = lat_head = 0;
+    lat_sum = 0;
+    lat_ok = lat_rounds = 0;
+    next_step = 0;
+}
+
+/* Closes the step: its rounds become one slot. A step without rounds with
+   pings (no ping target) leaves no slot. */
+static void lat_close(void) {
+    if (!lat_rounds) return;
+    int ms = lat_ok ? (int)(lat_sum / lat_ok + 0.5) : -1;
     lat_hist[lat_head] = (int16_t)(ms > 30000 ? 30000 : ms);
-    lat_head = (lat_head + 1) % LAT_HISTORY;
-    if (lat_n < LAT_HISTORY) lat_n++;
+    lat_head = (lat_head + 1) % lat_cap;
+    if (lat_n < lat_cap) lat_n++;
     lat_last_ms = monotonic_ms();
-    conn_seq++;
+    hist_seq++;
+    dbg("[conn] history slot %u: %d ms from %d round(s)\n", hist_seq, ms, lat_rounds);
+    lat_sum = 0;
+    lat_ok = lat_rounds = 0;
 }
 
 /* SIMPLEADMIN_PING_TARGETS="a,b", SIMPLEADMIN_DNS_TESTS="server:domain,...",
-   SIMPLEADMIN_HTTP_PROBE="http://..." and SIMPLEADMIN_HTTP_PROBE_TIMEOUT=s */
-static void load_conf(void) {
+   SIMPLEADMIN_HTTP_PROBE="http://...", SIMPLEADMIN_HTTP_PROBE_TIMEOUT=s and
+   SIMPLEADMIN_BG_CHECK_INTERVAL=s. Read again when the file changes, never
+   while a round is in flight (it resets the targets). Every sed -i of
+   set_connection_config writes a new file, so the inode and size tell two
+   writes within the same second apart. Returns 1 when it read the file. */
+static int load_conf(void) {
     struct stat st;
-    if (stat(conf_file, &st) == 0 && st.st_mtime == conf_mtime && (npings || ndns)) return;
+    if (stat(conf_file, &st) < 0) memset(&st, 0, sizeof(st));
+    if (conf_loaded && st.st_mtime == conf_mtime && st.st_ino == conf_ino && st.st_size == conf_size) return 0;
+    conf_loaded = 1;
     conf_mtime = st.st_mtime;
+    conf_ino = st.st_ino;
+    conf_size = st.st_size;
     char ping_list[256] = "8.8.8.8,1.1.1.1", dns_list[512] = "8.8.8.8:www.google.com,1.1.1.1:www.google.com";
     char b[8192];
+    int bg_s = 0;
     snprintf(hp.url, sizeof(hp.url), "%s", HTTP_PROBE_DEFAULT);
     hp.timeout_s = 5;
     if (read_file(conf_file, b, sizeof(b)) > 0) {
@@ -968,9 +1018,18 @@ static void load_conf(void) {
             }
             if (!strncmp(line, "SIMPLEADMIN_HTTP_PROBE_TIMEOUT=", 31))
                 hp.timeout_s = atoi(line + 31 + (line[31] == '"'));
+            if (!strncmp(line, "SIMPLEADMIN_BG_CHECK_INTERVAL=", 30))
+                bg_s = atoi(line + 30 + (line[30] == '"'));
         }
     }
     if (hp.timeout_s < 1 || hp.timeout_s > 9) hp.timeout_s = 5;
+    /* 10..600 s in whole CONN_MS rounds, so a step holds a whole number of
+       live rounds; absent or not a number: the default. */
+    if (bg_s <= 0) bg_s = BG_CHECK_MS / 1000;
+    bg_s = (bg_s + 5) / 10 * 10;
+    if (bg_s < 10) bg_s = 10;
+    if (bg_s > 600) bg_s = 600;
+    if (bg_s * 1000 != bg_ms) lat_restart(bg_s * 1000);
     hp.url_ok = hp.url[0] && http_parse_url() == 0;
     npings = ndns = 0;
     for (char *t = strtok(ping_list, ","); t && npings < MAX_TARGETS; t = strtok(NULL, ",")) {
@@ -987,6 +1046,7 @@ static void load_conf(void) {
         d->fd = -1;
         if (sscanf(t, "%63[^:]:%127s", d->server, d->domain) == 2) ndns++;
     }
+    return 1;
 }
 
 static uint16_t icmp_checksum(const void *data, size_t len) {
@@ -1138,11 +1198,12 @@ static void http_read(void) {
     http_stop();
 }
 
-static void conn_start(int full) {
+static void conn_start(int full, int closes) {
     load_conf();
     uint64_t now = monotonic_ms();
     round_open = 1;
     round_full = full;
+    round_closes = closes;
     round_start_ms = now;
     for (int i = 0; i < npings; i++) {
         struct ping_target *p = &pings[i];
@@ -1236,8 +1297,9 @@ static void conn_expire(int force) {
 }
 
 /* Once nothing is in flight the round's results are published and its
-   average RTT goes into the latency history. A round without DNS and probe
-   leaves their results unknown rather than showing old ones. */
+   average RTT goes into the history step, which it may close. A round
+   without DNS and probe leaves their results unknown rather than showing
+   old ones. */
 static void conn_finish(void) {
     if (!round_open) return;
     for (int i = 0; i < npings; i++) if (pings[i].state == CK_WAIT) return;
@@ -1253,7 +1315,12 @@ static void conn_finish(void) {
         if (pings[i].state == CK_OK) { pass++; sum += pings[i].ms; }
     }
     for (int i = 0; i < ndns; i++) dnss[i].shown = round_full ? dnss[i].state : CK_IDLE;
-    if (npings) lat_push(pass ? (int)(sum / pass + 0.5) : -1);
+    if (npings) {
+        conn_seq++;
+        lat_rounds++;
+        if (pass) { lat_sum += sum / pass; lat_ok++; }
+    }
+    if (round_closes) lat_close();
 }
 
 /* ============= SIGNAL HISTORY ============= */
@@ -1302,19 +1369,23 @@ static void sig_push(void) {
 
 /* The one-time message a new client gets before its first snapshot:
      {"history":{"seq":N,
-       "latency":{"interval_s":10,"age_s":A,"rtt":[ms|null,...]},
+       "latency":{"interval_s":60,"round_s":10,"seq":H,"age_s":A,
+                  "rtt":[ms|null,...]},
        "signal":{"interval_s":10,"rows":[[age_s, lte_rsrp x4, lte_rsrq,
                  lte_sinr, nr_rsrp x4, nr_rsrq, nr_sinr],...]}}}
-   oldest first. rtt holds one value per round, age_s is the age of the
-   newest; seq is the conn.seq of that round, so the client appends only
-   later rounds. About 45 KB when full. */
+   oldest first. rtt holds one slot per history step (interval_s, the
+   background interval), age_s is the age of the newest and latency.seq
+   its conn.hist_seq, so the client appends only later slots; seq is the
+   conn.seq of the last round, which runs every round_s while a client is
+   connected. About 45 KB when full at a 10 s step. */
 static size_t serialize_history(char *out, size_t cap) {
     struct jbuf j = { out, 0, cap };
     uint64_t now = monotonic_ms();
-    jcat(&j, "{\"history\":{\"seq\":%u,\"latency\":{\"interval_s\":%d,\"age_s\":%ld,\"rtt\":[",
-         conn_seq, CONN_MS / 1000, lat_n ? (long)((now - lat_last_ms) / 1000) : -1L);
+    jcat(&j, "{\"history\":{\"seq\":%u,\"latency\":{\"interval_s\":%d,\"round_s\":%d,\"seq\":%u,"
+             "\"age_s\":%ld,\"rtt\":[",
+         conn_seq, bg_ms / 1000, CONN_MS / 1000, hist_seq, lat_n ? (long)((now - lat_last_ms) / 1000) : -1L);
     for (int k = 0; k < lat_n; k++) {
-        int16_t v = lat_hist[(lat_head - lat_n + k + LAT_HISTORY) % LAT_HISTORY];
+        int16_t v = lat_hist[(lat_head - lat_n + k + lat_cap) % lat_cap];
         if (v < 0) jcat(&j, "%snull", k ? "," : ""); else jcat(&j, "%s%d", k ? "," : "", v);
     }
     jcat(&j, "]},\"signal\":{\"interval_s\":%d,\"rows\":[", SIGNAL_MS / 1000);
@@ -1380,7 +1451,10 @@ static size_t serialize(char *out, size_t cap) {
        The status counts the checks that ran: all passed "ok", some
        "warning", none "error", "pending" before any finished; a captive
        portal makes it "warning" with portal true whatever the rest says.
-       seq counts the rounds in the latency history. */
+       seq counts the finished rounds (one live latency sample each);
+       hist_seq the closed history slots, hist_rtt being the newest (null:
+       no answer in its step, or none since the history restarted) and
+       hist_interval_s their step. */
     int pass_p = 0, pass_d = 0, done = 0, pending = 0, nt = 0;
     double sum = 0;
     for (int i = 0; i < npings; i++) {
@@ -1399,9 +1473,12 @@ static size_t serialize(char *out, size_t cap) {
     }
     int pass = pass_p + pass_d + pass_h;
     const char *status = !done ? "pending" : portal ? "warning" : pass == done ? "ok" : pass ? "warning" : "error";
+    int16_t newest = lat_n ? lat_hist[(lat_head - 1 + lat_cap) % lat_cap] : -1;
     jcat(&j, "},\"conn\":{\"status\":\"%s\",\"pending\":%s,\"portal\":%s,\"seq\":%u,"
-             "\"ping\":{\"total\":%d,\"passed\":%d,\"avg_ms\":",
-         status, pending ? "true" : "false", portal ? "true" : "false", conn_seq, npings, pass_p);
+             "\"hist_seq\":%u,\"hist_interval_s\":%d,\"hist_rtt\":",
+         status, pending ? "true" : "false", portal ? "true" : "false", conn_seq, hist_seq, bg_ms / 1000);
+    if (newest < 0) jcat(&j, "null"); else jcat(&j, "%d", newest);
+    jcat(&j, ",\"ping\":{\"total\":%d,\"passed\":%d,\"avg_ms\":", npings, pass_p);
     if (nt) jcat(&j, "%.1f", sum / nt); else jcat(&j, "null");
     jcat(&j, ",\"results\":[");
     for (int i = 0; i < npings; i++) {
@@ -1673,7 +1750,7 @@ int main(int argc, char **argv) {
     if (once) {
         data_sample();      /* shown, not saved */
         poll_identity(); poll_serving(); poll_radio(); poll_system();
-        conn_start(1);
+        conn_start(1, 1);
         uint64_t wait_ms = (uint64_t)hp.timeout_s * 1000 + 500;
         uint64_t until = monotonic_ms() + (wait_ms > DNS_TIMEOUT_MS ? wait_ms : DNS_TIMEOUT_MS) + 100;
         while (round_open && monotonic_ms() < until) {
@@ -1759,21 +1836,38 @@ int main(int argc, char **argv) {
         }
 
         /* With or without clients: the data counter, the check rounds and
-           the signal samples. A first client gets a full round at once,
-           after the pings in flight. Rounds keep their cadence on average
-           (the latency history assumes one per CONN_MS). */
+           the signal samples. Rounds run every CONN_MS while a client is
+           connected (a first client gets a full round at once, after the
+           pings in flight), once per history step otherwise; the round
+           nearest the end of a step closes it. Rounds and steps keep their
+           cadence on average (the latency history assumes one slot per
+           step). A changed configuration is read between rounds and
+           applies at once: a client gets a round with the new targets
+           (load_conf cleared the shown results). */
         if (data_reset_req) { data_reset_req = 0; data_reset(); }
         if (now >= next_data) { data_sample(); next_data = now + DATA_SAMPLE_MS; }
         if (now >= next_save) {
             if (du.dirty) data_save();
             next_save = now + DATA_SAVE_MS;
         }
+        static uint64_t next_conf;
+        if (!round_open && now >= next_conf) {
+            if (load_conf() && ws_nclients) next_conn = now;
+            next_conf = now + 1000;
+        }
         if (ws_nclients && !had_clients) next_conn = now;
         had_clients = ws_nclients > 0;
-        if (now >= next_conn && (!round_open || now - round_start_ms >= CONN_MS)) {
+        int due = ws_nclients ? now >= next_conn : now >= next_step;
+        if (due && (!round_open || now - round_start_ms >= CONN_MS)) {
             if (round_open) { conn_expire(1); conn_finish(); }
-            conn_start(ws_nclients > 0);
-            next_conn = next_conn && now - next_conn < CONN_MS ? next_conn + CONN_MS : now + CONN_MS;
+            int closes = now + CONN_MS / 2 >= next_step;
+            conn_start(ws_nclients > 0, closes);
+            if (ws_nclients)
+                next_conn = next_conn && now - next_conn < CONN_MS ? next_conn + CONN_MS : now + CONN_MS;
+            /* After conn_start: a new interval it read set next_step to 0. */
+            if (closes)
+                next_step = next_step && now < next_step + (uint64_t)bg_ms ? next_step + (uint64_t)bg_ms
+                                                                          : now + (uint64_t)bg_ms;
         }
         if (now >= next_signal) {
             if (!ws_nclients) poll_radio();          /* with clients it runs every RADIO_MS */
