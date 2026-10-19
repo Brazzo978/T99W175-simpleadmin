@@ -6,18 +6,18 @@ pushed at the end. The Next.js front-end is a port of QManager-RM520N
 stay in `deploy/www-alpine` and are not extended (decided 2026-10-17).
 
 ## Deploy and verify the merged work
-Merged on `Beta`, not installed yet: the `next` bump needs a fresh
-`npm ci` of the shared `frontend/node_modules`, done once the agents still
-building with it have finished.
-- [ ] `npm ci` (next 16.4.2), `frontend/build.sh`, full `./install.sh`
-- [ ] `BUILD` stamp without `-dirty`
+Installed on 2026-10-19 at 18:55 with a full `./install.sh`.
+- [x] `npm ci` (next 16.4.2), `frontend/build.sh`, full `./install.sh`
+- [x] `BUILD` stamp without `-dirty` (`1.0.5-82-g4ef0a20`)
+- [x] Every page loads on the modem without console errors or 4xx
 - [ ] Change password from the user menu: wrong current password refused,
       right one accepted, as admin and as a read-only user
 - [ ] Decide: change password open to every role (each user changes their
       own after typing the current one), as implemented
-- [ ] GUI toggle key moved to `/data/simpleadmin/gui_toggle.key`:
-      `config/simpleadmin.conf` no longer holds it, lock/unlock still work
-- [ ] Next.js navigation and prefetches (`__next.*.txt`, the `HEAD` that
+- [x] GUI toggle key moved to `/data/simpleadmin/gui_toggle.key`:
+      `config/simpleadmin.conf` served without it
+- [ ] GUI lock/unlock with a key set (none is set today)
+- [x] Next.js navigation and prefetches (`__next.*.txt`, the `HEAD` that
       16.4 sends) answer 200 with the gzip-only web root
 - [ ] Antenna Statistics: `rx_diversity` against the chains that report,
       NR per-chain SNR (`snr_rx`, not seen so far)
@@ -36,9 +36,10 @@ building with it have finished.
       3 MB of mobile data a day (90 MB a month on the backup SIM); every
       60 s would be about 0.5 MB, but the 24 h history then has 1-minute
       resolution (bridge and store rework)
-- [ ] Verify on the modem: data session age after a data reconnect, the
-      history on connect, the probe with `http://google.com/` (portal) and
-      back to the default
+- [x] Live: hostname, kernel, data session age (reset to 0 by the data
+      reconnect at 18:59 and growing since), history sent first on connect,
+      probe answering `ok` (204)
+- [ ] Probe with `http://google.com/` (portal) and back to the default
 - [ ] LTE UE category: not in QMI NAS/DMS nor `AT^DEBUG?`; only in the RRC
       UE capability information at attach (0xB0C0, diag_bridge)
 
@@ -87,7 +88,10 @@ Applied automatically when the ICCID changes (decided 2026-10-19).
       change (in progress)
 - [ ] NR timing advance: 0xB825 arrives but `ta_scs_estimated` stays true,
       the decoder does not extract the SCS (in progress)
-- [ ] Merge, rebuild, install, verify after a reselection
+- [x] Merged to the bridge's `main` (`bc5f297`), installed: one PCell
+      published, `diag_logs` carries each log's version
+- [ ] Watch a real handover/reselection with the new build; capture a
+      0xB825 body (`-d -c B825` across an attach)
 
 ## Core: stale SLAAC state on dc-rtr-01
 `lte-backup` keeps default routes via modem link-locals that ra-guard
@@ -95,10 +99,17 @@ withdraws (router lifetime 0 every 5 minutes, confirmed with a dump), and
 `vl300_lte1` keeps the SLAAC addresses of old prefixes since lte-watch was
 removed. Worked on together with the proxmox-infra session.
 - [x] ra-guard stopped on the modem (15:15) to test whether its
-      router-lifetime-0 RAs re-create those routes on RouterOS
-- [ ] proxmox-infra removes the stale addresses and routes and watches 15 min
-- [ ] Restart ra-guard; if the routes came back only with its RAs, stop
-      sending RAs from stale link-locals (the core is the only LAN host)
+      router-lifetime-0 RAs re-create those routes on RouterOS: they do not,
+      the stale routes only went away with a `vl300_lte1` bounce
+- [x] proxmox-infra removed the stale addresses and bounced the interface
+- [x] After the bounce the router failed duplicate address detection on
+      its own address: radish (`-x`, ND proxy) answered for it because
+      ra-guard held it as a permanent neighbor. ra-guard now routes the
+      router's global addresses via its pinned link-local (`/128`) instead;
+      the router took its address again at the next prefix (18:59)
+- [x] ra-guard restarted (15:33)
+- [ ] Decide whether the router-lifetime-0 RAs from stale link-locals stay:
+      useless for RouterOS, harmless
 
 ## Page strings to locales
 - [ ] Move the English page strings to `locales/` (en, it), after every
