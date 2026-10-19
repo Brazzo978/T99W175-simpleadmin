@@ -8,7 +8,7 @@ pages removed from `frontend/` are re-imported from there when ported.
 
 ### Done
 - Shell: sidebar, session gate, login, user menu (theme, language,
-  reconnect, reboot, logout), en + it.
+  change password, reconnect, reboot, logout), en + it.
 - Dashboard from diag_bridge / system_bridge (`lib/bridge/`), About page,
   reboot countdown.
 - Every former page rebuilt: Signal Details, Cellular Settings, Band and
@@ -75,11 +75,6 @@ this firmware sends (the "DIAG log coverage" card counts each log code).
 ### Gaps in the dashboard
 - [ ] system_bridge: hostname, kernel version, storage of `/data`
       (`hooks/use-modem-subsys.ts`), connection uptime, LTE category.
-- [ ] Change password from the user menu (today it is in Credentials).
-- [ ] `frontend/build.sh` always stamps `BUILD` as `-dirty`: it rewrites
-      `deploy/www-nextjs` before running `git describe`.
-- [ ] Bump `next` past 16.0.7 (advisory concerns server features, not the
-      static export).
 
 ## Other
 - [ ] `bridge0` link-local changes at every boot (derived from the random
@@ -91,8 +86,10 @@ this firmware sends (the "DIAG log coverage" card counts each log code).
       after which system_bridge finds every service again (checked
       2026-10-19); the in-process path (`qmi_lookup` when a service is
       marked lost) has no way to be triggered from AT.
-- [ ] Remove the unused `cgi-bin/get_sys_info`?
-- [ ] `config/simpleadmin.conf` is readable without login and holds
-      `SIMPLEADMIN_GUI_TOGGLE_KEY` (predates the new interface).
+- [ ] `config/simpleadmin.conf` is still served without login, but holds no
+      secret since the GUI toggle key moved to
+      `/data/simpleadmin/gui_toggle.key`. Hiding it too would take a `D:*`
+      line in a `config/httpd.conf`, untested on the modem's busybox 1.29.3
+      httpd (started without `-c`, no `/etc/httpd.conf`).
 - The Tailscale auth key travels in the GET query string of
   `cgi-bin/tailscale`: risk accepted (2026-10-07).
