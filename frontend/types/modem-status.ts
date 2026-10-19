@@ -7,6 +7,8 @@
 // See: QManager_Backend_Architecture.docx §6 "JSON Data Contract"
 // =============================================================================
 
+import type { TFunction } from "i18next";
+import type { Msg } from "@/lib/i18n/message";
 import type { RadioEventCategory, RadioRat } from "./bridge";
 
 // --- Top-Level Status --------------------------------------------------------
@@ -638,8 +640,11 @@ export interface NetworkEvent {
   timestamp: number;
   /** Event classification */
   type: NetworkEventType;
-  /** Human-readable description of the event */
+  /** Human-readable description of the event, in English */
   message: string;
+  /** `message` as a translatable message (lib/i18n/message.ts), shown
+   *  instead of it when present */
+  text?: Msg;
   /** Severity for UI indicator (info = green, warning = amber) */
   severity: EventSeverity;
   /** radio_event only: the DIAG event's category and radio technology */
@@ -787,11 +792,22 @@ export function signalToProgress(
 /**
  * Formats a Unix timestamp into a relative time string.
  * e.g., (now - 120) → "2m ago", (now - 3700) → "1h ago"
+ * With `t`, in the current language (`common:time.*`).
  */
-export function formatTimeAgo(timestamp: number): string {
+export function formatTimeAgo(timestamp: number, t?: TFunction): string {
   const now = Math.floor(Date.now() / 1000);
   const diff = now - timestamp;
 
+  if (t) {
+    if (diff < 60) return t("common:time.just_now");
+    if (diff < 3600) {
+      return t("common:time.minutes_ago", { count: Math.floor(diff / 60) });
+    }
+    if (diff < 86400) {
+      return t("common:time.hours_ago", { count: Math.floor(diff / 3600) });
+    }
+    return t("common:time.days_ago", { count: Math.floor(diff / 86400) });
+  }
   if (diff < 0) return "just now";
   if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;

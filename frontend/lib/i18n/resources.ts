@@ -5,11 +5,10 @@ import itCommon from "@/locales/it/common.json";
 import itSidebar from "@/locales/it/sidebar.json";
 import itDashboard from "@/locales/it/dashboard.json";
 
-// Static resources for i18next. Every bundled language declares every namespace.
-// locales/ also holds the namespaces of pages not ported yet (cellular,
-// system-settings): they join the bundle with their pages.
-// Bundle-only: the whole locale catalog rides the existing out/ → www deploy
-// path, so nothing is fetched at runtime.
+// Static resources for i18next. Every bundled language declares every
+// namespace: one per page (or page group), plus common, sidebar and
+// dashboard. Bundle-only: the whole locale catalog rides the existing
+// out/ → www deploy path, so nothing is fetched at runtime.
 export const resources = {
   en: {
     common: enCommon,
@@ -24,4 +23,8 @@ export const resources = {
 } as const;
 
 export const DEFAULT_NAMESPACE = "common" as const;
-export const ALL_NAMESPACES = ["common", "sidebar", "dashboard"] as const;
+export const ALL_NAMESPACES = [
+  "common",
+  "sidebar",
+  "dashboard",
+] as const;

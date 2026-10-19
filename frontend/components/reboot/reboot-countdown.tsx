@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useTranslation } from "react-i18next";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
@@ -20,18 +21,20 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const RING_STROKE = 5;
 
 interface Phase {
-  label: string;
+  /** `common:reboot.phase.<id>` */
+  id: "shutting_down" | "restarting" | "almost_ready" | "overtime";
   segment: number; // 1-indexed active segment
 }
 
 function getPhase(remaining: number): Phase {
-  if (remaining > 47) return { label: "Shutting down...", segment: 1 };
-  if (remaining > 23) return { label: "Restarting services...", segment: 2 };
-  if (remaining > 0) return { label: "Almost ready...", segment: 3 };
-  return { label: "Reconnecting \u2014 taking longer than usual...", segment: 3 };
+  if (remaining > 47) return { id: "shutting_down", segment: 1 };
+  if (remaining > 23) return { id: "restarting", segment: 2 };
+  if (remaining > 0) return { id: "almost_ready", segment: 3 };
+  return { id: "overtime", segment: 3 };
 }
 
 export function RebootCountdown() {
+  const { t } = useTranslation("common");
   const [verified, setVerified] = useState(false);
   const [remaining, setRemaining] = useState(TOTAL_SECONDS);
   const pollingRef = useRef(false);
@@ -94,6 +97,7 @@ export function RebootCountdown() {
   if (!verified) return null;
 
   const phase = getPhase(remaining);
+  const phaseLabel = t(`reboot.phase.${phase.id}`);
   const isOvertime = remaining <= 0;
   const displaySeconds = Math.max(0, remaining);
   const showEscape = remaining <= OVERTIME_ESCAPE_AT;
@@ -124,8 +128,8 @@ export function RebootCountdown() {
           role="timer"
           aria-label={
             isOvertime
-              ? "Reconnecting, taking longer than usual"
-              : `${displaySeconds} seconds remaining`
+              ? t("reboot.overtime_aria")
+              : t("reboot.seconds_remaining", { count: displaySeconds })
           }
           className="relative"
           style={{ width: RING_SIZE, height: RING_SIZE }}
@@ -175,7 +179,7 @@ export function RebootCountdown() {
                   {displaySeconds}
                 </span>
                 <span className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
-                  sec
+                  {t("reboot.seconds_unit")}
                 </span>
               </>
             )}
@@ -186,11 +190,11 @@ export function RebootCountdown() {
         <div className="text-center min-h-[48px] flex flex-col items-center justify-center">
           {/* Visually hidden live region for screen reader phase announcements */}
           <p className="sr-only" aria-live="polite" aria-atomic="true">
-            {phase.label}
+            {phaseLabel}
           </p>
           <AnimatePresence mode="wait">
             <motion.div
-              key={phase.label}
+              key={phase.id}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
@@ -198,12 +202,12 @@ export function RebootCountdown() {
               aria-hidden="true"
             >
               <p className="text-[15px] font-medium text-foreground">
-                {phase.label}
+                {phaseLabel}
               </p>
               <p className="mt-1 text-[13px] text-muted-foreground">
                 {isOvertime
-                  ? "The device is still restarting"
-                  : "Your device will be back online shortly"}
+                  ? t("reboot.still_restarting")
+                  : t("reboot.back_shortly")}
               </p>
             </motion.div>
           </AnimatePresence>
@@ -236,7 +240,7 @@ export function RebootCountdown() {
           href="/login/"
           className="mt-3 text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
         >
-          Device may need manual attention — go to login
+          {t("reboot.escape_link")}
         </a>
       )}
       </motion.div>

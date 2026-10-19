@@ -12,6 +12,7 @@ import type { NetworkEvent, EventSeverity } from "@/types/modem-status";
 import { formatTimeAgo } from "@/types/modem-status";
 import { useRecentActivities } from "@/hooks/use-recent-activities";
 import { eventLabel } from "@/constants/network-events";
+import { translate } from "@/lib/i18n/message";
 
 import {
   Empty,
@@ -43,8 +44,10 @@ const rowVariants = {
 
 // --- Single event row ---
 function EventRow({ event }: { event: NetworkEvent }) {
-  const label = eventLabel(event);
-  const timeAgo = formatTimeAgo(event.timestamp);
+  const { t } = useTranslation("dashboard");
+  const label = eventLabel(event, t);
+  const timeAgo = formatTimeAgo(event.timestamp, t);
+  const message = event.text ? translate(t, event.text) : event.message;
 
   return (
     <motion.div
@@ -58,7 +61,7 @@ function EventRow({ event }: { event: NetworkEvent }) {
           <Label className="text-muted-foreground text-xs">
             {label} — {timeAgo}
           </Label>
-          <p className="text-sm font-medium leading-snug">{event.message}</p>
+          <p className="text-sm font-medium leading-snug">{message}</p>
         </div>
       </div>
     </motion.div>

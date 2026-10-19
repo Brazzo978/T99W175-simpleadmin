@@ -46,7 +46,7 @@
     "banner": "{{controls}} is managed by the <strong>{{profile_name}}</strong> Custom SIM Profile."
   },
   "time": {
-    "just_now": "Just now",
+    "just_now": "just now",
     "now": "Now",
     "unknown": "Unknown",
     "minutes_ago_one": "{{count}}m ago",
@@ -63,25 +63,6 @@
     "page_description": "Choose the display language for QManager. Your selection is saved on this device.",
     "active": "Active",
     "select_prompt": "Select a language"
-  },
-  "login": {
-    "brand_label": "QManager operator console",
-    "welcome": "Welcome to QManager",
-    "password_label": "Password",
-    "submit": "Sign in",
-    "signing_in": "Signing in…",
-    "locked": "Locked ({{seconds}}s)",
-    "show_password": "Show password",
-    "hide_password": "Hide password",
-    "session_expired": "Your session ended because the device was unreachable for too long.",
-    "signing_in_to": "Signing in to {{hostname}}",
-    "signing_in_as": "Sign in as {{hostname}}",
-    "recovery": {
-      "toggle": "Can't sign in?",
-      "intro": "If you've lost the admin password, you have two recovery paths:",
-      "option_reset": "Open an SSH session to the device and run <code>qmanager_reset_password</code> to set a new admin password. (Requires SSH access to be enabled.)",
-      "option_backup": "If you saved a .qmbackup file, re-flash the device firmware and restore from it."
-    }
   },
   "overview": {
     "title": "QManager",
@@ -175,5 +156,115 @@
       "minutes": "{{minutes}}m"
     },
     "copyright": "© {{year}} QManager"
+  },
+  "at": {
+    "unreachable": "Modem unreachable",
+    "error": "The modem answered ERROR",
+    "reattach_failed": "The modem is deregistered: re-registration (AT+COPS=0) failed. Retry the reconnect or reboot the modem."
+  },
+  "radio_category": {
+    "failure": "Failure",
+    "mobility": "Mobility",
+    "rrc": "RRC state",
+    "rach": "RACH",
+    "ca": "Carrier agg.",
+    "paging": "Paging",
+    "other": "Other"
+  },
+  "login": {
+    "logo_alt": "Simple T99 Logo",
+    "title": "Sign in to Simple T99",
+    "description": "Enter your SimpleAdmin credentials to continue.",
+    "username": "Username",
+    "password": "Password",
+    "password_placeholder": "Enter your password",
+    "show_password": "Show password",
+    "hide_password": "Hide password",
+    "submit": "Login",
+    "submitting": "Logging in...",
+    "footer": "Simple T99 — Foxconn T99W175 Management",
+    "errors": {
+      "invalid_credentials": "Invalid username or password.",
+      "missing_credentials": "Missing credentials",
+      "gui_locked": "GUI locked",
+      "failed": "Login failed",
+      "connection_failed": "Connection failed"
+    }
+  },
+  "layout": {
+    "skip_to_content": "Skip to main content"
+  },
+  "user_menu": {
+    "role": {
+      "admin": "admin",
+      "user": "user"
+    },
+    "toggle_theme": "Toggle Theme",
+    "reconnect_network": "Reconnect Network",
+    "reconnect_description": "This will deregister from the network and reregister, forcing a fresh connection. Internet will drop briefly.",
+    "reconnect": "Reconnect",
+    "reconnecting": "Reconnecting...",
+    "reconnect_started": "Network reconnect initiated. Connection may drop briefly.",
+    "reconnect_failed": "Reconnect failed.",
+    "reconnect_send_failed": "Failed to send reconnect command.",
+    "reboot_description": "The device will restart and all network connections will drop until it comes back online.",
+    "reboot_sent": "Reboot command sent. You will be logged out shortly...",
+    "reboot_refused": "Reboot refused.",
+    "not_now": "Not Now",
+    "reboot_now": "Reboot Now",
+    "rebooting": "Rebooting...",
+    "logout_failed": "Logout failed: the session is still active."
+  },
+  "bridges": {
+    "title": "Live data bridges",
+    "radio_source": "Radio source now: {{source}}",
+    "source_qmi": "QMI (diag_bridge not available)",
+    "source_none": "none",
+    "diag_role": "Radio: cells, signal, per-antenna values (Qualcomm DIAG)",
+    "system_role": "QMI identity and radio, system stats, connectivity checks",
+    "port": "port {{port}}",
+    "last_message": "Last message: {{age}}",
+    "health": {
+      "ok": "Connected",
+      "stale": "Connected, no recent data",
+      "connecting": "Connecting…",
+      "down": "Unreachable",
+      "standby": "Standby: not needed on this page"
+    },
+    "age": {
+      "never": "never",
+      "seconds_one": "{{count}} s ago",
+      "seconds_other": "{{count}} s ago",
+      "minutes_one": "{{count}} min ago",
+      "minutes_other": "{{count}} min ago",
+      "hours_one": "{{count}} h ago",
+      "hours_other": "{{count}} h ago"
+    },
+    "checking": "Checking…",
+    "check_now": "Check now"
+  },
+  "reboot": {
+    "phase": {
+      "shutting_down": "Shutting down...",
+      "restarting": "Restarting services...",
+      "almost_ready": "Almost ready...",
+      "overtime": "Reconnecting — taking longer than usual..."
+    },
+    "overtime_aria": "Reconnecting, taking longer than usual",
+    "seconds_remaining_one": "{{count}} second remaining",
+    "seconds_remaining_other": "{{count}} seconds remaining",
+    "seconds_unit": "sec",
+    "still_restarting": "The device is still restarting",
+    "back_shortly": "Your device will be back online shortly",
+    "escape_link": "Device may need manual attention — go to login"
+  },
+  "ui": {
+    "save_settings": "Save Settings",
+    "sidebar_title": "Sidebar",
+    "sidebar_description": "Displays the mobile sidebar.",
+    "toggle_sidebar": "Toggle Sidebar",
+    "breadcrumb": "breadcrumb",
+    "more": "More",
+    "notifications": "Notifications"
   }
 }

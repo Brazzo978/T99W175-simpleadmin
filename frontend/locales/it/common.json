@@ -34,8 +34,8 @@
     "reconnecting": "Riconnessione…",
     "installing": "Installazione…",
     "removing": "Rimozione…",
-    "enabled": "Abilita",
-    "disabled": "Disabilita",
+    "enabled": "Abilitato",
+    "disabled": "Disabilitato",
     "on": "Attivo",
     "off": "Disattivo"
   },
@@ -46,15 +46,15 @@
     "banner": "{{controls}} è gestito dal profilo SIM personalizzato <strong>{{profile_name}}</strong>."
   },
   "time": {
-    "just_now": "Proprio adesso",
+    "just_now": "adesso",
     "now": "Ora",
     "unknown": "Sconosciuto",
-    "minutes_ago_one": "{{count}}m fa",
-    "minutes_ago_other": "{{count}}m fa",
-    "hours_ago_one": "{{count}}h fa",
-    "hours_ago_other": "{{count}}h fa",
-    "days_ago_one": "{{count}}d fa",
-    "days_ago_other": "{{count}}d fa"
+    "minutes_ago_one": "{{count}} min fa",
+    "minutes_ago_other": "{{count}} min fa",
+    "hours_ago_one": "{{count}} h fa",
+    "hours_ago_other": "{{count}} h fa",
+    "days_ago_one": "{{count}} g fa",
+    "days_ago_other": "{{count}} g fa"
   },
   "language": {
     "label": "Lingua",
@@ -63,25 +63,6 @@
     "page_description": "Scegli la lingua di visualizzazione di QManager. La selezione viene salvata su questo dispositivo.",
     "active": "Attivo",
     "select_prompt": "Seleziona una lingua"
-  },
-  "login": {
-    "brand_label": "Console operatore QManager",
-    "welcome": "Benvenuto in QManager",
-    "password_label": "Password",
-    "submit": "Accedi",
-    "signing_in": "Accesso in corso…",
-    "locked": "Bloccato ({{seconds}}s)",
-    "show_password": "Mostra password",
-    "hide_password": "Nascondi password",
-    "session_expired": "La sessione è terminata perché il dispositivo è stato irraggiungibile troppo a lungo.",
-    "signing_in_to": "Accesso a {{hostname}}",
-    "signing_in_as": "Accedi come {{hostname}}",
-    "recovery": {
-      "toggle": "Non riesci ad accedere?",
-      "intro": "Se hai perso la password di amministratore, hai due opzioni di ripristino:",
-      "option_reset": "Apri una sessione SSH sul dispositivo ed esegui <code>qmanager_reset_password</code> per impostare una nuova password di amministratore. (Richiede l'accesso SSH già abilitato.)",
-      "option_backup": "Se hai salvato un file .qmbackup, riprogramma il firmware del dispositivo e ripristina da quel file."
-    }
   },
   "overview": {
     "title": "QManager",
@@ -175,5 +156,115 @@
       "minutes": "{{minutes}}m"
     },
     "copyright": "© {{year}} QManager"
+  },
+  "at": {
+    "unreachable": "Modem non raggiungibile",
+    "error": "Il modem ha risposto ERROR",
+    "reattach_failed": "Il modem non è registrato: la nuova registrazione (AT+COPS=0) non è riuscita. Riprova la riconnessione o riavvia il modem."
+  },
+  "radio_category": {
+    "failure": "Errore",
+    "mobility": "Mobilità",
+    "rrc": "Stato RRC",
+    "rach": "RACH",
+    "ca": "Aggr. portanti",
+    "paging": "Paging",
+    "other": "Altro"
+  },
+  "login": {
+    "logo_alt": "Logo Simple T99",
+    "title": "Accedi a Simple T99",
+    "description": "Inserisci le credenziali di SimpleAdmin per continuare.",
+    "username": "Nome utente",
+    "password": "Password",
+    "password_placeholder": "Inserisci la password",
+    "show_password": "Mostra la password",
+    "hide_password": "Nascondi la password",
+    "submit": "Accedi",
+    "submitting": "Accesso in corso…",
+    "footer": "Simple T99 — gestione del Foxconn T99W175",
+    "errors": {
+      "invalid_credentials": "Nome utente o password non validi.",
+      "missing_credentials": "Credenziali mancanti",
+      "gui_locked": "Interfaccia bloccata",
+      "failed": "Accesso non riuscito",
+      "connection_failed": "Connessione non riuscita"
+    }
+  },
+  "layout": {
+    "skip_to_content": "Vai al contenuto principale"
+  },
+  "user_menu": {
+    "role": {
+      "admin": "amministratore",
+      "user": "utente"
+    },
+    "toggle_theme": "Cambia tema",
+    "reconnect_network": "Riconnetti alla rete",
+    "reconnect_description": "Il modem si scollega dalla rete e si registra di nuovo, forzando una nuova connessione. Internet si interromperà per qualche istante.",
+    "reconnect": "Riconnetti",
+    "reconnecting": "Riconnessione…",
+    "reconnect_started": "Riconnessione alla rete avviata. La connessione potrebbe interrompersi per qualche istante.",
+    "reconnect_failed": "Riconnessione non riuscita.",
+    "reconnect_send_failed": "Impossibile inviare il comando di riconnessione.",
+    "reboot_description": "Il dispositivo si riavvierà e tutte le connessioni di rete resteranno interrotte finché non tornerà online.",
+    "reboot_sent": "Comando di riavvio inviato. Verrai disconnesso a breve…",
+    "reboot_refused": "Riavvio rifiutato.",
+    "not_now": "Non ora",
+    "reboot_now": "Riavvia ora",
+    "rebooting": "Riavvio…",
+    "logout_failed": "Uscita non riuscita: la sessione è ancora attiva."
+  },
+  "bridges": {
+    "title": "Bridge dei dati in tempo reale",
+    "radio_source": "Sorgente radio attuale: {{source}}",
+    "source_qmi": "QMI (diag_bridge non disponibile)",
+    "source_none": "nessuna",
+    "diag_role": "Radio: celle, segnale, valori per antenna (Qualcomm DIAG)",
+    "system_role": "Identità e radio da QMI, statistiche di sistema, controlli di connettività",
+    "port": "porta {{port}}",
+    "last_message": "Ultimo messaggio: {{age}}",
+    "health": {
+      "ok": "Connesso",
+      "stale": "Connesso, nessun dato recente",
+      "connecting": "Connessione…",
+      "down": "Non raggiungibile",
+      "standby": "In attesa: non serve in questa pagina"
+    },
+    "age": {
+      "never": "mai",
+      "seconds_one": "{{count}} s fa",
+      "seconds_other": "{{count}} s fa",
+      "minutes_one": "{{count}} min fa",
+      "minutes_other": "{{count}} min fa",
+      "hours_one": "{{count}} h fa",
+      "hours_other": "{{count}} h fa"
+    },
+    "checking": "Verifica…",
+    "check_now": "Verifica ora"
+  },
+  "reboot": {
+    "phase": {
+      "shutting_down": "Arresto in corso…",
+      "restarting": "Riavvio dei servizi…",
+      "almost_ready": "Quasi pronto…",
+      "overtime": "Riconnessione — più lenta del solito…"
+    },
+    "overtime_aria": "Riconnessione, più lenta del solito",
+    "seconds_remaining_one": "{{count}} secondo rimanente",
+    "seconds_remaining_other": "{{count}} secondi rimanenti",
+    "seconds_unit": "sec",
+    "still_restarting": "Il dispositivo si sta ancora riavviando",
+    "back_shortly": "Il dispositivo tornerà online a breve",
+    "escape_link": "Il dispositivo potrebbe richiedere un intervento manuale — vai all'accesso"
+  },
+  "ui": {
+    "save_settings": "Salva impostazioni",
+    "sidebar_title": "Barra laterale",
+    "sidebar_description": "Mostra la barra laterale su mobile.",
+    "toggle_sidebar": "Mostra/nascondi la barra laterale",
+    "breadcrumb": "percorso di navigazione",
+    "more": "Altro",
+    "notifications": "Notifiche"
   }
 }

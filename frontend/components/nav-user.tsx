@@ -19,6 +19,7 @@ import { useSessionInfo } from "@/components/auth/session-context";
 import { ChangePasswordDialog } from "@/components/auth/change-password-dialog";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { reconnectNetwork, rebootModem } from "@/lib/modem-actions";
+import { atMessage } from "@/lib/at";
 
 import {
   Avatar,
@@ -79,7 +80,7 @@ export function NavUser({
     setRebooting(true);
     const result = await rebootModem();
     if (!result.ok) {
-      toast.error(result.message || "Reboot refused.");
+      toast.error(atMessage(t, result) || t("user_menu.reboot_refused"));
       setRebooting(false);
       setRebootDialogOpen(false);
       return;
@@ -94,12 +95,12 @@ export function NavUser({
     try {
       const result = await reconnectNetwork();
       if (result.ok) {
-        toast.success("Network reconnect initiated. Connection may drop briefly.");
+        toast.success(t("user_menu.reconnect_started"));
       } else {
-        toast.error(result.message || "Reconnect failed.");
+        toast.error(atMessage(t, result) || t("user_menu.reconnect_failed"));
       }
     } catch {
-      toast.error("Failed to send reconnect command.");
+      toast.error(t("user_menu.reconnect_send_failed"));
     } finally {
       setReconnecting(false);
       setReconnectDialogOpen(false);
@@ -123,7 +124,7 @@ export function NavUser({
         <span className="truncate font-medium">{displayName}</span>
         {session?.role && (
           <span className="truncate text-xs text-muted-foreground">
-            {session.role}
+            {t(`user_menu.role.${session.role}`, { defaultValue: session.role })}
           </span>
         )}
       </div>
@@ -173,7 +174,7 @@ export function NavUser({
                 >
                   <Sun className="dark:hidden" />
                   <Moon className="hidden dark:block" />
-                  Toggle Theme
+                  {t("user_menu.toggle_theme")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setPasswordDialogOpen(true)}>
                   <KeyRound />
@@ -185,7 +186,7 @@ export function NavUser({
                 onClick={() => setReconnectDialogOpen(true)}
               >
                 <RefreshCw />
-                Reconnect Network
+                {t("user_menu.reconnect_network")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
@@ -197,7 +198,7 @@ export function NavUser({
               <DropdownMenuItem
                 onClick={async () => {
                   const { success } = await logout();
-                  if (!success) toast.error("Logout failed: the session is still active.");
+                  if (!success) toast.error(t("user_menu.logout_failed"));
                 }}
               >
                 <LogOut />
@@ -219,14 +220,14 @@ export function NavUser({
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reconnect Network</AlertDialogTitle>
+            <AlertDialogTitle>{t("user_menu.reconnect_network")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will deregister from the network and reregister, forcing a fresh connection. Internet will drop briefly.
+              {t("user_menu.reconnect_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={reconnecting}>
-              Cancel
+              {t("actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={reconnecting}
@@ -235,10 +236,10 @@ export function NavUser({
               {reconnecting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Reconnecting...
+                  {t("user_menu.reconnecting")}
                 </>
               ) : (
-                "Reconnect"
+                t("user_menu.reconnect")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -250,16 +251,16 @@ export function NavUser({
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reboot Device</AlertDialogTitle>
+            <AlertDialogTitle>{t("actions.reboot_device")}</AlertDialogTitle>
             <AlertDialogDescription aria-live="polite">
               {rebooting
-                ? "Reboot command sent. You will be logged out shortly..."
-                : "The device will restart and all network connections will drop until it comes back online."}
+                ? t("user_menu.reboot_sent")
+                : t("user_menu.reboot_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={rebooting}>
-              Not Now
+              {t("user_menu.not_now")}
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
@@ -269,10 +270,10 @@ export function NavUser({
               {rebooting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Rebooting...
+                  {t("user_menu.rebooting")}
                 </>
               ) : (
-                "Reboot Now"
+                t("user_menu.reboot_now")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

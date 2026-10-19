@@ -25,6 +25,7 @@ import {
   type NetworkEvent,
   type NetworkEventType,
 } from "@/types/modem-status";
+import { englishText, msg, type Msg } from "@/lib/i18n/message";
 import { radioActivity, type RadioEvent } from "./events";
 import type { RadioSource } from "./radio";
 
@@ -158,6 +159,9 @@ function cellText(rat: RadioRat, cell: Cell): string {
     : `PCI ${cell.pci}`;
 }
 
+/** Keys of the derived activity messages (locales/<lang>/dashboard.json). */
+const K = "dashboard:activity.derived";
+
 // --- Log ---------------------------------------------------------------------
 
 interface Recent {
@@ -170,7 +174,9 @@ interface Recent {
   pci?: number;
 }
 
-type Entry = Pick<NetworkEvent, "type" | "severity" | "message" | "category" | "rat">;
+type Entry = Pick<NetworkEvent, "type" | "severity" | "message" | "category" | "rat"> & {
+  text: Msg;
+};
 
 export class ActivityLog {
   /** Newest first; replaced by a new array whenever it changes. */
@@ -230,6 +236,7 @@ export class ActivityLog {
           type: "radio_event",
           severity: activity.severity,
           message: activity.message,
+          text: activity.text,
           category: activity.category,
           rat: activity.rat,
         },
@@ -323,17 +330,12 @@ export class ActivityLog {
         "internet_restored",
         "info",
         avg === null
-          ? "Internet connectivity restored"
-          : `Internet connectivity restored (ping ${Math.round(avg)} ms)`,
+          ? msg(`${K}.internet_restored`)
+          : msg(`${K}.internet_restored_ping`, { ms: Math.round(avg) }),
         online.at,
       );
     } else if (online) {
-      this.derived(
-        "internet_lost",
-        "error",
-        "Internet connectivity lost: no ping or DNS reply",
-        online.at,
-      );
+      this.derived("internet_lost", "error", msg(`${K}.internet_lost`), online.at);
     }
 
     if (!up || avg === null) return;
@@ -345,14 +347,14 @@ export class ActivityLog {
       this.derived(
         "high_latency",
         "warning",
-        `High latency: ${Math.round(latency.to.avg)} ms average ping`,
+        msg(`${K}.high_latency`, { ms: Math.round(latency.to.avg) }),
         latency.at,
       );
     } else if (latency) {
       this.derived(
         "latency_recovered",
         "info",
-        `Latency recovered: ${Math.round(latency.to.avg)} ms average ping`,
+        msg(`${K}.latency_recovered`, { ms: Math.round(latency.to.avg) }),
         latency.at,
       );
     }
@@ -367,20 +369,29 @@ export class ActivityLog {
       this.derived(
         "band_change",
         "info",
-        `${rat} band ${bandName(rat, from.band)} → ${bandName(rat, to.band)} (PCI ${from.pci} → ${to.pci})`,
+        msg(`${K}.band_change`, {
+          rat,
+          from: bandName(rat, from.band),
+          to: bandName(rat, to.band),
+          from_pci: from.pci,
+          to_pci: to.pci,
+        }),
         at,
         rat,
         to.pci,
       );
       return;
     }
-    const move = idle && rat === "LTE" ? "cell reselection" : "handover";
-    const on = to.band > 0 ? ` on ${bandName(rat, to.band)}` : "";
+    const move = idle && rat === "LTE" ? "reselection" : "handover";
     const detail =
       from.pci !== to.pci
         ? `PCI ${from.pci} → ${to.pci}`
         : `${rat === "LTE" ? "EARFCN" : "ARFCN"} ${from.freq} → ${to.freq}`;
-    this.derived("pci_change", "info", `${rat} ${move}${on}: ${detail}`, at, rat, to.pci);
+    const text =
+      to.band > 0
+        ? msg(`${K}.${move}_on`, { rat, band: bandName(rat, to.band), detail })
+        : msg(`${K}.${move}`, { rat, detail });
+    this.derived("pci_change", "info", text, at, rat, to.pci);
   }
 
   /** NR primary cell: a cell change, or in NSA the NR leg added or lost. */
@@ -393,9 +404,21 @@ export class ActivityLog {
     // In SA, NR is the whole service: losing it is an out of service.
     if (!nsa) return;
     if (to) {
-      this.derived("nr_anchor", "info", `5G NR added (${cellText("5G", to)})`, at, "5G", to.pci);
+      this.derived(
+        "nr_anchor",
+        "info",
+        msg(`${K}.nr_added`, { cell: cellText("5G", to) }),
+        at,
+        "5G",
+        to.pci,
+      );
     } else if (from) {
-      this.derived("nr_anchor", "warning", `5G NR lost (was ${cellText("5G", from)})`, at);
+      this.derived(
+        "nr_anchor",
+        "warning",
+        msg(`${K}.nr_lost`, { cell: cellText("5G", from) }),
+        at,
+      );
     }
   }
 
@@ -405,11 +428,21 @@ export class ActivityLog {
     const name = (cell: Cell) => bandName(rat, cell.band);
     if (!from.length && to.length) {
       const bands = [pcell, ...to].map(name).join(" + ");
-      this.derived("ca_change", "info", `${tech} CA active: ${bands} (${to.length + 1} carriers)`, at);
+      this.derived(
+        "ca_change",
+        "info",
+        msg(`${K}.ca_active`, { tech, bands, count: to.length + 1 }),
+        at,
+      );
       return;
     }
     if (from.length && !to.length) {
-      this.derived("ca_change", "warning", `${tech} CA off: single carrier ${name(pcell)}`, at);
+      this.derived(
+        "ca_change",
+        "warning",
+        msg(`${K}.ca_off`, { tech, band: name(pcell) }),
+        at,
+      );
       return;
     }
     let added = to.filter((cell) => !from.some((old) => cellKey(old) === cellKey(cell)));
@@ -418,7 +451,17 @@ export class ActivityLog {
     for (const cell of [...added]) {
       const old = removed.find((r) => r.freq === cell.freq);
       if (!old) continue;
-      this.derived("scc_pci_change", "info", `${tech} SCell on ${name(cell)}: PCI ${old.pci} → ${cell.pci}`, at);
+      this.derived(
+        "scc_pci_change",
+        "info",
+        msg(`${K}.scell_moved`, {
+          tech,
+          band: name(cell),
+          from: old.pci,
+          to: cell.pci,
+        }),
+        at,
+      );
       added = added.filter((a) => a !== cell);
       removed = removed.filter((r) => r !== old);
     }
@@ -433,8 +476,8 @@ export class ActivityLog {
       "ca_change",
       after < before ? "warning" : "info",
       before === after
-        ? `${tech} carriers changed (${diff})`
-        : `${tech} carriers ${before} → ${after} (${diff})`,
+        ? msg(`${K}.carriers_changed`, { tech, diff })
+        : msg(`${K}.carriers_count`, { tech, before, after, diff }),
       at,
     );
   }
@@ -446,7 +489,7 @@ export class ActivityLog {
   private derived(
     type: NetworkEventType,
     severity: EventSeverity,
-    message: string,
+    text: Msg,
     at: number,
     rat?: RadioRat,
     pci?: number,
@@ -465,7 +508,11 @@ export class ActivityLog {
         this.remove(twin.id);
       }
     }
-    this.add({ type, severity, message }, when, { origin: "derived", rat, pci });
+    this.add(
+      { type, severity, message: englishText(text), text },
+      when,
+      { origin: "derived", rat, pci },
+    );
   }
 
   private add(entry: Entry, at: number, meta: Omit<Recent, "id" | "at" | "message">) {

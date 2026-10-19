@@ -77,7 +77,7 @@ const LiveLatencyComponent = ({ connectivity }: LiveLatencyComponentProps) => {
 
       // Time label: seconds ago counting back from the most recent entry
       const secsAgo = (displaySlice.length - 1 - i) * interval;
-      const timeLabel = secsAgo === 0 ? "Now" : `-${secsAgo}s`;
+      const timeLabel = secsAgo === 0 ? t("latency.now") : `-${secsAgo}s`;
 
       // Rolling packet loss: look back LOSS_WINDOW entries ending at absIdx
       const windowStart = Math.max(0, absIdx - LOSS_WINDOW + 1);
@@ -91,7 +91,7 @@ const LiveLatencyComponent = ({ connectivity }: LiveLatencyComponentProps) => {
         packetloss: lossPct,
       };
     });
-  }, [connectivity?.latency_history, connectivity?.history_interval_sec]);
+  }, [connectivity?.latency_history, connectivity?.history_interval_sec, t]);
 
   const formatMs = (value: number | null | undefined) =>
     typeof value === "number" ? `${Math.round(value)} ms` : "-";

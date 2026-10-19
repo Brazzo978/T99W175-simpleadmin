@@ -9,7 +9,9 @@
 // The raw AT terminal uses cgi-bin/user_atcommand instead (admin, verbatim).
 // =============================================================================
 
+import type { TFunction } from "i18next";
 import { authFetch } from "@/lib/auth-fetch";
+import { msg, translate, type Msg } from "@/lib/i18n/message";
 
 const AT_ENDPOINT = "/cgi-bin/get_atcommand";
 
@@ -20,6 +22,14 @@ export interface AtResult {
   output: string;
   /** Why it failed: CGI message, the modem's error line, or a network error */
   message?: string;
+  /** `message` as a translatable message, when it is our own text and not
+   *  the CGI's or the modem's (atMessage() picks it) */
+  msg?: Msg;
+}
+
+/** Why an AT request failed, in the current language when the text is ours. */
+export function atMessage(t: TFunction, result: AtResult): string | undefined {
+  return result.msg ? translate(t, result.msg) : result.message;
 }
 
 export async function sendAt(
@@ -33,7 +43,12 @@ export async function sendAt(
       { cache: "no-store", ...init },
     );
   } catch {
-    return { ok: false, output: "", message: "Modem unreachable" };
+    return {
+      ok: false,
+      output: "",
+      message: "Modem unreachable",
+      msg: msg("common:at.unreachable"),
+    };
   }
   let data: {
     success?: boolean;
@@ -55,7 +70,13 @@ export async function sendAt(
       .split("\n")
       .map((l) => l.trim())
       .find((l) => /ERROR/.test(l));
-    return { ok: false, output, message: line || "The modem answered ERROR" };
+    if (line) return { ok: false, output, message: line };
+    return {
+      ok: false,
+      output,
+      message: "The modem answered ERROR",
+      msg: msg("common:at.error"),
+    };
   }
   return { ok: true, output };
 }

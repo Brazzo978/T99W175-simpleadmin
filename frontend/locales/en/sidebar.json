@@ -54,5 +54,9 @@
     "connection_monitoring": "Connection Monitoring",
     "credentials": "Credentials",
     "cell_locking": "Cell Locking"
-  }
+  },
+  "brand": {
+    "logo_alt": "Simple T99 Logo"
+  },
+  "toggle_submenu": "Toggle"
 }

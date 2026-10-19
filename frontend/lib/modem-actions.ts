@@ -6,6 +6,7 @@
 // =============================================================================
 
 import { sendAt, type AtResult } from "@/lib/at";
+import { msg } from "@/lib/i18n/message";
 
 /** How long to wait for the reset to be acknowledged before assuming it. */
 const REBOOT_ACK_MS = 3000;
@@ -49,5 +50,6 @@ export async function reconnectNetwork(): Promise<AtResult> {
     message:
       "The modem is deregistered: re-registration (AT+COPS=0) failed. " +
       "Retry the reconnect or reboot the modem.",
+    msg: msg("common:at.reattach_failed"),
   };
 }

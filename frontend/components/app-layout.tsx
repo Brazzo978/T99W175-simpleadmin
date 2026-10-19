@@ -3,6 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
+import { useTranslation } from "react-i18next";
 
 import {
   SidebarInset,
@@ -28,6 +29,7 @@ import { useAutoLogout } from "@/hooks/use-auto-logout";
 import { SessionContext } from "@/components/auth/session-context";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation("common");
   const breadcrumbs = useBreadcrumbs();
   const pathname = usePathname();
   const { state, session } = useSession();
@@ -46,7 +48,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg focus:ring-2 focus:ring-ring"
       >
-        Skip to main content
+        {t("layout.skip_to_content")}
       </a>
       <AppSidebar />
       <SidebarInset>

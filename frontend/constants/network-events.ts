@@ -1,44 +1,19 @@
-import { RADIO_EVENT_CATEGORIES } from "@/lib/bridge/events";
+import type { TFunction } from "i18next";
 import type { NetworkEvent, NetworkEventType } from "@/types/modem-status";
 
-/** Human-readable labels for each event type */
-export const EVENT_LABELS: Record<NetworkEventType, string> = {
-  network_mode: "Mode Change",
-  band_change: "Band Change",
-  pci_change: "Cell Handoff",
-  scc_pci_change: "Secondary Band Change",
-  ca_change: "Carrier Aggregation",
-  nr_anchor: "5G Anchor Change",
-  signal_lost: "Signal Lost",
-  signal_restored: "Signal Restored",
-  internet_lost: "Internet Lost",
-  internet_restored: "Internet Restored",
-  high_latency: "High Latency",
-  latency_recovered: "Latency Recovered",
-  high_packet_loss: "High Packet Loss",
-  packet_loss_recovered: "Packet Loss Recovered",
-  watchcat_recovery: "Watchdog Recovery",
-  sim_failover: "SIM Failover",
-  sim_swap_detected: "SIM Swap Detected",
-  airplane_mode: "Airplane Mode",
-  profile_applied: "Profile Applied",
-  profile_failed: "Profile Failed",
-  profile_deactivated: "Profile Deactivated",
-  tower_failover: "Tower Lock Failover",
-  radio_event: "Radio Event",
-};
-
 /**
- * Label of one event: its type's, or for a DIAG radio event its technology
+ * Label of one event in the current language: its type's
+ * (`dashboard:event_type.<type>`), or for a DIAG radio event its technology
  * and category as Signal Details names them ("5G Failure", "LTE Mobility").
  */
-export function eventLabel(event: NetworkEvent): string {
+export function eventLabel(event: NetworkEvent, t: TFunction): string {
   if (event.type === "radio_event" && event.category) {
-    return [event.rat, RADIO_EVENT_CATEGORIES[event.category]]
-      .filter(Boolean)
-      .join(" ");
+    const category = t(`common:radio_category.${event.category}`);
+    return event.rat
+      ? t("dashboard:event_type.radio_label", { rat: event.rat, category })
+      : category;
   }
-  return EVENT_LABELS[event.type] ?? event.type;
+  return t(`dashboard:event_type.${event.type}`, { defaultValue: event.type });
 }
 
 /** Tab categories used by the monitoring Network Events card */

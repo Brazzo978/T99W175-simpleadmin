@@ -107,7 +107,7 @@ const DeviceStatusComponent = ({
     <Card className="@container/card">
       <CardHeader>
         <CardTitle className="text-2xl font-semibold @[250px]/card:text-3xl">
-          Device Information
+          {t("device_status.title")}
         </CardTitle>
         <CardAction>
           <Button

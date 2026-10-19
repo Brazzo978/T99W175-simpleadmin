@@ -9,6 +9,7 @@
 // Details.
 // =============================================================================
 
+import { englishText, msg, type Msg } from "@/lib/i18n/message";
 import type { DiagEvent, RadioEventCategory, RadioRat } from "@/types/bridge";
 import type { EventSeverity } from "@/types/modem-status";
 
@@ -24,6 +25,8 @@ type NamedEvent = Pick<DiagEvent, "name" | "f">;
 
 // --- Classification ----------------------------------------------------------
 
+/** English names of the categories; the UI shows
+ *  `common:radio_category.<category>` instead. */
 export const RADIO_EVENT_CATEGORIES: Record<RadioEventCategory, string> = {
   failure: "Failure",
   mobility: "Mobility",
@@ -99,6 +102,9 @@ export interface RadioActivity {
   category: RadioEventCategory;
   rat: RadioRat | null;
   severity: EventSeverity;
+  /** The one-line message, translated when it renders */
+  text: Msg;
+  /** `text` in English */
   message: string;
   /** Shared by events that report the same thing (versions of one event, an
    *  RLF and its statistics): the activity log keeps one of them. */
@@ -107,6 +113,12 @@ export interface RadioActivity {
    *  radio snapshots. */
   pci?: number;
 }
+
+/** Keys of the radio activity messages (locales/<lang>/dashboard.json). */
+const K = "dashboard:activity.radio";
+
+/** Text that is no translation: DIAG names and values. */
+const raw = (text: string): Msg => msg(`${K}.raw`, { text });
 
 function field(
   f: DiagEvent["f"],
@@ -132,70 +144,62 @@ const VALUE_ACRONYMS = new Set([
 /** Enum value as text: "T310_EXPIRY" -> "T310 expiry", "CAUSE_RACH" ->
  *  "RACH". Camel-case names ("randomAccessProblem") stay as they are; a
  *  number is an enum value AirScreen has no name for. */
-function valueText(v: string | number | undefined): string | null {
+function valueText(v: string | number | undefined): Msg | null {
   if (v === undefined) return null;
-  if (typeof v === "number") return `cause ${v}`;
+  if (typeof v === "number") return msg(`${K}.cause_number`, { value: v });
   const s = v.trim();
   if (!s || /^(CAUSE_)?(NONE|MAX)$/i.test(s)) return null;
-  if (!/^[A-Z0-9_ ]+$/.test(s)) return s;
+  if (!/^[A-Z0-9_ ]+$/.test(s)) return raw(s);
   const words = s
     .replace(/^NR5G_[A-Z]+_FAILURE_CAUSE_/, "")
     .replace(/^CAUSE_/, "")
     .split(/[_ ]+/)
     .filter(Boolean);
-  return words
-    .map((w, i) => {
-      if (VALUE_ACRONYMS.has(w) || /\d/.test(w)) return w;
-      const lower = w.toLowerCase();
-      return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
-    })
-    .join(" ");
+  return raw(
+    words
+      .map((w, i) => {
+        if (VALUE_ACRONYMS.has(w) || /\d/.test(w)) return w;
+        const lower = w.toLowerCase();
+        return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
+      })
+      .join(" "),
+  );
 }
 
-function withCause(text: string, cause: string | null): string {
-  return cause ? `${text}: ${cause}` : text;
+function withCause(text: Msg, cause: Msg | null): Msg {
+  return cause ? msg(`${K}.with_cause`, { text, cause }) : text;
 }
 
-const SETUP_FAILURE: Record<string, string> = {
-  CONN_ABORTED: "aborted",
-  T300_EXPIRY: "no answer (T300)",
-  CONN_REJECT: "rejected",
-  CELL_RESEL: "cell reselection",
-  ACCESS_BARRED: "access barred",
-  OTHER: "other cause",
-};
-const REESTABLISHMENT: Record<string, string> = {
-  RECFG_FAILURE: "a reconfiguration failure",
-  HO_FAILURE: "a handover failure",
-  OTHER_FAILURE: "a failure",
-};
-const DROP: Record<string, string> = {
-  T311_EXPIRY: "re-establishment timed out (T311)",
-  T301_EXPIRY: "re-establishment unanswered (T301)",
-  REEST_REJECT: "re-establishment rejected",
-};
+/** Trigger suffixes with a message of their own (keys under K). */
+const SETUP_FAILURE = new Set([
+  "CONN_ABORTED", "T300_EXPIRY", "CONN_REJECT", "CELL_RESEL", "ACCESS_BARRED",
+  "OTHER",
+]);
+const REESTABLISHMENT = new Set(["RECFG_FAILURE", "HO_FAILURE", "OTHER_FAILURE"]);
+const DROP = new Set(["T311_EXPIRY", "T301_EXPIRY", "REEST_REJECT"]);
 
 /** EVENT_LTE_RRC_STATE_CHANGE_TRIGGER: only the abnormal transitions. */
 function rrcTrigger(
   trigger: string,
-): { severity: EventSeverity; message: string } | null {
+): { severity: EventSeverity; text: Msg } | null {
   let m = /^CAMPED_TRIGGER_CONN_EST_FAILURE_(\w+)$/.exec(trigger);
   if (m) {
-    return {
-      severity: "warning",
-      message: `RRC connection setup failed: ${SETUP_FAILURE[m[1]] ?? valueText(m[1]) ?? "other cause"}`,
-    };
+    const cause = SETUP_FAILURE.has(m[1])
+      ? msg(`${K}.setup_cause.${m[1].toLowerCase()}`)
+      : (valueText(m[1]) ?? msg(`${K}.setup_cause.other`));
+    return { severity: "warning", text: msg(`${K}.rrc_setup_failed`, { cause }) };
   }
   m = /^CONNECTED_TRIGGER_REEST_(\w+)$/.exec(trigger);
   if (m) {
-    return {
-      severity: "warning",
-      message: `RRC re-establishment after ${REESTABLISHMENT[m[1]] ?? "a failure"}`,
-    };
+    const cause = msg(
+      `${K}.reest_cause.${REESTABLISHMENT.has(m[1]) ? m[1].toLowerCase() : "other_failure"}`,
+    );
+    return { severity: "warning", text: msg(`${K}.rrc_reestablishment`, { cause }) };
   }
   m = /^CLOSING_TRIGGER_(\w+)$/.exec(trigger);
-  if (m && DROP[m[1]]) {
-    return { severity: "error", message: `RRC connection dropped: ${DROP[m[1]]}` };
+  if (m && DROP.has(m[1])) {
+    const cause = msg(`${K}.drop_cause.${m[1].toLowerCase()}`);
+    return { severity: "error", text: msg(`${K}.rrc_dropped`, { cause }) };
   }
   return null;
 }
@@ -216,70 +220,91 @@ export function radioActivity(
   const plainTitle = title.replace(/ v\d+$/, "");
   const make = (
     severity: EventSeverity,
-    message: string,
+    text: Msg,
     key: string,
     pci?: number | null,
   ): RadioActivity => ({
     category,
     rat,
     severity,
-    message,
+    text,
+    message: englishText(text),
     dedupKey: `${rat ?? ""}:${key}`,
     ...(pci != null ? { pci } : {}),
   });
   const channel = rat === "5G" ? "ARFCN" : "EARFCN";
+  /** "PCI 12" or "PCI 12 (EARFCN 1850)" */
+  const cellAt = (pci: number, freq: number | null): Msg =>
+    freq === null
+      ? msg(`${K}.cell_pci`, { pci })
+      : msg(`${K}.cell_pci_freq`, { pci, channel, freq });
 
   switch (category) {
     case "failure": {
       if (/RADIO_LINK/.test(name)) {
-        return make("error", withCause("Radio link failure", valueText(field(f, "RLF Cause"))), "rlf");
+        return make(
+          "error",
+          withCause(msg(`${K}.rlf`), valueText(field(f, "RLF Cause"))),
+          "rlf",
+        );
       }
-      if (/OUT_OF_SERVICE|_OOS/.test(name)) return make("error", "Out of service", "oos");
+      if (/OUT_OF_SERVICE|_OOS/.test(name)) return make("error", msg(`${K}.oos`), "oos");
       if (/HO_FAIL|HANDOVER_FAIL/.test(name)) {
         const pci = num(field(f, "Target Phy Cell Id", "Cell ID"));
         const freq = num(field(f, "Target ARFCN", "Frequency"));
-        const target =
-          pci === null ? "" : ` to PCI ${pci}${freq === null ? "" : ` (${channel} ${freq})`}`;
+        const text =
+          pci === null
+            ? msg(`${K}.handover_failed`)
+            : msg(`${K}.handover_to_failed`, { target: cellAt(pci, freq) });
         const cause = valueText(field(f, "Failure Cause", "Cause"));
-        return make("warning", withCause(`Handover${target} failed`, cause), "hof");
+        return make("warning", withCause(text, cause), "hof");
       }
       if (/SCG_FAIL/.test(name)) {
-        return make("warning", withCause("SCG failure", valueText(field(f, "Failure Type"))), "scg");
+        return make(
+          "warning",
+          withCause(msg(`${K}.scg_failure`), valueText(field(f, "Failure Type"))),
+          "scg",
+        );
       }
       if (/MCG_FAIL/.test(name)) {
-        return make("error", withCause("MCG failure", valueText(field(f, "Failure Type"))), "mcg");
+        return make(
+          "error",
+          withCause(msg(`${K}.mcg_failure`), valueText(field(f, "Failure Type"))),
+          "mcg",
+        );
       }
-      return make("warning", plainTitle, plainTitle);
+      return make("warning", raw(plainTitle), plainTitle);
     }
     case "mobility": {
       // A handover start is followed by its success or failure.
       if (/HO_START|HANDOVER_START/.test(name)) return null;
       const pci = num(field(f, "Phy Cell Id", "Cell ID", "Target Phy Cell Id"));
-      if (pci === null) return make("info", plainTitle, plainTitle);
+      if (pci === null) return make("info", raw(plainTitle), plainTitle);
       const freq = num(field(f, "Frequency", "EARFCN", "SSB Freq", "Target ARFCN"));
-      const where = `PCI ${pci}${freq === null ? "" : ` (${channel} ${freq})`}`;
-      let message = `Handover to ${where}`;
+      const where = cellAt(pci, freq);
+      let text = msg(`${K}.handover_to`, { where });
       if (/NEW_CELL/.test(name)) {
-        if (rat === "5G") message = `New cell ${where}`;
+        if (rat === "5G") text = msg(`${K}.new_cell`, { where });
         else if (lteState !== undefined && lteState !== "Connected") {
-          message = `Cell reselection to ${where}`;
+          text = msg(`${K}.reselection_to`, { where });
         }
       }
-      return make("info", message, `cell:${pci}`, pci);
+      return make("info", text, `cell:${pci}`, pci);
     }
     case "rach": {
       const result = valueText(field(f, "RACH Result", "RACH_RESULT", "RACH RESULT"));
-      if (!result || !/fail|problem/i.test(result)) return null;
+      const resultText = result ? englishText(result) : "";
+      if (!resultText || !/fail|problem/i.test(resultText)) return null;
       return make(
         "warning",
-        /problem/i.test(result) ? "Random access problem" : "Random access failed",
+        msg(/problem/i.test(resultText) ? `${K}.rach_problem` : `${K}.rach_failed`),
         "rach",
       );
     }
     case "rrc": {
       const trigger = field(f, "RRC State Change Trigger");
       const abnormal = typeof trigger === "string" ? rrcTrigger(trigger) : null;
-      return abnormal ? make(abnormal.severity, abnormal.message, "rrc") : null;
+      return abnormal ? make(abnormal.severity, abnormal.text, "rrc") : null;
     }
     default:
       // Carrier aggregation bookkeeping (frame-level SCell configuration and

@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { motion } from "motion/react";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useLogin } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,12 +19,24 @@ import { Spinner } from "@/components/ui/spinner";
 // LoginComponent
 // =============================================================================
 
+/** The fixed messages of cgi-bin/authenticate and useLogin, translated:
+ *  `common:login.errors.<key>`. Anything else is shown as it comes. */
+const LOGIN_ERRORS: Record<string, string> = {
+  "Invalid username or password": "invalid_credentials",
+  "Missing credentials": "missing_credentials",
+  "GUI locked": "gui_locked",
+  "Login failed": "failed",
+  "Connection failed": "connection_failed",
+};
+
 export default function LoginComponent() {
+  const { t } = useTranslation("common");
   const { status, login } = useLogin();
 
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  /** A message from the CGI, or "" */
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,7 +48,7 @@ export default function LoginComponent() {
       try {
         const result = await login(username, password);
         if (!result.success) {
-          setError(result.error || "Invalid username or password.");
+          setError(result.error || "Invalid username or password");
         }
       } finally {
         setIsSubmitting(false);
@@ -66,18 +79,18 @@ export default function LoginComponent() {
             <div className="flex size-16 p-1 items-center justify-center rounded-md">
               <img
                 src="/simple-t99-icon.png"
-                alt="Simple T99 Logo"
+                alt={t("login.logo_alt")}
                 className="size-full"
               />
             </div>
-            <h1 className="text-xl font-bold">Sign in to Simple T99</h1>
+            <h1 className="text-xl font-bold">{t("login.title")}</h1>
             <FieldDescription>
-              Enter your SimpleAdmin credentials to continue.
+              {t("login.description")}
             </FieldDescription>
           </div>
 
           <Field>
-            <FieldLabel htmlFor="username">Username</FieldLabel>
+            <FieldLabel htmlFor="username">{t("login.username")}</FieldLabel>
             <Input
               id="username"
               type="text"
@@ -90,12 +103,12 @@ export default function LoginComponent() {
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="password">Password</FieldLabel>
+            <FieldLabel htmlFor="password">{t("login.password")}</FieldLabel>
             <div className="relative">
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder={t("login.password_placeholder")}
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -110,7 +123,7 @@ export default function LoginComponent() {
                 className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 onClick={() => setShowPassword((v) => !v)}
                 tabIndex={-1}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? t("login.hide_password") : t("login.show_password")}
               >
                 {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
               </Button>
@@ -119,7 +132,7 @@ export default function LoginComponent() {
 
           {error && (
             <p role="alert" className="text-sm text-destructive">
-              {error}
+              {LOGIN_ERRORS[error] ? t(`login.errors.${LOGIN_ERRORS[error]}`) : error}
             </p>
           )}
 
@@ -132,17 +145,17 @@ export default function LoginComponent() {
               {isSubmitting ? (
                 <>
                   <Spinner className="mr-2" />
-                  Logging in...
+                  {t("login.submitting")}
                 </>
               ) : (
-                "Login"
+                t("login.submit")
               )}
             </Button>
           </Field>
         </FieldGroup>
       </form>
       <FieldDescription className="px-6 text-center">
-        Simple T99 — Foxconn T99W175 Management
+        {t("login.footer")}
       </FieldDescription>
     </motion.div>
   );

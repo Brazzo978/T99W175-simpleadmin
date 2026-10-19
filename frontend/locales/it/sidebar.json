@@ -54,5 +54,9 @@
     "connection_monitoring": "Monitoraggio connessione",
     "credentials": "Credenziali",
     "cell_locking": "Blocco cella"
-  }
+  },
+  "brand": {
+    "logo_alt": "Logo Simple T99"
+  },
+  "toggle_submenu": "Espandi o comprimi"
 }

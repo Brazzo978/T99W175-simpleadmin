@@ -21,7 +21,7 @@ reference for the visual rules (its font is replaced here by Geist).
 | `lib/bridge/` | WebSocket store for diag_bridge (9001) and system_bridge (9002), DIAG/QMI selection, `ModemStatus` adapter |
 | `lib/at.ts`, `lib/radio-at.ts`, `lib/sms.ts` | AT client (`get_atcommand`), Foxconn radio command parsers and builders, SMS text-mode decoding |
 | `hooks/` | data hooks, one per page or feature |
-| `locales/` | en and it strings, bundled into the JS (namespaces not used yet stay out of the bundle) |
+| `locales/` | en and it strings, bundled into the JS: `common`, `sidebar`, `dashboard` and one namespace per page, registered in `lib/i18n/resources.ts`. Text built outside React (activity log, AT errors) carries a key and its values (`lib/i18n/message.ts`) and is translated when it renders |
 
 ## Build
 

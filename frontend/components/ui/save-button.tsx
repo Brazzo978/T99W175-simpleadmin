@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2, CheckIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
@@ -39,11 +40,12 @@ interface SaveButtonProps extends Omit<ButtonProps, "children"> {
 export function SaveButton({
   isSaving,
   saved,
-  label = "Save Settings",
+  label,
   disabled,
   className,
   ...props
 }: SaveButtonProps) {
+  const { t } = useTranslation("common");
   const isActive = isSaving || saved;
 
   return (
@@ -63,7 +65,7 @@ export function SaveButton({
             transition={{ duration: 0.14 }}
           >
             <Loader2 className="size-3.5 animate-spin" />
-            Saving…
+            {t("state.saving")}
           </motion.span>
         ) : saved ? (
           <motion.span
@@ -75,7 +77,7 @@ export function SaveButton({
             transition={{ duration: 0.18, type: "spring", stiffness: 400, damping: 22 }}
           >
             <CheckIcon className="size-3.5" />
-            Saved!
+            {t("actions.saved")}
           </motion.span>
         ) : (
           <motion.span
@@ -85,7 +87,7 @@ export function SaveButton({
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.14 }}
           >
-            {label}
+            {label ?? t("ui.save_settings")}
           </motion.span>
         )}
       </AnimatePresence>

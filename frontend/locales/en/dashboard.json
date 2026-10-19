@@ -131,7 +131,8 @@
     "chart_packetloss": "Packetloss",
     "avg": "Average",
     "jitter": "Jitter",
-    "loss": "Packet loss"
+    "loss": "Packet loss",
+    "now": "Now"
   },
   "scc": {
     "title": "Secondary Carriers",
@@ -143,5 +144,92 @@
     "title": "Recent Activities",
     "empty_title": "No Events",
     "empty_description": "No recent network events detected. Your device is likely stable and not experiencing any significant changes in network conditions."
+  },
+  "event_type": {
+    "network_mode": "Mode Change",
+    "band_change": "Band Change",
+    "pci_change": "Cell Handoff",
+    "scc_pci_change": "Secondary Band Change",
+    "ca_change": "Carrier Aggregation",
+    "nr_anchor": "5G Anchor Change",
+    "signal_lost": "Signal Lost",
+    "signal_restored": "Signal Restored",
+    "internet_lost": "Internet Lost",
+    "internet_restored": "Internet Restored",
+    "high_latency": "High Latency",
+    "latency_recovered": "Latency Recovered",
+    "high_packet_loss": "High Packet Loss",
+    "packet_loss_recovered": "Packet Loss Recovered",
+    "watchcat_recovery": "Watchdog Recovery",
+    "sim_failover": "SIM Failover",
+    "sim_swap_detected": "SIM Swap Detected",
+    "airplane_mode": "Airplane Mode",
+    "profile_applied": "Profile Applied",
+    "profile_failed": "Profile Failed",
+    "profile_deactivated": "Profile Deactivated",
+    "tower_failover": "Tower Lock Failover",
+    "radio_event": "Radio Event",
+    "radio_label": "{{rat}} {{category}}"
+  },
+  "activity": {
+    "radio": {
+      "raw": "{{text}}",
+      "with_cause": "{{text}}: {{cause}}",
+      "cause_number": "cause {{value}}",
+      "cell_pci": "PCI {{pci}}",
+      "cell_pci_freq": "PCI {{pci}} ({{channel}} {{freq}})",
+      "rlf": "Radio link failure",
+      "oos": "Out of service",
+      "handover_failed": "Handover failed",
+      "handover_to_failed": "Handover to {{target}} failed",
+      "scg_failure": "SCG failure",
+      "mcg_failure": "MCG failure",
+      "handover_to": "Handover to {{where}}",
+      "new_cell": "New cell {{where}}",
+      "reselection_to": "Cell reselection to {{where}}",
+      "rach_problem": "Random access problem",
+      "rach_failed": "Random access failed",
+      "rrc_setup_failed": "RRC connection setup failed: {{cause}}",
+      "setup_cause": {
+        "conn_aborted": "aborted",
+        "t300_expiry": "no answer (T300)",
+        "conn_reject": "rejected",
+        "cell_resel": "cell reselection",
+        "access_barred": "access barred",
+        "other": "other cause"
+      },
+      "rrc_reestablishment": "RRC re-establishment after {{cause}}",
+      "reest_cause": {
+        "recfg_failure": "a reconfiguration failure",
+        "ho_failure": "a handover failure",
+        "other_failure": "a failure"
+      },
+      "rrc_dropped": "RRC connection dropped: {{cause}}",
+      "drop_cause": {
+        "t311_expiry": "re-establishment timed out (T311)",
+        "t301_expiry": "re-establishment unanswered (T301)",
+        "reest_reject": "re-establishment rejected"
+      }
+    },
+    "derived": {
+      "internet_restored": "Internet connectivity restored",
+      "internet_restored_ping": "Internet connectivity restored (ping {{ms}} ms)",
+      "internet_lost": "Internet connectivity lost: no ping or DNS reply",
+      "high_latency": "High latency: {{ms}} ms average ping",
+      "latency_recovered": "Latency recovered: {{ms}} ms average ping",
+      "band_change": "{{rat}} band {{from}} → {{to}} (PCI {{from_pci}} → {{to_pci}})",
+      "handover": "{{rat}} handover: {{detail}}",
+      "handover_on": "{{rat}} handover on {{band}}: {{detail}}",
+      "reselection": "{{rat}} cell reselection: {{detail}}",
+      "reselection_on": "{{rat}} cell reselection on {{band}}: {{detail}}",
+      "nr_added": "5G NR added ({{cell}})",
+      "nr_lost": "5G NR lost (was {{cell}})",
+      "ca_active_one": "{{tech}} CA active: {{bands}} ({{count}} carrier)",
+      "ca_active_other": "{{tech}} CA active: {{bands}} ({{count}} carriers)",
+      "ca_off": "{{tech}} CA off: single carrier {{band}}",
+      "scell_moved": "{{tech}} SCell on {{band}}: PCI {{from}} → {{to}}",
+      "carriers_changed": "{{tech}} carriers changed ({{diff}})",
+      "carriers_count": "{{tech}} carriers {{before}} → {{after}} ({{diff}})"
+    }
   }
 }

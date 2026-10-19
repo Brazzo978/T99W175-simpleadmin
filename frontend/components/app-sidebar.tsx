@@ -17,6 +17,7 @@ import {
   SignalIcon,
   TerminalIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import SimpleT99Icon from "@/public/simple-t99-icon.png";
 
@@ -91,6 +92,7 @@ const navSecondary = [
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { t } = useTranslation("sidebar");
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -101,7 +103,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg">
                   <Image
                     src={SimpleT99Icon}
-                    alt="Simple T99 Logo"
+                    alt={t("brand.logo_alt")}
                     className="size-full"
                     priority
                   />

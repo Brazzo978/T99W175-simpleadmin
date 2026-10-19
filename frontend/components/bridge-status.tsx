@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Loader2Icon, RefreshCwIcon } from "lucide-react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -36,13 +38,8 @@ const DOT: Record<Health, string> = {
   standby: "bg-muted-foreground/50",
 };
 
-const LABEL: Record<Health, string> = {
-  ok: "Connected",
-  stale: "Connected, no recent data",
-  connecting: "Connecting…",
-  down: "Unreachable",
-  standby: "Standby: not needed on this page",
-};
+/** Health labels: `common:bridges.health.<health>` */
+const label = (t: TFunction, h: Health) => t(`bridges.health.${h}`);
 
 function health(link: LinkState, lastAt: number, now: number, staleMs: number): Health {
   if (link === "idle") return "standby";
@@ -51,12 +48,12 @@ function health(link: LinkState, lastAt: number, now: number, staleMs: number): 
   return lastAt && now - lastAt < staleMs ? "ok" : "stale";
 }
 
-function age(lastAt: number, now: number): string {
-  if (!lastAt) return "never";
+function age(t: TFunction, lastAt: number, now: number): string {
+  if (!lastAt) return t("bridges.age.never");
   const s = Math.max(0, Math.round((now - lastAt) / 1000));
-  if (s < 60) return `${s} s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  return `${Math.floor(s / 3600)} h ago`;
+  if (s < 60) return t("bridges.age.seconds", { count: s });
+  if (s < 3600) return t("bridges.age.minutes", { count: Math.floor(s / 60) });
+  return t("bridges.age.hours", { count: Math.floor(s / 3600) });
 }
 
 function Row({
@@ -74,23 +71,27 @@ function Row({
   lastAt: number;
   now: number;
 }) {
+  const { t } = useTranslation("common");
   return (
     <div className="grid gap-0.5 rounded-md border px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium">{name}</span>
-        <span className="text-xs text-muted-foreground">port {port}</span>
+        <span className="text-xs text-muted-foreground">{t("bridges.port", { port })}</span>
       </div>
       <span className="text-xs text-muted-foreground">{role}</span>
       <div className="mt-1 flex items-center gap-2 text-sm">
         <span className={cn("size-2 rounded-full", DOT[state])} />
-        {LABEL[state]}
+        {label(t, state)}
       </div>
-      <span className="text-xs text-muted-foreground">Last message: {age(lastAt, now)}</span>
+      <span className="text-xs text-muted-foreground">
+        {t("bridges.last_message", { age: age(t, lastAt, now) })}
+      </span>
     </div>
   );
 }
 
 export function BridgeStatus() {
+  const { t } = useTranslation("common");
   const state = useBridgeStatePassive();
   const now = useNow();
   const [checking, setChecking] = useState(false);
@@ -122,7 +123,7 @@ export function BridgeStatus() {
           variant="ghost"
           size="sm"
           className="gap-3 font-mono text-xs"
-          aria-label={`diag_bridge: ${LABEL[diag]}; system_bridge: ${LABEL[system]}`}
+          aria-label={`diag_bridge: ${label(t, diag)}; system_bridge: ${label(t, system)}`}
         >
           {diag !== "standby" && badge("DIAG", diag)}
           {system !== "standby" && badge("SYS", system)}
@@ -130,21 +131,23 @@ export function BridgeStatus() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
         <PopoverHeader>
-          <PopoverTitle>Live data bridges</PopoverTitle>
+          <PopoverTitle>{t("bridges.title")}</PopoverTitle>
           <PopoverDescription>
-            Radio source now:{" "}
-            {source === "diag"
-                ? "DIAG"
-                : source === "qmi"
-                  ? "QMI (diag_bridge not available)"
-                  : "none"}
+            {t("bridges.radio_source", {
+              source:
+                source === "diag"
+                  ? "DIAG"
+                  : source === "qmi"
+                    ? t("bridges.source_qmi")
+                    : t("bridges.source_none"),
+            })}
           </PopoverDescription>
         </PopoverHeader>
         <div className="mt-3 grid gap-2">
           <Row
             name="diag_bridge"
             port={9001}
-            role="Radio: cells, signal, per-antenna values (Qualcomm DIAG)"
+            role={t("bridges.diag_role")}
             state={diag}
             lastAt={state.diagAt}
             now={now}
@@ -152,7 +155,7 @@ export function BridgeStatus() {
           <Row
             name="system_bridge"
             port={9002}
-            role="QMI identity and radio, system stats, connectivity checks"
+            role={t("bridges.system_role")}
             state={system}
             lastAt={state.systemAt}
             now={now}
@@ -160,7 +163,7 @@ export function BridgeStatus() {
         </div>
         <Button variant="outline" size="sm" className="mt-3 w-full" onClick={check} disabled={checking}>
           {checking ? <Loader2Icon className="animate-spin" /> : <RefreshCwIcon />}
-          {checking ? "Checking…" : "Check now"}
+          {checking ? t("bridges.checking") : t("bridges.check_now")}
         </Button>
       </PopoverContent>
     </Popover>
