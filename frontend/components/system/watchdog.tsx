@@ -27,6 +27,35 @@ import {
 import ConnectivityStatusCard from "./connectivity-status";
 import LatencyHistoryCard from "./latency-history";
 
+function NumberField({
+  id,
+  label,
+  value,
+  onChange,
+  suffix,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  suffix?: string;
+}) {
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={id}>
+        {label}
+        {suffix && <span className="text-muted-foreground font-normal">({suffix})</span>}
+      </Label>
+      <Input
+        id={id}
+        inputMode="numeric"
+        value={Number.isNaN(value) ? "" : String(value)}
+        onChange={(e) => onChange(Number.parseInt(e.target.value, 10))}
+      />
+    </div>
+  );
+}
+
 /** Same rule as cgi-bin/set_connection_config. */
 const PROBE_URL = /^http:\/\/[A-Za-z0-9.-]+(:[0-9]{1,5})?(\/[A-Za-z0-9._~/?=%-]*)?$/;
 
