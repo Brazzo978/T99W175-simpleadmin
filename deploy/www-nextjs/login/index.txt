@@ -1,39 +1,40 @@
 1:"$Sreact.fragment"
-2:"/_next/static/chunks/1qcc6amdac3g1.js"
-3:"/_next/static/chunks/19ijmbch_l97b.js"
-4:"/_next/static/chunks/3exed3pvvwb-r.js"
-5:I[89554,["$2","$3","$4"],"ThemeProvider"]
-6:I[35259,["$2","$3","$4"],"MotionProvider"]
-7:I[21960,["$2","$3","$4"],"I18nProvider"]
-8:I[39756,["$2","$3","$4"],"default"]
-9:I[37457,["$2","$3","$4"],"default"]
-a:I[3484,["$2","$3","$4"],"Toaster"]
-e:"/_next/static/chunks/01o7kyhyty3mn.js"
-f:"/_next/static/chunks/0n-xmtng8cvij.js"
-10:"/_next/static/chunks/3ukdads8uj3ff.js"
-11:"/_next/static/chunks/0pemo4d1qxjal.js"
-12:"/_next/static/chunks/1y9np3jkzz-_v.js"
-13:"/_next/static/chunks/42a2pjf7qv1xy.js"
-14:"LoginLanguagePicker"
-15:I[17087,["$2","$3","$4","$e","$f","$10","$11","$12","$13"],"$14"]
-16:I[17351,["$2","$3","$4","$e","$f","$10","$11","$12","$13"],"default"]
-17:I[97367,["$2","$3","$4"],"OutletBoundary"]
-18:"$Sreact.suspense"
-1a:"ViewportBoundary"
-1b:I[97367,["$2","$3","$4"],"$1a"]
-1d:"MetadataBoundary"
-1e:I[97367,["$2","$3","$4"],"$1d"]
-20:I[68027,["$2","$3","$4"],"default",1]
+2:"/_next/static/chunks/3el4mjd6q908t.js"
+3:"/_next/static/chunks/0d8nsp6hg0nai.js"
+4:"/_next/static/chunks/2x1y5h49pojt_.js"
+5:"/_next/static/chunks/42d_xlpdlwuvv.js"
+6:I[89554,["$2","$3","$4","$5"],"ThemeProvider"]
+7:I[35259,["$2","$3","$4","$5"],"MotionProvider"]
+8:I[21960,["$2","$3","$4","$5"],"I18nProvider"]
+9:I[39756,["$2","$3","$4","$5"],"default"]
+a:I[37457,["$2","$3","$4","$5"],"default"]
+b:I[3484,["$2","$3","$4","$5"],"Toaster"]
+f:"/_next/static/chunks/20akawkbvwjt3.js"
+10:"/_next/static/chunks/0n-xmtng8cvij.js"
+11:"/_next/static/chunks/3ukdads8uj3ff.js"
+12:"/_next/static/chunks/0pemo4d1qxjal.js"
+13:"/_next/static/chunks/1y9np3jkzz-_v.js"
+14:"/_next/static/chunks/42a2pjf7qv1xy.js"
+15:"LoginLanguagePicker"
+16:I[17087,["$2","$3","$4","$5","$f","$10","$11","$12","$13","$14"],"$15"]
+17:I[17351,["$2","$3","$4","$5","$f","$10","$11","$12","$13","$14"],"default"]
+18:I[97367,["$2","$3","$4","$5"],"OutletBoundary"]
+19:"$Sreact.suspense"
+1b:"ViewportBoundary"
+1c:I[97367,["$2","$3","$4","$5"],"$1b"]
+1e:"MetadataBoundary"
+1f:I[97367,["$2","$3","$4","$5"],"$1e"]
+21:I[68027,["$2","$3","$4","$5"],"default",1]
 :HL["/_next/static/chunks/3eyw4da6m5gb4.css","style"]
 :HL["/_next/static/chunks/1yue--vbyixdj.css","style"]
 :HL["/_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/_next/static/media/caa3a2e1cccd8315-s.p.0wgildi0cnwt9.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
-c:X
-d:[["children",{"s":"__PAGE__","h":512,"d":{"r":["$","$1","c",{"children":[["$","div",null,{"className":"bg-background relative flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10","children":[["$","$L15",null,{"className":"fixed top-4 right-4"}],["$","div",null,{"className":"w-full max-w-sm","children":["$","$L16",null,{}]}]]}],[["$","script","script-0",{"src":"/_next/static/chunks/01o7kyhyty3mn.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/_next/static/chunks/0n-xmtng8cvij.js","async":true,"nonce":"$undefined"}],["$","script","script-2",{"src":"/_next/static/chunks/3ukdads8uj3ff.js","async":true,"nonce":"$undefined"}],["$","script","script-3",{"src":"/_next/static/chunks/0pemo4d1qxjal.js","async":true,"nonce":"$undefined"}],["$","script","script-4",{"src":"/_next/static/chunks/1y9np3jkzz-_v.js","async":true,"nonce":"$undefined"}],["$","script","script-5",{"src":"/_next/static/chunks/42a2pjf7qv1xy.js","async":true,"nonce":"$undefined"}]],["$","$L17",null,{"children":["$","$18",null,{"name":"Next.MetadataOutlet","children":"$@19"}]}]]}],"p":false,"v":null}}]]
-b:[["children",{"s":"login","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L8",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L9",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$c"},"c":"$Qd"}]]
-0:{"P":null,"c":["","login",""],"q":"","i":false,"t":{"t":{"s":"","h":528,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/chunks/3eyw4da6m5gb4.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","link","1",{"rel":"stylesheet","href":"/_next/static/chunks/1yue--vbyixdj.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","script","script-0",{"src":"/_next/static/chunks/1qcc6amdac3g1.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/_next/static/chunks/19ijmbch_l97b.js","async":true,"nonce":"$undefined"}],["$","script","script-2",{"src":"/_next/static/chunks/3exed3pvvwb-r.js","async":true,"nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":["$","body",null,{"className":"rvdEwa_variable _8Li5zG_variable rvdEwa_className antialiased","children":["$","$L5",null,{"attribute":"class","defaultTheme":"system","enableSystem":true,"disableTransitionOnChange":true,"children":["$","$L6",null,{"children":["$","$L7",null,{"children":[["$","$L8",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L9",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}],["$","$La",null,{}]]}]}]}]}]}]]}],"p":false,"v":null},"c":"$Qb"},"h":{"r":["$","$1","h",{"children":[null,["$","$L1b",null,{"children":"$L1c"}],["$","$L1e",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$18",null,{"name":"Next.Metadata","children":"$L1f"}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":false,"v":null}},"m":"$undefined","G":["$20",[["$","link","0",{"rel":"stylesheet","href":"/_next/static/chunks/3eyw4da6m5gb4.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","link","1",{"rel":"stylesheet","href":"/_next/static/chunks/1yue--vbyixdj.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]]],"S":true,"r":"$undefined","s":"$undefined","a":"$undefined","l":"$undefined","p":"$undefined","d":"$undefined","b":"JXhOL94CI-Ni6ODQOzsqE"}
-c:C
-1c:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
-21:I[27201,["$2","$3","$4"],"IconMark"]
-19:null
-1f:[["$","title","0",{"children":"Simple T99"}],["$","meta","1",{"name":"description","content":"Simple T99 (SimpleAdmin) — web interface for the Foxconn T99W175 modem."}],["$","link","2",{"rel":"icon","href":"/favicon.ico?favicon.3fa_h-gihv8cr.ico","sizes":"32x32","type":"image/x-icon"}],["$","$L21","3",{}]]
+d:X
+e:[["children",{"s":"__PAGE__","h":512,"d":{"r":["$","$1","c",{"children":[["$","div",null,{"className":"bg-background relative flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10","children":[["$","$L16",null,{"className":"fixed top-4 right-4"}],["$","div",null,{"className":"w-full max-w-sm","children":["$","$L17",null,{}]}]]}],[["$","script","script-0",{"src":"/_next/static/chunks/20akawkbvwjt3.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/_next/static/chunks/0n-xmtng8cvij.js","async":true,"nonce":"$undefined"}],["$","script","script-2",{"src":"/_next/static/chunks/3ukdads8uj3ff.js","async":true,"nonce":"$undefined"}],["$","script","script-3",{"src":"/_next/static/chunks/0pemo4d1qxjal.js","async":true,"nonce":"$undefined"}],["$","script","script-4",{"src":"/_next/static/chunks/1y9np3jkzz-_v.js","async":true,"nonce":"$undefined"}],["$","script","script-5",{"src":"/_next/static/chunks/42a2pjf7qv1xy.js","async":true,"nonce":"$undefined"}]],["$","$L18",null,{"children":["$","$19",null,{"name":"Next.MetadataOutlet","children":"$@1a"}]}]]}],"p":false,"v":null}}]]
+c:[["children",{"s":"login","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L9",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$La",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$d"},"c":"$Qe"}]]
+0:{"P":null,"c":["","login",""],"q":"","i":false,"t":{"t":{"s":"","h":528,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/chunks/3eyw4da6m5gb4.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","link","1",{"rel":"stylesheet","href":"/_next/static/chunks/1yue--vbyixdj.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","script","script-0",{"src":"/_next/static/chunks/3el4mjd6q908t.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/_next/static/chunks/0d8nsp6hg0nai.js","async":true,"nonce":"$undefined"}],["$","script","script-2",{"src":"/_next/static/chunks/2x1y5h49pojt_.js","async":true,"nonce":"$undefined"}],["$","script","script-3",{"src":"/_next/static/chunks/42d_xlpdlwuvv.js","async":true,"nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":["$","body",null,{"className":"rvdEwa_variable _8Li5zG_variable rvdEwa_className antialiased","children":["$","$L6",null,{"attribute":"class","defaultTheme":"system","enableSystem":true,"disableTransitionOnChange":true,"children":["$","$L7",null,{"children":["$","$L8",null,{"children":[["$","$L9",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$La",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}],["$","$Lb",null,{}]]}]}]}]}]}]]}],"p":false,"v":null},"c":"$Qc"},"h":{"r":["$","$1","h",{"children":[null,["$","$L1c",null,{"children":"$L1d"}],["$","$L1f",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$19",null,{"name":"Next.Metadata","children":"$L20"}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":false,"v":null}},"m":"$undefined","G":["$21",[["$","link","0",{"rel":"stylesheet","href":"/_next/static/chunks/3eyw4da6m5gb4.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","link","1",{"rel":"stylesheet","href":"/_next/static/chunks/1yue--vbyixdj.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]]],"S":true,"r":"$undefined","s":"$undefined","a":"$undefined","l":"$undefined","p":"$undefined","d":"$undefined","b":"DUWZzFBrMNss8p6JIKvvc"}
+d:C
+1d:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
+22:I[27201,["$2","$3","$4","$5"],"IconMark"]
+1a:null
+20:[["$","title","0",{"children":"Simple T99"}],["$","meta","1",{"name":"description","content":"Simple T99 (SimpleAdmin) — web interface for the Foxconn T99W175 modem."}],["$","link","2",{"rel":"icon","href":"/favicon.ico?favicon.3fa_h-gihv8cr.ico","sizes":"32x32","type":"image/x-icon"}],["$","$L22","3",{}]]
