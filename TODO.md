@@ -41,9 +41,14 @@ Installed on 2026-10-19 at 18:55 with a full `./install.sh`.
       instead of 3 MB), every 10 s with a page open; the 24 h history keeps
       one slot per interval (average of its rounds, restarted when the
       interval changes); the dashboard's live latency stays per 10 s round
-- [ ] Verify on the modem: rounds once a minute with no page open
-      (`system_bridge -d` or the `rmnet` counters), the 24 h chart at 1-minute
-      slots, a new interval saved from Connection Monitoring restarting it
+- [x] Installed: `bgCheckInterval` 60 in the config; with no page open
+      system_bridge sent 6 pings in 3 minutes (one round a minute, two
+      targets), checked on `/proc/net/snmp` OutEchos
+- [ ] The 24 h chart at 1-minute slots, and a new interval saved from
+      Connection Monitoring restarting it
+- [ ] Decide: the watchdog pings on its own every 10 s (`WD_CHECK_INTERVAL`,
+      18 of the 24 echoes in those 3 minutes, about 1.7 MB a day); align it
+      with the background interval, or keep its faster detection
 - [x] Live: hostname, kernel, data session age (reset to 0 by the data
       reconnect at 18:59 and growing since), history sent first on connect,
       probe answering `ok` (204)
