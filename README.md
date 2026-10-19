@@ -241,8 +241,9 @@ In this order; each step reports `unchanged` when there is nothing to do.
    `modem_config` (linked from `/usr/bin` and `/usr/sbin`); each one is run
    once to check it works.
 4. **System scripts and units**: `ttl-override`, `connection-watchdog` (its
-   configuration `/opt/scripts/Watchdog` only the first time), the crontab
-   init script, `dhcp-guard` and the systemd units in `/lib/systemd/system`.
+   configuration `/opt/scripts/Watchdog` only the first time, its state in
+   `/data/simpleadmin/watchdog`), the crontab init script, `dhcp-guard` and
+   the systemd units in `/lib/systemd/system`.
 5. **Persistent MAC**: udev rule and script for `eth0`, `/sbin/ifconfig`
    wrapper for `bridge0` (the firmware's `ifconfig` kept as
    `/sbin/ifconfig.real`); applies at the next reboot.
@@ -304,7 +305,7 @@ installs are removed.
 | Web UI | `deploy/www/` plus `deploy/www-nextjs/` (default) or `deploy/www-alpine/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
 | `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled); system_bridge's data counter in `/data/simpleadmin/data_usage` |
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
-| System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`; see `docs/Enable_New_feature.md` |
+| System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`, watchdog state in `/data/simpleadmin/watchdog` (see "Connection watchdog" below and `docs/Enable_New_feature.md`) |
 | DHCP guard | `deploy/dhcp-guard/` | `/opt/scripts/dhcp-guard/dhcp-guard`, run every minute by `dhcp-guard.timer` (see below) |
 | IPv6 RA guard | `deploy/ra-guard/` (`src/`, `build.sh`, `bin/ra-guard`, `systemd/ra-guard.service`, `udev/99-bridge-no-snooping.rules`) | `/data/simpleadmin/bin/ra-guard` linked from `/usr/bin/ra-guard`, state in `/data/simpleadmin/ra-guard.state`, `ra-guard.service` (enabled), `/etc/udev/rules.d/99-bridge-no-snooping.rules` (see below) |
 | `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
@@ -340,7 +341,7 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 | SMS Center | inbox, send, delete | `+CMGL`, `send_sms` |
 | eSIM | profiles, download (QR), notifications | euicc-client API |
 | Local Network | LAN, DHCP, DMZ, IP passthrough, WAN, TTL | `network_settings`, `set_ttl` |
-| Connection Monitoring | live check results with captive portal warning, checks (ping, DNS, HTTP probe), latency of the last 24 hours, watchdog, its log | WebSocket, `*_connection_config`, `connection_watchdog` |
+| Connection Monitoring | live check results with captive portal warning, checks (ping, DNS, HTTP probe), latency of the last 24 hours, watchdog (detection, recovery tiers, limits), its status, recovery activity and log | WebSocket, `*_connection_config`, `connection_watchdog`, `watchdog_events`, `get_watchdog_log` |
 | Tailscale VPN, AT Terminal, Credentials | as named | `tailscale`, `user_atcommand`, `manage_credentials` |
 | System | scheduled reboot, IMEI, eSIM manager, factory reset | `reboot_schedule`, `^NV=550`, `toggle_esim`, `factory_reset` |
 
@@ -448,6 +449,56 @@ a checkout next to this one (`deploy/diag_bridge/README.md`); that
 repository's `scripts/publish-to-simpleadmin.sh` builds it, creates the link
 and copies the unit. Both listen on `bridge0` only (`-i bridge0`), so they
 are not reachable from the mobile network.
+
+## 🐕 Connection watchdog
+
+`connection-watchdog.service` runs `/opt/scripts/watchdog/connection-watchdog`
+(`deploy/watchdog/`), configured by `/opt/scripts/Watchdog` (written by the
+*Connection Monitoring* page). It pings the targets every check interval; a
+check passes when any target answers. After the set number of failed checks
+in a row it climbs a recovery ladder, one tier at a time: a tier runs only
+when the previous one did not bring the connection back within its settle
+time, and disabled tiers are skipped.
+
+| Tier | Action | AT commands |
+|---|---|---|
+| 1 | re-registration (a manually chosen operator is kept) | `AT+COPS?`, `AT+COPS=2`, `AT+COPS=0` (or `AT+COPS=1,<format>,"<oper>"`) |
+| 2 | radio restart, repeated up to `WD_CFUN_MAX_ATTEMPTS` times | `AT+CFUN=4`, `AT+CFUN=1` |
+| 3 | switch to the other SIM slot (off by default) | `AT^SWITCH_SLOT?`, `AT^SLMODE?`, `AT^SWITCH_SLOT=0\|1`, `AT^SLMODE=1,<mode>`, `AT+CPIN?`, `AT+ICCID` |
+| 4 | reboot | `reboot` |
+
+- Tier 2 never uses `AT+CFUN=0`: on this modem the SIM then answers "SIM not
+  inserted" until a reboot, while `AT+CFUN=4` keeps it and data is back in
+  about 10 s.
+- Tier 3 puts back the network mode the switch resets (`^SLMODE`, as the
+  Cellular Settings page does) and keeps the other slot only when its SIM
+  answers `+CPIN: READY` within 45 s; otherwise it switches back at once and
+  leaves that slot alone for 6 hours (until the settings are saved again).
+  When the other SIM does not bring the connection back either, the original
+  one is put back before the reboot. With `WD_SIM_REVERT="timer"` the
+  original SIM is tried again after `WD_SIM_REVERT_AFTER` seconds, and the
+  other one returns if it is still offline; with `never` it stays until you
+  switch back. A slot switched by hand cancels the failover record.
+- Limits, counted across reboots: `WD_MAX_RECOVERIES_PER_HOUR` actions of
+  any tier an hour, `WD_MAX_REBOOTS_PER_DAY` reboots in 24 hours. Beyond them
+  the watchdog only watches. Nothing runs during the first `WD_BOOT_GRACE`
+  seconds of uptime, nor within `WD_RECOVERY_COOLDOWN` seconds of the end of
+  the previous ladder.
+- A configuration written before the tiers (no `WD_TIER*_ENABLED`) keeps its
+  meaning until the page saves it: `WD_ACTION="cfun"` is tier 2
+  (`WD_CFUN_MAX_ATTEMPTS` times) then tier 4, `WD_ACTION="reboot"` tier 4
+  alone. The classic pages still save `action`, mapped the same way.
+- A script that restarts the radio on purpose writes its PID to
+  `/tmp/connection-watchdog.pause`: the checks stop while that process lives.
+
+| File | What |
+|---|---|
+| `/tmp/connection-watchdog.log` | human log (last 800 lines) |
+| `/tmp/connection-watchdog.events` | one JSON object per action, for the *Recovery Activity* card (`cgi-bin/watchdog_events`) |
+| `/tmp/connection-watchdog.status` | live state (online, offline, recovering, ...) |
+| `/data/simpleadmin/watchdog/recoveries` | `<epoch> <tier>` per action, for the rate limits |
+| `/data/simpleadmin/watchdog/sim-failover` | original and backup slot while on the other SIM |
+| `/data/simpleadmin/watchdog/sim-unusable` | slot that showed no SIM, and when |
 
 ## 🛡 DHCP guard
 

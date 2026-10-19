@@ -1,208 +1,817 @@
 #!/bin/sh
-# Lightweight connection watchdog for embedded systems.
+# Connection watchdog with tiered recovery for the Foxconn T99W175.
+#
+# Pings the targets of /opt/scripts/Watchdog every WD_CHECK_INTERVAL
+# seconds. After WD_FAIL_COUNT failed checks in a row it climbs a recovery
+# ladder, one tier at a time; a tier runs only when the previous one did
+# not bring the connection back within its settle time (WD_TIERn_SETTLE):
+#
+#   1. re-registration  AT+COPS=2, then AT+COPS=0 (or the operator that was
+#                       chosen by hand)
+#   2. radio restart    AT+CFUN=4 (RF off), AT+CFUN=1; repeated up to
+#                       WD_CFUN_MAX_ATTEMPTS times. Never AT+CFUN=0: on
+#                       this modem the SIM is lost after it until a reboot
+#   3. SIM switch       AT^SWITCH_SLOT to the other slot, kept only when a
+#                       SIM there answers READY (otherwise back at once, and
+#                       that slot is left alone for 6 hours); with
+#                       WD_SIM_REVERT="timer" the original SIM is tried
+#                       again after WD_SIM_REVERT_AFTER seconds, and the
+#                       other SIM comes back if the original is still down
+#   4. reboot
+#
+# Disabled tiers are skipped. Limits, kept across reboots in
+# /data/simpleadmin/watchdog/recoveries: WD_MAX_RECOVERIES_PER_HOUR actions
+# an hour, WD_MAX_REBOOTS_PER_DAY reboots in 24 hours. Nothing happens
+# during the first WD_BOOT_GRACE seconds of uptime, nor within
+# WD_RECOVERY_COOLDOWN seconds of the last ladder.
+#
+# Human log: /tmp/connection-watchdog.log. For the web UI: one JSON object
+# per line in /tmp/connection-watchdog.events, the live state in
+# /tmp/connection-watchdog.status. A script that restarts the radio on
+# purpose writes its PID to /tmp/connection-watchdog.pause: checks stop
+# while that process lives.
+#
+# A configuration without WD_TIER*_ENABLED (written before the tiers) keeps
+# its meaning: WD_ACTION="cfun" is tier 2 (WD_CFUN_MAX_ATTEMPTS times) then
+# tier 4, WD_ACTION="reboot" is tier 4 alone.
+set -u
 
 CONFIG_FILE="/opt/scripts/Watchdog"
 LOG_FILE="/tmp/connection-watchdog.log"
+EVENTS_FILE="/tmp/connection-watchdog.events"
+STATUS_FILE="/tmp/connection-watchdog.status"
+PAUSE_FILE="/tmp/connection-watchdog.pause"
+STATE_DIR="/data/simpleadmin/watchdog"
+RECOVERIES_FILE="$STATE_DIR/recoveries"
+FAILOVER_FILE="$STATE_DIR/sim-failover"
+UNUSABLE_FILE="$STATE_DIR/sim-unusable"
 MAX_LOG_LINES=800
+MAX_EVENTS=200
+MAX_RECOVERY_LINES=2000
+SIM_READY_TIMEOUT=45
+SIM_UNUSABLE_HOLD=21600
+
+STATE="monitor"         # monitor | settle | revert
 FAIL_STREAK=0
-LAST_RECOVERY_TS=0
-CFUN_RECOVERY_COUNT=0
+LADDER_TIER=0           # last tier run in the current ladder
+CFUN_RUNS=0             # radio restarts in the current ladder
+SETTLE_UNTIL=0          # uptime at which the running tier is judged
+ACTION_AT=0             # uptime of the last tier run
+LADDER_END=-100000      # uptime at which the last ladder ended
+NOTE=""                 # last repeated message, logged once
+TIER_DETAIL=""
+AT_SERIALIZED=0
+FAILOVER_CHECKED=0
+
+# ---------------------------------------------------------------- config
+
+# clamp NAME DEFAULT MIN MAX: NAME becomes DEFAULT when it is not a plain
+# number, MIN or MAX when it is out of range; leading zeros go (no octal).
+clamp() {
+    eval "v=\${$1:-}"
+    case "$v" in
+        ''|*[!0-9]*) v="$2" ;;
+    esac
+    v="${v#"${v%%[!0]*}"}"
+    [ -n "$v" ] || v=0
+    [ "$v" -ge "$3" ] || v="$3"
+    [ "$v" -le "$4" ] || v="$4"
+    eval "$1=\$v"
+}
+
+# flag NAME DEFAULT: NAME becomes 1 or 0.
+flag() {
+    eval "v=\${$1:-}"
+    case "$v" in
+        1|0) ;;
+        *) v="$2" ;;
+    esac
+    eval "$1=\$v"
+}
 
 load_config() {
     WD_ENABLED=0
     WD_TARGETS="1.1.1.1,8.8.8.8"
     WD_FAIL_COUNT=3
     WD_CHECK_INTERVAL=10
-    WD_PING_TIMEOUT_SEC=5
+    WD_PING_TIMEOUT_SEC=""
+    WD_PING_TIMEOUT_MS=""
+    WD_PING_TIMEOUT=""
     WD_ACTION="cfun"
     WD_CFUN_DELAY=5
-    WD_CFUN_MAX_ATTEMPTS=10
+    WD_CFUN_MAX_ATTEMPTS=1
     WD_BOOT_GRACE=600
     WD_RECOVERY_COOLDOWN=120
+    WD_TIER1_ENABLED=""
+    WD_TIER2_ENABLED=""
+    WD_TIER3_ENABLED=""
+    WD_TIER4_ENABLED=""
+    WD_TIER1_SETTLE=30
+    WD_TIER2_SETTLE=60
+    WD_TIER3_SETTLE=120
+    WD_SIM_REVERT="timer"
+    WD_SIM_REVERT_AFTER=3600
+    WD_MAX_RECOVERIES_PER_HOUR=6
+    WD_MAX_REBOOTS_PER_DAY=3
 
     if [ -f "$CONFIG_FILE" ]; then
         # shellcheck disable=SC1090
         . "$CONFIG_FILE"
     fi
 
-    if [ -z "${WD_PING_TIMEOUT_SEC:-}" ] && [ -n "${WD_PING_TIMEOUT_MS:-}" ]; then
+    if [ -z "$WD_PING_TIMEOUT_SEC" ] && [ -n "$WD_PING_TIMEOUT_MS" ]; then
+        clamp WD_PING_TIMEOUT_MS 5000 1 60000
         WD_PING_TIMEOUT_SEC=$(((WD_PING_TIMEOUT_MS + 999) / 1000))
     fi
-    if [ -z "${WD_PING_TIMEOUT_SEC:-}" ] && [ -n "${WD_PING_TIMEOUT:-}" ]; then
+    if [ -z "$WD_PING_TIMEOUT_SEC" ] && [ -n "$WD_PING_TIMEOUT" ]; then
         WD_PING_TIMEOUT_SEC="$WD_PING_TIMEOUT"
     fi
 
-    case "${WD_PING_TIMEOUT_SEC:-}" in
-        *[!0-9]*|"") WD_PING_TIMEOUT_SEC=5 ;;
-    esac
-    case "${WD_RECOVERY_COOLDOWN:-}" in
-        *[!0-9]*|"") WD_RECOVERY_COOLDOWN=120 ;;
-    esac
-    case "${WD_CFUN_MAX_ATTEMPTS:-}" in
-        *[!0-9]*|"") WD_CFUN_MAX_ATTEMPTS=10 ;;
-    esac
-
-    [ "$WD_PING_TIMEOUT_SEC" -ge 1 ] || WD_PING_TIMEOUT_SEC=1
-    [ "$WD_PING_TIMEOUT_SEC" -le 60 ] || WD_PING_TIMEOUT_SEC=60
-    [ "$WD_RECOVERY_COOLDOWN" -ge 0 ] || WD_RECOVERY_COOLDOWN=0
-    [ "$WD_CFUN_MAX_ATTEMPTS" -ge 1 ] || WD_CFUN_MAX_ATTEMPTS=1
-    [ "$WD_CFUN_MAX_ATTEMPTS" -le 120 ] || WD_CFUN_MAX_ATTEMPTS=120
-}
-
-get_uptime_seconds() {
-    if [ -r /proc/uptime ]; then
-        awk '{print int($1)}' /proc/uptime 2>/dev/null || echo 0
-    else
-        echo 0
+    # Before the tiers, WD_ACTION chose between radio restarts and reboot.
+    if [ -f "$CONFIG_FILE" ] && \
+       [ -z "$WD_TIER1_ENABLED$WD_TIER2_ENABLED$WD_TIER3_ENABLED$WD_TIER4_ENABLED" ]; then
+        WD_TIER1_ENABLED=0
+        WD_TIER3_ENABLED=0
+        WD_TIER4_ENABLED=1
+        if [ "$WD_ACTION" = "reboot" ]; then
+            WD_TIER2_ENABLED=0
+        else
+            WD_TIER2_ENABLED=1
+        fi
     fi
+
+    flag WD_ENABLED 0
+    flag WD_TIER1_ENABLED 1
+    flag WD_TIER2_ENABLED 1
+    flag WD_TIER3_ENABLED 0
+    flag WD_TIER4_ENABLED 1
+    clamp WD_FAIL_COUNT 3 1 120
+    clamp WD_CHECK_INTERVAL 10 1 60
+    clamp WD_PING_TIMEOUT_SEC 5 1 60
+    clamp WD_CFUN_DELAY 5 1 120
+    clamp WD_CFUN_MAX_ATTEMPTS 1 1 120
+    clamp WD_BOOT_GRACE 600 0 3600
+    clamp WD_RECOVERY_COOLDOWN 120 0 3600
+    clamp WD_TIER1_SETTLE 30 10 600
+    clamp WD_TIER2_SETTLE 60 10 600
+    clamp WD_TIER3_SETTLE 120 30 900
+    clamp WD_SIM_REVERT_AFTER 3600 300 86400
+    clamp WD_MAX_RECOVERIES_PER_HOUR 6 1 60
+    clamp WD_MAX_REBOOTS_PER_DAY 3 1 24
+    [ "$WD_SIM_REVERT" = "never" ] || WD_SIM_REVERT="timer"
 }
 
+# ---------------------------------------------------------------- clocks
+
+# Uptime in seconds: timers within one boot, immune to clock changes.
+mono() {
+    v="$(cat /proc/uptime 2>/dev/null)"
+    echo "${v%%.*}"
+}
+
+# Wall clock: what has to survive a reboot (rate limits, SIM failover).
 now_ts() {
     date +%s 2>/dev/null || echo 0
 }
 
-is_boot_grace_elapsed() {
-    local uptime
-    uptime="$(get_uptime_seconds)"
-    [ "$uptime" -ge "$WD_BOOT_GRACE" ]
+# ---------------------------------------------------------------- logs
+
+# trim FILE LINES: keeps the last LINES lines.
+trim() {
+    [ -f "$1" ] || return 0
+    n="$(wc -l < "$1" 2>/dev/null || echo 0)"
+    if [ "$n" -gt "$2" ]; then
+        tail -n "$2" "$1" > "$1.tmp" 2>/dev/null && mv "$1.tmp" "$1"
+    fi
 }
 
 log_msg() {
-    local message="$1"
-    local timestamp
-
-    timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
-    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
-    printf '%s %s\n' "$timestamp" "$message" >> "$LOG_FILE" 2>/dev/null || true
-
-    if [ -f "$LOG_FILE" ]; then
-        local line_count
-        line_count="$(wc -l < "$LOG_FILE" 2>/dev/null || echo 0)"
-        if [ "$line_count" -gt "$MAX_LOG_LINES" ]; then
-            tail -n "$MAX_LOG_LINES" "$LOG_FILE" > "${LOG_FILE}.tmp" 2>/dev/null && mv "${LOG_FILE}.tmp" "$LOG_FILE"
-        fi
-    fi
-
-    logger -t connection-watchdog "$message" 2>/dev/null || echo "connection-watchdog: $message"
+    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG_FILE" 2>/dev/null
+    trim "$LOG_FILE" "$MAX_LOG_LINES"
+    logger -t connection-watchdog "$1" 2>/dev/null || true
 }
 
-is_any_target_up() {
-    local target
-    local IFS=','
+# note MESSAGE: logged once while it repeats tick after tick.
+note() {
+    [ "$1" = "$NOTE" ] && return 0
+    NOTE="$1"
+    log_msg "$1"
+}
 
-    for target in $WD_TARGETS; do
-        target="$(echo "$target" | xargs)"
-        [ -n "$target" ] || continue
+# event TIER EVENT RESULT DETAIL: one JSON line for the web UI. RESULT is
+# ok, done, failed, skipped or warning; quotes, backslashes and control
+# characters never reach the file.
+event() {
+    detail="$(printf '%s' "$4" | sed 's/["\\]//g; s/[^ -~]//g')"
+    printf '{"ts":%s,"tier":%s,"event":"%s","result":"%s","detail":"%s"}\n' \
+        "$(now_ts)" "$1" "$2" "$3" "$detail" >> "$EVENTS_FILE" 2>/dev/null
+    trim "$EVENTS_FILE" "$MAX_EVENTS"
+}
 
-        if ping -c 1 -W "$WD_PING_TIMEOUT_SEC" "$target" >/dev/null 2>&1; then
-            log_msg "Ping target ${target} reachable (timeout ${WD_PING_TIMEOUT_SEC}s)"
+write_status() {
+    {
+        echo "STATE=$1"
+        echo "TIER=$LADDER_TIER"
+        echo "FAIL_STREAK=$FAIL_STREAK"
+        echo "UPDATED=$(now_ts)"
+        echo "NOTE=\"$(printf '%s' "$NOTE" | sed 's/["\\$`]//g')\""
+    } > "$STATUS_FILE.tmp" 2>/dev/null && mv "$STATUS_FILE.tmp" "$STATUS_FILE"
+}
+
+# ---------------------------------------------------------------- rate limits
+
+# Keeps the last 24 hours (the widest limit window), at most
+# MAX_RECOVERY_LINES lines (60 an hour, the highest hourly limit, for a day
+# is 1440).
+record_recovery() {
+    mkdir -p "$STATE_DIR"
+    echo "$(now_ts) $1" >> "$RECOVERIES_FILE"
+    awk -v since="$(($(now_ts) - 86400))" '$1 >= since' "$RECOVERIES_FILE" \
+        > "$RECOVERIES_FILE.tmp" 2>/dev/null && mv "$RECOVERIES_FILE.tmp" "$RECOVERIES_FILE"
+    trim "$RECOVERIES_FILE" "$MAX_RECOVERY_LINES"
+}
+
+# count_recent SECONDS [TIER]: recoveries (of TIER) in the last SECONDS.
+# Entries from "the future" (clock set back) still count: the safe side.
+count_recent() {
+    [ -f "$RECOVERIES_FILE" ] || { echo 0; return; }
+    awk -v since="$(($(now_ts) - $1))" -v tier="${2:-}" \
+        '$1 >= since && (tier == "" || $2 == tier) { n++ } END { print n + 0 }' \
+        "$RECOVERIES_FILE" 2>/dev/null || echo 0
+}
+
+# ---------------------------------------------------------------- AT channel
+
+# atcli_smd8 is the serialized system_bridge client after install.sh (it
+# takes -t); the firmware's client otherwise.
+detect_at_client() {
+    case "$(readlink -f "$(command -v atcli_smd8 2>/dev/null)" 2>/dev/null)" in
+        *system_bridge) AT_SERIALIZED=1 ;;
+        *) AT_SERIALIZED=0 ;;
+    esac
+}
+
+# at_cmd TIMEOUT COMMAND: the answer goes to AT_OUT (no CR); true on OK.
+at_cmd() {
+    if [ "$AT_SERIALIZED" = 1 ]; then
+        AT_OUT="$(atcli_smd8 -t "$1" "$2" 2>/dev/null | tr -d '\r')"
+    else
+        AT_OUT="$(atcli_smd8 "$2" 2>/dev/null | tr -d '\r')"
+    fi
+    printf '%s\n' "$AT_OUT" | grep -qx 'OK'
+}
+
+# Active slot, 1 or 2 ("SIM2 ENABLE"); empty when unknown.
+read_slot() {
+    at_cmd 10 'AT^SWITCH_SLOT?' || return 0
+    printf '%s\n' "$AT_OUT" | sed -n 's/^SIM\([12]\) ENABLE.*/\1/p' | head -1
+}
+
+# Network mode bit mask of ^SLMODE:1,<mode>; empty when unknown.
+read_slmode() {
+    at_cmd 10 'AT^SLMODE?' || return 0
+    printf '%s\n' "$AT_OUT" | sed -n 's/^\^SLMODE: *[0-9]*, *\([0-9]*\).*/\1/p' | head -1
+}
+
+# ICCID of the active SIM, digits only ("ICCID: 8939...830F").
+read_iccid() {
+    at_cmd 10 'AT+ICCID' || return 0
+    printf '%s\n' "$AT_OUT" | sed -n 's/^+\{0,1\}ICCID: *//p' | head -1 | tr -cd '0-9'
+}
+
+sim_ready() {
+    at_cmd 10 'AT+CPIN?' && printf '%s\n' "$AT_OUT" | grep -q '+CPIN: *READY'
+}
+
+# ---------------------------------------------------------------- SIM state
+
+# kv FILE KEY: value of KEY=value in FILE.
+kv() {
+    sed -n "s/^$2=//p" "$1" 2>/dev/null | head -1
+}
+
+failover_active() {
+    [ -f "$FAILOVER_FILE" ]
+}
+
+failover_write() {
+    mkdir -p "$STATE_DIR"
+    printf 'ORIGINAL_SLOT=%s\nBACKUP_SLOT=%s\nSINCE=%s\n' "$1" "$2" "$(now_ts)" \
+        > "$FAILOVER_FILE.tmp" && mv "$FAILOVER_FILE.tmp" "$FAILOVER_FILE"
+}
+
+# A failover record only holds while the modem is still on its backup slot:
+# a switch by hand (or anything else) makes it stale.
+failover_validate() {
+    FAILOVER_CHECKED=1
+    failover_active || return 0
+    slot="$(read_slot)"
+    [ -n "$slot" ] || { FAILOVER_CHECKED=0; return 0; }
+    if [ "$slot" != "$(kv "$FAILOVER_FILE" BACKUP_SLOT)" ]; then
+        log_msg "SIM $slot is active: SIM failover record cleared"
+        rm -f "$FAILOVER_FILE"
+    fi
+}
+
+# slot_unusable SLOT: true while SLOT is in its hold after showing no SIM.
+slot_unusable() {
+    [ -f "$UNUSABLE_FILE" ] || return 1
+    [ "$(kv "$UNUSABLE_FILE" SLOT)" = "$1" ] || return 1
+    since="$(kv "$UNUSABLE_FILE" SINCE)"
+    case "$since" in ''|*[!0-9]*) return 1 ;; esac
+    age=$(($(now_ts) - since))
+    [ "$age" -ge 0 ] && [ "$age" -lt "$SIM_UNUSABLE_HOLD" ]
+}
+
+# Hook for whatever follows the active SIM (SIM profiles): run after every
+# switch that the watchdog makes.
+after_sim_switch() {
+    :
+}
+
+# switch_slot SLOT SLMODE: AT^SWITCH_SLOT, the network mode put back (the
+# switch resets it), then up to SIM_READY_TIMEOUT seconds for SLOT to show
+# a READY SIM. 0 ready, 2 command refused, 3 no usable SIM.
+switch_slot() {
+    at_cmd 30 "AT^SWITCH_SLOT=$(($1 - 1))" || return 2
+    sleep 5
+    if [ -n "$2" ]; then
+        tries=0
+        while [ "$tries" -lt 3 ]; do
+            at_cmd 10 "AT^SLMODE=1,$2" && break
+            tries=$((tries + 1))
+            sleep 2
+        done
+    fi
+    waited=0
+    while [ "$waited" -lt "$SIM_READY_TIMEOUT" ]; do
+        if sim_ready && [ "$(read_slot)" = "$1" ]; then
             return 0
         fi
-
-        log_msg "Ping target ${target} failed"
+        sleep 3
+        waited=$((waited + 3))
     done
+    return 3
+}
 
+# ---------------------------------------------------------------- tiers
+
+tier_name() {
+    case "$1" in
+        1) echo "re-registration" ;;
+        2) echo "radio restart" ;;
+        3) echo "SIM switch" ;;
+        4) echo "reboot" ;;
+    esac
+}
+
+tier_event() {
+    case "$1" in
+        1) echo "reregister" ;;
+        2) echo "radio_restart" ;;
+        3) echo "sim_switch" ;;
+        4) echo "reboot" ;;
+    esac
+}
+
+tier_settle() {
+    case "$1" in
+        1) echo "$WD_TIER1_SETTLE" ;;
+        2) echo "$WD_TIER2_SETTLE" ;;
+        *) echo "$WD_TIER3_SETTLE" ;;
+    esac
+}
+
+# Each tier sets TIER_DETAIL and returns 0 when it acted, 1 when it did not
+# apply (nothing sent), 2 when it acted and something failed.
+
+# Tier 1: deregister, then register again; a manual operator choice
+# (+COPS: 1 or 4) is restored as it was.
+tier_reregister() {
+    register='AT+COPS=0'
+    if at_cmd 10 'AT+COPS?'; then
+        line="$(printf '%s\n' "$AT_OUT" | sed -n 's/^+COPS: *//p' | head -1)"
+        mode="${line%%,*}"
+        oper="$(printf '%s' "$line" | sed -n 's/^[^"]*"\([^"]*\)".*/\1/p')"
+        if [ -n "$oper" ] && { [ "$mode" = 1 ] || [ "$mode" = 4 ]; }; then
+            fmt="$(printf '%s' "$line" | cut -d, -f2)"
+            act="$(printf '%s' "$line" | sed -n 's/^[^"]*"[^"]*", *\([0-9]*\).*/\1/p')"
+            register="AT+COPS=$mode,$fmt,\"$oper\"${act:+,$act}"
+        fi
+    fi
+    if ! at_cmd 30 'AT+COPS=2'; then
+        TIER_DETAIL="AT+COPS=2 refused"
+        return 2
+    fi
+    sleep 3
+    if ! at_cmd 120 "$register" && ! at_cmd 120 "$register"; then
+        TIER_DETAIL="AT+COPS=2 sent, $register refused"
+        return 2
+    fi
+    TIER_DETAIL="AT+COPS=2, $register"
+    return 0
+}
+
+# AT+CFUN=1, retried for about half a minute.
+radio_on() {
+    tries=0
+    while [ "$tries" -lt 6 ]; do
+        at_cmd 30 'AT+CFUN=1' && return 0
+        tries=$((tries + 1))
+        sleep 5
+    done
     return 1
 }
 
-do_cfun_cycle() {
-    if command -v atcli_smd8 >/dev/null 2>&1; then
-        atcli_smd8 'AT+CFUN=0' >/dev/null 2>&1 || true
-        sleep "$WD_CFUN_DELAY"
-        atcli_smd8 'AT+CFUN=1' >/dev/null 2>&1 || true
-        log_msg "CFUN cycle executed after connectivity loss"
-    else
-        log_msg "atcli_smd8 not available, CFUN cycle skipped"
+# Tier 2: RF off, then on. AT+CFUN=4 keeps the SIM; after AT+CFUN=0 this
+# modem answers "SIM not inserted" until it reboots.
+tier_radio_restart() {
+    if ! at_cmd 30 'AT+CFUN=4'; then
+        # No OK does not prove the radio stayed on.
+        radio_on
+        TIER_DETAIL="AT+CFUN=4 refused"
+        return 2
     fi
+    sleep "$WD_CFUN_DELAY"
+    if ! radio_on; then
+        TIER_DETAIL="AT+CFUN=4 sent, AT+CFUN=1 refused for 30 s"
+        return 2
+    fi
+    TIER_DETAIL="AT+CFUN=4, ${WD_CFUN_DELAY} s, AT+CFUN=1 (restart $CFUN_RUNS of $WD_CFUN_MAX_ATTEMPTS)"
+    return 0
 }
 
-take_recovery_action() {
-    case "$WD_ACTION" in
-        cfun)
-            if [ "$CFUN_RECOVERY_COUNT" -ge "$WD_CFUN_MAX_ATTEMPTS" ]; then
-                log_msg "CFUN attempts limit reached (${CFUN_RECOVERY_COUNT}/${WD_CFUN_MAX_ATTEMPTS}), escalating to full reboot"
-                reboot
-                return
+# Tier 3: the other slot, kept only with a READY SIM in it. From the backup
+# slot this is the way home, and the failover record goes.
+tier_sim_switch() {
+    current="$(read_slot)"
+    if [ -z "$current" ]; then
+        TIER_DETAIL="active SIM slot unknown (AT^SWITCH_SLOT?)"
+        return 1
+    fi
+    target=$((3 - current))
+    if slot_unusable "$target"; then
+        TIER_DETAIL="SIM $target showed no usable SIM less than $((SIM_UNUSABLE_HOLD / 3600)) h ago"
+        return 1
+    fi
+    slmode="$(read_slmode)"
+    switch_slot "$target" "$slmode"
+    case $? in
+        0)
+            iccid="$(read_iccid)"
+            if failover_active && [ "$target" = "$(kv "$FAILOVER_FILE" ORIGINAL_SLOT)" ]; then
+                rm -f "$FAILOVER_FILE"
+                TIER_DETAIL="SIM $current to SIM $target, the original one (ICCID ...${iccid#"${iccid%????}"})"
+            else
+                failover_write "$current" "$target"
+                TIER_DETAIL="SIM $current to SIM $target (ICCID ...${iccid#"${iccid%????}"})"
             fi
-
-            do_cfun_cycle
-            CFUN_RECOVERY_COUNT=$((CFUN_RECOVERY_COUNT + 1))
-            log_msg "CFUN attempts used: ${CFUN_RECOVERY_COUNT}/${WD_CFUN_MAX_ATTEMPTS} before reboot escalation"
+            after_sim_switch
+            return 0
             ;;
-        reboot)
-            log_msg "Reboot action triggered after connectivity loss"
-            reboot
+        2)
+            TIER_DETAIL="AT^SWITCH_SLOT=$((target - 1)) refused"
+            return 1
             ;;
         *)
-            log_msg "Unknown action '$WD_ACTION', skipping"
+            mkdir -p "$STATE_DIR"
+            printf 'SLOT=%s\nSINCE=%s\n' "$target" "$(now_ts)" > "$UNUSABLE_FILE"
+            if switch_slot "$current" "$slmode"; then
+                TIER_DETAIL="no READY SIM in slot $target within ${SIM_READY_TIMEOUT} s, back on SIM $current"
+            else
+                TIER_DETAIL="no READY SIM in slot $target, and SIM $current is not READY again either"
+            fi
+            after_sim_switch
+            return 2
             ;;
     esac
 }
 
-can_run_recovery() {
-    local now
-    local elapsed
-
-    now="$(now_ts)"
-    [ "$now" -gt 0 ] || return 0
-
-    if [ "$LAST_RECOVERY_TS" -eq 0 ]; then
-        return 0
+# Tier 3 did not help: back to the original SIM before going on (the
+# problem is not that SIM).
+tier3_undo() {
+    failover_active || return 0
+    original="$(kv "$FAILOVER_FILE" ORIGINAL_SLOT)"
+    case "$original" in 1|2) ;; *) rm -f "$FAILOVER_FILE"; return 0 ;; esac
+    if switch_slot "$original" "$(read_slmode)"; then
+        log_msg "The other SIM did not help either: back on SIM $original"
+        event 3 sim_switch done "back on SIM $original, the other SIM did not help"
+    else
+        log_msg "Back to SIM $original after the failed switch, but it is not READY"
+        event 3 sim_switch failed "back to SIM $original, not READY"
     fi
+    rm -f "$FAILOVER_FILE"
+    after_sim_switch
+}
 
-    elapsed=$((now - LAST_RECOVERY_TS))
-    if [ "$elapsed" -lt "$WD_RECOVERY_COOLDOWN" ]; then
-        log_msg "Recovery skipped due to cooldown (${elapsed}s/${WD_RECOVERY_COOLDOWN}s)"
+# Tier 4: the last resort, within WD_MAX_REBOOTS_PER_DAY.
+tier_reboot() {
+    reboots="$(count_recent 86400 4)"
+    if [ "$reboots" -ge "$WD_MAX_REBOOTS_PER_DAY" ]; then
+        TIER_DETAIL="reboot limit reached ($reboots in 24 h, at most $WD_MAX_REBOOTS_PER_DAY)"
         return 1
     fi
-
-    return 0
+    record_recovery 4
+    event 4 reboot done "reboot $((reboots + 1)) of $WD_MAX_REBOOTS_PER_DAY in 24 h"
+    log_msg "Tier 4: rebooting the modem ($((reboots + 1)) of $WD_MAX_REBOOTS_PER_DAY in 24 h)"
+    write_status recovering
+    sync
+    reboot
+    sleep 120
+    TIER_DETAIL="reboot did not happen"
+    return 2
 }
 
-mark_recovery_ts() {
-    LAST_RECOVERY_TS="$(now_ts)"
+run_tier() {
+    case "$1" in
+        1) tier_reregister ;;
+        2) tier_radio_restart ;;
+        3) tier_sim_switch ;;
+        4) tier_reboot ;;
+    esac
 }
 
-log_msg "Connection watchdog service started"
+# ---------------------------------------------------------------- ladder
+
+# next_tier AFTER: the first enabled tier after AFTER; tier 2 again while
+# its attempts last. 0 when the ladder is over.
+next_tier() {
+    if [ "$1" -eq 2 ] && [ "$WD_TIER2_ENABLED" = 1 ] && \
+       [ "$CFUN_RUNS" -lt "$WD_CFUN_MAX_ATTEMPTS" ]; then
+        echo 2
+        return
+    fi
+    t=$(($1 + 1))
+    while [ "$t" -le 4 ]; do
+        eval "on=\$WD_TIER${t}_ENABLED"
+        if [ "$on" = 1 ]; then
+            echo "$t"
+            return
+        fi
+        t=$((t + 1))
+    done
+    echo 0
+}
+
+end_ladder() {
+    STATE="monitor"
+    LADDER_TIER=0
+    CFUN_RUNS=0
+    FAIL_STREAK=0
+    LADDER_END="$(mono)"
+}
+
+# escalate: runs the next tier; one that does not apply or fails hands over
+# to the following tier at once.
+escalate() {
+    while :; do
+        tier="$(next_tier "$LADDER_TIER")"
+        if [ "$tier" -eq 0 ]; then
+            log_msg "Recovery ladder exhausted: next attempt after the ${WD_RECOVERY_COOLDOWN} s cooldown"
+            event 0 exhausted failed "no tier left to try"
+            end_ladder
+            return
+        fi
+        recent="$(count_recent 3600)"
+        if [ "$recent" -ge "$WD_MAX_RECOVERIES_PER_HOUR" ]; then
+            log_msg "Recovery limit reached ($recent actions in the last hour, at most $WD_MAX_RECOVERIES_PER_HOUR): tier $tier not run"
+            event "$tier" rate_limit skipped "$recent actions in the last hour, at most $WD_MAX_RECOVERIES_PER_HOUR"
+            end_ladder
+            return
+        fi
+        LADDER_TIER="$tier"
+        [ "$tier" -eq 2 ] && CFUN_RUNS=$((CFUN_RUNS + 1))
+        TIER_DETAIL=""
+        NOTE=""
+        log_msg "Tier $tier: $(tier_name "$tier")"
+        write_status recovering
+        run_tier "$tier"
+        rc=$?
+        case "$rc" in
+            0)
+                record_recovery "$tier"
+                settle="$(tier_settle "$tier")"
+                log_msg "Tier $tier done: $TIER_DETAIL; waiting up to ${settle} s for the connection"
+                event "$tier" "$(tier_event "$tier")" done "$TIER_DETAIL"
+                ACTION_AT="$(mono)"
+                SETTLE_UNTIL=$((ACTION_AT + settle))
+                STATE="settle"
+                return
+                ;;
+            1)
+                log_msg "Tier $tier skipped: $TIER_DETAIL"
+                event "$tier" "$(tier_event "$tier")" skipped "$TIER_DETAIL"
+                ;;
+            *)
+                # A reboot is recorded before it is attempted.
+                [ "$tier" -eq 4 ] || record_recovery "$tier"
+                log_msg "Tier $tier failed: $TIER_DETAIL"
+                event "$tier" "$(tier_event "$tier")" failed "$TIER_DETAIL"
+                ;;
+        esac
+    done
+}
+
+# ---------------------------------------------------------------- SIM revert
+
+# On the backup SIM since WD_SIM_REVERT_AFTER seconds: try the original one
+# again. revert_failed brings the backup back when the original stays down.
+maybe_revert_sim() {
+    [ "$WD_SIM_REVERT" = "timer" ] || return 0
+    failover_active || return 0
+    since="$(kv "$FAILOVER_FILE" SINCE)"
+    case "$since" in ''|*[!0-9]*) return 0 ;; esac
+    [ $(($(now_ts) - since)) -ge "$WD_SIM_REVERT_AFTER" ] || return 0
+    failover_validate
+    failover_active || return 0
+    original="$(kv "$FAILOVER_FILE" ORIGINAL_SLOT)"
+    backup="$(kv "$FAILOVER_FILE" BACKUP_SLOT)"
+    log_msg "On SIM $backup for ${WD_SIM_REVERT_AFTER} s: trying SIM $original again"
+    write_status recovering
+    if switch_slot "$original" "$(read_slmode)"; then
+        after_sim_switch
+        event 3 sim_revert done "back to SIM $original, checking the connection"
+        STATE="revert"
+        SETTLE_UNTIL=$(($(mono) + WD_TIER3_SETTLE))
+        return 0
+    fi
+    log_msg "SIM $original is not READY: staying on SIM $backup"
+    event 3 sim_revert failed "SIM $original not READY, staying on SIM $backup"
+    switch_slot "$backup" "$(read_slmode)" || true
+    failover_write "$original" "$backup"
+    after_sim_switch
+}
+
+# The revert settle time ran out with the original SIM still offline.
+revert_failed() {
+    original="$(kv "$FAILOVER_FILE" ORIGINAL_SLOT)"
+    backup="$(kv "$FAILOVER_FILE" BACKUP_SLOT)"
+    log_msg "SIM $original still offline after ${WD_TIER3_SETTLE} s: back on SIM $backup"
+    if switch_slot "$backup" "$(read_slmode)"; then
+        event 3 sim_revert failed "SIM $original still offline, back on SIM $backup"
+    else
+        event 3 sim_revert failed "SIM $original still offline, SIM $backup not READY"
+    fi
+    failover_write "$original" "$backup"
+    after_sim_switch
+    STATE="monitor"
+    FAIL_STREAK=0
+}
+
+# ---------------------------------------------------------------- checks
+
+# True when any target answers; the failures are logged only when all fail.
+is_any_target_up() {
+    failed=""
+    old_ifs="$IFS"
+    IFS=','
+    set -- $WD_TARGETS
+    IFS="$old_ifs"
+    for target in "$@"; do
+        target="$(echo "$target" | xargs)"
+        [ -n "$target" ] || continue
+        if ping -c 1 -W "$WD_PING_TIMEOUT_SEC" "$target" >/dev/null 2>&1; then
+            return 0
+        fi
+        failed="${failed:+$failed, }$target"
+    done
+    LAST_FAILED="$failed"
+    return 1
+}
+
+# Another script restarts the radio on purpose: its PID is in PAUSE_FILE.
+paused() {
+    [ -f "$PAUSE_FILE" ] || return 1
+    pid="$(cat "$PAUSE_FILE" 2>/dev/null)"
+    case "$pid" in ''|*[!0-9]*) rm -f "$PAUSE_FILE"; return 1 ;; esac
+    if [ -d "/proc/$pid" ]; then
+        return 0
+    fi
+    rm -f "$PAUSE_FILE"
+    return 1
+}
+
+on_up() {
+    case "$STATE" in
+        settle)
+            took=$(($(mono) - ACTION_AT))
+            log_msg "Connection restored ${took} s after tier $LADDER_TIER ($(tier_name "$LADDER_TIER"))"
+            event "$LADDER_TIER" restored ok "${took} s after the $(tier_name "$LADDER_TIER")"
+            ;;
+        revert)
+            log_msg "Connection restored on SIM $(kv "$FAILOVER_FILE" ORIGINAL_SLOT): SIM failover over"
+            event 3 sim_revert ok "connection restored on SIM $(kv "$FAILOVER_FILE" ORIGINAL_SLOT)"
+            rm -f "$FAILOVER_FILE"
+            ;;
+        *)
+            [ "$FAIL_STREAK" -gt 0 ] && log_msg "Connection back after $FAIL_STREAK failed check(s)"
+            ;;
+    esac
+    if [ "$STATE" != "monitor" ]; then
+        STATE="monitor"
+        LADDER_TIER=0
+        CFUN_RUNS=0
+        LADDER_END="$(mono)"
+    fi
+    FAIL_STREAK=0
+    NOTE=""
+    [ "$FAILOVER_CHECKED" = 1 ] || failover_validate
+    maybe_revert_sim
+}
+
+on_down() {
+    FAIL_STREAK=$((FAIL_STREAK + 1))
+    case "$STATE" in
+        settle)
+            if [ "$(mono)" -lt "$SETTLE_UNTIL" ]; then
+                note "No answer from ${LAST_FAILED:-the targets} after tier $LADDER_TIER: waiting"
+                return
+            fi
+            # Paused since the ping started (sim-profiles restarting the
+            # radio): judge at the next check.
+            paused && return
+            settle="$(tier_settle "$LADDER_TIER")"
+            log_msg "Tier $LADDER_TIER did not restore the connection within ${settle} s"
+            event "$LADDER_TIER" no_effect failed "no connection ${settle} s after the $(tier_name "$LADDER_TIER")"
+            [ "$LADDER_TIER" -eq 3 ] && tier3_undo
+            escalate
+            return
+            ;;
+        revert)
+            if [ "$(mono)" -lt "$SETTLE_UNTIL" ]; then
+                note "No answer on SIM $(kv "$FAILOVER_FILE" ORIGINAL_SLOT) yet: waiting"
+            else
+                revert_failed
+            fi
+            return
+            ;;
+    esac
+
+    if [ "$FAIL_STREAK" -le "$WD_FAIL_COUNT" ]; then
+        log_msg "No answer from ${LAST_FAILED:-the targets} ($FAIL_STREAK/$WD_FAIL_COUNT)"
+    fi
+    [ "$FAIL_STREAK" -ge "$WD_FAIL_COUNT" ] || return
+
+    up="$(mono)"
+    if [ "$up" -lt "$WD_BOOT_GRACE" ]; then
+        note "Offline, recovery held during the boot grace (${WD_BOOT_GRACE} s of uptime)"
+        return
+    fi
+    if [ $((up - LADDER_END)) -lt "$WD_RECOVERY_COOLDOWN" ]; then
+        note "Offline, recovery held during the cooldown (${WD_RECOVERY_COOLDOWN} s after the last one)"
+        return
+    fi
+    # Paused since the ping started: no ladder over a deliberate restart.
+    if paused; then
+        FAIL_STREAK=0
+        return
+    fi
+    NOTE=""
+    log_msg "Connection lost: $FAIL_STREAK failed checks, starting the recovery ladder"
+    event 0 offline warning "$FAIL_STREAK failed checks"
+    LADDER_TIER=0
+    CFUN_RUNS=0
+    escalate
+}
+
+# ---------------------------------------------------------------- main
+
+mkdir -p "$STATE_DIR" 2>/dev/null
+detect_at_client
+log_msg "Connection watchdog started"
 
 while true; do
     load_config
 
     if [ "$WD_ENABLED" != "1" ]; then
-        log_msg "Watchdog disabled, waiting before next configuration reload"
+        note "Watchdog disabled in $CONFIG_FILE"
+        write_status disabled
         sleep 15
         continue
     fi
 
-    log_msg "Watchdog tick: fail_streak=${FAIL_STREAK}, fail_threshold=${WD_FAIL_COUNT}, action=${WD_ACTION}, check_interval=${WD_CHECK_INTERVAL}s"
-
-    if is_any_target_up; then
-        if [ "$FAIL_STREAK" -gt 0 ]; then
-            log_msg "Connectivity restored, resetting failure counter (${FAIL_STREAK} -> 0)"
-        fi
-        if [ "$CFUN_RECOVERY_COUNT" -gt 0 ]; then
-            log_msg "Connectivity stable again, resetting CFUN attempts counter (${CFUN_RECOVERY_COUNT} -> 0)"
-        fi
+    if paused; then
+        note "Checks paused by PID $(cat "$PAUSE_FILE" 2>/dev/null)"
         FAIL_STREAK=0
-        CFUN_RECOVERY_COUNT=0
+        write_status paused
+        sleep "$WD_CHECK_INTERVAL"
+        continue
+    fi
+    case "$NOTE" in
+        "Checks paused"*|"Watchdog disabled"*) NOTE="" ;;
+    esac
+
+    LAST_FAILED=""
+    if is_any_target_up; then
+        on_up
     else
-        FAIL_STREAK=$((FAIL_STREAK + 1))
-        log_msg "Last ping failed, increasing counter (${FAIL_STREAK}/${WD_FAIL_COUNT})"
-        if [ "$FAIL_STREAK" -ge "$WD_FAIL_COUNT" ]; then
-            log_msg "Failure threshold reached, device considered offline"
-            if is_boot_grace_elapsed; then
-                if can_run_recovery; then
-                    log_msg "Boot grace elapsed, attempting recovery action (${WD_ACTION})"
-                    take_recovery_action
-                    mark_recovery_ts
-                fi
-            else
-                log_msg "Recovery suppressed during boot grace window (${WD_BOOT_GRACE}s)"
-            fi
-            FAIL_STREAK=0
-            sleep 2
-        fi
+        on_down
     fi
 
+    case "$STATE" in
+        settle) write_status recovering ;;
+        revert) write_status reverting ;;
+        *) [ "$FAIL_STREAK" -gt 0 ] && write_status offline || write_status online ;;
+    esac
     sleep "$WD_CHECK_INTERVAL"
 done

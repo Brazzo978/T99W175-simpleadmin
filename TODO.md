@@ -59,8 +59,14 @@ hardware (eth0 offload is on) are likely missing.
 ## 4-tier watchdog
 COPS → CFUN=4/1 → SIM switch → reboot, with rate limits, replacing
 `connection_watchdog` (decided 2026-10-19). Never CFUN=0 on this modem.
-- [ ] Implementation (in progress, separate worktree)
-- [ ] Merge, deploy, trigger each tier safely on the modem
+- [x] Implementation: tiers, rate limits kept across reboots, JSON activity
+      log, Connection Monitoring cards (tiers, limits, status, activity)
+- [x] Merged on `Beta`
+- [ ] Deploy, then trigger tiers 1, 2 and 4 on the modem (README,
+      "Connection watchdog": unreachable ping target, one tier at a time)
+      and check the Recovery Activity card
+- [ ] Tier 3 (SIM switch), with a second SIM and with an empty slot: needs
+      your OK, SIM switch was not among the authorized live tests
 
 ## Per-SIM profiles (APN + TTL)
 Applied automatically when the ICCID changes (decided 2026-10-19).

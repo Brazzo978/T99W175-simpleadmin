@@ -21,6 +21,7 @@
 #                                    usrfs, the root filesystem has only a few
 #                                    MB free), reached through /usr/bin
 #   /opt/scripts, /etc/init.d        TTL, watchdog and crontab scripts
+#   /data/simpleadmin/watchdog       watchdog rate limits, SIM failover state
 #   /lib/systemd/system              units, enabled through /etc/systemd
 #   /etc/udev, /sbin/ifconfig        persistent eth0/bridge0 MAC
 #                                    (deploy/persistent-mac/README.md)
@@ -376,8 +377,14 @@ install_file "$SRC/ttl/scripts/ttl-override" 755 /opt/scripts/ttl/ttl-override
 install_file "$SRC/watchdog/scripts/connection-watchdog" 755 /opt/scripts/watchdog/connection-watchdog
 install_file "$SRC/crontab/init.d/crontab" 755 /etc/init.d/crontab
 # The UI writes the watchdog configuration: only install the default once.
+# A file from before the recovery tiers keeps working as it is (WD_ACTION
+# cfun: radio restarts then reboot; reboot: reboot only) until the UI saves.
 if [ -f /opt/scripts/Watchdog ]; then
-  info "⚙️  /opt/scripts/Watchdog kept (written by the UI)"
+  if grep -q '^WD_TIER[1-4]_ENABLED=' /opt/scripts/Watchdog; then
+    info "⚙️  /opt/scripts/Watchdog kept (written by the UI)"
+  else
+    info "⚙️  /opt/scripts/Watchdog kept: no recovery tiers yet, WD_ACTION applies until the UI saves"
+  fi
 else
   install_file "$SRC/watchdog/config/Watchdog" 644 /opt/scripts/Watchdog
 fi
@@ -385,6 +392,8 @@ install_file "$SRC/crontab/systemd/crontab.service" 644 "$UNIT_DIR/crontab.servi
 install_file "$SRC/ttl/systemd/ttl-override.service" 644 "$UNIT_DIR/ttl-override.service"
 install_file "$SRC/watchdog/systemd/connection-watchdog.service" 644 \
   "$UNIT_DIR/connection-watchdog.service"
+# Watchdog rate limits and SIM failover state, kept across reboots.
+mkdir -p "$BASE/watchdog"
 install_file "$SRC/euicc/systemd/euicc.service" 644 "$UNIT_DIR/euicc.service"
 mkdir -p /opt/scripts/dhcp-guard
 install_file "$SRC/dhcp-guard/scripts/dhcp-guard" 755 /opt/scripts/dhcp-guard/dhcp-guard

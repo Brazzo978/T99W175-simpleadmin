@@ -26,7 +26,9 @@ Together with the web UI and the binaries, it copies the files over SSH
 * installs `/opt/scripts/ttl/ttl-override`,
   `/opt/scripts/watchdog/connection-watchdog` and `/etc/init.d/crontab`
 * installs `/opt/scripts/Watchdog` (watchdog configuration) only when it is
-  missing, so the settings saved from the UI are kept
+  missing, so the settings saved from the UI are kept (a file from before
+  the recovery tiers keeps its `WD_ACTION` meaning until the UI saves), and
+  creates `/data/simpleadmin/watchdog` (rate limits, SIM failover state)
 * installs `crontab`, `ttl-override`, `connection-watchdog` and `euicc` units
   in `/lib/systemd/system`, then `systemctl daemon-reload`
 * enables and restarts `crontab` (cron jobs in `/persist/cron`) and

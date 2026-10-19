@@ -4,13 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { authFetch } from "@/lib/auth-fetch";
 
 // =============================================================================
-// useWatchdog — connection watchdog configuration and log
+// useWatchdog — connection watchdog configuration, activity and log
 // =============================================================================
 // cgi-bin/connection_watchdog: GET the configuration, POST it as JSON.
+// cgi-bin/watchdog_events?limit=N: recent recovery actions (newest first),
+//   the daemon's live state, the rate limit counters and the SIM failover.
 // cgi-bin/get_watchdog_log?lines=N: the tail of /tmp/connection-watchdog.log.
 // =============================================================================
 
-export type WatchdogAction = "cfun" | "reboot";
+export type SimRevertPolicy = "never" | "timer";
 
 export interface WatchdogConfig {
   enabled: boolean;
@@ -19,13 +21,134 @@ export interface WatchdogConfig {
   failCount: number;
   checkInterval: number;
   pingTimeoutSec: number;
-  action: WatchdogAction;
   bootGrace: number;
+  /** Seconds after a recovery ladder before another one may start */
+  recoveryCooldown: number;
+  /** Tier 1: re-registration (AT+COPS=2, AT+COPS=0) */
+  tier1Enabled: boolean;
+  tier1Settle: number;
+  /** Tier 2: radio restart (AT+CFUN=4, AT+CFUN=1) */
+  tier2Enabled: boolean;
+  tier2Settle: number;
+  cfunDelay: number;
   cfunMaxAttempts: number;
+  /** Tier 3: SIM slot switch (AT^SWITCH_SLOT) */
+  tier3Enabled: boolean;
+  tier3Settle: number;
+  simRevert: SimRevertPolicy;
+  simRevertAfter: number;
+  /** Tier 4: reboot */
+  tier4Enabled: boolean;
+  maxRecoveriesPerHour: number;
+  maxRebootsPerDay: number;
+}
+
+export const WATCHDOG_DEFAULTS: WatchdogConfig = {
+  enabled: false,
+  targets: "1.1.1.1,8.8.8.8",
+  failCount: 3,
+  checkInterval: 10,
+  pingTimeoutSec: 5,
+  bootGrace: 600,
+  recoveryCooldown: 120,
+  tier1Enabled: true,
+  tier1Settle: 30,
+  tier2Enabled: true,
+  tier2Settle: 60,
+  cfunDelay: 5,
+  cfunMaxAttempts: 1,
+  tier3Enabled: false,
+  tier3Settle: 120,
+  simRevert: "timer",
+  simRevertAfter: 3600,
+  tier4Enabled: true,
+  maxRecoveriesPerHour: 6,
+  maxRebootsPerDay: 3,
+};
+
+/** One line of /tmp/connection-watchdog.events. */
+export interface WatchdogEvent {
+  /** Unix seconds */
+  ts: number;
+  /** 1-4, 0 for events of the whole ladder */
+  tier: number;
+  /** offline, reregister, radio_restart, sim_switch, reboot, restored,
+   *  no_effect, rate_limit, exhausted, sim_revert */
+  event: string;
+  /** ok, done, failed, skipped, warning */
+  result: string;
+  detail: string;
+}
+
+export interface WatchdogRuntime {
+  /** Modem clock, Unix seconds */
+  now: number;
+  status: {
+    /** online, offline, recovering, reverting, paused, disabled, stopped */
+    state: string;
+    tier: number;
+    failStreak: number;
+    updated: number;
+    note: string;
+  };
+  limits: {
+    recoveriesLastHour: number;
+    maxRecoveriesPerHour: number;
+    rebootsLastDay: number;
+    maxRebootsPerDay: number;
+  };
+  simFailover: {
+    active: boolean;
+    originalSlot?: number;
+    backupSlot?: number;
+    since?: number;
+  };
+  events: WatchdogEvent[];
+}
+
+export interface SaveResult {
+  ok: boolean;
+  message?: string;
 }
 
 const LOG_LINES = 160;
 const LOG_REFRESH_MS = 3000;
+const EVENTS_LIMIT = 50;
+const EVENTS_REFRESH_MS = 5000;
+
+const num = (value: unknown, fallback: number) => {
+  const n = Number(value);
+  return value !== null && value !== "" && Number.isFinite(n) ? n : fallback;
+};
+
+const bool = (value: unknown, fallback: boolean) =>
+  typeof value === "boolean" ? value : fallback;
+
+function parseConfig(json: Record<string, unknown>): WatchdogConfig {
+  const d = WATCHDOG_DEFAULTS;
+  return {
+    enabled: bool(json.enabled, d.enabled),
+    targets: typeof json.targets === "string" && json.targets ? json.targets : d.targets,
+    failCount: num(json.failCount, d.failCount),
+    checkInterval: num(json.checkInterval, d.checkInterval),
+    pingTimeoutSec: num(json.pingTimeoutSec, d.pingTimeoutSec),
+    bootGrace: num(json.bootGrace, d.bootGrace),
+    recoveryCooldown: num(json.recoveryCooldown, d.recoveryCooldown),
+    tier1Enabled: bool(json.tier1Enabled, d.tier1Enabled),
+    tier1Settle: num(json.tier1Settle, d.tier1Settle),
+    tier2Enabled: bool(json.tier2Enabled, d.tier2Enabled),
+    tier2Settle: num(json.tier2Settle, d.tier2Settle),
+    cfunDelay: num(json.cfunDelay, d.cfunDelay),
+    cfunMaxAttempts: num(json.cfunMaxAttempts, d.cfunMaxAttempts),
+    tier3Enabled: bool(json.tier3Enabled, d.tier3Enabled),
+    tier3Settle: num(json.tier3Settle, d.tier3Settle),
+    simRevert: json.simRevert === "never" ? "never" : "timer",
+    simRevertAfter: num(json.simRevertAfter, d.simRevertAfter),
+    tier4Enabled: bool(json.tier4Enabled, d.tier4Enabled),
+    maxRecoveriesPerHour: num(json.maxRecoveriesPerHour, d.maxRecoveriesPerHour),
+    maxRebootsPerDay: num(json.maxRebootsPerDay, d.maxRebootsPerDay),
+  };
+}
 
 export function useWatchdog() {
   const [config, setConfig] = useState<WatchdogConfig | null>(null);
@@ -46,16 +169,8 @@ export function useWatchdog() {
       const resp = await authFetch("/cgi-bin/connection_watchdog", { cache: "no-store" });
       const json = await resp.json();
       if (!mounted.current) return;
-      setConfig({
-        enabled: Boolean(json.enabled),
-        targets: json.targets || "1.1.1.1,8.8.8.8",
-        failCount: Number(json.failCount || 3),
-        checkInterval: Number(json.checkInterval || 10),
-        pingTimeoutSec: Number(json.pingTimeoutSec || 5),
-        action: json.action === "reboot" ? "reboot" : "cfun",
-        bootGrace: Number(json.bootGrace ?? 600),
-        cfunMaxAttempts: Number(json.cfunMaxAttempts || 10),
-      });
+      if (!json.success) throw new Error(json.message);
+      setConfig(parseConfig(json));
       setError(null);
     } catch {
       if (mounted.current) setError("Unable to read the watchdog configuration");
@@ -65,10 +180,11 @@ export function useWatchdog() {
   }, []);
 
   useEffect(() => {
-    load();
+    const id = setTimeout(load, 0);
+    return () => clearTimeout(id);
   }, [load]);
 
-  const save = useCallback(async (next: WatchdogConfig) => {
+  const save = useCallback(async (next: WatchdogConfig): Promise<SaveResult> => {
     setIsSaving(true);
     try {
       const resp = await authFetch("/cgi-bin/connection_watchdog", {
@@ -76,11 +192,11 @@ export function useWatchdog() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(next),
       });
-      if (!resp.ok) return { ok: false, message: `HTTP ${resp.status}` };
-      const json = await resp.json();
-      if (mounted.current) {
-        setConfig({ ...next, enabled: Boolean(json.enabled), targets: json.targets || next.targets });
+      const json = await resp.json().catch(() => ({}));
+      if (!resp.ok || !json.success) {
+        return { ok: false, message: json.message || `HTTP ${resp.status}` };
       }
+      if (mounted.current) setConfig(parseConfig(json));
       return { ok: true };
     } catch {
       return { ok: false, message: "Modem unreachable" };
@@ -90,6 +206,54 @@ export function useWatchdog() {
   }, []);
 
   return { config, isLoading, isSaving, error, save, reload: load };
+}
+
+/** Recovery activity and live state, refreshed while `active`. */
+export function useWatchdogEvents(active: boolean) {
+  const [runtime, setRuntime] = useState<WatchdogRuntime | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const resp = await authFetch(`/cgi-bin/watchdog_events?limit=${EVENTS_LIMIT}`, {
+        cache: "no-store",
+      });
+      const json = await resp.json();
+      if (!mounted.current) return;
+      if (!json.success) throw new Error(json.message || `HTTP ${resp.status}`);
+      setRuntime(json as WatchdogRuntime);
+      setError(null);
+    } catch (err) {
+      if (mounted.current) {
+        setError(err instanceof Error ? err.message : "Unable to read the watchdog activity");
+      }
+    } finally {
+      if (mounted.current) setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
+    // First read right away, then on the polling cadence.
+    const first = setTimeout(refresh, 0);
+    const id = setInterval(refresh, EVENTS_REFRESH_MS);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [active, refresh]);
+
+  return { runtime, error, isRefreshing, refresh };
 }
 
 /** Tail of the watchdog log, refreshed while `active`. */
@@ -164,7 +328,7 @@ export function useConnectionChecks() {
     };
   }, []);
 
-  const save = useCallback(async (next: ConnectionChecks) => {
+  const save = useCallback(async (next: ConnectionChecks): Promise<SaveResult> => {
     setIsSaving(true);
     try {
       const resp = await authFetch("/cgi-bin/set_connection_config", {
