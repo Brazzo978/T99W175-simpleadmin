@@ -10,8 +10,10 @@ Installed on 2026-10-19 at 18:55 with a full `./install.sh`.
 - [x] `npm ci` (next 16.4.2), `frontend/build.sh`, full `./install.sh`
 - [x] `BUILD` stamp without `-dirty` (`1.0.5-82-g4ef0a20`)
 - [x] Every page loads on the modem without console errors or 4xx
-- [ ] Change password from the user menu: wrong current password refused,
-      right one accepted, as admin and as a read-only user
+- [x] Change password: a wrong current password is refused (403,
+      `wrong_current_password`)
+- [ ] Change password: the right one accepted, as admin and as a read-only
+      user (changes the real password: to do with the owner)
 - [ ] Decide: change password open to every role (each user changes their
       own after typing the current one), as implemented
 - [x] GUI toggle key moved to `/data/simpleadmin/gui_toggle.key`:
@@ -39,7 +41,8 @@ Installed on 2026-10-19 at 18:55 with a full `./install.sh`.
 - [x] Live: hostname, kernel, data session age (reset to 0 by the data
       reconnect at 18:59 and growing since), history sent first on connect,
       probe answering `ok` (204)
-- [ ] Probe with `http://google.com/` (portal) and back to the default
+- [x] Probe with `http://google.com/`: "portal" (301 to www.google.com),
+      overall status `warning`; back to the default afterwards
 - [ ] LTE UE category: not in QMI NAS/DMS nor `AT^DEBUG?`; only in the RRC
       UE capability information at attach (0xB0C0, diag_bridge)
 
@@ -75,8 +78,9 @@ Applied automatically when the ICCID changes (decided 2026-10-19).
       `sim-profiles.timer` (30 s) and the watchdog's SIM switch apply them,
       SIM Profiles page with create/edit/delete/apply
 - [x] Merged on `Beta`
-- [ ] Deploy, then verify create from current settings, apply unchanged,
-      TTL apply, APN/PDP apply (CFUN=4/1) and restore
+- [x] Installed; create, apply unchanged (both steps "Unchanged"), TTL
+      apply to 64 and back to off, delete: all verified on the modem
+- [ ] APN/PDP apply (CFUN=4/1) and restore
 - [ ] Automatic apply on a SIM change: needs your OK (SIM switch)
 - [ ] Check that the operator profile (MBN) does not rewrite profile 1
       after an apply
