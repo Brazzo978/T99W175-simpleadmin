@@ -21,8 +21,9 @@ Installed on 2026-10-19 at 18:55 with a full `./install.sh`.
 - [ ] GUI lock/unlock with a key set (none is set today)
 - [x] Next.js navigation and prefetches (`__next.*.txt`, the `HEAD` that
       16.4 sends) answer 200 with the gzip-only web root
-- [ ] Antenna Statistics: `rx_diversity` against the chains that report,
-      NR per-chain SNR (`snr_rx`, not seen so far)
+- [x] Antenna Statistics: `rx_diversity` matches the chains that report
+      (LTE PCell 1 → one chain, 5G 15 → four chains)
+- [ ] NR per-chain SNR (`snr_rx`): never sent by this firmware so far
 - [ ] Antenna Alignment: a recording, also under QMI fallback (2 s polls)
 - [ ] Frequency Calculator: bands and channels against the serving carriers
 - [ ] Recent Activities: hold times and the dashboard filter stay readable
