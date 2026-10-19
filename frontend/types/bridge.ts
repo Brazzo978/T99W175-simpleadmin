@@ -226,6 +226,28 @@ export interface QmiRadio {
 
 export type CheckStatus = "ok" | "warning" | "error";
 
+/**
+ * system_bridge's one-time message to a new client, sent before its first
+ * snapshot: what it recorded while nobody was connected. Oldest first.
+ */
+export interface SystemHistory {
+  /** conn.seq of the newest latency sample */
+  seq: number;
+  latency: {
+    interval_s: number;
+    /** Age of the newest sample, -1 when there is none */
+    age_s: number;
+    /** Average RTT (ms) of each check round, null when no target answered */
+    rtt: (number | null)[];
+  };
+  signal: {
+    interval_s: number;
+    /** [age_s, lte_rsrp x4, lte_rsrq, lte_sinr, nr_rsrp x4, nr_rsrq, nr_sinr]
+     *  from QMI (per-chain RSRP; RSRQ and SINR of the cell) */
+    rows: (number | null)[][];
+  };
+}
+
 export interface SystemSnapshot {
   sys: {
     uptime_s: number;
@@ -267,6 +289,9 @@ export interface SystemSnapshot {
   conn: {
     status: CheckStatus;
     pending: boolean;
+    /** Check rounds recorded in the bridge's latency history; a new value
+     *  means a new round finished (one sample) */
+    seq?: number;
     ping?: {
       total: number;
       passed: number;

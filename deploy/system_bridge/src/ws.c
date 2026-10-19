@@ -1,7 +1,8 @@
 /*
  * Minimal WebSocket server (RFC 6455) of system_bridge (a copy of the one
  * in T99W175-diag-json-bridge, which diag_bridge uses): text frames out, ping/close in, handshakes polled with the
- * caller's main loop. See ws.h.
+ * caller's main loop. Added here: the on-open hook and frames above 64 KiB,
+ * finished when the socket takes them in part. See ws.h.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +12,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -84,10 +86,12 @@ static size_t base64_encode(const uint8_t *in, size_t len, char *out) {
 
 #define WS_HANDSHAKE_MS  3000
 #define WS_MAX_KEY_LEN   64
-#define WS_MAX_PAYLOAD   16384
+#define WS_MAX_PAYLOAD   131072
+#define WS_SEND_MS       1000    /* to finish a frame the socket took in part */
 #define WS_GUID          "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 int ws_listen_fd = -1;
+int (*ws_on_open)(int fd);
 int ws_clients[WS_MAX_CLIENTS];
 static uint64_t ws_client_since[WS_MAX_CLIENTS];
 int ws_nclients = 0;
@@ -241,6 +245,7 @@ void ws_pending_read(int idx) {
     int fd = c->fd;
     ws_pending_remove(idx, 0);
     ws_add_client(fd);
+    if (ws_on_open && ws_on_open(fd) < 0) ws_remove_client(ws_nclients - 1);
 }
 
 void ws_pending_expire(void) {
@@ -249,9 +254,10 @@ void ws_pending_expire(void) {
         if (now >= ws_pending[i].deadline_ms) ws_pending_remove(i, 1);
 }
 
-/* Header and payload go out in a single write: on a non-blocking socket a
-   short write would otherwise leave half a frame on the wire and desync the
-   stream, so anything short of the full frame drops the client. */
+/* Header and payload go out together. A frame the non-blocking socket only
+   takes in part (the history message is larger than a fresh socket's
+   buffer) is finished within WS_SEND_MS; past that the client is dropped,
+   since half a frame on the wire would desync the stream. */
 int ws_send_text(int fd, const char *text, size_t len) {
     static uint8_t frame[10 + WS_MAX_PAYLOAD];
     size_t hlen;
@@ -259,12 +265,26 @@ int ws_send_text(int fd, const char *text, size_t len) {
     frame[0] = 0x81;
     if (len < 126) {
         frame[1] = (uint8_t)len; hlen = 2;
-    } else {
+    } else if (len <= 0xFFFF) {
         frame[1] = 126; frame[2] = (uint8_t)(len >> 8); frame[3] = (uint8_t)len; hlen = 4;
+    } else {
+        frame[1] = 127;
+        for (int i = 0; i < 8; i++) frame[2 + i] = (uint8_t)((uint64_t)len >> (56 - 8 * i));
+        hlen = 10;
     }
     memcpy(frame + hlen, text, len);
-    ssize_t w = write(fd, frame, hlen + len);
-    return (w == (ssize_t)(hlen + len)) ? 0 : -1;
+    size_t total = hlen + len, sent = 0;
+    uint64_t deadline = monotonic_ms() + WS_SEND_MS;
+    while (sent < total) {
+        ssize_t w = write(fd, frame + sent, total - sent);
+        if (w > 0) { sent += (size_t)w; continue; }
+        if (w < 0 && errno == EINTR) continue;
+        uint64_t now = monotonic_ms();
+        if (w == 0 || (errno != EAGAIN && errno != EWOULDBLOCK) || now >= deadline) return -1;
+        struct pollfd p = { fd, POLLOUT, 0 };
+        poll(&p, 1, (int)(deadline - now));
+    }
+    return 0;
 }
 
 void ws_broadcast(const char *text, size_t len) {

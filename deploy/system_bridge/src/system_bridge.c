@@ -13,10 +13,14 @@
  * the data session from rtnetlink; connectivity from ICMP echo and DNS
  * queries to the targets in simpleadmin.conf.
  *
- * The modem is only polled while a WebSocket client is connected: radio
- * every 2 s, serving system / CA / temperatures every 10 s, identity every
- * 60 s, connectivity every 10 s. Radio data here is the fallback of the
- * dashboard: diag_bridge (port 9001) is the primary radio source.
+ * While a WebSocket client is connected the modem is polled for the
+ * snapshot pushed every 2 s: radio every 2 s, serving system / CA /
+ * temperatures every 10 s, identity every 60 s, connectivity every 10 s.
+ * Radio data here is the fallback of the dashboard: diag_bridge (port 9001)
+ * is the primary radio source. With or without clients it keeps the
+ * histories a new client receives at once (latency of every 10 s ping round
+ * for 24 h, QMI signal every 10 s for 30 min) and the persistent data
+ * counter.
  *
  * The same binary is the serialized AT client: called as atcli_smd8 (the
  * firmware's client is replaced by a link to it) or as "system_bridge at",
@@ -66,6 +70,7 @@
 #define SERVING_MS        10000
 #define IDENTITY_MS       60000
 #define CONN_MS           10000
+#define SIGNAL_MS         10000
 #define PING_TIMEOUT_MS   1500
 #define DNS_TIMEOUT_MS    2000
 #define MAX_TARGETS       4
@@ -865,8 +870,12 @@ static void data_reset(void) {
 
 /* ============= CONNECTIVITY ============= */
 
-struct ping_target { char host[64]; struct in_addr addr; int state; double ms; uint16_t seq; uint64_t sent_ms; };
-struct dns_target { char server[64], domain[128]; int state; uint16_t id; uint64_t sent_ms; int fd; };
+/* The checks run in rounds every CONN_MS, with or without clients: pings
+   only while nobody is connected (they feed the latency history), pings and
+   DNS while someone is. `state` is the round in flight, `shown` the last
+   finished round, which is what the snapshot publishes. */
+struct ping_target { char host[64]; struct in_addr addr; int state, shown; double ms, shown_ms; uint16_t seq; uint64_t sent_ms; };
+struct dns_target { char server[64], domain[128]; int state, shown; uint16_t id; uint64_t sent_ms; int fd; };
 enum { CK_IDLE, CK_WAIT, CK_OK, CK_FAILED };
 
 static struct ping_target pings[MAX_TARGETS];
@@ -875,6 +884,24 @@ static int npings, ndns;
 static int icmp_fd = -1;
 static uint16_t echo_id;
 static time_t conf_mtime;
+static int round_open, round_full;   /* a round is in flight; it runs DNS too */
+static uint64_t round_start_ms;
+
+/* Latency history: the average RTT of every round of the last 24 h, in ms,
+   -1 when no target answered. 17 KiB. */
+#define LAT_HISTORY  (24 * 3600 * 1000 / CONN_MS)
+static int16_t lat_hist[LAT_HISTORY];
+static int lat_n, lat_head;           /* head: next slot */
+static uint64_t lat_last_ms;          /* monotonic time of the newest */
+static uint32_t conn_seq;             /* rounds recorded so far */
+
+static void lat_push(int ms) {
+    lat_hist[lat_head] = (int16_t)(ms > 30000 ? 30000 : ms);
+    lat_head = (lat_head + 1) % LAT_HISTORY;
+    if (lat_n < LAT_HISTORY) lat_n++;
+    lat_last_ms = monotonic_ms();
+    conn_seq++;
+}
 
 /* SIMPLEADMIN_PING_TARGETS="a,b" and SIMPLEADMIN_DNS_TESTS="server:domain,..." */
 static void load_conf(void) {
@@ -915,9 +942,12 @@ static uint16_t icmp_checksum(const void *data, size_t len) {
     return htons((uint16_t)~sum);
 }
 
-static void conn_start(void) {
+static void conn_start(int full) {
     load_conf();
     uint64_t now = monotonic_ms();
+    round_open = 1;
+    round_full = full;
+    round_start_ms = now;
     for (int i = 0; i < npings; i++) {
         struct ping_target *p = &pings[i];
         uint8_t pkt[64];
@@ -935,6 +965,9 @@ static void conn_start(void) {
     for (int i = 0; i < ndns; i++) {
         struct dns_target *d = &dnss[i];
         if (d->fd >= 0) close(d->fd);
+        d->fd = -1;
+        d->state = CK_IDLE;
+        if (!full) continue;
         d->fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
         struct sockaddr_in to = { .sin_family = AF_INET, .sin_port = htons(53) };
         uint8_t q[300];
@@ -983,15 +1016,113 @@ static void dns_read(struct dns_target *d) {
     d->fd = -1;
 }
 
-static void conn_expire(void) {
+/* Timeouts; with force, everything still in flight fails now. */
+static void conn_expire(int force) {
     uint64_t now = monotonic_ms();
     for (int i = 0; i < npings; i++)
-        if (pings[i].state == CK_WAIT && now - pings[i].sent_ms > PING_TIMEOUT_MS) pings[i].state = CK_FAILED;
+        if (pings[i].state == CK_WAIT && (force || now - pings[i].sent_ms > PING_TIMEOUT_MS)) pings[i].state = CK_FAILED;
     for (int i = 0; i < ndns; i++)
-        if (dnss[i].state == CK_WAIT && now - dnss[i].sent_ms > DNS_TIMEOUT_MS) {
+        if (dnss[i].state == CK_WAIT && (force || now - dnss[i].sent_ms > DNS_TIMEOUT_MS)) {
             dnss[i].state = CK_FAILED;
             if (dnss[i].fd >= 0) { close(dnss[i].fd); dnss[i].fd = -1; }
         }
+}
+
+/* Once nothing is in flight the round's results are published and its
+   average RTT goes into the latency history. A round without DNS leaves
+   the DNS results unknown rather than showing old ones. */
+static void conn_finish(void) {
+    if (!round_open) return;
+    for (int i = 0; i < npings; i++) if (pings[i].state == CK_WAIT) return;
+    for (int i = 0; i < ndns; i++) if (dnss[i].state == CK_WAIT) return;
+    round_open = 0;
+    int pass = 0;
+    double sum = 0;
+    for (int i = 0; i < npings; i++) {
+        pings[i].shown = pings[i].state;
+        pings[i].shown_ms = pings[i].ms;
+        if (pings[i].state == CK_OK) { pass++; sum += pings[i].ms; }
+    }
+    for (int i = 0; i < ndns; i++) dnss[i].shown = round_full ? dnss[i].state : CK_IDLE;
+    if (npings) lat_push(pass ? (int)(sum / pass + 0.5) : -1);
+}
+
+/* ============= SIGNAL HISTORY ============= */
+
+/* One QMI radio sample every SIGNAL_MS for the last 30 min, with or
+   without clients, so the dashboard's signal chart starts full. Values are
+   tenths of dB(m), SIG_NONE where unknown: per-chain RSRP, RSRQ and SINR
+   for LTE (PCell) then NR. QMI has no per-chain SINR. */
+#define SIG_HISTORY  (30 * 60 * 1000 / SIGNAL_MS)
+#define SIG_NONE     INT16_MIN
+enum { SIG_LTE_RSRP = 0, SIG_LTE_RSRQ = 4, SIG_LTE_SINR, SIG_NR_RSRP, SIG_NR_RSRQ = 10, SIG_NR_SINR, SIG_COLS };
+
+struct sig_row { uint32_t t_s; int16_t v[SIG_COLS]; };   /* t_s: monotonic seconds */
+static struct sig_row sig_hist[SIG_HISTORY];
+static int sig_n, sig_head;
+
+static int16_t x10(int v) { return v == INT32_MIN || v == INVALID_DB || v < -32000 || v > 32000 ? SIG_NONE : (int16_t)v; }
+
+static void sig_chains(int16_t *out, const struct chain *c, int fallback_db) {
+    int any = 0;
+    for (int k = 0; k < 4; k++) {
+        out[k] = c[k].valid ? x10(c[k].rsrp_x10) : SIG_NONE;
+        any |= out[k] != SIG_NONE;
+    }
+    if (!any && fallback_db != INVALID_DB) out[0] = x10(fallback_db * 10);
+}
+
+static void sig_push(void) {
+    if (!md.radio_at || time(NULL) - md.radio_at > 5 || (!md.lte.valid && !md.nr.valid)) return;
+    struct sig_row *r = &sig_hist[sig_head];
+    for (int k = 0; k < SIG_COLS; k++) r->v[k] = SIG_NONE;
+    r->t_s = (uint32_t)(monotonic_ms() / 1000);
+    if (md.lte.valid) {
+        sig_chains(r->v + SIG_LTE_RSRP, md.lte.chains, md.lte.rsrp);
+        r->v[SIG_LTE_RSRQ] = x10(md.lte.rsrq * 10);
+        r->v[SIG_LTE_SINR] = x10(md.lte.snr_x10);
+    }
+    if (md.nr.valid) {
+        sig_chains(r->v + SIG_NR_RSRP, md.nr.chains, md.nr.rsrp);
+        if (md.nr.rsrq != INVALID_DB) r->v[SIG_NR_RSRQ] = x10(md.nr.rsrq * 10);
+        if (md.nr.snr_x10 != INVALID_DB) r->v[SIG_NR_SINR] = x10(md.nr.snr_x10);
+    }
+    sig_head = (sig_head + 1) % SIG_HISTORY;
+    if (sig_n < SIG_HISTORY) sig_n++;
+}
+
+/* The one-time message a new client gets before its first snapshot:
+     {"history":{"seq":N,
+       "latency":{"interval_s":10,"age_s":A,"rtt":[ms|null,...]},
+       "signal":{"interval_s":10,"rows":[[age_s, lte_rsrp x4, lte_rsrq,
+                 lte_sinr, nr_rsrp x4, nr_rsrq, nr_sinr],...]}}}
+   oldest first. rtt holds one value per round, age_s is the age of the
+   newest; seq is the conn.seq of that round, so the client appends only
+   later rounds. About 45 KB when full. */
+static size_t serialize_history(char *out, size_t cap) {
+    struct jbuf j = { out, 0, cap };
+    uint64_t now = monotonic_ms();
+    jcat(&j, "{\"history\":{\"seq\":%u,\"latency\":{\"interval_s\":%d,\"age_s\":%ld,\"rtt\":[",
+         conn_seq, CONN_MS / 1000, lat_n ? (long)((now - lat_last_ms) / 1000) : -1L);
+    for (int k = 0; k < lat_n; k++) {
+        int16_t v = lat_hist[(lat_head - lat_n + k + LAT_HISTORY) % LAT_HISTORY];
+        if (v < 0) jcat(&j, "%snull", k ? "," : ""); else jcat(&j, "%s%d", k ? "," : "", v);
+    }
+    jcat(&j, "]},\"signal\":{\"interval_s\":%d,\"rows\":[", SIGNAL_MS / 1000);
+    uint32_t now_s = (uint32_t)(now / 1000);
+    for (int k = 0; k < sig_n; k++) {
+        const struct sig_row *r = &sig_hist[(sig_head - sig_n + k + SIG_HISTORY) % SIG_HISTORY];
+        jcat(&j, "%s[%u", k ? "," : "", now_s - r->t_s);
+        for (int c = 0; c < SIG_COLS; c++) {
+            int16_t v = r->v[c];
+            if (v == SIG_NONE) jcat(&j, ",null");
+            else if (c == SIG_LTE_SINR || c == SIG_NR_SINR) jcat(&j, ",%.1f", v / 10.0);
+            else jcat(&j, ",%d", (v + (v < 0 ? -5 : 5)) / 10);   /* whole dB(m) */
+        }
+        jcat(&j, "]");
+    }
+    jcat(&j, "]}}}");
+    return j.n;
 }
 
 /* ============= SERIALIZATION ============= */
@@ -1036,35 +1167,36 @@ static size_t serialize(char *out, size_t cap) {
          du.ok ? "true" : "false", (unsigned long long)du.rx, (unsigned long long)du.tx,
          (long long)du.sampled_at, (long long)du.reset_at, du.resets, (long long)du.saved_at);
 
-    /* Connectivity, same shape and rules as cgi-bin/get_ping. */
-    int pass_p = 0, pass_d = 0, pending = 0, nt = 0;
+    /* Connectivity: the last finished round, same shape as cgi-bin/get_ping.
+       The status counts the checks that ran: all passed "ok", some
+       "warning", none "error", "pending" before any finished. seq counts
+       the rounds in the latency history. */
+    int pass_p = 0, pass_d = 0, done = 0, pending = 0, nt = 0;
     double sum = 0;
     for (int i = 0; i < npings; i++) {
-        if (pings[i].state == CK_OK) { pass_p++; sum += pings[i].ms; nt++; }
-        if (pings[i].state == CK_WAIT || pings[i].state == CK_IDLE) pending++;
+        if (pings[i].shown == CK_OK) { pass_p++; sum += pings[i].shown_ms; nt++; }
+        if (pings[i].shown == CK_IDLE) pending++; else done++;
     }
     for (int i = 0; i < ndns; i++) {
-        if (dnss[i].state == CK_OK) pass_d++;
-        if (dnss[i].state == CK_WAIT || dnss[i].state == CK_IDLE) pending++;
+        if (dnss[i].shown == CK_OK) pass_d++;
+        if (dnss[i].shown == CK_IDLE) pending++; else done++;
     }
-    /* Nothing answered yet but checks still in flight: not a failure. */
-    const char *status = pass_p + pass_d == npings + ndns ? "ok" : pass_p + pass_d > 0 ? "warning"
-                         : pending ? "pending" : "error";
-    jcat(&j, "},\"conn\":{\"status\":\"%s\",\"pending\":%s,\"ping\":{\"total\":%d,\"passed\":%d,\"avg_ms\":",
-         status, pending ? "true" : "false", npings, pass_p);
+    const char *status = !done ? "pending" : pass_p + pass_d == done ? "ok" : pass_p + pass_d ? "warning" : "error";
+    jcat(&j, "},\"conn\":{\"status\":\"%s\",\"pending\":%s,\"seq\":%u,\"ping\":{\"total\":%d,\"passed\":%d,\"avg_ms\":",
+         status, pending ? "true" : "false", conn_seq, npings, pass_p);
     if (nt) jcat(&j, "%.1f", sum / nt); else jcat(&j, "null");
     jcat(&j, ",\"results\":[");
     for (int i = 0; i < npings; i++) {
         jcat(&j, "%s{\"host\":", i ? "," : ""); jstr(&j, pings[i].host);
-        jcat(&j, ",\"status\":\"%s\"", pings[i].state == CK_OK ? "ok" : pings[i].state == CK_FAILED ? "failed" : "pending");
-        if (pings[i].state == CK_OK) jcat(&j, ",\"time\":%.1f", pings[i].ms);
+        jcat(&j, ",\"status\":\"%s\"", pings[i].shown == CK_OK ? "ok" : pings[i].shown == CK_FAILED ? "failed" : "pending");
+        if (pings[i].shown == CK_OK) jcat(&j, ",\"time\":%.1f", pings[i].shown_ms);
         jcat(&j, "}");
     }
     jcat(&j, "]},\"dns\":{\"total\":%d,\"passed\":%d,\"results\":[", ndns, pass_d);
     for (int i = 0; i < ndns; i++) {
         jcat(&j, "%s{\"server\":", i ? "," : ""); jstr(&j, dnss[i].server);
         jcat(&j, ",\"domain\":"); jstr(&j, dnss[i].domain);
-        jcat(&j, ",\"status\":\"%s\"}", dnss[i].state == CK_OK ? "ok" : dnss[i].state == CK_FAILED ? "failed" : "pending");
+        jcat(&j, ",\"status\":\"%s\"}", dnss[i].shown == CK_OK ? "ok" : dnss[i].shown == CK_FAILED ? "failed" : "pending");
     }
     jcat(&j, "]}}");
 
@@ -1259,6 +1391,14 @@ static int at_main(int argc, char **argv) {
 static void on_signal(int s) { (void)s; running = 0; }
 static void on_usr1(int s) { (void)s; data_reset_req = 1; }
 
+/* A new client gets the histories before its first snapshot; -1 drops it
+   when they cannot be sent whole. */
+static int send_history(int fd) {
+    static char hist[98304];
+    size_t n = serialize_history(hist, sizeof(hist));
+    return ws_send_text(fd, hist, n);
+}
+
 static void usage(const char *prog) {
     fprintf(stderr, "Usage: %s [-d] [-1] [-p PORT] [-i IFACE] [-C CONF] [-D FILE]\n"
                     "  -d        debug: foreground, log to stderr\n"
@@ -1303,9 +1443,9 @@ int main(int argc, char **argv) {
     if (once) {
         data_sample();      /* shown, not saved */
         poll_identity(); poll_serving(); poll_radio(); poll_system();
-        conn_start();
+        conn_start(1);
         uint64_t until = monotonic_ms() + DNS_TIMEOUT_MS + 100;
-        while (monotonic_ms() < until) {
+        while (round_open && monotonic_ms() < until) {
             struct pollfd p[1 + MAX_TARGETS];
             int n = 0;
             if (icmp_fd >= 0) { p[n].fd = icmp_fd; p[n++].events = POLLIN; }
@@ -1314,8 +1454,11 @@ int main(int argc, char **argv) {
                 if (icmp_fd >= 0 && (p[0].revents & POLLIN)) icmp_read();
                 for (int i = 0; i < ndns; i++) if (dnss[i].fd >= 0) dns_read(&dnss[i]);
             }
-            conn_expire();
+            conn_expire(0);
+            conn_finish();
         }
+        conn_expire(1);
+        conn_finish();
         poll_system();
         size_t n = serialize(out, sizeof(out));
         fwrite(out, 1, n, stdout);
@@ -1333,8 +1476,10 @@ int main(int argc, char **argv) {
 
     data_sample();
     if (!du.loaded) data_save();      /* first run: create the file */
-    uint64_t next_push = 0, next_radio = 0, next_serving = 0, next_identity = 0, next_conn = 0;
+    uint64_t next_push = 0, next_radio = 0, next_serving = 0, next_identity = 0, next_conn = 0, next_signal = 0;
     uint64_t next_data = monotonic_ms() + DATA_SAMPLE_MS, next_save = monotonic_ms() + DATA_SAVE_MS;
+    int had_clients = 0;
+    ws_on_open = send_history;
     while (running) {
         struct pollfd fds[2 + WS_MAX_CLIENTS + WS_MAX_PENDING + MAX_TARGETS];
         int nfds = 0, base_clients, base_pending, base_dns;
@@ -1363,19 +1508,11 @@ int main(int argc, char **argv) {
                 if (dnss[i].fd >= 0 && (fds[base_dns + i].revents & POLLIN)) dns_read(&dnss[i]);
         }
         ws_pending_expire();
-        conn_expire();
+        conn_expire(0);
+        conn_finish();
 
         uint64_t now = monotonic_ms();
-        /* The data counter runs with or without clients. */
-        if (data_reset_req) { data_reset_req = 0; data_reset(); }
-        if (now >= next_data) { data_sample(); next_data = now + DATA_SAMPLE_MS; }
-        if (now >= next_save) {
-            if (du.dirty) data_save();
-            next_save = now + DATA_SAVE_MS;
-        }
-        if (ws_nclients == 0) { next_push = next_radio = next_serving = next_conn = 0; continue; }
-        /* A new client gets data at once; QMI services are looked up again
-           if the modem restarted. */
+        /* QMI services are looked up again if the modem restarted. */
         static uint64_t next_lookup;
         int down = 0;
         for (size_t i = 0; i < sizeof(svcs) / sizeof(svcs[0]); i++) down |= !svcs[i].ok;
@@ -1384,10 +1521,35 @@ int main(int argc, char **argv) {
             next_lookup = now + LOOKUP_RETRY_MS;
             next_identity = 0;      /* re-read everything from the new endpoints */
         }
+
+        /* With or without clients: the data counter, the check rounds and
+           the signal samples. A first client gets a full round at once,
+           after the pings in flight. Rounds keep their cadence on average
+           (the latency history assumes one per CONN_MS). */
+        if (data_reset_req) { data_reset_req = 0; data_reset(); }
+        if (now >= next_data) { data_sample(); next_data = now + DATA_SAMPLE_MS; }
+        if (now >= next_save) {
+            if (du.dirty) data_save();
+            next_save = now + DATA_SAVE_MS;
+        }
+        if (ws_nclients && !had_clients) next_conn = now;
+        had_clients = ws_nclients > 0;
+        if (now >= next_conn && (!round_open || now - round_start_ms >= CONN_MS)) {
+            if (round_open) { conn_expire(1); conn_finish(); }
+            conn_start(ws_nclients > 0);
+            next_conn = next_conn && now - next_conn < CONN_MS ? next_conn + CONN_MS : now + CONN_MS;
+        }
+        if (now >= next_signal) {
+            if (!ws_nclients) poll_radio();          /* with clients it runs every RADIO_MS */
+            sig_push();
+            next_signal = next_signal && now - next_signal < SIGNAL_MS ? next_signal + SIGNAL_MS : now + SIGNAL_MS;
+        }
+        if (ws_nclients == 0) { next_push = next_radio = next_serving = 0; continue; }
+
+        /* A new client gets data at once. */
         if (now >= next_identity) { poll_identity(); next_identity = now + IDENTITY_MS; }
         if (now >= next_serving) { poll_serving(); next_serving = now + SERVING_MS; }
         if (now >= next_radio) { poll_radio(); next_radio = now + RADIO_MS; }
-        if (now >= next_conn) { conn_start(); next_conn = now + CONN_MS; }
         if (now >= next_push) {
             poll_system();
             data_sample();

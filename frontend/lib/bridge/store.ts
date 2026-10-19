@@ -6,12 +6,22 @@
 // store therefore opens the sockets only while at least one component is
 // subscribed and the tab is visible, and closes them otherwise.
 //
+// system_bridge keeps the latency of its check rounds (24 h) and QMI signal
+// samples (30 min) while nobody is connected, and sends them in a one-time
+// `history` message on connect: the store starts from them, then appends
+// its own samples as before.
+//
 // Components read it through useSyncExternalStore (see hooks/use-bridge.ts):
 // every accepted message replaces the snapshot object, so React sees a new
 // reference exactly when something changed.
 // =============================================================================
 
-import type { DiagEvent, DiagSnapshot, SystemSnapshot } from "@/types/bridge";
+import type {
+  DiagEvent,
+  DiagSnapshot,
+  SystemHistory,
+  SystemSnapshot,
+} from "@/types/bridge";
 import type { NetworkEvent, SignalHistoryEntry } from "@/types/modem-status";
 import { ActivityLog } from "./activities";
 import type { RadioEvent } from "./events";
@@ -35,10 +45,13 @@ export interface BridgeState {
   systemLink: LinkState;
   /** Per-antenna signal samples, oldest first */
   signalHistory: SignalHistoryEntry[];
-  /** Average ping RTT samples (ms), oldest first; null for a failed check */
+  /** Average ping RTT of each check round (ms), oldest first, up to 24 h;
+   *  null for a round no target answered */
   latencyHistory: (number | null)[];
-  /** Mean seconds between latency samples, 0 until two have arrived */
+  /** Seconds between latency samples, 0 until known */
   latencyIntervalSec: number;
+  /** Date.now() of the newest latency sample, 0 before the first */
+  latencyLastAt: number;
   /** One radio sample per second, oldest first (Signal Details trends) */
   radioHistory: RadioSample[];
   /** First sighting of each DIAG log counter in this page session, for a
@@ -63,8 +76,8 @@ const RECONNECT_MAX_MS = 10_000;
 /** Signal history cadence and depth: 30 minutes at 10 s. */
 export const SIGNAL_HISTORY_INTERVAL_S = 10;
 const SIGNAL_HISTORY_MAX = 180;
-/** Latency samples kept for the live latency card. */
-const LATENCY_HISTORY_MAX = 60;
+/** Latency samples kept: 24 h of system_bridge's 10 s check rounds. */
+export const LATENCY_HISTORY_MAX = 8640;
 
 let state: BridgeState = {
   diag: null,
@@ -76,6 +89,7 @@ let state: BridgeState = {
   signalHistory: [],
   latencyHistory: [],
   latencyIntervalSec: 0,
+  latencyLastAt: 0,
   radioHistory: [],
   diagLogBase: {},
   radioEvents: [],
@@ -131,6 +145,8 @@ function mergeEvents(
   };
 }
 let lastLatencySampleAt = 0;
+/** conn.seq of the last latency sample taken (see onSystem) */
+let lastConnSeq: number | undefined;
 let visibilityHooked = false;
 
 function setState(patch: Partial<BridgeState>) {
@@ -190,6 +206,7 @@ function connect(kind: Kind) {
     }
     if (!data || typeof data !== "object") return;
     if (kind === "diag") onDiag(data as DiagSnapshot);
+    else if ("history" in data) onHistory((data as { history: SystemHistory }).history);
     else onSystem(data as SystemSnapshot);
   };
   ws.onerror = () => ws.close();
@@ -244,14 +261,60 @@ function onDiag(diag: DiagSnapshot) {
   sampleRadio();
 }
 
+/** One history row ([age_s, lte x6, nr x6]) as a chart entry. */
+function signalEntry(row: (number | null)[], nowSec: number): SignalHistoryEntry {
+  const v = (i: number) => row[i] ?? null;
+  return {
+    ts: nowSec - (row[0] ?? 0),
+    lte_rsrp: [v(1), v(2), v(3), v(4)],
+    lte_rsrq: [v(5), null, null, null],
+    lte_sinr: [v(6), null, null, null],
+    nr_rsrp: [v(7), v(8), v(9), v(10)],
+    nr_rsrq: [v(11), null, null, null],
+    nr_sinr: [v(12), null, null, null],
+  };
+}
+
+/**
+ * The bridge's histories replace the local ones (it kept sampling while the
+ * page was closed); an empty one (bridge just restarted) leaves them as
+ * they are.
+ */
+function onHistory(history: SystemHistory) {
+  const now = Date.now();
+  const patch: Partial<BridgeState> = {};
+  lastConnSeq = history.seq;
+  const latency = history.latency;
+  if (latency) patch.latencyIntervalSec = latency.interval_s;
+  if (latency?.rtt?.length) {
+    patch.latencyHistory = latency.rtt.slice(-LATENCY_HISTORY_MAX);
+    patch.latencyLastAt = now - Math.max(latency.age_s, 0) * 1000;
+  }
+  const rows = history.signal?.rows ?? [];
+  if (rows.length) {
+    const nowSec = Math.floor(now / 1000);
+    const entries = rows.map((row) => signalEntry(row, nowSec));
+    patch.signalHistory = entries.slice(-SIGNAL_HISTORY_MAX);
+    lastSignalSampleAt = entries[entries.length - 1].ts * 1000;
+  }
+  setState(patch);
+}
+
 function onSystem(system: SystemSnapshot) {
   const now = Date.now();
-  const ping = system.conn?.ping;
-  let { latencyHistory, latencyIntervalSec } = state;
-  if (ping && !system.conn.pending) {
+  const conn = system.conn;
+  const ping = conn?.ping;
+  let { latencyHistory, latencyIntervalSec, latencyLastAt } = state;
+  // One sample per finished check round (conn.seq), at the interval the
+  // history message gave; a bridge without seq gets one per settled
+  // message and a measured interval, as before.
+  const rounds = conn?.seq !== undefined;
+  const fresh = rounds ? conn.seq !== lastConnSeq : !conn?.pending;
+  if (ping && fresh) {
+    lastConnSeq = conn.seq;
     const sample = ping.passed > 0 ? ping.avg_ms : null;
     latencyHistory = [...latencyHistory, sample].slice(-LATENCY_HISTORY_MAX);
-    if (lastLatencySampleAt) {
+    if (!rounds && lastLatencySampleAt) {
       const gap = (now - lastLatencySampleAt) / 1000;
       // Exponential average: one late message must not skew the axis.
       latencyIntervalSec = latencyIntervalSec
@@ -259,6 +322,7 @@ function onSystem(system: SystemSnapshot) {
         : gap;
     }
     lastLatencySampleAt = now;
+    latencyLastAt = now;
   }
   const radio = pickRadio({ ...state, system, systemAt: now }, now);
   if (radio.snapshot && radio.source === "qmi") {
@@ -270,6 +334,7 @@ function onSystem(system: SystemSnapshot) {
     systemAt: now,
     latencyHistory,
     latencyIntervalSec,
+    latencyLastAt,
     activities: activityLog.events,
   });
   sampleSignal();

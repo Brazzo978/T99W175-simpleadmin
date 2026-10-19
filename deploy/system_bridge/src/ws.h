@@ -1,4 +1,5 @@
-/* Minimal WebSocket server of system_bridge (same as diag_bridge's copy). */
+/* Minimal WebSocket server of system_bridge (diag_bridge's copy, plus the
+   on-open hook and frames up to WS_MAX_PAYLOAD sent whole). */
 #ifndef COMMON_WS_H
 #define COMMON_WS_H
 
@@ -23,6 +24,9 @@ extern int ws_clients[WS_MAX_CLIENTS];
 extern int ws_nclients;
 extern struct ws_pending_conn ws_pending[WS_MAX_PENDING];
 extern int ws_npending;
+/* Called once a client completes the upgrade, before any broadcast
+   reaches it (system_bridge sends its histories); returning -1 drops it. */
+extern int (*ws_on_open)(int fd);
 
 uint64_t monotonic_ms(void);
 /* Listens on port, only on iface when given (SO_BINDTODEVICE). */

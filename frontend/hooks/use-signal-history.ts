@@ -8,8 +8,9 @@ import type { SignalHistoryEntry } from "@/types/modem-status";
 // useSignalHistory — per-antenna signal history for the dashboard chart
 // =============================================================================
 // Reads the samples the bridge store takes every 10 s from the live radio
-// data, and turns the latest ones into chart points with the best antenna
-// value per RAT.
+// data (seeded on connect with system_bridge's last 30 minutes of QMI
+// samples), and turns the latest ones into chart points with the best
+// antenna value per RAT.
 //
 // Usage:
 //   const { chartData, isLoading, error } = useSignalHistory();

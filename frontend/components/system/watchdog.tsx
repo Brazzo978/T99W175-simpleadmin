@@ -27,6 +27,7 @@ import {
   type WatchdogConfig,
 } from "@/hooks/use-watchdog";
 import { isValidIp } from "@/lib/ipv4";
+import LatencyHistoryCard from "./latency-history";
 
 function validate(c: WatchdogConfig): string | null {
   const targets = c.targets.split(",").map((t) => t.trim()).filter(Boolean);
@@ -163,6 +164,8 @@ export default function WatchdogComponent() {
       description="How the connection is tested, and what the watchdog does when it fails: restart the radio or the modem."
     >
       <ConnectionChecksCard />
+
+      <LatencyHistoryCard />
 
       <Card>
         <CardHeader>

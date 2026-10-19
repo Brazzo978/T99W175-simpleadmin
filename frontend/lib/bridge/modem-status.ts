@@ -20,6 +20,10 @@ import type { BridgeState } from "./store";
 import { isSystemFresh, pickRadio, type RadioSource } from "./radio";
 
 const NO_CHAINS = [null, null, null, null];
+/** Latency samples behind the dashboard's latency card and its average,
+ *  jitter and loss: the last 10 minutes of 10 s check rounds (the store
+ *  keeps 24 h). */
+const LATENCY_WINDOW = 60;
 
 function popcount(mask: number): number {
   let count = 0;
@@ -166,10 +170,11 @@ export function buildModemStatus(
   else if (registered) serviceStatus = "connected";
 
   const cellState: ConnectionState = registered ? "connected" : "searching";
-  const latency = stats(state.latencyHistory);
+  const recent = state.latencyHistory.slice(-LATENCY_WINDOW);
+  const latency = stats(recent);
   const ping = system?.conn.ping;
-  const lossSamples = state.latencyHistory.length;
-  const lost = state.latencyHistory.filter((v) => v === null).length;
+  const lossSamples = recent.length;
+  const lost = recent.filter((v) => v === null).length;
 
   const mimo = [
     pcell && pcell.rx_diversity
@@ -279,9 +284,9 @@ export function buildModemStatus(
       jitter_ms: latency.jitter,
       packet_loss_pct: lossSamples ? Math.round((lost / lossSamples) * 100) : 0,
       ping_target: ping?.results.map((r) => r.host).join(", ") ?? "",
-      latency_history: state.latencyHistory,
+      latency_history: recent,
       history_interval_sec: Math.round(state.latencyIntervalSec),
-      history_size: state.latencyHistory.length,
+      history_size: recent.length,
       during_recovery: false,
       state:
         conn === "connected"
