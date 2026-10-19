@@ -31,7 +31,7 @@ building with it have finished.
 - [x] 24 h latency and 30 min signal kept without clients, sent on connect
       (24 h chart in Connection Monitoring)
 - [x] Captive-portal probe (`SIMPLEADMIN_HTTP_PROBE`, "Carrier Limited")
-- [ ] Merge on `Beta` (in progress)
+- [x] Merged on `Beta`
 - [ ] Background pings every 60 s instead of 10 s while no page is open
       (10 s costs about 3 MB of mobile data a day on the backup line)
 - [ ] Verify on the modem: data session age after a data reconnect, the
