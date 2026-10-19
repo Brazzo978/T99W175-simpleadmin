@@ -29,7 +29,8 @@
 # per line in /tmp/connection-watchdog.events, the live state in
 # /tmp/connection-watchdog.status. A script that restarts the radio on
 # purpose writes its PID to /tmp/connection-watchdog.pause: checks stop
-# while that process lives.
+# while that process lives (sim-profiles does, while it sets an APN). After
+# its own SIM switches the watchdog runs "sim-profiles check --now".
 #
 # A configuration without WD_TIER*_ENABLED (written before the tiers) keeps
 # its meaning: WD_ACTION="cfun" is tier 2 (WD_CFUN_MAX_ATTEMPTS times) then
@@ -45,6 +46,7 @@ STATE_DIR="/data/simpleadmin/watchdog"
 RECOVERIES_FILE="$STATE_DIR/recoveries"
 FAILOVER_FILE="$STATE_DIR/sim-failover"
 UNUSABLE_FILE="$STATE_DIR/sim-unusable"
+SIM_PROFILES="/opt/scripts/sim-profiles/sim-profiles"
 MAX_LOG_LINES=800
 MAX_EVENTS=200
 MAX_RECOVERY_LINES=2000
@@ -323,10 +325,12 @@ slot_unusable() {
     [ "$age" -ge 0 ] && [ "$age" -lt "$SIM_UNUSABLE_HOLD" ]
 }
 
-# Hook for whatever follows the active SIM (SIM profiles): run after every
-# switch that the watchdog makes.
+# After every switch the watchdog makes, the profile of the SIM now active
+# (APN, TTL) is applied at once rather than at the next sim-profiles.timer
+# check; the ladder waits for it.
 after_sim_switch() {
-    :
+    [ -x "$SIM_PROFILES" ] || return 0
+    "$SIM_PROFILES" check --now --trigger watchdog >/dev/null 2>&1 || true
 }
 
 # switch_slot SLOT SLMODE: AT^SWITCH_SLOT, the network mode put back (the

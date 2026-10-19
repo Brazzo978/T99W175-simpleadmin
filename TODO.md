@@ -70,8 +70,15 @@ COPS → CFUN=4/1 → SIM switch → reboot, with rate limits, replacing
 
 ## Per-SIM profiles (APN + TTL)
 Applied automatically when the ICCID changes (decided 2026-10-19).
-- [ ] Implementation (in progress, separate worktree)
-- [ ] Merge, deploy, verify create/apply/delete and the automatic apply
+- [x] Implementation: profiles in /data/simpleadmin/sim-profiles,
+      `sim-profiles.timer` (30 s) and the watchdog's SIM switch apply them,
+      SIM Profiles page with create/edit/delete/apply
+- [x] Merged on `Beta`
+- [ ] Deploy, then verify create from current settings, apply unchanged,
+      TTL apply, APN/PDP apply (CFUN=4/1) and restore
+- [ ] Automatic apply on a SIM change: needs your OK (SIM switch)
+- [ ] Check that the operator profile (MBN) does not rewrite profile 1
+      after an apply
 
 ## diag_bridge fixes (bridge repository)
 - [ ] A former PCell stays in `lte[]` next to the serving one (B20/PCI 26

@@ -1,0 +1,477 @@
+#!/bin/sh
+# Per-SIM profiles: APN (with its PDP type) and TTL/HL, keyed by ICCID and
+# applied when the active SIM changes (a swapped card, a slot switch by hand
+# or by the connection watchdog).
+#
+#   sim-profiles check [--now] [--trigger NAME]
+#       Run every 30 s by sim-profiles.timer, and by the watchdog with --now
+#       right after it switches SIM. A new ICCID is applied on the next
+#       check, once the SIM has settled (at once with --now); a profile is
+#       re-applied up to 3 times while the modem does not keep it.
+#   sim-profiles apply ICCID [ID [--locked]]
+#       Apply the profile of ICCID now (cgi-bin/sim_profiles, "Apply"; it
+#       takes the lock itself and passes it on fd 9 with --locked).
+#   sim-profiles current
+#       Active SIM and settings as KEY=value lines (ICCID, SLOT, APN,
+#       PDP_TYPE, TTL).
+#
+# Profiles: /data/simpleadmin/sim-profiles/<ICCID>.conf with NAME, APN,
+# PDP_TYPE, TTL (APN or TTL empty: left as they are) and UPDATED. The last
+# SIM seen is kept next to them in .state, so a reboot with the same SIM
+# changes nothing. Progress of the running or last apply, for the web UI:
+# /tmp/sim-profiles.apply (JSON). Log: /tmp/sim-profiles.log.
+#
+# The APN is set as the Cellular Settings page does it (other contexts
+# removed, profile 1 rewritten), then the radio restarts with AT+CFUN=4 and
+# AT+CFUN=1: never AT+CFUN=0, after which this modem loses the SIM until a
+# reboot. The connection watchdog is paused meanwhile. The TTL goes through
+# /persist/ttlvalue and ttl-override, as cgi-bin/set_ttl does.
+set -u
+
+DIR="/data/simpleadmin/sim-profiles"
+STATE_FILE="$DIR/.state"
+STATUS_FILE="/tmp/sim-profiles.apply"
+LOG_FILE="/tmp/sim-profiles.log"
+LOCK_FILE="/tmp/sim-profiles.lock"
+WATCHDOG_PAUSE="/tmp/connection-watchdog.pause"
+TTL_FILE="/persist/ttlvalue"
+TTL_SCRIPT="/opt/scripts/ttl/ttl-override"
+MAX_LOG_LINES=300
+MAX_ATTEMPTS=3
+
+log() {
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG_FILE" 2>/dev/null
+  n="$(wc -l < "$LOG_FILE" 2>/dev/null || echo 0)"
+  if [ "$n" -gt "$MAX_LOG_LINES" ]; then
+    tail -n "$MAX_LOG_LINES" "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"
+  fi
+  logger -t sim-profiles "$1" 2>/dev/null || true
+  echo "$1"
+}
+
+# ---------------------------------------------------------------- AT channel
+
+case "$(readlink -f "$(command -v atcli_smd8 2>/dev/null)" 2>/dev/null)" in
+  *system_bridge) AT_SERIALIZED=1 ;;
+  *) AT_SERIALIZED=0 ;;
+esac
+
+# at_cmd TIMEOUT COMMAND: the answer goes to AT_OUT (no CR); true on OK.
+at_cmd() {
+  if [ "$AT_SERIALIZED" = 1 ]; then
+    AT_OUT="$(atcli_smd8 -t "$1" "$2" 2>/dev/null | tr -d '\r')"
+  else
+    AT_OUT="$(atcli_smd8 "$2" 2>/dev/null | tr -d '\r')"
+  fi
+  printf '%s\n' "$AT_OUT" | grep -qx 'OK'
+}
+
+# ICCID of the active SIM, digits only ("ICCID: 8939...830F"); empty
+# without a readable SIM.
+read_iccid() {
+  at_cmd 10 'AT+ICCID' || return 0
+  printf '%s\n' "$AT_OUT" | sed -n 's/^+\{0,1\}ICCID: *//p' | head -n 1 | tr -cd '0-9'
+}
+
+# Profile 1 of +CGDCONT: CUR_PDP, CUR_APN, and OTHER_CIDS (the rest).
+read_contexts() {
+  CUR_PDP=""
+  CUR_APN=""
+  OTHER_CIDS=""
+  at_cmd 10 'AT+CGDCONT?' || return 1
+  ctx="$(printf '%s\n' "$AT_OUT" | sed -n 's/^+CGDCONT: *\([0-9]*\),"\([^"]*\)","\([^"]*\)".*/\1 \2 \3/p')"
+  CUR_PDP="$(printf '%s\n' "$ctx" | awk '$1 == 1 { print $2; exit }')"
+  CUR_APN="$(printf '%s\n' "$ctx" | awk '$1 == 1 { print $3; exit }')"
+  OTHER_CIDS="$(printf '%s\n' "$ctx" | awk '$1 != 1 && $1 != "" { printf "%s ", $1 }')"
+  return 0
+}
+
+current_ttl() {
+  v="$(grep -o '[0-9]\{1,3\}' "$TTL_FILE" 2>/dev/null | head -n 1)"
+  echo "${v:-0}"
+}
+
+# ---------------------------------------------------------------- files
+
+# kv FILE KEY: value of KEY=value in FILE.
+kv() {
+  sed -n "s/^$2=//p" "$1" 2>/dev/null | head -n 1
+}
+
+state_write() {
+  mkdir -p "$DIR"
+  printf 'ICCID=%s\nSEEN=%s\nATTEMPTS=%s\nDONE=%s\n' "$1" "$2" "$3" "$4" \
+    > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+}
+
+valid_iccid() {
+  case "$1" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ "${#1}" -ge 18 ] && [ "${#1}" -le 22 ]
+}
+
+tail4() {
+  printf '%s' "$1" | sed 's/.*\(....\)$/\1/'
+}
+
+# ---------------------------------------------------------------- status
+
+# Progress for the web UI, rewritten at every step. Every value is written
+# here from validated profile fields or fixed text.
+APPLY_ID=""
+APPLY_TRIGGER="manual"
+APPLY_STARTED=0
+APPLY_STATUS="applying"
+APPLY_ERROR=""
+STEP=0
+S_APN="pending"
+D_APN=""
+S_TTL="pending"
+D_TTL=""
+P_ICCID=""
+P_NAME=""
+
+json_text() {
+  printf '%s' "$1" | sed 's/["\\]//g; s/[^ -~]//g'
+}
+
+write_status() {
+  finished=0
+  [ "$APPLY_STATUS" = "applying" ] || finished="$(date +%s)"
+  err="null"
+  [ -n "$APPLY_ERROR" ] && err="\"$(json_text "$APPLY_ERROR")\""
+  printf '{"id":"%s","status":"%s","iccid":"%s","name":"%s","trigger":"%s","started":%s,"finished":%s,"currentStep":%s,"totalSteps":2,"steps":[{"name":"apn","status":"%s","detail":"%s"},{"name":"ttl","status":"%s","detail":"%s"}],"error":%s}\n' \
+    "$(json_text "$APPLY_ID")" "$APPLY_STATUS" "$P_ICCID" "$(json_text "$P_NAME")" \
+    "$(json_text "$APPLY_TRIGGER")" "$APPLY_STARTED" "$finished" "$STEP" \
+    "$S_APN" "$(json_text "$D_APN")" "$S_TTL" "$(json_text "$D_TTL")" "$err" \
+    > "$STATUS_FILE.tmp" 2>/dev/null && mv "$STATUS_FILE.tmp" "$STATUS_FILE"
+}
+
+# ---------------------------------------------------------------- steps
+
+# Pauses the connection watchdog for as long as this process lives.
+pause_watchdog() {
+  echo "$$" > "$WATCHDOG_PAUSE" 2>/dev/null
+}
+
+resume_watchdog() {
+  if [ "$(cat "$WATCHDOG_PAUSE" 2>/dev/null)" = "$$" ]; then
+    rm -f "$WATCHDOG_PAUSE"
+  fi
+}
+
+# AT+CFUN=1, retried for about half a minute: an apply never leaves the
+# radio off on purpose.
+radio_on() {
+  tries=0
+  while [ "$tries" -lt 6 ]; do
+    at_cmd 30 'AT+CFUN=1' && return 0
+    tries=$((tries + 1))
+    sleep 5
+  done
+  return 1
+}
+
+step_apn() {
+  STEP=1
+  S_APN="running"
+  D_APN="Reading the APN profiles"
+  write_status
+  if [ -z "$P_APN" ]; then
+    S_APN="skipped"
+    D_APN="Not set in this profile"
+    return
+  fi
+  if ! read_contexts; then
+    S_APN="failed"
+    D_APN="AT+CGDCONT? refused"
+    return
+  fi
+  want_apn="$(printf '%s' "$P_APN" | tr 'A-Z' 'a-z')"
+  have_apn="$(printf '%s' "$CUR_APN" | tr 'A-Z' 'a-z')"
+  if [ "$want_apn" = "$have_apn" ] && [ "$P_PDP" = "$CUR_PDP" ]; then
+    S_APN="skipped"
+    D_APN="Unchanged: $P_APN ($P_PDP)"
+    return
+  fi
+  D_APN="Setting $P_APN ($P_PDP), the radio restarts"
+  write_status
+  pause_watchdog
+  for cid in $OTHER_CIDS; do
+    if ! at_cmd 10 "AT+CGDCONT=$cid"; then
+      S_APN="failed"
+      D_APN="Unable to remove APN profile $cid"
+      resume_watchdog
+      return
+    fi
+  done
+  if ! at_cmd 10 "AT+CGDCONT=1,\"$P_PDP\",\"$P_APN\""; then
+    S_APN="failed"
+    D_APN="AT+CGDCONT=1 refused"
+    resume_watchdog
+    return
+  fi
+  if ! at_cmd 30 'AT+CFUN=4'; then
+    # No OK does not prove the radio stayed on.
+    S_APN="failed"
+    if radio_on; then
+      D_APN="APN set, but AT+CFUN=4 refused: restart the radio to use it"
+    else
+      D_APN="APN set, AT+CFUN=4 not confirmed and AT+CFUN=1 refused for 30 s: the radio may be off"
+      log "AT+CFUN=1 refused for 30 s after an unconfirmed AT+CFUN=4: the radio may be off"
+    fi
+    resume_watchdog
+    return
+  fi
+  sleep 3
+  if ! radio_on; then
+    S_APN="failed"
+    D_APN="APN set, but the radio stays off: AT+CFUN=1 refused for 30 s"
+    log "AT+CFUN=1 refused for 30 s after the APN change: the radio is off"
+    resume_watchdog
+    return
+  fi
+  # Leave the watchdog paused while the data call comes back up.
+  sleep 15
+  resume_watchdog
+  S_APN="done"
+  D_APN="$P_APN ($P_PDP), radio restarted"
+  if [ -n "$CUR_APN" ]; then
+    D_APN="$D_APN, was $CUR_APN"
+  fi
+}
+
+step_ttl() {
+  STEP=2
+  S_TTL="running"
+  D_TTL="Checking TTL/HL"
+  write_status
+  if [ -z "$P_TTL" ]; then
+    S_TTL="skipped"
+    D_TTL="Not set in this profile"
+    return
+  fi
+  have="$(current_ttl)"
+  if [ "$have" = "$P_TTL" ]; then
+    S_TTL="skipped"
+    if [ "$P_TTL" = 0 ]; then D_TTL="Unchanged: off"; else D_TTL="Unchanged: $P_TTL"; fi
+    return
+  fi
+  if [ ! -x "$TTL_SCRIPT" ]; then
+    S_TTL="failed"
+    D_TTL="$TTL_SCRIPT is missing"
+    return
+  fi
+  "$TTL_SCRIPT" stop >/dev/null 2>&1
+  if ! echo "$P_TTL" > "$TTL_FILE"; then
+    S_TTL="failed"
+    D_TTL="Unable to write $TTL_FILE"
+    "$TTL_SCRIPT" start >/dev/null 2>&1
+    return
+  fi
+  "$TTL_SCRIPT" start >/dev/null 2>&1
+  S_TTL="done"
+  if [ "$P_TTL" = 0 ]; then D_TTL="TTL/HL override off"; else D_TTL="TTL/HL set to $P_TTL"; fi
+  [ "$have" = 0 ] || D_TTL="$D_TTL, was $have"
+}
+
+# load_profile ICCID: P_* from <ICCID>.conf; false when there is none.
+load_profile() {
+  f="$DIR/$1.conf"
+  [ -f "$f" ] || return 1
+  P_ICCID="$1"
+  P_NAME="$(kv "$f" NAME)"
+  P_APN="$(kv "$f" APN)"
+  P_PDP="$(kv "$f" PDP_TYPE)"
+  P_TTL="$(kv "$f" TTL)"
+  # Only what the web UI can write gets through.
+  printf '%s' "$P_APN" | grep -qE '^[A-Za-z0-9._-]{0,63}$' || P_APN=""
+  case "$P_PDP" in IP|IPV6|IPV4V6) ;; *) P_PDP="IPV4V6" ;; esac
+  case "$P_TTL" in
+    ''|*[!0-9]*) P_TTL="" ;;
+    *) [ "$P_TTL" -le 255 ] || P_TTL="" ;;
+  esac
+  return 0
+}
+
+# apply ICCID TRIGGER ID: runs both steps and leaves the outcome in
+# STATUS_FILE; returns 0 when nothing failed.
+apply_profile() {
+  APPLY_TRIGGER="$2"
+  APPLY_ID="${3:-$(date +%s)-$$}"
+  APPLY_STARTED="$(date +%s)"
+  APPLY_STATUS="applying"
+  APPLY_ERROR=""
+  STEP=0
+  S_APN="pending"; D_APN=""
+  S_TTL="pending"; D_TTL=""
+  P_ICCID="$1"; P_NAME=""
+  if ! load_profile "$1"; then
+    APPLY_STATUS="failed"
+    APPLY_ERROR="No profile for SIM ...$(tail4 "$1")"
+    write_status
+    return 1
+  fi
+  write_status
+  log "Applying profile '$P_NAME' to SIM ...$(tail4 "$1") ($2)"
+  step_apn
+  write_status
+  step_ttl
+  failed=0
+  changed=0
+  for s in "$S_APN" "$S_TTL"; do
+    [ "$s" = "failed" ] && failed=$((failed + 1))
+    [ "$s" = "done" ] && changed=$((changed + 1))
+  done
+  if [ "$failed" = 0 ]; then
+    APPLY_STATUS="complete"
+  elif [ "$changed" -gt 0 ]; then
+    APPLY_STATUS="partial"
+    APPLY_ERROR="Some settings were not applied: see the steps"
+  else
+    APPLY_STATUS="failed"
+    APPLY_ERROR="The profile was not applied"
+  fi
+  write_status
+  log "Profile '$P_NAME': $APPLY_STATUS (APN: $S_APN, $D_APN; TTL: $S_TTL, $D_TTL)"
+  [ "$failed" = 0 ]
+}
+
+# True when the modem already runs the profile of ICCID.
+profile_holds() {
+  load_profile "$1" || return 1
+  if [ -n "$P_APN" ]; then
+    read_contexts || return 1
+    [ "$(printf '%s' "$P_APN" | tr 'A-Z' 'a-z')" = "$(printf '%s' "$CUR_APN" | tr 'A-Z' 'a-z')" ] || return 1
+    [ "$P_PDP" = "$CUR_PDP" ] || return 1
+  fi
+  if [ -n "$P_TTL" ]; then
+    [ "$(current_ttl)" = "$P_TTL" ] || return 1
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------- lock
+
+# take_lock WAIT: one run at a time; WAIT seconds at most (0: no wait).
+take_lock() {
+  exec 9> "$LOCK_FILE"
+  waited=0
+  while ! flock -n 9; do
+    [ "$waited" -lt "$1" ] || return 1
+    sleep 1
+    waited=$((waited + 1))
+  done
+  return 0
+}
+
+# ---------------------------------------------------------------- commands
+
+cmd_check() {
+  now_mode=0
+  trigger="sim_change"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --now) now_mode=1 ;;
+      --trigger) shift; trigger="${1:-sim_change}" ;;
+    esac
+    shift
+  done
+  if [ "$now_mode" = 1 ]; then
+    take_lock 120 || { log "Another run holds $LOCK_FILE: check skipped"; return 0; }
+  else
+    take_lock 0 || return 0
+  fi
+
+  iccid="$(read_iccid)"
+  valid_iccid "$iccid" || return 0
+  last="$(kv "$STATE_FILE" ICCID)"
+  attempts="$(kv "$STATE_FILE" ATTEMPTS)"
+  done_flag="$(kv "$STATE_FILE" DONE)"
+  case "$attempts" in ''|*[!0-9]*) attempts=0 ;; esac
+
+  if [ "$iccid" != "$last" ]; then
+    if [ -n "$last" ]; then
+      log "Active SIM changed: ...$(tail4 "$last") to ...$(tail4 "$iccid")"
+    else
+      log "Active SIM: ...$(tail4 "$iccid")"
+    fi
+    attempts=0
+    done_flag=0
+    state_write "$iccid" "$(date +%s)" 0 0
+    # Give the new SIM one check interval to settle, unless asked not to.
+    [ "$now_mode" = 1 ] || return 0
+  fi
+  [ "$done_flag" = 1 ] && return 0
+
+  if [ ! -f "$DIR/$iccid.conf" ]; then
+    log "No profile for SIM ...$(tail4 "$iccid"): settings left as they are"
+    state_write "$iccid" "$(date +%s)" "$attempts" 1
+    return 0
+  fi
+  if [ "$attempts" -gt 0 ] && profile_holds "$iccid"; then
+    state_write "$iccid" "$(date +%s)" "$attempts" 1
+    return 0
+  fi
+  if [ "$attempts" -ge "$MAX_ATTEMPTS" ]; then
+    log "Profile for SIM ...$(tail4 "$iccid") not kept by the modem after $attempts attempts: giving up until the next SIM change"
+    state_write "$iccid" "$(date +%s)" "$attempts" 1
+    return 0
+  fi
+  attempts=$((attempts + 1))
+  state_write "$iccid" "$(date +%s)" "$attempts" 0
+  apply_profile "$iccid" "$trigger"
+  return 0
+}
+
+cmd_apply() {
+  valid_iccid "${1:-}" || { echo "usage: sim-profiles apply ICCID [ID [--locked]]" >&2; return 2; }
+  # With --locked the CGI holds the lock on fd 9 for this run: re-locking the
+  # inherited descriptor succeeds at once, and without it the lock is taken
+  # here as usual.
+  if { [ "${3:-}" != "--locked" ] || ! flock -n 9 2>/dev/null; } && ! take_lock 60; then
+    APPLY_ID="${2:-}"
+    P_ICCID="$1"
+    APPLY_STARTED="$(date +%s)"
+    APPLY_STATUS="failed"
+    APPLY_ERROR="Another profile apply is still running"
+    write_status
+    echo "busy" >&2
+    return 3
+  fi
+  apply_profile "$1" manual "${2:-}"
+  rc=$?
+  # A successful manual apply counts as the profile of the active SIM; a
+  # failed one leaves the automatic retries as they were.
+  if [ "$rc" = 0 ] && [ "$(kv "$STATE_FILE" ICCID)" = "$1" ]; then
+    state_write "$1" "$(date +%s)" 0 1
+  fi
+  return "$rc"
+}
+
+cmd_current() {
+  slot=""
+  if at_cmd 10 'AT^SWITCH_SLOT?'; then
+    slot="$(printf '%s\n' "$AT_OUT" | sed -n 's/^SIM\([12]\) ENABLE.*/\1/p' | head -n 1)"
+  fi
+  read_contexts
+  echo "ICCID=$(read_iccid)"
+  echo "SLOT=$slot"
+  echo "APN=$(printf '%s' "$CUR_APN" | tr -cd 'A-Za-z0-9._-')"
+  echo "PDP_TYPE=$(printf '%s' "$CUR_PDP" | tr -cd 'A-Z0-9')"
+  echo "TTL=$(current_ttl)"
+}
+
+mkdir -p "$DIR" 2>/dev/null
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
+  check) cmd_check "$@" ;;
+  apply) cmd_apply "$@" ;;
+  current) cmd_current ;;
+  *)
+    echo "usage: sim-profiles check [--now] [--trigger NAME] | apply ICCID [ID [--locked]] | current" >&2
+    exit 2
+    ;;
+esac

@@ -174,10 +174,10 @@ if [ "$SA_ONLY_WWW" = 0 ]; then
       warn "📡 $sb is missing: run deploy/$d/build.sh"
     fi
   done
-  for t in curl jq modem-config ttl crontab watchdog euicc persistent-mac dhcp-guard; do
+  for t in curl jq modem-config ttl crontab watchdog sim-profiles euicc persistent-mac dhcp-guard; do
     [ -d "$STAGE/$t" ] || die "module deploy/$t is missing"
   done
-  ok "🧩 modules: curl jq modem-config ttl crontab watchdog euicc persistent-mac dhcp-guard"
+  ok "🧩 modules: curl jq modem-config ttl crontab watchdog sim-profiles euicc persistent-mac dhcp-guard"
 fi
 [ -n "$SA_LOGIN" ] && ok "🔐 login will be set to $SA_LOGIN" || info "🔐 login setting kept"
 [ "$SA_ONLY_WWW" = 1 ] || { [ -n "$SA_ESIM" ] && ok "📶 eSIM will be set to $SA_ESIM" || info "📶 eSIM setting kept"; }

@@ -242,8 +242,9 @@ In this order; each step reports `unchanged` when there is nothing to do.
    once to check it works.
 4. **System scripts and units**: `ttl-override`, `connection-watchdog` (its
    configuration `/opt/scripts/Watchdog` only the first time, its state in
-   `/data/simpleadmin/watchdog`), the crontab init script, `dhcp-guard` and
-   the systemd units in `/lib/systemd/system`.
+   `/data/simpleadmin/watchdog`), `sim-profiles` (profiles in
+   `/data/simpleadmin/sim-profiles`), the crontab init script, `dhcp-guard`
+   and the systemd units in `/lib/systemd/system`.
 5. **Persistent MAC**: udev rule and script for `eth0`, `/sbin/ifconfig`
    wrapper for `bridge0` (the firmware's `ifconfig` kept as
    `/sbin/ifconfig.real`); applies at the next reboot.
@@ -254,8 +255,9 @@ In this order; each step reports `unchanged` when there is nothing to do.
    the serialized AT client (the firmware's is kept as
    `/usr/bin/atcli_smd8.real` and put back if the new one does not answer).
 8. **Services**: `crontab`, `dhcp-guard.timer` (run once right away),
-   `ttl-override` (re-applies `/persist/ttlvalue`), `connection-watchdog` and
-   `euicc` enabled or disabled as their configuration says.
+   `sim-profiles.timer`, `ttl-override` (re-applies `/persist/ttlvalue`),
+   `connection-watchdog` and `euicc` enabled or disabled as their
+   configuration says.
 9. **Summary**: state of every unit and free space on `/` and `/data`.
 
 ### Manual install (web UI only)
@@ -285,6 +287,7 @@ deploy/
   www-alpine/            classic Alpine.js front-end
   diag_bridge/  system_bridge/  curl/  jq/
   ttl/  crontab/  watchdog/  euicc/  persistent-mac/  modem-config/
+  sim-profiles/          applies the APN and TTL of the active SIM's profile
   dhcp-guard/            keeps stale passthrough leases out of the LAN DHCP
   ra-guard/              deprecates old IPv6 prefixes and routers on the LAN
   tailscale/             not pushed: the UI downloads it from GitHub
@@ -306,6 +309,7 @@ installs are removed.
 | `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled); system_bridge's data counter in `/data/simpleadmin/data_usage` |
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`, watchdog state in `/data/simpleadmin/watchdog` (see "Connection watchdog" below and `docs/Enable_New_feature.md`) |
+| SIM profiles | `deploy/sim-profiles/` (`scripts/sim-profiles`, `systemd/sim-profiles.{service,timer}`) | `/opt/scripts/sim-profiles/sim-profiles`, run every 30 s by `sim-profiles.timer`; profiles in `/data/simpleadmin/sim-profiles` (see "SIM profiles" below) |
 | DHCP guard | `deploy/dhcp-guard/` | `/opt/scripts/dhcp-guard/dhcp-guard`, run every minute by `dhcp-guard.timer` (see below) |
 | IPv6 RA guard | `deploy/ra-guard/` (`src/`, `build.sh`, `bin/ra-guard`, `systemd/ra-guard.service`, `udev/99-bridge-no-snooping.rules`) | `/data/simpleadmin/bin/ra-guard` linked from `/usr/bin/ra-guard`, state in `/data/simpleadmin/ra-guard.state`, `ra-guard.service` (enabled), `/etc/udev/rules.d/99-bridge-no-snooping.rules` (see below) |
 | `modem_config` | `deploy/modem-config/scripts/modem_config` | `/data/simpleadmin/bin/modem_config`, linked from `/usr/bin` and `/usr/sbin`: run `modem_config` from an SSH console |
@@ -337,6 +341,7 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 | Antenna Alignment | live RSRP/SINR of the serving cells, three slots (angles of a directional antenna or positions of an omni one) each averaging five one-second samples, a recommendation scored on RSRP and SINR, and what each receive chain sees live; slots are kept in the browser | WebSockets |
 | Frequency Calculator | EARFCN or NR-ARFCN to frequency and bands (DL/UL channel, band edges, duplex spacing), and a frequency to its channel numbers; the serving carriers as quick picks and with their centre frequencies, a history kept in the browser | computed in the browser; WebSockets for the serving carriers |
 | Cellular Settings | network mode, 5G NSA/SA, SIM slot, APN | `^SLMODE`, `^NR5G_MODE`, `^SWITCH_SLOT`, `+CGDCONT` |
+| SIM Profiles | APN and TTL per SIM (ICCID), the active SIM, last apply, apply with progress | `sim_profiles` |
 | Band Locking / Cell Locking | LTE, NSA, SA bands; LTE and 5G SA cell locks | `^BAND_PREF_EXT`, `^LTE_LOCK`, `^NR5G_LOCK` |
 | SMS Center | inbox, send, delete | `+CMGL`, `send_sms` |
 | eSIM | profiles, download (QR), notifications | euicc-client API |
@@ -499,6 +504,41 @@ time, and disabled tiers are skipped.
 | `/data/simpleadmin/watchdog/recoveries` | `<epoch> <tier>` per action, for the rate limits |
 | `/data/simpleadmin/watchdog/sim-failover` | original and backup slot while on the other SIM |
 | `/data/simpleadmin/watchdog/sim-unusable` | slot that showed no SIM, and when |
+
+## 🪪 SIM profiles
+
+A profile holds the APN of the data connection (with its PDP type) and the
+TTL/HL override for one SIM, keyed by its ICCID. Profiles are edited on the
+*SIM Profiles* page (Cellular) and kept in
+`/data/simpleadmin/sim-profiles/<ICCID>.conf` (`NAME`, `APN`, `PDP_TYPE`,
+`TTL`; an empty `APN` or `TTL` leaves that setting alone).
+
+`sim-profiles.timer` runs `/opt/scripts/sim-profiles/sim-profiles check`
+every 30 seconds: it reads the ICCID (`AT+ICCID`) and, when it differs from
+the last one seen (`.state` next to the profiles, so a reboot with the same
+SIM changes nothing), applies the matching profile at the next check, once
+the new SIM has settled. A profile the modem does not keep is applied again,
+up to three times. The connection watchdog runs `sim-profiles check --now`
+right after its own SIM switches (tier 3 and the way back), so the backup
+SIM gets its APN before the watchdog judges it. A timer was chosen over a
+hook in an existing daemon: system_bridge only polls while a browser is
+connected and is a binary built elsewhere, the watchdog can be disabled,
+and a oneshot every 30 s (like `dhcp-guard.timer`) adds no resident process
+and one AT query.
+
+Applying a profile, from the timer or with *Apply* (`cgi-bin/sim_profiles`,
+progress in `/tmp/sim-profiles.apply`, log in `/tmp/sim-profiles.log`):
+
+1. **APN**: skipped when profile 1 of `AT+CGDCONT?` already matches;
+   otherwise the other contexts are removed and profile 1 rewritten, as the
+   Cellular Settings page does (`AT+CGDCONT=<cid>`,
+   `AT+CGDCONT=1,"<type>","<apn>"`), then the radio restarts with
+   `AT+CFUN=4` and `AT+CFUN=1` (never `AT+CFUN=0`, after which this modem
+   loses the SIM until a reboot). The watchdog is paused meanwhile
+   (`/tmp/connection-watchdog.pause`).
+2. **TTL/HL**: skipped when `/persist/ttlvalue` already holds it; otherwise
+   `ttl-override stop`, the new value, `ttl-override start`, as
+   `cgi-bin/set_ttl` does.
 
 ## 🛡 DHCP guard
 

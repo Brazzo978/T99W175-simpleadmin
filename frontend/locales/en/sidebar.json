@@ -14,6 +14,7 @@
     "sms_center": "SMS Center",
     "sms_forwarding": "SMS Forwarding",
     "custom_profiles": "Custom Profiles",
+    "sim_profiles": "SIM Profiles",
     "connection_scenarios": "Connection Scenarios",
     "band_locking": "Band Locking",
     "tower_locking": "Tower Locking",

@@ -41,6 +41,7 @@ const TRAILS: Record<string, Trail> = {
     ],
   },
   '/cellular/settings': { ...CELLULAR, items: [{ key: 'items.settings', href: '/cellular/settings' }] },
+  '/cellular/sim-profiles': { ...CELLULAR, items: [{ key: 'items.sim_profiles', href: '/cellular/sim-profiles' }] },
   '/cellular/band-locking': { ...CELLULAR, items: [{ key: 'items.band_locking', href: '/cellular/band-locking' }] },
   '/cellular/cell-locking': {
     ...CELLULAR,

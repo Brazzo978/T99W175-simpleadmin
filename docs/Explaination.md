@@ -135,6 +135,7 @@ Services installed by `install.sh`:
 - `reboot_schedule`: scheduled reboot in `/persist/cron/root` (run by `crontab.service`).
 - `connection_watchdog`: reads and writes `/opt/scripts/Watchdog` and enables or disables `connection-watchdog.service` accordingly.
 - `get_watchdog_log`: tail of `/tmp/connection-watchdog.log`.
+- `sim_profiles`: per-SIM profiles (APN, PDP type, TTL) in `/data/simpleadmin/sim-profiles`, the active SIM and its settings; save, delete, and apply in the background through `/opt/scripts/sim-profiles/sim-profiles` (progress with `?status=1`).
 - `watchdog_events`: recent recovery actions (`/tmp/connection-watchdog.events`), the daemon's live state, the rate-limit counters and the SIM failover record (`/data/simpleadmin/watchdog`).
 - `esim_config` / `toggle_esim`: eSIM page switch (`SIMPLEADMIN_ENABLE_ESIM`) and the `euicc` service.
 - `get_esim_server_config` / `esim_server_config`: the eSIM LPA server configuration in `/home/root/client.yaml`.

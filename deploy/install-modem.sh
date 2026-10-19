@@ -20,8 +20,10 @@
 #   /data/simpleadmin/{bin,lib}      diag_bridge, system_bridge, ra-guard, curl, jq, modem_config (UBIFS
 #                                    usrfs, the root filesystem has only a few
 #                                    MB free), reached through /usr/bin
-#   /opt/scripts, /etc/init.d        TTL, watchdog and crontab scripts
+#   /opt/scripts, /etc/init.d        TTL, watchdog, SIM profiles and crontab
+#                                    scripts
 #   /data/simpleadmin/watchdog       watchdog rate limits, SIM failover state
+#   /data/simpleadmin/sim-profiles   per-SIM profiles (APN, TTL) by ICCID
 #   /lib/systemd/system              units, enabled through /etc/systemd
 #   /etc/udev, /sbin/ifconfig        persistent eth0/bridge0 MAC
 #                                    (deploy/persistent-mac/README.md)
@@ -399,6 +401,12 @@ mkdir -p /opt/scripts/dhcp-guard
 install_file "$SRC/dhcp-guard/scripts/dhcp-guard" 755 /opt/scripts/dhcp-guard/dhcp-guard
 install_file "$SRC/dhcp-guard/systemd/dhcp-guard.service" 644 "$UNIT_DIR/dhcp-guard.service"
 install_file "$SRC/dhcp-guard/systemd/dhcp-guard.timer" 644 "$UNIT_DIR/dhcp-guard.timer"
+# Per-SIM profiles (APN, TTL), applied when the active SIM changes; the
+# profiles the UI saves stay in /data/simpleadmin/sim-profiles.
+mkdir -p /opt/scripts/sim-profiles "$BASE/sim-profiles"
+install_file "$SRC/sim-profiles/scripts/sim-profiles" 755 /opt/scripts/sim-profiles/sim-profiles
+install_file "$SRC/sim-profiles/systemd/sim-profiles.service" 644 "$UNIT_DIR/sim-profiles.service"
+install_file "$SRC/sim-profiles/systemd/sim-profiles.timer" 644 "$UNIT_DIR/sim-profiles.timer"
 
 # ---------------------------------------------------------------- MAC
 # eth0 and bridge0 get <EarlyEthMACAddr> instead of a random MAC per boot:
@@ -526,6 +534,10 @@ restart crontab
 /opt/scripts/dhcp-guard/dhcp-guard | sed 's/^/  /' || warn "dhcp-guard failed"
 unit_state dhcp-guard.timer on
 restart dhcp-guard.timer
+# Every 30 s: a new ICCID gets its profile (sim-profiles check).
+unit_state sim-profiles.timer on
+restart sim-profiles.timer
+info "🪪 $(ls "$BASE/sim-profiles" 2>/dev/null | grep -c '\.conf$') SIM profile(s) in $BASE/sim-profiles"
 unit_state ttl-override on
 # Oneshot: re-applies the TTL rules from /persist/ttlvalue.
 ttl="$(cat /persist/ttlvalue 2>/dev/null || echo 0)"
@@ -565,7 +577,7 @@ section "📋 Summary"
 # Flush to flash: the files are on disk before we say so, and UBIFS reports
 # the real free space only after write-back.
 sync
-for u in qcmap_httpd crontab dhcp-guard.timer ttl-override connection-watchdog euicc diag_bridge system_bridge ra-guard; do
+for u in qcmap_httpd crontab dhcp-guard.timer sim-profiles.timer ttl-override connection-watchdog euicc diag_bridge system_bridge ra-guard; do
   en="$(systemctl is-enabled "$u" 2>/dev/null || true)"
   say "  $(printf '%-22s' "$u") $(printf '%-9s' "${en:--}") $(systemctl is-active "$u" 2>/dev/null || true)"
 done

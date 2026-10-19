@@ -1,0 +1,6 @@
+[Unit]
+Description=Apply the SIM profile (APN, TTL) of the active SIM when it changes
+
+[Service]
+Type=oneshot
+ExecStart=/opt/scripts/sim-profiles/sim-profiles check

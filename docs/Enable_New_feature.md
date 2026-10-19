@@ -35,6 +35,9 @@ Together with the web UI and the binaries, it copies the files over SSH
   `ttl-override` (re-applies `/persist/ttlvalue`)
 * enables and starts `connection-watchdog` only when `WD_ENABLED=1`, as the
   UI does
+* installs `/opt/scripts/sim-profiles/sim-profiles` with
+  `sim-profiles.timer` (every 30 s, applies the APN and TTL profile of a
+  newly active SIM; profiles in `/data/simpleadmin/sim-profiles`)
 * enables and starts `euicc` only when `SIMPLEADMIN_ENABLE_ESIM=1` **and**
   `/home/root/euicc-sd-client` exists; otherwise it leaves it off
 

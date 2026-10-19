@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   ActivityIcon,
+  CardSimIcon,
   CogIcon,
   CreditCardIcon,
   GlobeIcon,
@@ -55,6 +56,7 @@ const navigation: { groupKey: string; items: NavItem[] }[] = [
         ],
       },
       { t_key: "settings", url: "/cellular/settings", icon: Settings2Icon },
+      { t_key: "sim_profiles", url: "/cellular/sim-profiles", icon: CardSimIcon },
       {
         t_key: "band_locking",
         url: "/cellular/band-locking",

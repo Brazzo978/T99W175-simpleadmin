@@ -14,6 +14,7 @@
     "sms_center": "SMS",
     "sms_forwarding": "Inoltro SMS",
     "custom_profiles": "Profili personalizzati",
+    "sim_profiles": "Profili SIM",
     "connection_scenarios": "Scenari di connessione",
     "band_locking": "Blocco bande",
     "tower_locking": "Blocco BTS",
