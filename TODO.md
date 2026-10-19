@@ -32,8 +32,10 @@ building with it have finished.
       (24 h chart in Connection Monitoring)
 - [x] Captive-portal probe (`SIMPLEADMIN_HTTP_PROBE`, "Carrier Limited")
 - [x] Merged on `Beta`
-- [ ] Background pings every 60 s instead of 10 s while no page is open
-      (10 s costs about 3 MB of mobile data a day on the backup line)
+- [ ] Decide: background pings every 10 s while no page is open cost about
+      3 MB of mobile data a day (90 MB a month on the backup SIM); every
+      60 s would be about 0.5 MB, but the 24 h history then has 1-minute
+      resolution (bridge and store rework)
 - [ ] Verify on the modem: data session age after a data reconnect, the
       history on connect, the probe with `http://google.com/` (portal) and
       back to the default
