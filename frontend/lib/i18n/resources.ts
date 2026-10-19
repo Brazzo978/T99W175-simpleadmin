@@ -12,6 +12,9 @@ import enSms from "@/locales/en/sms.json";
 import enEsim from "@/locales/en/esim.json";
 import enNetwork from "@/locales/en/network.json";
 import enSystemSettings from "@/locales/en/system-settings.json";
+import enCredentials from "@/locales/en/credentials.json";
+import enTailscale from "@/locales/en/tailscale.json";
+import enTerminal from "@/locales/en/terminal.json";
 import enAbout from "@/locales/en/about.json";
 import itCommon from "@/locales/it/common.json";
 import itSidebar from "@/locales/it/sidebar.json";
@@ -27,6 +30,9 @@ import itSms from "@/locales/it/sms.json";
 import itEsim from "@/locales/it/esim.json";
 import itNetwork from "@/locales/it/network.json";
 import itSystemSettings from "@/locales/it/system-settings.json";
+import itCredentials from "@/locales/it/credentials.json";
+import itTailscale from "@/locales/it/tailscale.json";
+import itTerminal from "@/locales/it/terminal.json";
 import itAbout from "@/locales/it/about.json";
 
 // Static resources for i18next. Every bundled language declares every
@@ -49,6 +55,9 @@ export const resources = {
     esim: enEsim,
     network: enNetwork,
     "system-settings": enSystemSettings,
+    credentials: enCredentials,
+    tailscale: enTailscale,
+    terminal: enTerminal,
     about: enAbout,
   },
   it: {
@@ -66,6 +75,9 @@ export const resources = {
     esim: itEsim,
     network: itNetwork,
     "system-settings": itSystemSettings,
+    credentials: itCredentials,
+    tailscale: itTailscale,
+    terminal: itTerminal,
     about: itAbout,
   },
 } as const;
@@ -86,5 +98,8 @@ export const ALL_NAMESPACES = [
   "esim",
   "network",
   "system-settings",
+  "credentials",
+  "tailscale",
+  "terminal",
   "about",
 ] as const;

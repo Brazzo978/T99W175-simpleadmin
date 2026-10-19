@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Tailscale VPN",
+    "description": "Raggiungi questo modem e la sua LAN dalla tua tailnet, senza aprire porte sulla rete mobile."
+  },
+  "status": {
+    "title": "Stato",
+    "checking": "Verifica in corso…",
+    "not_installed": "Non installato",
+    "online": "Online",
+    "offline": "Offline",
+    "no_output": "Nessun output di stato."
+  },
+  "actions": {
+    "refresh": "Ricarica",
+    "start": "Avvia",
+    "stop": "Ferma",
+    "update": "Aggiorna",
+    "remove": "Rimuovi",
+    "log_in": "Accedi",
+    "install": "Installa"
+  },
+  "login": {
+    "title_installed": "Accedi",
+    "title_install": "Installa",
+    "description_installed": "Accedi di nuovo con una nuova chiave di autenticazione dalla console di amministrazione di Tailscale.",
+    "description_install": "Scarica Tailscale sul modem ed esegue l'accesso con una chiave di autenticazione dalla console di amministrazione di Tailscale.",
+    "auth_key": "Chiave di autenticazione"
+  },
+  "remove_dialog": {
+    "title": "Rimuovere Tailscale?",
+    "description": "Tailscale viene disinstallato dal modem. Se sei connesso tramite Tailscale, perdi l'accesso a questa pagina.",
+    "confirm": "Rimuovi"
+  },
+  "toast": {
+    "started": "Tailscale avviato",
+    "stopped": "Tailscale fermato",
+    "updated": "Tailscale aggiornato",
+    "logged_in": "Accesso eseguito",
+    "installed": "Tailscale installato",
+    "removed": "Tailscale rimosso",
+    "status_failed": "Impossibile leggere lo stato di Tailscale",
+    "action_failed": "{{action}} non riuscito",
+    "request_failed": "Richiesta non riuscita ({{status}})"
+  }
+}

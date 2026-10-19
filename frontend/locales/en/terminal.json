@@ -1,0 +1,73 @@
+{
+  "page": {
+    "title": "AT Terminal",
+    "description": "Sends commands to the modem as typed. Admin accounts only; each command waits for the other AT clients."
+  },
+  "card": {
+    "title": "AT Terminal",
+    "clear": "Clear",
+    "export": "Export",
+    "empty": "No commands yet. Type an AT command below.",
+    "send": "Send"
+  },
+  "warning": {
+    "title": "Warning",
+    "send_anyway": "Send Anyway",
+    "radio_off": "This turns the radio off: over Tailscale or the mobile network you lose access to this page."
+  },
+  "blocked": {
+    "imei": "Change the IMEI from the System page."
+  },
+  "history": {
+    "command_failed": "Command failed",
+    "network_error": "Network error — could not reach modem backend",
+    "unexpected_error": "Unexpected error — check backend logs"
+  },
+  "commands": {
+    "trigger": "Commands",
+    "search": "Search commands...",
+    "empty": "No commands found.",
+    "group_default": "Default",
+    "group_custom": "Custom",
+    "count_one": "{{count}} command",
+    "count_other": "{{count}} commands",
+    "manage": "Manage Commands"
+  },
+  "manage": {
+    "title": "Manage Custom Commands",
+    "description": "Add and remove custom AT command presets.",
+    "empty": "No custom commands yet.",
+    "delete_aria": "Delete {{label}}",
+    "name_placeholder": "Command name",
+    "name_aria": "Command name",
+    "command_aria": "AT command",
+    "add": "Add",
+    "errors": {
+      "required": "Both fields are required.",
+      "prefix": "Command must start with \"AT\".",
+      "duplicate_command": "This command already exists.",
+      "duplicate_label": "A command with this label already exists."
+    }
+  },
+  "presets": {
+    "identity": "Modem identity",
+    "imei": "IMEI",
+    "imsi": "IMSI",
+    "iccid": "ICCID",
+    "sim_status": "SIM status",
+    "sim_slot": "Active SIM slot",
+    "operator": "Operator",
+    "signal_quality": "Signal quality",
+    "carrier_aggregation": "Carrier aggregation",
+    "network_mode": "Network mode",
+    "nr5g_mode": "5G mode (NSA/SA)",
+    "band_preferences": "Band preferences",
+    "lte_lock": "LTE cell lock",
+    "nr5g_lock": "5G cell lock",
+    "apn_profiles": "APN profiles",
+    "data_connection": "Data connection",
+    "radio_off": "Radio off",
+    "radio_on": "Radio on",
+    "reboot": "Reboot"
+  }
+}

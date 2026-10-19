@@ -8,6 +8,7 @@ import {
   useMemo,
   type FormEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
   TerminalIcon,
   TriangleAlertIcon,
@@ -33,12 +34,16 @@ interface HistoryEntry {
   id: string;
   command: string;
   response: string;
+  /** Key of `response` in the "terminal" namespace when the text is ours
+   *  and not the modem's: shown in the current language */
+  responseKey?: string;
   status: "success" | "error" | "blocked";
   timestamp: number;
 }
 
 interface Warning {
-  message: string;
+  /** Key in the "terminal" namespace */
+  messageKey: string;
   command: string;
 }
 
@@ -49,15 +54,14 @@ interface Warning {
 const BLOCKED_COMMANDS = [
   {
     pattern: /\^NV\s*=\s*550\b/i,
-    message: "Change the IMEI from the System page.",
+    messageKey: "blocked.imei",
   },
 ];
 
 const WARNING_COMMANDS = [
   {
     pattern: /CFUN\s*=\s*[04]\b/i,
-    message:
-      "This turns the radio off: over Tailscale or the mobile network you lose access to this page.",
+    messageKey: "warning.radio_off",
   },
 ];
 
@@ -103,12 +107,15 @@ function saveHistory(entries: HistoryEntry[]): void {
   }
 }
 
-function formatExport(entries: HistoryEntry[]): string {
+function formatExport(
+  entries: HistoryEntry[],
+  responseText: (entry: HistoryEntry) => string,
+): string {
   return entries
     .map((e) => {
       const date = new Date(e.timestamp);
       const ts = date.toISOString().replace("T", " ").slice(0, 19);
-      return `[${ts}] ❯ ${e.command}\n${e.response}`;
+      return `[${ts}] ❯ ${e.command}\n${responseText(e)}`;
     })
     .join("\n\n");
 }
@@ -116,6 +123,7 @@ function formatExport(entries: HistoryEntry[]): string {
 // --- Component ---
 
 export default function ATTerminalCard() {
+  const { t } = useTranslation("terminal");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -169,6 +177,12 @@ export default function ATTerminalCard() {
     [],
   );
 
+  /** One of our own texts as a history response. */
+  const ownResponse = useCallback(
+    (key: string) => ({ response: t(key), responseKey: key }),
+    [t],
+  );
+
   const sendCommand = useCallback(
     async (command: string) => {
       setIsLoading(true);
@@ -188,17 +202,20 @@ export default function ATTerminalCard() {
         } else {
           appendEntry({
             command,
-            response: json.message ?? "Command failed",
+            ...(json.message != null
+              ? { response: json.message }
+              : ownResponse("history.command_failed")),
             status: "error",
           });
         }
       } catch (err) {
         appendEntry({
           command,
-          response:
+          ...ownResponse(
             err instanceof TypeError
-              ? "Network error — could not reach modem backend"
-              : "Unexpected error — check backend logs",
+              ? "history.network_error"
+              : "history.unexpected_error",
+          ),
           status: "error",
         });
       } finally {
@@ -207,7 +224,7 @@ export default function ATTerminalCard() {
         inputRef.current?.focus();
       }
     },
-    [appendEntry],
+    [appendEntry, ownResponse],
   );
 
   const handleSubmit = useCallback(
@@ -221,7 +238,7 @@ export default function ATTerminalCard() {
         if (rule.pattern.test(trimmed)) {
           appendEntry({
             command: trimmed,
-            response: rule.message,
+            ...ownResponse(rule.messageKey),
             status: "blocked",
           });
           setInput("");
@@ -233,7 +250,7 @@ export default function ATTerminalCard() {
       // Check warning commands
       for (const rule of WARNING_COMMANDS) {
         if (rule.pattern.test(trimmed)) {
-          setWarning({ message: rule.message, command: trimmed });
+          setWarning({ messageKey: rule.messageKey, command: trimmed });
           return;
         }
       }
@@ -241,7 +258,7 @@ export default function ATTerminalCard() {
       setLastCommand(trimmed);
       sendCommand(trimmed);
     },
-    [input, isLoading, appendEntry, sendCommand],
+    [input, isLoading, appendEntry, ownResponse, sendCommand],
   );
 
   const handleSendAnyway = useCallback(() => {
@@ -266,7 +283,9 @@ export default function ATTerminalCard() {
   }, []);
 
   const handleExport = useCallback(() => {
-    const text = formatExport(history);
+    const text = formatExport(history, (e) =>
+      e.responseKey ? t(e.responseKey) : e.response,
+    );
     const date = new Date().toISOString().slice(0, 10);
     const blob = new Blob([text], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -275,7 +294,7 @@ export default function ATTerminalCard() {
     a.download = `at-terminal-export-${date}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [history]);
+  }, [history, t]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -313,7 +332,7 @@ export default function ATTerminalCard() {
       <div className="bg-muted flex items-center gap-2 border-b px-3 py-2">
         <TerminalIcon className="text-muted-foreground size-4" />
         <span className="text-muted-foreground text-sm font-medium">
-          AT Terminal
+          {t("card.title")}
         </span>
         <div className="ml-auto flex gap-1">
           <>
@@ -325,7 +344,7 @@ export default function ATTerminalCard() {
               disabled={isEmpty}
             >
               <Trash2Icon />
-              Clear
+              {t("card.clear")}
             </Button>
             <Button
               variant="ghost"
@@ -334,7 +353,7 @@ export default function ATTerminalCard() {
               disabled={isEmpty}
             >
               <DownloadIcon />
-              Export
+              {t("card.export")}
             </Button>
           </>
         </div>
@@ -348,7 +367,7 @@ export default function ATTerminalCard() {
         >
           {isEmpty ? (
             <div className="text-muted-foreground flex h-40 items-center justify-center text-sm">
-              No commands yet. Type an AT command below.
+              {t("card.empty")}
             </div>
           ) : (
             <div className="space-y-3">
@@ -377,13 +396,13 @@ export default function ATTerminalCard() {
           <div className="mx-3 mb-2 rounded-lg border border-warning/30 bg-warning/10 p-3">
             <div className="text-warning mb-1 flex items-center gap-1.5 text-sm font-semibold">
               <TriangleAlertIcon className="size-4" />
-              Warning
+              {t("warning.title")}
             </div>
             <p className="text-muted-foreground mb-2 text-sm">
               <code className="bg-warning/10 rounded px-1 py-0.5 text-xs">
                 {warning.command}
               </code>{" "}
-              {warning.message}
+              {t(warning.messageKey)}
             </p>
             <div className="flex gap-2">
               <Button
@@ -391,10 +410,10 @@ export default function ATTerminalCard() {
                 className="bg-warning text-warning-foreground hover:bg-warning/90"
                 onClick={handleSendAnyway}
               >
-                Send Anyway
+                {t("warning.send_anyway")}
               </Button>
               <Button variant="outline" size="xs" onClick={handleCancelWarning}>
-                Cancel
+                {t("common:actions.cancel")}
               </Button>
             </div>
           </div>
@@ -432,7 +451,7 @@ export default function ATTerminalCard() {
             ) : (
               <ChevronRightIcon />
             )}
-            Send
+            {t("card.send")}
           </InputGroupButton>
         </InputGroup>
       </form>
@@ -443,6 +462,7 @@ export default function ATTerminalCard() {
 // --- History entry row ---
 
 function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
+  const { t } = useTranslation("terminal");
   const colorClass =
     entry.status === "blocked"
       ? "text-destructive"
@@ -460,7 +480,7 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
             : "text-muted-foreground"
         }`}
       >
-        {entry.response}
+        {entry.responseKey ? t(entry.responseKey) : entry.response}
       </div>
     </div>
   );

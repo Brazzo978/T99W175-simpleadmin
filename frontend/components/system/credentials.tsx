@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KeyRoundIcon, Trash2Icon, UserPlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/page-shell";
@@ -63,27 +64,33 @@ async function manage(fields: Record<string, string>) {
       body: new URLSearchParams(fields).toString(),
     });
     const json = await resp.json().catch(() => ({ success: false }));
-    return { ok: resp.ok && json.success, message: json.message as string | undefined };
+    return {
+      ok: resp.ok && json.success,
+      message: json.message as string | undefined,
+      unreachable: false,
+    };
   } catch {
-    return { ok: false, message: "Modem unreachable" };
+    return { ok: false, message: undefined, unreachable: true };
   }
 }
 
 function RoleSelect({ value, onChange }: { value: Role; onChange: (r: Role) => void }) {
+  const { t } = useTranslation("credentials");
   return (
     <Select value={value} onValueChange={(v) => onChange(v as Role)}>
       <SelectTrigger className="w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="admin">Admin</SelectItem>
-        <SelectItem value="user">User (read only)</SelectItem>
+        <SelectItem value="admin">{t("roles.admin")}</SelectItem>
+        <SelectItem value="user">{t("roles.user_read_only")}</SelectItem>
       </SelectContent>
     </Select>
   );
 }
 
 export default function CredentialsComponent() {
+  const { t } = useTranslation("credentials");
   const session = useSessionInfo();
   const [users, setUsers] = useState<User[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -100,10 +107,10 @@ export default function CredentialsComponent() {
       if (!json.success) throw new Error(json.message);
       setUsers(json.data as User[]);
     } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : "Unable to read the users");
+      toast.error(err instanceof Error && err.message ? err.message : t("toast.load_failed"));
       setUsers([]);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -120,7 +127,11 @@ export default function CredentialsComponent() {
       await load();
       return true;
     }
-    toast.error(result.message || "Operation failed");
+    toast.error(
+      result.unreachable
+        ? t("common:at.unreachable")
+        : result.message || t("toast.failed"),
+    );
     return false;
   };
 
@@ -128,13 +139,13 @@ export default function CredentialsComponent() {
 
   return (
     <PageShell
-      title="Credentials"
-      description="Accounts of the web interface. Read-only users can look at everything but change nothing."
+      title={t("page.title")}
+      description={t("page.description")}
     >
       <Card>
         <CardHeader>
-          <CardTitle>Users</CardTitle>
-          <CardDescription>Select a user to change it.</CardDescription>
+          <CardTitle>{t("users.title")}</CardTitle>
+          <CardDescription>{t("users.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           {!users ? (
@@ -143,8 +154,8 @@ export default function CredentialsComponent() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>{t("users.username")}</TableHead>
+                  <TableHead>{t("users.role")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -162,10 +173,10 @@ export default function CredentialsComponent() {
                     <TableCell className="font-medium">
                       {u.username}
                       {u.username === session?.username && (
-                        <Badge variant="secondary" className="ml-2">you</Badge>
+                        <Badge variant="secondary" className="ml-2">{t("users.you_badge")}</Badge>
                       )}
                     </TableCell>
-                    <TableCell>{u.role === "admin" ? "Admin" : "User"}</TableCell>
+                    <TableCell>{u.role === "admin" ? t("roles.admin") : t("roles.user")}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -176,12 +187,12 @@ export default function CredentialsComponent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Add User</CardTitle>
-          <CardDescription>Passwords are stored as SHA-512 crypt hashes.</CardDescription>
+          <CardTitle>{t("add.title")}</CardTitle>
+          <CardDescription>{t("add.description")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="new-username">Username</Label>
+            <Label htmlFor="new-username">{t("add.username")}</Label>
             <Input
               id="new-username"
               autoComplete="off"
@@ -190,7 +201,7 @@ export default function CredentialsComponent() {
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="new-password">Password</Label>
+            <Label htmlFor="new-password">{t("add.password")}</Label>
             <Input
               id="new-password"
               type="password"
@@ -200,7 +211,7 @@ export default function CredentialsComponent() {
             />
           </div>
           <div className="grid gap-2">
-            <Label>Role</Label>
+            <Label>{t("add.role")}</Label>
             <RoleSelect value={newUser.role} onChange={(r) => setNewUser({ ...newUser, role: r })} />
           </div>
         </CardContent>
@@ -210,27 +221,31 @@ export default function CredentialsComponent() {
             onClick={async () => {
               const ok = await run(
                 { action: "add", username: newUser.username.trim(), password: newUser.password, role: newUser.role },
-                "User added",
+                t("toast.added"),
               );
               if (ok) setNewUser({ username: "", password: "", role: "user" });
             }}
           >
             <UserPlusIcon />
-            Add User
+            {t("add.button")}
           </Button>
         </CardFooter>
       </Card>
 
       <Card className="col-span-full">
         <CardHeader>
-          <CardTitle>{target ? `Change ${target.username}` : "Change a User"}</CardTitle>
+          <CardTitle>
+            {target
+              ? t("change.title", { username: target.username })
+              : t("change.title_none")}
+          </CardTitle>
           <CardDescription>
-            {target ? "New password, role, or removal." : "Select a user in the table first."}
+            {target ? t("change.description") : t("change.description_none")}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 @md/main:grid-cols-2">
           <div className="grid gap-2">
-            <Label htmlFor="upd-password">New password</Label>
+            <Label htmlFor="upd-password">{t("change.new_password")}</Label>
             <div className="flex gap-2">
               <Input
                 id="upd-password"
@@ -244,26 +259,33 @@ export default function CredentialsComponent() {
                 variant="outline"
                 disabled={!isAdmin || !target || !password || busy}
                 onClick={async () => {
-                  if (await run({ action: "update_password", username: selected, password }, "Password changed")) {
+                  if (
+                    await run(
+                      { action: "update_password", username: selected, password },
+                      t("toast.password_changed"),
+                    )
+                  ) {
                     setPassword("");
                   }
                 }}
               >
                 <KeyRoundIcon />
-                Set
+                {t("change.set")}
               </Button>
             </div>
           </div>
           <div className="grid gap-2">
-            <Label>Role</Label>
+            <Label>{t("change.role")}</Label>
             <div className="flex gap-2">
               <RoleSelect value={role} onChange={setRole} />
               <Button
                 variant="outline"
                 disabled={!isAdmin || !target || role === target?.role || busy}
-                onClick={() => run({ action: "update_role", username: selected, role }, "Role changed")}
+                onClick={() =>
+                  run({ action: "update_role", username: selected, role }, t("toast.role_changed"))
+                }
               >
-                Set
+                {t("change.set")}
               </Button>
             </div>
           </div>
@@ -275,7 +297,7 @@ export default function CredentialsComponent() {
             onClick={() => setConfirmDelete(true)}
           >
             <Trash2Icon />
-            Remove User
+            {t("change.remove_button")}
           </Button>
         </CardFooter>
       </Card>
@@ -283,22 +305,25 @@ export default function CredentialsComponent() {
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {selected}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("remove_dialog.title", { username: selected })}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The account is deleted. A session it has open stays valid until it
-              expires or the modem restarts.
+              {t("remove_dialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={async () => {
                 setConfirmDelete(false);
-                if (await run({ action: "delete", username: selected }, "User removed")) setSelected("");
+                if (await run({ action: "delete", username: selected }, t("toast.removed"))) {
+                  setSelected("");
+                }
               }}
             >
-              Remove
+              {t("remove_dialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

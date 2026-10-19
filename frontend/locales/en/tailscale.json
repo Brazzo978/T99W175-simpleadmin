@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Tailscale VPN",
+    "description": "Reach this modem and its LAN from your tailnet, without opening ports on the mobile network."
+  },
+  "status": {
+    "title": "Status",
+    "checking": "Checking…",
+    "not_installed": "Not installed",
+    "online": "Online",
+    "offline": "Offline",
+    "no_output": "No status output."
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "start": "Start",
+    "stop": "Stop",
+    "update": "Update",
+    "remove": "Remove",
+    "log_in": "Log In",
+    "install": "Install"
+  },
+  "login": {
+    "title_installed": "Log In",
+    "title_install": "Install",
+    "description_installed": "Log in again with a new auth key from the Tailscale admin console.",
+    "description_install": "Downloads Tailscale to the modem and logs in with an auth key from the Tailscale admin console.",
+    "auth_key": "Auth key"
+  },
+  "remove_dialog": {
+    "title": "Remove Tailscale?",
+    "description": "Tailscale is uninstalled from the modem. If you are connected through Tailscale you lose access to this page.",
+    "confirm": "Remove"
+  },
+  "toast": {
+    "started": "Tailscale started",
+    "stopped": "Tailscale stopped",
+    "updated": "Tailscale updated",
+    "logged_in": "Logged in",
+    "installed": "Tailscale installed",
+    "removed": "Tailscale removed",
+    "status_failed": "Unable to read the Tailscale status",
+    "action_failed": "{{action}} failed",
+    "request_failed": "Request failed ({{status}})"
+  }
+}

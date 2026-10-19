@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   DownloadIcon,
   LogInIcon,
@@ -46,6 +47,13 @@ interface TailscaleStatus {
   rawStatus: string;
 }
 
+/** A request the CGI refused without a message of its own. */
+class RequestFailed extends Error {
+  constructor(public readonly status: number) {
+    super(`Request failed (${status})`);
+  }
+}
+
 async function request(action: string, extra: Record<string, string> = {}) {
   const resp = await authFetch(
     `/cgi-bin/tailscale?${new URLSearchParams({ action, ...extra })}`,
@@ -53,16 +61,27 @@ async function request(action: string, extra: Record<string, string> = {}) {
   );
   const json = await resp.json();
   if (!resp.ok || json.status !== "ok") {
-    throw new Error(json.message || `Request failed (${resp.status})`);
+    throw json.message ? new Error(json.message) : new RequestFailed(resp.status);
   }
   return json;
 }
 
 export default function TailscaleComponent() {
+  const { t } = useTranslation("tailscale");
   const [status, setStatus] = useState<TailscaleStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [authKey, setAuthKey] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const errorText = useCallback(
+    (err: unknown, fallback: string) =>
+      err instanceof RequestFailed
+        ? t("toast.request_failed", { status: err.status })
+        : err instanceof Error
+          ? err.message
+          : fallback,
+    [t],
+  );
 
   const refresh = useCallback(async () => {
     try {
@@ -74,9 +93,9 @@ export default function TailscaleComponent() {
         rawStatus: json.rawStatus || "",
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Unable to read the Tailscale status");
+      toast.error(errorText(err, t("toast.status_failed")));
     }
-  }, []);
+  }, [errorText, t]);
 
   useEffect(() => {
     refresh();
@@ -89,7 +108,7 @@ export default function TailscaleComponent() {
       toast.success(label);
       if (extra?.authkey) setAuthKey("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : `${action} failed`);
+      toast.error(errorText(err, t("toast.action_failed", { action })));
     } finally {
       await refresh();
       setBusy(null);
@@ -100,15 +119,15 @@ export default function TailscaleComponent() {
 
   return (
     <PageShell
-      title="Tailscale VPN"
-      description="Reach this modem and its LAN from your tailnet, without opening ports on the mobile network."
+      title={t("page.title")}
+      description={t("page.description")}
     >
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle>Status</CardTitle>
-              <CardDescription>{status?.statusLine || "Checking…"}</CardDescription>
+              <CardTitle>{t("status.title")}</CardTitle>
+              <CardDescription>{status?.statusLine || t("status.checking")}</CardDescription>
             </div>
             {status && (
               <Badge
@@ -121,7 +140,11 @@ export default function TailscaleComponent() {
                       : "bg-warning/15 text-warning border-warning/30"
                 }
               >
-                {!status.installed ? "Not installed" : status.connected ? "Online" : "Offline"}
+                {!status.installed
+                  ? t("status.not_installed")
+                  : status.connected
+                    ? t("status.online")
+                    : t("status.offline")}
               </Badge>
             )}
           </div>
@@ -131,40 +154,44 @@ export default function TailscaleComponent() {
             <Skeleton className="h-24 w-full" />
           ) : (
             <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
-              {status.rawStatus || "No status output."}
+              {status.rawStatus || t("status.no_output")}
             </pre>
           )}
         </CardContent>
         <CardFooter className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => refresh()} disabled={busy !== null}>
             <RefreshCwIcon />
-            Refresh
+            {t("actions.refresh")}
           </Button>
           {installed && (
             <>
               <Button
                 variant="outline"
-                onClick={() => run("up", "Tailscale started")}
+                onClick={() => run("up", t("toast.started"))}
                 disabled={busy !== null || status?.connected}
               >
                 <PlayIcon />
-                Start
+                {t("actions.start")}
               </Button>
               <Button
                 variant="outline"
-                onClick={() => run("down", "Tailscale stopped")}
+                onClick={() => run("down", t("toast.stopped"))}
                 disabled={busy !== null || !status?.connected}
               >
                 <SquareIcon />
-                Stop
+                {t("actions.stop")}
               </Button>
-              <Button variant="outline" onClick={() => run("update", "Tailscale updated")} disabled={busy !== null}>
+              <Button
+                variant="outline"
+                onClick={() => run("update", t("toast.updated"))}
+                disabled={busy !== null}
+              >
                 <DownloadIcon />
-                Update
+                {t("actions.update")}
               </Button>
               <Button variant="destructive" onClick={() => setConfirmRemove(true)} disabled={busy !== null}>
                 <Trash2Icon />
-                Remove
+                {t("actions.remove")}
               </Button>
             </>
           )}
@@ -173,15 +200,17 @@ export default function TailscaleComponent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{installed ? "Log In" : "Install"}</CardTitle>
+          <CardTitle>
+            {installed ? t("login.title_installed") : t("login.title_install")}
+          </CardTitle>
           <CardDescription>
             {installed
-              ? "Log in again with a new auth key from the Tailscale admin console."
-              : "Downloads Tailscale to the modem and logs in with an auth key from the Tailscale admin console."}
+              ? t("login.description_installed")
+              : t("login.description_install")}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2">
-          <Label htmlFor="ts-key">Auth key</Label>
+          <Label htmlFor="ts-key">{t("login.auth_key")}</Label>
           <Input
             id="ts-key"
             type="password"
@@ -196,12 +225,16 @@ export default function TailscaleComponent() {
             disabled={busy !== null || !authKey.trim() || !status}
             onClick={() =>
               installed
-                ? run("login", "Logged in", { authkey: authKey.trim() })
-                : run("install", "Tailscale installed", { authkey: authKey.trim() })
+                ? run("login", t("toast.logged_in"), { authkey: authKey.trim() })
+                : run("install", t("toast.installed"), { authkey: authKey.trim() })
             }
           >
             {installed ? <LogInIcon /> : <DownloadIcon />}
-            {busy === "install" ? "Installing…" : installed ? "Log In" : "Install"}
+            {busy === "install"
+              ? t("common:state.installing")
+              : installed
+                ? t("actions.log_in")
+                : t("actions.install")}
           </Button>
         </CardFooter>
       </Card>
@@ -209,22 +242,21 @@ export default function TailscaleComponent() {
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Tailscale?</AlertDialogTitle>
+            <AlertDialogTitle>{t("remove_dialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Tailscale is uninstalled from the modem. If you are connected
-              through Tailscale you lose access to this page.
+              {t("remove_dialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={() => {
                 setConfirmRemove(false);
-                run("remove", "Tailscale removed");
+                run("remove", t("toast.removed"));
               }}
             >
-              Remove
+              {t("remove_dialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

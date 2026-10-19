@@ -16,10 +16,13 @@ export type Namespace =
   | "frequency-calculator"
   | "cellular"
   | "sim-profiles"
-  | "esim"
   | "sms"
+  | "esim"
   | "network"
   | "system-settings"
+  | "credentials"
+  | "tailscale"
+  | "terminal"
   | "about";
 
 export interface LanguageMeta {

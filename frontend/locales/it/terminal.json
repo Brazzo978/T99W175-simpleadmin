@@ -1,0 +1,73 @@
+{
+  "page": {
+    "title": "Terminale AT",
+    "description": "Invia i comandi al modem così come li scrivi. Solo per gli account amministratore; ogni comando attende il proprio turno dopo gli altri client AT."
+  },
+  "card": {
+    "title": "Terminale AT",
+    "clear": "Pulisci",
+    "export": "Esporta",
+    "empty": "Ancora nessun comando. Scrivi un comando AT qui sotto.",
+    "send": "Invia"
+  },
+  "warning": {
+    "title": "Attenzione",
+    "send_anyway": "Invia comunque",
+    "radio_off": "spegne la radio: se sei connesso tramite Tailscale o la rete mobile, perdi l'accesso a questa pagina."
+  },
+  "blocked": {
+    "imei": "Cambia l'IMEI dalla pagina Sistema."
+  },
+  "history": {
+    "command_failed": "Comando non riuscito",
+    "network_error": "Errore di rete — impossibile raggiungere il backend del modem",
+    "unexpected_error": "Errore imprevisto — controlla i log del backend"
+  },
+  "commands": {
+    "trigger": "Comandi",
+    "search": "Cerca comandi...",
+    "empty": "Nessun comando trovato.",
+    "group_default": "Predefiniti",
+    "group_custom": "Personalizzati",
+    "count_one": "{{count}} comando",
+    "count_other": "{{count}} comandi",
+    "manage": "Gestisci comandi"
+  },
+  "manage": {
+    "title": "Gestisci comandi personalizzati",
+    "description": "Aggiungi e rimuovi comandi AT personalizzati.",
+    "empty": "Ancora nessun comando personalizzato.",
+    "delete_aria": "Elimina {{label}}",
+    "name_placeholder": "Nome del comando",
+    "name_aria": "Nome del comando",
+    "command_aria": "Comando AT",
+    "add": "Aggiungi",
+    "errors": {
+      "required": "Entrambi i campi sono obbligatori.",
+      "prefix": "Il comando deve iniziare con \"AT\".",
+      "duplicate_command": "Questo comando esiste già.",
+      "duplicate_label": "Esiste già un comando con questo nome."
+    }
+  },
+  "presets": {
+    "identity": "Identità del modem",
+    "imei": "IMEI",
+    "imsi": "IMSI",
+    "iccid": "ICCID",
+    "sim_status": "Stato della SIM",
+    "sim_slot": "Slot SIM attivo",
+    "operator": "Operatore",
+    "signal_quality": "Qualità del segnale",
+    "carrier_aggregation": "Aggregazione di portanti",
+    "network_mode": "Modalità di rete",
+    "nr5g_mode": "Modalità 5G (NSA/SA)",
+    "band_preferences": "Preferenze di banda",
+    "lte_lock": "Blocco cella LTE",
+    "nr5g_lock": "Blocco cella 5G",
+    "apn_profiles": "Profili APN",
+    "data_connection": "Connessione dati",
+    "radio_off": "Spegni la radio",
+    "radio_on": "Accendi la radio",
+    "reboot": "Riavvia"
+  }
+}
