@@ -23,6 +23,12 @@ pages removed from `frontend/` are re-imported from there when ported.
   MTPL/Pcmax, PHR, timing advance distance, DL/UL link table), DIAG log
   coverage. Dashboard: CQI, rank, TX power, cell distance from `ta_m`.
   The classic pages were not extended (decided 2026-10-17).
+- Dashboard Recent Activities (2026-10-19), derived in the browser
+  (`lib/bridge/activities.ts`) with the event model of the Signal Details
+  radio events log (`lib/bridge/events.ts`): DIAG failures, cell changes and
+  abnormal RRC transitions; PCell band/cell, SCell set and 5G NR leg changes
+  between radio snapshots; internet lost/restored and high latency from the
+  system_bridge checks.
 
 ### Next
 - [ ] Page strings are English only: move them to `locales/` (en, it).
@@ -35,10 +41,11 @@ pages removed from `frontend/` are re-imported from there when ported.
       previous value (1,7 here).
 
 ### Features chosen from QManager (first round)
-- [ ] Network events: diag_bridge now pushes DIAG events (`rrc`, `events`)
-      and Signal Details shows them. Still to do: feed the dashboard "Recent
-      Activities" with them (`hooks/use-recent-activities.ts`), plus data
-      link up/down from system_bridge.
+- [ ] Network events: Recent Activities is fed (see Done). Data link
+      up/down from system_bridge is covered only as internet lost/restored
+      (its ping/DNS checks). The log lives in the page, so a reload empties
+      it. Check on the modem that the hold times and the dashboard filter
+      keep it readable (RRC idle/connected cycles, SCell churn).
 - [ ] Signal history (30 min) and latency history (24 h) kept in the bridges
       and sent on connect; today the store samples them in the browser.
 - [ ] Connectivity: upstream moved from the HTTP 204 probe back to ICMP; ours
@@ -64,8 +71,6 @@ this firmware sends (the "DIAG log coverage" card counts each log code).
       card stays or moves to a diagnostics page.
 - [ ] NR timing advance: 0xB825 arrives but `ta_scs_estimated` stays true,
       so its decoder probably does not extract the SCS (bridge side).
-- [ ] Recent Activities and the radio events log could share one event
-      model (categories, labels) once the dashboard uses the events.
 
 ### Gaps in the dashboard
 - [ ] system_bridge: hostname, kernel version, storage of `/data`

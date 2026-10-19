@@ -7,6 +7,8 @@
 // See: QManager_Backend_Architecture.docx §6 "JSON Data Contract"
 // =============================================================================
 
+import type { RadioEventCategory, RadioRat } from "./bridge";
+
 // --- Top-Level Status --------------------------------------------------------
 
 export interface ModemStatus {
@@ -598,7 +600,8 @@ export function formatJitter(jitterMs: number | null): string {
 
 // --- Network Events (Recent Activities) --------------------------------------
 
-/** Event types emitted by the poller's change detection */
+/** Event types of the dashboard's activity log (lib/bridge/activities.ts
+ *  derives some of them in the browser; the rest are kept from QManager) */
 export type NetworkEventType =
   | "network_mode"        // Network mode changed (LTE → 5G-NSA, etc.)
   | "band_change"         // LTE or NR band changed
@@ -610,7 +613,7 @@ export type NetworkEventType =
   | "signal_restored"     // Modem signal restored
   | "internet_lost"       // Internet connectivity lost
   | "internet_restored"   // Internet connectivity restored
-  | "high_latency"        // Latency exceeded 90ms threshold
+  | "high_latency"        // Ping average above the high-latency threshold
   | "latency_recovered"   // Latency returned below threshold
   | "high_packet_loss"    // Packet loss exceeded 20% threshold
   | "packet_loss_recovered" // Packet loss returned below threshold
@@ -621,14 +624,17 @@ export type NetworkEventType =
   | "profile_applied"     // Custom SIM Profile applied (complete or partial)
   | "profile_failed"      // Custom SIM Profile apply failed (all steps)
   | "profile_deactivated" // Custom SIM Profile deactivated by user
-  | "tower_failover";     // Tower lock failover activated (signal below threshold)
+  | "tower_failover"      // Tower lock failover activated (signal below threshold)
+  | "radio_event";        // DIAG radio event: failure, cell change, abnormal RRC transition
 
 /** Severity level for UI icon coloring */
 export type EventSeverity = "info" | "warning" | "error";
 
-/** A single network event from the poller's NDJSON events file */
+/** A single entry of the activity log */
 export interface NetworkEvent {
-  /** Unix epoch (seconds) when the event was detected */
+  /** Unique within the page session */
+  id: string;
+  /** Unix epoch (seconds) when the event happened or was first seen */
   timestamp: number;
   /** Event classification */
   type: NetworkEventType;
@@ -636,6 +642,9 @@ export interface NetworkEvent {
   message: string;
   /** Severity for UI indicator (info = green, warning = amber) */
   severity: EventSeverity;
+  /** radio_event only: the DIAG event's category and radio technology */
+  category?: RadioEventCategory;
+  rat?: RadioRat | null;
 }
 
 // --- Formatting Utilities ----------------------------------------------------

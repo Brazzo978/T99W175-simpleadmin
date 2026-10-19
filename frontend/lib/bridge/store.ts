@@ -12,7 +12,9 @@
 // =============================================================================
 
 import type { DiagEvent, DiagSnapshot, SystemSnapshot } from "@/types/bridge";
-import type { SignalHistoryEntry } from "@/types/modem-status";
+import type { NetworkEvent, SignalHistoryEntry } from "@/types/modem-status";
+import { ActivityLog } from "./activities";
+import type { RadioEvent } from "./events";
 import { pickRadio, type RadioSource } from "./radio";
 import {
   RADIO_HISTORY_INTERVAL_MS,
@@ -45,13 +47,8 @@ export interface BridgeState {
   /** DIAG events seen while the page was open, newest first: the bridge
    *  sends only its last 20, this keeps the whole session */
   radioEvents: RadioEvent[];
-}
-
-export interface RadioEvent extends Omit<DiagEvent, "age_s"> {
-  /** Unique within the session */
-  key: string;
-  /** Date.now() of the event: receive time minus its age */
-  ts: number;
+  /** Dashboard activity log, newest first (lib/bridge/activities.ts) */
+  activities: NetworkEvent[];
 }
 
 const RADIO_EVENTS_MAX = 500;
@@ -82,6 +79,7 @@ let state: BridgeState = {
   radioHistory: [],
   diagLogBase: {},
   radioEvents: [],
+  activities: [],
 };
 
 const listeners = new Set<() => void>();
@@ -102,11 +100,18 @@ let lastRadioSampleAt = 0;
 let eventSeq = 0;
 /** Events older than this were cleared by the user: not re-added. */
 let eventsClearedAt = 0;
+/** Derived once per message, here rather than in a component, so that it
+ *  keeps running across page changes. */
+const activityLog = new ActivityLog();
 
-/** New events of a snapshot (its list repeats them with growing ages). */
-function mergeEvents(events: DiagEvent[] | undefined, now: number): RadioEvent[] {
+/** The session's event list with the new events of a snapshot (its list
+ *  repeats them with growing ages), and those new events, oldest first. */
+function mergeEvents(
+  events: DiagEvent[] | undefined,
+  now: number,
+): { list: RadioEvent[]; added: RadioEvent[] } {
   const known = state.radioEvents;
-  if (!events?.length) return known;
+  if (!events?.length) return { list: known, added: [] };
   const added: RadioEvent[] = [];
   // Oldest first, so equal events in one snapshot stay apart.
   for (const e of [...events].reverse()) {
@@ -119,8 +124,11 @@ function mergeEvents(events: DiagEvent[] | undefined, now: number): RadioEvent[]
     if (dup) continue;
     added.push({ key: `${ts}-${e.id}-${eventSeq++}`, ts, id: e.id, name: e.name, f: e.f });
   }
-  if (!added.length) return known;
-  return [...added.reverse(), ...known].slice(0, RADIO_EVENTS_MAX);
+  if (!added.length) return { list: known, added };
+  return {
+    list: [...[...added].reverse(), ...known].slice(0, RADIO_EVENTS_MAX),
+    added,
+  };
 }
 let lastLatencySampleAt = 0;
 let visibilityHooked = false;
@@ -217,11 +225,20 @@ function onDiag(diag: DiagSnapshot) {
     diagLogBase = { ...diagLogBase };
     for (const l of fresh) diagLogBase[l.code] = { t: now, n: l.n };
   }
+  const { list: radioEvents, added } = mergeEvents(diag.events, now);
+  const lteState = diag.rrc?.lte_state;
+  activityLog.addRadioEvents(added, lteState);
+  // Each radio source is observed on its own messages.
+  const radio = pickRadio({ ...state, diag, diagAt: now }, now);
+  if (radio.snapshot && radio.source === "diag") {
+    activityLog.observeRadio(radio.snapshot, radio.source, lteState, now);
+  }
   setState({
     diag,
     diagAt: now,
     diagLogBase,
-    radioEvents: mergeEvents(diag.events, now),
+    radioEvents,
+    activities: activityLog.events,
   });
   sampleSignal();
   sampleRadio();
@@ -243,7 +260,18 @@ function onSystem(system: SystemSnapshot) {
     }
     lastLatencySampleAt = now;
   }
-  setState({ system, systemAt: now, latencyHistory, latencyIntervalSec });
+  const radio = pickRadio({ ...state, system, systemAt: now }, now);
+  if (radio.snapshot && radio.source === "qmi") {
+    activityLog.observeRadio(radio.snapshot, radio.source, undefined, now);
+  }
+  activityLog.observeSystem(system, now);
+  setState({
+    system,
+    systemAt: now,
+    latencyHistory,
+    latencyIntervalSec,
+    activities: activityLog.events,
+  });
   sampleSignal();
   sampleRadio();
 }
@@ -339,4 +367,4 @@ export function getState(): BridgeState {
   return state;
 }
 
-export type { RadioSource };
+export type { RadioEvent, RadioSource };

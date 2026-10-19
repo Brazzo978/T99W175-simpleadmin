@@ -25,23 +25,31 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { RadioEvent } from "@/lib/bridge/store";
+import {
+  RADIO_EVENT_CATEGORIES,
+  describeEvent,
+  eventCategory,
+  eventSucceeded,
+  type RadioEvent,
+} from "@/lib/bridge/events";
 import { clearRadioEvents } from "@/lib/bridge/store";
 import { cn } from "@/lib/utils";
-import type { RrcInfo } from "@/types/bridge";
+import type { RadioEventCategory, RadioRat, RrcInfo } from "@/types/bridge";
 
 // --- Classification ----------------------------------------------------------
+// The categories themselves live in lib/bridge/events.ts, shared with the
+// dashboard's Recent Activities.
 
-type Category = "failure" | "mobility" | "rrc" | "rach" | "ca" | "paging" | "other";
+type Category = RadioEventCategory;
 
-const CATEGORIES: Record<Category, { label: string; icon: LucideIcon }> = {
-  failure: { label: "Failure", icon: XCircleIcon },
-  mobility: { label: "Mobility", icon: ArrowLeftRightIcon },
-  rrc: { label: "RRC state", icon: RadioTowerIcon },
-  rach: { label: "RACH", icon: ZapIcon },
-  ca: { label: "Carrier agg.", icon: LayersIcon },
-  paging: { label: "Paging", icon: BellIcon },
-  other: { label: "Other", icon: CircleDotIcon },
+const CATEGORY_ICONS: Record<Category, LucideIcon> = {
+  failure: XCircleIcon,
+  mobility: ArrowLeftRightIcon,
+  rrc: RadioTowerIcon,
+  rach: ZapIcon,
+  ca: LayersIcon,
+  paging: BellIcon,
+  other: CircleDotIcon,
 };
 
 const FILTERS: { value: "all" | Category; label: string }[] = [
@@ -53,62 +61,11 @@ const FILTERS: { value: "all" | Category; label: string }[] = [
   { value: "ca", label: "CA" },
 ];
 
-function categoryOf(name: string): Category {
-  const n = name.toUpperCase();
-  if (/FAIL|RLF|RADIO_LINK|OUT_OF_SERVICE|_OOS/.test(n)) return "failure";
-  if (/HANDOVER|_HO_|_HO$|NEW_CELL|RESELECT|REDIRECT/.test(n)) return "mobility";
-  if (/RACH|RANDOM_ACCESS/.test(n)) return "rach";
-  if (/SCELL|_CA_|SCG_ADD|SCG_CONFIG/.test(n)) return "ca";
-  if (/PAGING/.test(n)) return "paging";
-  if (/STATE|CONNECTION|RRC/.test(n)) return "rrc";
-  return "other";
-}
-
-/** A good outcome inside a category (handover or RACH success). */
-function succeeded(e: RadioEvent): boolean {
-  if (/SUCCESS/i.test(e.name)) return true;
-  return Object.entries(e.f ?? {}).some(
-    ([k, v]) => /result|status/i.test(k) && /^success/i.test(String(v)),
-  );
-}
-
-const ACRONYMS = new Set([
-  "SCG", "MCG", "RLF", "HO", "RACH", "PCI", "TA", "PHR", "EPHR", "BSR", "OOS",
-  "IRAT", "MIB", "SIB", "PDCP", "RLC", "MAC", "RRC", "CA", "NR", "LTE", "UE",
-  "DRX", "ML1", "LL1", "NAS", "EMM", "ESM", "SR", "CSI", "CQI", "TDD", "FDD",
-]);
-
-/** EVENT_NR5G_RRC_SCG_FAILURE -> { rat: "5G", layer: "RRC", title: "SCG failure" } */
-function describe(name: string): { rat: "LTE" | "5G" | null; layer: string | null; title: string } {
-  let parts = name.replace(/^EVENT_/, "").split("_").filter(Boolean);
-  let rat: "LTE" | "5G" | null = null;
-  if (parts[0] === "LTE") {
-    rat = "LTE";
-    parts = parts.slice(1);
-  } else if (parts[0] === "NR5G" || parts[0] === "NR") {
-    rat = "5G";
-    parts = parts.slice(1);
-  }
-  let layer: string | null = null;
-  if (parts.length > 1 && ["RRC", "ML1", "LL1", "MAC", "NAS", "EMM", "PDCP", "RLC"].includes(parts[0])) {
-    layer = parts[0];
-    parts = parts.slice(1);
-  }
-  const words = parts.map((w, i) => {
-    if (w === "IND") return "indication";
-    if (w === "SCELL") return "SCell";
-    if (/^V\d+$/.test(w)) return w.toLowerCase();
-    if (ACRONYMS.has(w)) return w;
-    const lower = w.toLowerCase();
-    return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
-  });
-  return { rat, layer, title: words.join(" ") || name };
-}
-
 // --- Pieces ------------------------------------------------------------------
 
 function CategoryBadge({ category, ok }: { category: Category; ok: boolean }) {
-  const { label, icon: Icon } = CATEGORIES[category];
+  const label = RADIO_EVENT_CATEGORIES[category];
+  const Icon = CATEGORY_ICONS[category];
   const tint =
     category === "failure"
       ? "border-destructive/30 bg-destructive/15 text-destructive"
@@ -125,7 +82,7 @@ function CategoryBadge({ category, ok }: { category: Category; ok: boolean }) {
   );
 }
 
-function RatBadge({ rat }: { rat: "LTE" | "5G" | null }) {
+function RatBadge({ rat }: { rat: RadioRat | null }) {
   if (!rat) return <span className="w-12" />;
   return (
     <Badge variant="outline" className="w-12 justify-center gap-1.5 font-medium">
@@ -227,7 +184,12 @@ export function RadioEventsCard({
   const [filter, setFilter] = useState<"all" | Category>("all");
   const rows = useMemo(
     () =>
-      events.map((e) => ({ e, category: categoryOf(e.name), ok: succeeded(e), d: describe(e.name) })),
+      events.map((e) => ({
+        e,
+        category: eventCategory(e.name),
+        ok: eventSucceeded(e),
+        d: describeEvent(e.name),
+      })),
     [events],
   );
   const shown = filter === "all" ? rows : rows.filter((r) => r.category === filter);

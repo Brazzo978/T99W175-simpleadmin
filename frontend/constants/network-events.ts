@@ -1,4 +1,5 @@
-import type { NetworkEventType } from "@/types/modem-status";
+import { RADIO_EVENT_CATEGORIES } from "@/lib/bridge/events";
+import type { NetworkEvent, NetworkEventType } from "@/types/modem-status";
 
 /** Human-readable labels for each event type */
 export const EVENT_LABELS: Record<NetworkEventType, string> = {
@@ -24,7 +25,21 @@ export const EVENT_LABELS: Record<NetworkEventType, string> = {
   profile_failed: "Profile Failed",
   profile_deactivated: "Profile Deactivated",
   tower_failover: "Tower Lock Failover",
+  radio_event: "Radio Event",
 };
+
+/**
+ * Label of one event: its type's, or for a DIAG radio event its technology
+ * and category as Signal Details names them ("5G Failure", "LTE Mobility").
+ */
+export function eventLabel(event: NetworkEvent): string {
+  if (event.type === "radio_event" && event.category) {
+    return [event.rat, RADIO_EVENT_CATEGORIES[event.category]]
+      .filter(Boolean)
+      .join(" ");
+  }
+  return EVENT_LABELS[event.type] ?? event.type;
+}
 
 /** Tab categories used by the monitoring Network Events card */
 export type EventTabCategory = "bandChanges" | "dataConnection" | "networkMode";
@@ -54,4 +69,5 @@ export const EVENT_TAB_CATEGORIES: Record<NetworkEventType, EventTabCategory> =
     profile_failed: "dataConnection",
     profile_deactivated: "dataConnection",
     tower_failover: "dataConnection",
+    radio_event: "networkMode",
   };

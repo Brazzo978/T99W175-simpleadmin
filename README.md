@@ -316,7 +316,7 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 
 | Page | What | Backend |
 |---|---|---|
-| Dashboard | network, LTE/5G cells, device, latency, signal chart | WebSockets |
+| Dashboard | network, LTE/5G cells, device, latency, signal chart, recent activities | WebSockets |
 | Signal Details | aggregate DL/UL throughput with its trend, a carrier table, a radio events log (LTE RRC state, failure counters, events by category), throughput by carrier, metric trends and histograms (CQI, MCS, rank, SINR, RSRP, TX power, BLER), LTE neighbour cells, one card per carrier (per-antenna RSRP/SINR/SNR, CQI, rank, TX power, timing advance distance, DL/UL link table) and the DIAG log coverage | WebSockets |
 | Cellular Settings | network mode, 5G NSA/SA, SIM slot, APN | `^SLMODE`, `^NR5G_MODE`, `^SWITCH_SLOT`, `+CGDCONT` |
 | Band Locking / Cell Locking | LTE, NSA, SA bands; LTE and 5G SA cell locks | `^BAND_PREF_EXT`, `^LTE_LOCK`, `^NR5G_LOCK` |
@@ -367,7 +367,14 @@ DIAG event of the session (the bridge sends its last 20), with a badge per
 category (failure, mobility, RRC state, RACH, carrier aggregation). Values the
 bridge does not send are shown as a dash, never as zero; the DIAG log
 coverage card says which logs this firmware emits (timing advance, for
-instance, only comes at attach or handover). LTE SCells come from the RRC configuration (or QMI):
+instance, only comes at attach or handover). The dashboard's *Recent
+Activities* keeps the events worth a glance (failures, cell changes,
+abnormal RRC transitions) with the band, cell, carrier aggregation and 5G NR
+changes seen between radio snapshots, internet lost/restored and high
+latency (ping average above 100 ms, recovered under 80 ms) from the
+system_bridge checks. No poller on the modem detects them: the browser does,
+while a page is open, and counts a change once it has held for a few
+snapshots. LTE SCells come from the RRC configuration (or QMI):
 this firmware does not always measure them, so their RSRP/SINR can be
 missing. Both sockets close while the tab is hidden, and the bridges only
 poll the modem while someone is connected.

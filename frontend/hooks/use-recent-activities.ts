@@ -1,33 +1,36 @@
 "use client";
 
 import { useCallback } from "react";
+import { useBridgeState } from "@/hooks/use-bridge";
 import type { NetworkEvent } from "@/types/modem-status";
 
 // =============================================================================
-// useRecentActivities — network events (band changes, handovers, CA changes)
+// useRecentActivities — network events for the dashboard
 // =============================================================================
-// Not provided yet: the bridges will detect the events and push them (see
-// TODO.md). Until then the list is empty.
+// The store derives them in the browser from the bridge messages (DIAG radio
+// events, radio snapshot changes, connectivity checks; see
+// lib/bridge/activities.ts) and keeps them while the page is open.
 // =============================================================================
 
 export interface UseRecentActivitiesReturn {
   /** Network events, newest first */
   events: NetworkEvent[];
-  /** True during the very first fetch */
+  /** True until the first radio data arrives */
   isLoading: boolean;
-  /** True during a manual refresh (non-initial fetch) */
+  /** Always false: the list is pushed, not fetched */
   isRefreshing: boolean;
-  /** Error message if the last fetch failed */
+  /** Always null: the bridges' own state is shown elsewhere */
   error: string | null;
-  /** Manually trigger an immediate fetch and reset the poll timer */
+  /** No-op: the list follows the bridges by itself */
   refresh: () => void;
 }
 
 export function useRecentActivities(): UseRecentActivitiesReturn {
+  const { diag, system, activities } = useBridgeState();
   const refresh = useCallback(() => {}, []);
   return {
-    events: [],
-    isLoading: false,
+    events: activities,
+    isLoading: !diag && !system?.radio && activities.length === 0,
     isRefreshing: false,
     error: null,
     refresh,

@@ -162,6 +162,19 @@ export interface DiagEvent {
   f?: Record<string, string | number>;
 }
 
+/** What a DIAG event is about, from its name (lib/bridge/events.ts). */
+export type RadioEventCategory =
+  | "failure"
+  | "mobility"
+  | "rrc"
+  | "rach"
+  | "ca"
+  | "paging"
+  | "other";
+
+/** Radio access technology a DIAG event belongs to. */
+export type RadioRat = "LTE" | "5G";
+
 /** One diag_bridge radio snapshot (also the shape QMI radio is converted to). */
 export interface DiagSnapshot {
   lte: DiagLteCell[];
