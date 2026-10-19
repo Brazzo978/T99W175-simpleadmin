@@ -31,6 +31,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -130,6 +131,7 @@ export default function SmsInboxCard({
   onDeleteAll,
   onRefresh,
 }: SmsInboxCardProps) {
+  const { t } = useTranslation("sms");
   const [viewMessage, setViewMessage] = React.useState<SmsMessage | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<SmsMessage | null>(
     null,
@@ -192,7 +194,7 @@ export default function SmsInboxCard({
 
   const handleMarkAllRead = () => {
     markAllRead();
-    toast.success("All messages marked as read");
+    toast.success(t("inbox.toast.marked_all_read"));
   };
 
   const handleDelete = async () => {
@@ -202,9 +204,9 @@ export default function SmsInboxCard({
     setIsDeleting(false);
     setDeleteTarget(null);
     if (success) {
-      toast.success("Message deleted");
+      toast.success(t("inbox.toast.deleted"));
     } else {
-      toast.error("Failed to delete message");
+      toast.error(t("inbox.toast.delete_failed"));
     }
   };
 
@@ -215,9 +217,9 @@ export default function SmsInboxCard({
     setShowDeleteAll(false);
     setRowSelection({});
     if (success) {
-      toast.success("All messages deleted");
+      toast.success(t("inbox.toast.deleted_all"));
     } else {
-      toast.error("Failed to delete messages");
+      toast.error(t("inbox.toast.delete_all_failed"));
     }
   };
 
@@ -247,9 +249,9 @@ export default function SmsInboxCard({
     setShowDeleteSelected(false);
     setRowSelection({});
     if (success) {
-      toast.success(`${count} message${count !== 1 ? "s" : ""} deleted`);
+      toast.success(t("inbox.toast.deleted_selected", { count }));
     } else {
-      toast.error("Failed to delete selected messages");
+      toast.error(t("inbox.toast.delete_selected_failed"));
     }
   };
 
@@ -269,7 +271,7 @@ export default function SmsInboxCard({
               onCheckedChange={(value) =>
                 tbl.toggleAllPageRowsSelected(!!value)
               }
-              aria-label="Select all"
+              aria-label={t("inbox.columns.select_all")}
             />
           </div>
         ),
@@ -278,7 +280,7 @@ export default function SmsInboxCard({
             <Checkbox
               checked={row.getIsSelected()}
               onCheckedChange={(value) => row.toggleSelected(!!value)}
-              aria-label="Select row"
+              aria-label={t("inbox.columns.select_row")}
             />
           </div>
         ),
@@ -287,7 +289,7 @@ export default function SmsInboxCard({
       },
       {
         accessorKey: "sender",
-        header: "From",
+        header: t("inbox.columns.from"),
         cell: ({ row }) => {
           const unread = !isRead(row.original);
           return (
@@ -296,7 +298,7 @@ export default function SmsInboxCard({
                 {unread && (
                   <span
                     className="size-2 shrink-0 rounded-full bg-primary"
-                    aria-label="Unread"
+                    aria-label={t("inbox.columns.unread")}
                   />
                 )}
                 <span
@@ -323,7 +325,9 @@ export default function SmsInboxCard({
       {
         accessorKey: "content",
         header: () => (
-          <span className="hidden @md/card:inline">Message</span>
+          <span className="hidden @md/card:inline">
+            {t("inbox.columns.message")}
+          </span>
         ),
         cell: ({ row }) => (
           <div className="hidden @md/card:block max-w-xs truncate text-muted-foreground">
@@ -333,7 +337,11 @@ export default function SmsInboxCard({
       },
       {
         id: "date",
-        header: () => <span className="hidden @sm/card:inline">Date</span>,
+        header: () => (
+          <span className="hidden @sm/card:inline">
+            {t("inbox.columns.date")}
+          </span>
+        ),
         cell: ({ row }) => (
           <span className="hidden @sm/card:inline text-muted-foreground text-sm whitespace-nowrap">
             {row.original.timestamp}
@@ -353,13 +361,13 @@ export default function SmsInboxCard({
                   size="icon"
                 >
                   <TbDotsVertical />
-                  <span className="sr-only">Open menu</span>
+                  <span className="sr-only">{t("inbox.columns.open_menu")}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onClick={() => openMessage(row.original)}>
                   <TbEye className="size-4" />
-                  View
+                  {t("actions.view")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -367,7 +375,7 @@ export default function SmsInboxCard({
                   onClick={() => setDeleteTarget(row.original)}
                 >
                   <TbTrash className="size-4" />
-                  Delete
+                  {t("actions.delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -375,7 +383,7 @@ export default function SmsInboxCard({
         ),
       },
     ],
-    [isRead, openMessage],
+    [isRead, openMessage, t],
   );
 
   const table = useReactTable({
@@ -401,8 +409,8 @@ export default function SmsInboxCard({
     return (
       <Card className="@container/card">
         <CardHeader>
-          <CardTitle>Inbox</CardTitle>
-          <CardDescription>View and manage your SMS messages</CardDescription>
+          <CardTitle>{t("inbox.title")}</CardTitle>
+          <CardDescription>{t("inbox.description")}</CardDescription>
           <CardAction>
             <div className="flex items-center gap-2">
               <Skeleton className="size-8 rounded-md" />
@@ -458,8 +466,8 @@ export default function SmsInboxCard({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Inbox</CardTitle>
-          <CardDescription>View and manage your SMS messages</CardDescription>
+          <CardTitle>{t("inbox.title")}</CardTitle>
+          <CardDescription>{t("inbox.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div
@@ -468,14 +476,16 @@ export default function SmsInboxCard({
           >
             <AlertCircleIcon className="size-8 text-destructive" />
             <div className="space-y-1">
-              <p className="text-sm font-medium">Failed to load messages</p>
+              <p className="text-sm font-medium">{t("inbox.load_failed")}</p>
               <p className="text-xs text-muted-foreground">
-                Couldn&apos;t load your SMS inbox{error ? `: ${error}` : ""}
+                {error
+                  ? t("inbox.load_failed_detail_error", { error })
+                  : t("inbox.load_failed_detail")}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={onRefresh}>
               <TbRefresh className="size-4" />
-              Retry
+              {t("common:actions.retry")}
             </Button>
           </div>
         </CardContent>
@@ -491,12 +501,14 @@ export default function SmsInboxCard({
     <>
       <Card className="@container/card">
         <CardHeader>
-          <CardTitle>Inbox</CardTitle>
+          <CardTitle>{t("inbox.title")}</CardTitle>
           <CardDescription>
-            View and manage your SMS messages
             {storage
-              ? ` — ${storage.used}/${storage.total} messages stored`
-              : ""}
+              ? t("inbox.description_storage", {
+                  used: storage.used,
+                  total: storage.total,
+                })
+              : t("inbox.description")}
           </CardDescription>
           <CardAction>
             <div className="flex items-center gap-2">
@@ -505,7 +517,7 @@ export default function SmsInboxCard({
                 size="sm"
                 onClick={onRefresh}
                 disabled={isSaving}
-                aria-label="Refresh inbox"
+                aria-label={t("inbox.refresh_aria")}
               >
                 <TbRefresh className="size-4" />
               </Button>
@@ -515,11 +527,13 @@ export default function SmsInboxCard({
                   size="sm"
                   onClick={() => setShowDeleteSelected(true)}
                   disabled={isSaving}
-                  aria-label={`Delete ${selectedCount} selected`}
+                  aria-label={t("inbox.delete_selected_aria", {
+                    count: selectedCount,
+                  })}
                 >
                   <Trash2 className="size-4" />
                   <span className="hidden @sm/card:inline">
-                    Delete ({selectedCount})
+                    {t("inbox.delete_count", { count: selectedCount })}
                   </span>
                 </Button>
               )}
@@ -529,20 +543,24 @@ export default function SmsInboxCard({
                   size="sm"
                   onClick={() => setShowDeleteAll(true)}
                   disabled={isSaving}
-                  aria-label="Delete all messages"
+                  aria-label={t("inbox.delete_all_aria")}
                 >
                   <Trash2 className="size-4" />
-                  <span className="hidden @sm/card:inline">Delete All</span>
+                  <span className="hidden @sm/card:inline">
+                    {t("inbox.delete_all")}
+                  </span>
                 </Button>
               )}
               <Button
                 size="sm"
                 onClick={() => setShowCompose(true)}
                 disabled={isSaving}
-                aria-label="New Message"
+                aria-label={t("inbox.new_message")}
               >
                 <TbPlus className="size-4" />
-                <span className="hidden @xs/card:inline">New Message</span>
+                <span className="hidden @xs/card:inline">
+                  {t("inbox.new_message")}
+                </span>
               </Button>
             </div>
           </CardAction>
@@ -552,19 +570,19 @@ export default function SmsInboxCard({
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <MessageSquare className="size-8 text-muted-foreground" />
               <div className="space-y-1">
-                <p className="text-sm font-medium">No messages</p>
+                <p className="text-sm font-medium">{t("inbox.empty.title")}</p>
                 <p className="text-xs text-muted-foreground">
-                  Your inbox is empty. Send a new message to get started.
+                  {t("inbox.empty.description")}
                 </p>
               </div>
               <Button
                 size="sm"
                 onClick={() => setShowCompose(true)}
                 disabled={isSaving}
-                aria-label="New Message"
+                aria-label={t("inbox.new_message")}
               >
                 <TbPlus className="size-4" />
-                New Message
+                {t("inbox.new_message")}
               </Button>
             </div>
           ) : (
@@ -572,16 +590,16 @@ export default function SmsInboxCard({
               <div className="mb-3 flex flex-col gap-2 @lg/card:flex-row @lg/card:items-center @lg/card:justify-between">
                 <Tabs value={tab} onValueChange={(v) => setTab(v as SmsTab)}>
                   <TabsList>
-                    <TabsTrigger value="all">All</TabsTrigger>
+                    <TabsTrigger value="all">{t("inbox.tabs.all")}</TabsTrigger>
                     <TabsTrigger value="unread">
-                      Unread
+                      {t("inbox.tabs.unread")}
                       {unreadCount > 0 && (
                         <Badge className="p-1 rounded-full size-5 text-xs tabular-nums">
                           {unreadCount > 99 ? "99+" : unreadCount}
                         </Badge>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="read">Read</TabsTrigger>
+                    <TabsTrigger value="read">{t("inbox.tabs.read")}</TabsTrigger>
                   </TabsList>
                 </Tabs>
                 <div className="flex items-center gap-2">
@@ -590,8 +608,8 @@ export default function SmsInboxCard({
                     <Input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search messages…"
-                      aria-label="Search messages"
+                      placeholder={t("inbox.search_placeholder")}
+                      aria-label={t("inbox.search_aria")}
                       className="h-8 w-full pl-8 @lg/card:w-48"
                     />
                   </div>
@@ -600,16 +618,16 @@ export default function SmsInboxCard({
                       <Button
                         variant="outline"
                         size="sm"
-                        aria-label="Sort messages"
+                        aria-label={t("inbox.sort_aria")}
                       >
                         <ArrowDownUp className="size-4" />
                         <span className="hidden @sm/card:inline">
-                          {sortDir === "newest" ? "Newest" : "Oldest"}
+                          {t(`inbox.sort.${sortDir}`)}
                         </span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                      <DropdownMenuLabel>{t("inbox.sort_by")}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuRadioGroup
                         value={sortDir}
@@ -618,10 +636,10 @@ export default function SmsInboxCard({
                         }
                       >
                         <DropdownMenuRadioItem value="newest">
-                          Newest
+                          {t("inbox.sort.newest")}
                         </DropdownMenuRadioItem>
                         <DropdownMenuRadioItem value="oldest">
-                          Oldest
+                          {t("inbox.sort.oldest")}
                         </DropdownMenuRadioItem>
                       </DropdownMenuRadioGroup>
                     </DropdownMenuContent>
@@ -631,11 +649,11 @@ export default function SmsInboxCard({
                       variant="outline"
                       size="sm"
                       onClick={handleMarkAllRead}
-                      aria-label="Mark all as read"
+                      aria-label={t("inbox.mark_all_read_aria")}
                     >
                       <CheckCheck className="size-4" />
                       <span className="hidden @sm/card:inline">
-                        Mark all read
+                        {t("inbox.mark_all_read")}
                       </span>
                     </Button>
                   )}
@@ -671,7 +689,9 @@ export default function SmsInboxCard({
                           key={row.id}
                           className="cursor-pointer"
                           tabIndex={0}
-                          aria-label={`Message from ${row.original.sender}`}
+                          aria-label={t("inbox.row_aria", {
+                            sender: row.original.sender,
+                          })}
                           onClick={() => openMessage(row.original)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
@@ -698,12 +718,12 @@ export default function SmsInboxCard({
                           className="h-24 text-center"
                         >
                           {search.trim()
-                            ? "No messages match your search."
+                            ? t("inbox.no_results.search")
                             : tab === "unread"
-                              ? "No unread messages."
+                              ? t("inbox.no_results.unread")
                               : tab === "read"
-                                ? "No read messages."
-                                : "No messages found."}
+                                ? t("inbox.no_results.read")
+                                : t("inbox.no_results.all")}
                         </TableCell>
                       </TableRow>
                     )}
@@ -715,13 +735,16 @@ export default function SmsInboxCard({
                 <div className="flex flex-col gap-3 px-2 pt-3 @lg/card:flex-row @lg/card:items-center @lg/card:justify-between">
                   <span className="text-muted-foreground text-sm">
                     {selectedCount > 0
-                      ? `${selectedCount} of ${filteredMessages.length} selected`
-                      : `${filteredMessages.length} message${filteredMessages.length !== 1 ? "s" : ""}`}
+                      ? t("inbox.selected", {
+                          count: selectedCount,
+                          total: filteredMessages.length,
+                        })
+                      : t("inbox.count", { count: filteredMessages.length })}
                   </span>
                   <div className="flex items-center justify-between gap-4 @lg/card:justify-end @lg/card:gap-6">
                     <div className="hidden items-center gap-2 @sm/card:flex">
                       <span className="text-sm font-medium whitespace-nowrap">
-                        Rows per page
+                        {t("inbox.rows_per_page")}
                       </span>
                       <Select
                         value={`${table.getState().pagination.pageSize}`}
@@ -742,8 +765,10 @@ export default function SmsInboxCard({
                       </Select>
                     </div>
                     <span className="text-sm font-medium whitespace-nowrap tabular-nums">
-                      Page {table.getState().pagination.pageIndex + 1} of{" "}
-                      {Math.max(table.getPageCount(), 1)}
+                      {t("inbox.page_of", {
+                        page: table.getState().pagination.pageIndex + 1,
+                        pages: Math.max(table.getPageCount(), 1),
+                      })}
                     </span>
                     <div className="flex items-center gap-1.5">
                       <Button
@@ -752,7 +777,7 @@ export default function SmsInboxCard({
                         className="hidden size-8 @sm/card:flex pointer-coarse:size-11"
                         onClick={() => table.setPageIndex(0)}
                         disabled={!table.getCanPreviousPage()}
-                        aria-label="First page"
+                        aria-label={t("inbox.pagination.first")}
                       >
                         <ChevronsLeft className="size-4" />
                       </Button>
@@ -762,7 +787,7 @@ export default function SmsInboxCard({
                         className="size-8 pointer-coarse:size-11"
                         onClick={() => table.previousPage()}
                         disabled={!table.getCanPreviousPage()}
-                        aria-label="Previous page"
+                        aria-label={t("inbox.pagination.previous")}
                       >
                         <ChevronLeft className="size-4" />
                       </Button>
@@ -772,7 +797,7 @@ export default function SmsInboxCard({
                         className="size-8 pointer-coarse:size-11"
                         onClick={() => table.nextPage()}
                         disabled={!table.getCanNextPage()}
-                        aria-label="Next page"
+                        aria-label={t("inbox.pagination.next")}
                       >
                         <ChevronRight className="size-4" />
                       </Button>
@@ -784,7 +809,7 @@ export default function SmsInboxCard({
                           table.setPageIndex(table.getPageCount() - 1)
                         }
                         disabled={!table.getCanNextPage()}
-                        aria-label="Last page"
+                        aria-label={t("inbox.pagination.last")}
                       >
                         <ChevronsRight className="size-4" />
                       </Button>
@@ -804,7 +829,9 @@ export default function SmsInboxCard({
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Message from {viewMessage?.sender}</DialogTitle>
+            <DialogTitle>
+              {t("view_dialog.title", { sender: viewMessage?.sender ?? "" })}
+            </DialogTitle>
             <DialogDescription>{viewMessage?.timestamp}</DialogDescription>
           </DialogHeader>
           <div className="whitespace-pre-wrap wrap-break-word text-sm">
@@ -820,14 +847,17 @@ export default function SmsInboxCard({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Message</AlertDialogTitle>
+            <AlertDialogTitle>{t("delete_dialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this message from{" "}
-              {deleteTarget?.sender}? This action cannot be undone.
+              {t("delete_dialog.description", {
+                sender: deleteTarget?.sender ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>
+              {t("common:actions.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={isDeleting}
@@ -836,10 +866,10 @@ export default function SmsInboxCard({
               {isDeleting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Deleting&hellip;
+                  {t("actions.deleting")}
                 </>
               ) : (
-                "Delete"
+                t("actions.delete")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -853,14 +883,15 @@ export default function SmsInboxCard({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete All Messages</AlertDialogTitle>
+            <AlertDialogTitle>{t("delete_all_dialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete all {messages.length} messages?
-              This action cannot be undone.
+              {t("delete_all_dialog.description", { count: messages.length })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>
+              {t("common:actions.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteAll}
               disabled={isDeleting}
@@ -869,10 +900,10 @@ export default function SmsInboxCard({
               {isDeleting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Deleting&hellip;
+                  {t("actions.deleting")}
                 </>
               ) : (
-                "Delete All"
+                t("inbox.delete_all")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -886,14 +917,19 @@ export default function SmsInboxCard({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Selected Messages</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("delete_selected_dialog.title")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {selectedCount} selected message
-              {selectedCount !== 1 ? "s" : ""}? This action cannot be undone.
+              {t("delete_selected_dialog.description", {
+                count: selectedCount,
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>
+              {t("common:actions.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteSelected}
               disabled={isDeleting}
@@ -902,10 +938,10 @@ export default function SmsInboxCard({
               {isDeleting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Deleting&hellip;
+                  {t("actions.deleting")}
                 </>
               ) : (
-                `Delete (${selectedCount})`
+                t("inbox.delete_count", { count: selectedCount })
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

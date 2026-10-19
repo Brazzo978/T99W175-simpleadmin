@@ -1,0 +1,120 @@
+{
+  "page": {
+    "title": "Centro SMS",
+    "description": "Leggi, gestisci e invia SMS dal modem."
+  },
+  "actions": {
+    "view": "Visualizza",
+    "delete": "Elimina",
+    "deleting": "Eliminazione…"
+  },
+  "inbox": {
+    "title": "Posta in arrivo",
+    "description": "Leggi e gestisci i tuoi SMS",
+    "description_storage": "Leggi e gestisci i tuoi SMS — {{used}}/{{total}} messaggi in memoria",
+    "load_failed": "Impossibile caricare i messaggi",
+    "load_failed_detail": "Impossibile caricare la posta in arrivo SMS",
+    "load_failed_detail_error": "Impossibile caricare la posta in arrivo SMS: {{error}}",
+    "refresh_aria": "Aggiorna la posta in arrivo",
+    "delete_selected_aria_one": "Elimina {{count}} messaggio selezionato",
+    "delete_selected_aria_other": "Elimina {{count}} messaggi selezionati",
+    "delete_count": "Elimina ({{count}})",
+    "delete_all_aria": "Elimina tutti i messaggi",
+    "delete_all": "Elimina tutti",
+    "new_message": "Nuovo messaggio",
+    "empty": {
+      "title": "Nessun messaggio",
+      "description": "La posta in arrivo è vuota. Invia un nuovo messaggio per iniziare."
+    },
+    "tabs": {
+      "all": "Tutti",
+      "unread": "Non letti",
+      "read": "Letti"
+    },
+    "search_placeholder": "Cerca nei messaggi…",
+    "search_aria": "Cerca nei messaggi",
+    "sort_aria": "Ordina i messaggi",
+    "sort_by": "Ordina per",
+    "sort": {
+      "newest": "Più recenti",
+      "oldest": "Meno recenti"
+    },
+    "mark_all_read_aria": "Segna tutti come letti",
+    "mark_all_read": "Segna come letti",
+    "row_aria": "Messaggio da {{sender}}",
+    "no_results": {
+      "search": "Nessun messaggio corrisponde alla ricerca.",
+      "unread": "Nessun messaggio non letto.",
+      "read": "Nessun messaggio letto.",
+      "all": "Nessun messaggio trovato."
+    },
+    "selected_one": "{{count}} di {{total}} selezionato",
+    "selected_other": "{{count}} di {{total}} selezionati",
+    "count_one": "{{count}} messaggio",
+    "count_other": "{{count}} messaggi",
+    "rows_per_page": "Righe per pagina",
+    "page_of": "Pagina {{page}} di {{pages}}",
+    "pagination": {
+      "first": "Prima pagina",
+      "previous": "Pagina precedente",
+      "next": "Pagina successiva",
+      "last": "Ultima pagina"
+    },
+    "columns": {
+      "select_all": "Seleziona tutti",
+      "select_row": "Seleziona la riga",
+      "from": "Mittente",
+      "unread": "Non letto",
+      "message": "Messaggio",
+      "date": "Data",
+      "open_menu": "Apri il menu"
+    },
+    "toast": {
+      "marked_all_read": "Tutti i messaggi segnati come letti",
+      "deleted": "Messaggio eliminato",
+      "delete_failed": "Eliminazione del messaggio non riuscita",
+      "deleted_all": "Tutti i messaggi eliminati",
+      "delete_all_failed": "Eliminazione dei messaggi non riuscita",
+      "deleted_selected_one": "{{count}} messaggio eliminato",
+      "deleted_selected_other": "{{count}} messaggi eliminati",
+      "delete_selected_failed": "Eliminazione dei messaggi selezionati non riuscita"
+    }
+  },
+  "view_dialog": {
+    "title": "Messaggio da {{sender}}"
+  },
+  "delete_dialog": {
+    "title": "Elimina messaggio",
+    "description": "Vuoi davvero eliminare questo messaggio di {{sender}}? L'operazione non può essere annullata."
+  },
+  "delete_all_dialog": {
+    "title": "Elimina tutti i messaggi",
+    "description_one": "Vuoi davvero eliminare {{count}} messaggio? L'operazione non può essere annullata.",
+    "description_other": "Vuoi davvero eliminare tutti i {{count}} messaggi? L'operazione non può essere annullata."
+  },
+  "delete_selected_dialog": {
+    "title": "Elimina i messaggi selezionati",
+    "description_one": "Vuoi davvero eliminare {{count}} messaggio selezionato? L'operazione non può essere annullata.",
+    "description_other": "Vuoi davvero eliminare {{count}} messaggi selezionati? L'operazione non può essere annullata."
+  },
+  "compose": {
+    "title": "Nuovo messaggio",
+    "description": "Scrivi e invia un SMS.",
+    "phone_label": "Numero di telefono",
+    "message_label": "Messaggio",
+    "message_placeholder": "Scrivi il messaggio…",
+    "over_limit": "Il messaggio supera il limite di un singolo SMS: verrà inviato in più parti.",
+    "sending": "Invio…",
+    "send": "Invia",
+    "toast": {
+      "sent": "SMS inviato",
+      "send_failed": "Invio dell'SMS non riuscito"
+    }
+  },
+  "errors": {
+    "read_failed": "Impossibile leggere gli SMS",
+    "delete_failed": "Impossibile eliminare l'SMS",
+    "part_not_sent": "Parte {{part}} di {{total}} non inviata: {{reason}}",
+    "not_sent": "SMS non inviato: {{reason}}"
+  }
+}

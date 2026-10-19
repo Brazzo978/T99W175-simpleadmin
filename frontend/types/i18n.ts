@@ -16,7 +16,8 @@ export type Namespace =
   | "frequency-calculator"
   | "cellular"
   | "sim-profiles"
-  | "esim";
+  | "esim"
+  | "sms";
 
 export interface LanguageMeta {
   code: LanguageCode;

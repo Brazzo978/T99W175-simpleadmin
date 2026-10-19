@@ -1,0 +1,120 @@
+{
+  "page": {
+    "title": "SMS Center",
+    "description": "View, manage, and send SMS messages from your modem."
+  },
+  "actions": {
+    "view": "View",
+    "delete": "Delete",
+    "deleting": "Deleting…"
+  },
+  "inbox": {
+    "title": "Inbox",
+    "description": "View and manage your SMS messages",
+    "description_storage": "View and manage your SMS messages — {{used}}/{{total}} messages stored",
+    "load_failed": "Failed to load messages",
+    "load_failed_detail": "Couldn't load your SMS inbox",
+    "load_failed_detail_error": "Couldn't load your SMS inbox: {{error}}",
+    "refresh_aria": "Refresh inbox",
+    "delete_selected_aria_one": "Delete {{count}} selected",
+    "delete_selected_aria_other": "Delete {{count}} selected",
+    "delete_count": "Delete ({{count}})",
+    "delete_all_aria": "Delete all messages",
+    "delete_all": "Delete All",
+    "new_message": "New Message",
+    "empty": {
+      "title": "No messages",
+      "description": "Your inbox is empty. Send a new message to get started."
+    },
+    "tabs": {
+      "all": "All",
+      "unread": "Unread",
+      "read": "Read"
+    },
+    "search_placeholder": "Search messages…",
+    "search_aria": "Search messages",
+    "sort_aria": "Sort messages",
+    "sort_by": "Sort by",
+    "sort": {
+      "newest": "Newest",
+      "oldest": "Oldest"
+    },
+    "mark_all_read_aria": "Mark all as read",
+    "mark_all_read": "Mark all read",
+    "row_aria": "Message from {{sender}}",
+    "no_results": {
+      "search": "No messages match your search.",
+      "unread": "No unread messages.",
+      "read": "No read messages.",
+      "all": "No messages found."
+    },
+    "selected_one": "{{count}} of {{total}} selected",
+    "selected_other": "{{count}} of {{total}} selected",
+    "count_one": "{{count}} message",
+    "count_other": "{{count}} messages",
+    "rows_per_page": "Rows per page",
+    "page_of": "Page {{page}} of {{pages}}",
+    "pagination": {
+      "first": "First page",
+      "previous": "Previous page",
+      "next": "Next page",
+      "last": "Last page"
+    },
+    "columns": {
+      "select_all": "Select all",
+      "select_row": "Select row",
+      "from": "From",
+      "unread": "Unread",
+      "message": "Message",
+      "date": "Date",
+      "open_menu": "Open menu"
+    },
+    "toast": {
+      "marked_all_read": "All messages marked as read",
+      "deleted": "Message deleted",
+      "delete_failed": "Failed to delete message",
+      "deleted_all": "All messages deleted",
+      "delete_all_failed": "Failed to delete messages",
+      "deleted_selected_one": "{{count}} message deleted",
+      "deleted_selected_other": "{{count}} messages deleted",
+      "delete_selected_failed": "Failed to delete selected messages"
+    }
+  },
+  "view_dialog": {
+    "title": "Message from {{sender}}"
+  },
+  "delete_dialog": {
+    "title": "Delete Message",
+    "description": "Are you sure you want to delete this message from {{sender}}? This action cannot be undone."
+  },
+  "delete_all_dialog": {
+    "title": "Delete All Messages",
+    "description_one": "Are you sure you want to delete {{count}} message? This action cannot be undone.",
+    "description_other": "Are you sure you want to delete all {{count}} messages? This action cannot be undone."
+  },
+  "delete_selected_dialog": {
+    "title": "Delete Selected Messages",
+    "description_one": "Are you sure you want to delete {{count}} selected message? This action cannot be undone.",
+    "description_other": "Are you sure you want to delete {{count}} selected messages? This action cannot be undone."
+  },
+  "compose": {
+    "title": "New Message",
+    "description": "Compose and send an SMS message.",
+    "phone_label": "Phone Number",
+    "message_label": "Message",
+    "message_placeholder": "Type your message...",
+    "over_limit": "Message exceeds single SMS limit. It will be sent as multiple parts.",
+    "sending": "Sending…",
+    "send": "Send",
+    "toast": {
+      "sent": "SMS sent successfully",
+      "send_failed": "Failed to send SMS"
+    }
+  },
+  "errors": {
+    "read_failed": "Unable to read the SMS",
+    "delete_failed": "Unable to delete the SMS",
+    "part_not_sent": "Part {{part}} of {{total}} not sent: {{reason}}",
+    "not_sent": "SMS not sent: {{reason}}"
+  }
+}

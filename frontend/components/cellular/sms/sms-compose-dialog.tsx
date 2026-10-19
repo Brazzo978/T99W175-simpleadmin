@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,7 @@ export default function SmsComposeDialog({
   onSend,
   isSaving,
 }: SmsComposeDialogProps) {
+  const { t } = useTranslation("sms");
   const [phone, setPhone] = React.useState("");
   const [message, setMessage] = React.useState("");
 
@@ -52,12 +54,12 @@ export default function SmsComposeDialog({
 
     const success = await onSend(phone.trim(), message);
     if (success) {
-      toast.success("SMS sent successfully");
+      toast.success(t("compose.toast.sent"));
       setPhone("");
       setMessage("");
       onOpenChange(false);
     } else {
-      toast.error("Failed to send SMS");
+      toast.error(t("compose.toast.send_failed"));
     }
   };
 
@@ -73,14 +75,12 @@ export default function SmsComposeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New Message</DialogTitle>
-          <DialogDescription>
-            Compose and send an SMS message.
-          </DialogDescription>
+          <DialogTitle>{t("compose.title")}</DialogTitle>
+          <DialogDescription>{t("compose.description")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSend} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="sms-phone">Phone Number</Label>
+            <Label htmlFor="sms-phone">{t("compose.phone_label")}</Label>
             <Input
               id="sms-phone"
               type="tel"
@@ -92,7 +92,7 @@ export default function SmsComposeDialog({
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="sms-message">Message</Label>
+              <Label htmlFor="sms-message">{t("compose.message_label")}</Label>
               <span
                 className={`text-xs ${
                   isOverLimit
@@ -108,7 +108,7 @@ export default function SmsComposeDialog({
             </div>
             <Textarea
               id="sms-message"
-              placeholder="Type your message..."
+              placeholder={t("compose.message_placeholder")}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               disabled={isSaving}
@@ -117,8 +117,7 @@ export default function SmsComposeDialog({
             />
             {isOverLimit && (
               <p className="text-xs text-destructive">
-                Message exceeds single SMS limit. It will be sent as multiple
-                parts.
+                {t("compose.over_limit")}
               </p>
             )}
           </div>
@@ -129,16 +128,16 @@ export default function SmsComposeDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSaving}
             >
-              Cancel
+              {t("common:actions.cancel")}
             </Button>
             <Button type="submit" disabled={isSaving || !isValid}>
               {isSaving ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Sending&hellip;
+                  {t("compose.sending")}
                 </>
               ) : (
-                "Send"
+                t("compose.send")
               )}
             </Button>
           </DialogFooter>

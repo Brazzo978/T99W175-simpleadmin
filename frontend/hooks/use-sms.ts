@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { authFetch } from "@/lib/auth-fetch";
-import { sendAt } from "@/lib/at";
+import { sendAt, type AtResult } from "@/lib/at";
+import { msg, translate, type Msg } from "@/lib/i18n/message";
 import {
   SMS_LIST_COMMAND,
   encodeUcs2,
@@ -39,11 +41,19 @@ export interface UseSmsReturn {
   refresh: (silent?: boolean) => void;
 }
 
+/** Why an AT request failed: our own text translated, the CGI's or the
+ *  modem's as it is, or the fallback. */
+function atFailure(result: AtResult, fallbackKey: string): Msg | string {
+  return result.msg ?? (result.message || msg(fallbackKey));
+}
+
 export function useSms(): UseSmsReturn {
+  const { t } = useTranslation("sms");
   const [data, setData] = useState<SmsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Kept untranslated, so the text follows a language switch.
+  const [error, setError] = useState<Msg | string | null>(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -60,7 +70,7 @@ export function useSms(): UseSmsReturn {
     const list = await sendAt(SMS_LIST_COMMAND);
     if (!mounted.current) return;
     if (!list.ok) {
-      setError(list.message || "Unable to read the SMS");
+      setError(atFailure(list, "sms:errors.read_failed"));
       setIsLoading(false);
       return;
     }
@@ -92,7 +102,7 @@ export function useSms(): UseSmsReturn {
         const reference = Math.floor(Math.random() * 256);
         for (let i = 0; i < parts.length; i++) {
           let ok = false;
-          let reason = "";
+          let reason: Msg | string = "";
           try {
             const resp = await authFetch(SEND_ENDPOINT, {
               method: "POST",
@@ -107,13 +117,17 @@ export function useSms(): UseSmsReturn {
             ok = Boolean(json.success);
             reason = json.message || json.error_code || "";
           } catch {
-            reason = "Modem unreachable";
+            reason = msg("common:at.unreachable");
           }
           if (!ok) {
             setError(
               parts.length > 1
-                ? `Part ${i + 1} of ${parts.length} not sent: ${reason}`
-                : `SMS not sent: ${reason}`,
+                ? msg("sms:errors.part_not_sent", {
+                    part: i + 1,
+                    total: parts.length,
+                    reason,
+                  })
+                : msg("sms:errors.not_sent", { reason }),
             );
             return false;
           }
@@ -136,7 +150,7 @@ export function useSms(): UseSmsReturn {
         const command = [select, ...indexes.map((i) => `+CMGD=${i}`)].join(";");
         const result = await sendAt(command);
         if (!result.ok) {
-          setError(result.message || "Unable to delete the SMS");
+          setError(atFailure(result, "sms:errors.delete_failed"));
           return false;
         }
         await fetchInbox(true);
@@ -153,7 +167,7 @@ export function useSms(): UseSmsReturn {
     try {
       const result = await sendAt("AT+CMGD=,4");
       if (!result.ok) {
-        setError(result.message || "Unable to delete the SMS");
+        setError(atFailure(result, "sms:errors.delete_failed"));
         return false;
       }
       await fetchInbox(true);
@@ -167,7 +181,10 @@ export function useSms(): UseSmsReturn {
     data,
     isLoading,
     isSaving,
-    error,
+    error:
+      error === null || typeof error === "string"
+        ? error
+        : translate(t, error),
     sendSms,
     deleteSms,
     deleteAllSms,
