@@ -12,6 +12,7 @@ import type {
   DiagLteCell,
   DiagNrCell,
   DiagSnapshot,
+  DiagSummary,
   SystemSnapshot,
 } from "@/types/bridge";
 
@@ -112,12 +113,14 @@ function withQmiExtras(
   const radio = system?.radio;
   if (!radio) return snap;
 
+  // Only onto the same cell: around an NR handover QMI may still report
+  // the previous one for a few seconds.
   const nr0 = nr[0];
   if (
     nr0 &&
     radio.nr &&
     typeof radio.nr.sinr === "number" &&
-    (nr.length === 1 || radio.nr.pci === nr0.pci)
+    radio.nr.pci === nr0.pci
   ) {
     nr0.sinr = radio.nr.sinr;
   }
@@ -152,7 +155,29 @@ function withQmiExtras(
     }
     lte.push(blankScell(sc));
   });
+  // Cell counts and bandwidth again, with the SCells and bandwidths QMI
+  // added; the rates stay DIAG's. No summary from the bridge, none here.
+  if (diag.summary) snap.summary = summarize(lte, nr, diag.summary);
   return snap;
+}
+
+/** Totals over the cells; DL/UL rates from `rates` (0 without). */
+function summarize(
+  lte: DiagLteCell[],
+  nr: DiagNrCell[],
+  rates?: DiagSummary,
+): DiagSummary {
+  return {
+    cells: lte.length + nr.length,
+    lte: lte.length,
+    nr: nr.length,
+    total_bandwidth_mhz: [...lte, ...nr].reduce(
+      (sum, cell) => sum + (cell.bandwidth_mhz ?? 0),
+      0,
+    ),
+    total_dl_mbps: rates?.total_dl_mbps ?? 0,
+    total_ul_mbps: rates?.total_ul_mbps ?? 0,
+  };
 }
 
 function chainMask(chains: ChainValues | undefined): number {
@@ -203,20 +228,5 @@ function qmiAsDiag(system: SystemSnapshot): DiagSnapshot {
       rsrp_rx: n.rsrp_rx ?? NO_CHAINS,
     });
   }
-  const total = [...lte, ...nr].reduce(
-    (sum, cell) => sum + (cell.bandwidth_mhz ?? 0),
-    0,
-  );
-  return {
-    lte,
-    nr,
-    summary: {
-      cells: lte.length + nr.length,
-      lte: lte.length,
-      nr: nr.length,
-      total_bandwidth_mhz: total,
-      total_dl_mbps: 0,
-      total_ul_mbps: 0,
-    },
-  };
+  return { lte, nr, summary: summarize(lte, nr) };
 }

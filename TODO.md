@@ -76,10 +76,6 @@ this firmware sends (the "DIAG log coverage" card counts each log code).
 - [ ] system_bridge: hostname, kernel version, storage of `/data`
       (`hooks/use-modem-subsys.ts`), connection uptime, LTE category.
 - [ ] Change password from the user menu (today it is in Credentials).
-- [ ] `lib/bridge/radio.ts`: copy the QMI NR SINR only onto the same NR
-      PCI (today a single DIAG NR cell takes it unconditionally, wrong for a
-      few seconds around an NR handover); recompute `summary` after the QMI
-      merge if anything starts reading it.
 - [ ] `frontend/build.sh` always stamps `BUILD` as `-dirty`: it rewrites
       `deploy/www-nextjs` before running `git describe`.
 - [ ] Bump `next` past 16.0.7 (advisory concerns server features, not the
