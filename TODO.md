@@ -1,5 +1,41 @@
 # TODO
 
+## Status (2026-10-19, afternoon)
+
+Working through this list item by item; one commit per item on `Beta`,
+pushed at the end.
+
+- **In progress** (separate worktrees, merged when done):
+  - system_bridge: dashboard gaps, persistent data counter, signal and
+    latency history kept in the bridge, captive-portal probe.
+  - 4-tier watchdog and per-SIM profiles (APN + TTL).
+  - diag_bridge repo: a former PCell published next to the serving one
+    (the dashboard then counts too many carriers and reports false band
+    changes), and the NR TA subcarrier spacing not taken from 0xB825.
+- **Merged, not deployed yet** (waiting for the agents above, because the
+  `next` bump needs a fresh `npm ci` of the shared `node_modules`): next
+  16.4.2, clean `BUILD` stamp, change password from the user menu (open to
+  every role: each user changes their own password after typing the current
+  one; confirm this choice), `get_sys_info` removed, GUI toggle key moved
+  to `/data/simpleadmin/gui_toggle.key`, Antenna Statistics, Antenna
+  Alignment, Frequency Calculator.
+- **Done and verified on the modem today**: text assets installed
+  gzip-only (web root 5.5 → 2 MB, rootfs 4.9 → 7 MB free); band lock,
+  cell lock and APN change exercised and restored; APN change and airplane
+  mode moved from `CFUN=0` (lost the SIM until a reboot) to `CFUN=4`;
+  system_bridge back with every QMI service after a restart; `bridge0`
+  link-local stable across reboots (`fe80::255:7bff:feb5:7df7`); Recent
+  Activities fed (internet restored, CA and band changes, 5G handovers
+  seen live).
+- **Next**: deploy and verify the merged items, then move the page strings
+  to `locales/` (after every page change is in), then the Signal Details
+  cleanup (last, so the log counters cover more time under traffic).
+- **Outside this repository**: dc-rtr-01 keeps SLAAC default routes in
+  `lte-backup` via modem link-locals that ra-guard withdraws (router
+  lifetime 0, sent every 5 minutes, confirmed with a dump), and old SLAAC
+  addresses on `vl300_lte1` since lte-watch was removed. Reported to the
+  proxmox-infra session; core-side.
+
 ## Web interface (Next.js front-end)
 
 Port of the QManager frontend onto the bridges and the SimpleAdmin CGIs
@@ -50,21 +86,26 @@ pages removed from `frontend/` are re-imported from there when ported.
       (its ping/DNS checks). The log lives in the page, so a reload empties
       it. Check on the modem that the hold times and the dashboard filter
       keep it readable (RRC idle/connected cycles, SCell churn).
-- [ ] Signal history (30 min) and latency history (24 h) kept in the bridges
-      and sent on connect; today the store samples them in the browser.
-- [ ] Connectivity: upstream moved from the HTTP 204 probe back to ICMP; ours
-      (ICMP + DNS) is equivalent. Decide whether a captive-portal probe is
-      still wanted.
-- [ ] Watchdog with 4 tiers (COPS → CFUN → SIM switch → reboot) and rate
-      limit, replacing `connection_watchdog`.
+- [ ] (in progress) Signal history (30 min) and latency history (24 h) kept
+      in the bridges and sent on connect; today the store samples them in
+      the browser.
+- [ ] (in progress) Captive-portal probe (HTTP 204) added to the ICMP + DNS
+      checks: wanted (decided 2026-10-19).
+- [ ] (in progress) Watchdog with 4 tiers (COPS → CFUN=4/1 → SIM switch →
+      reboot) and rate limit, replacing `connection_watchdog` (decided
+      2026-10-19; never CFUN=0 on this modem).
 - [ ] Antenna Statistics, Antenna Alignment and Frequency Calculator are
       built (2026-10-19); check them on the modem: `rx_diversity` against
       the chains that report, NR per-chain SNR (`snr_rx`, not seen so far),
       an alignment recording under QMI fallback (2 s polls), and the
       calculator's band tables against the serving carriers.
-- [ ] Per-SIM profiles (APN + TTL) applied on SIM change.
-- [ ] Persistent data counter (rmnet bytes across reboots) in system_bridge
-      (`hooks/use-data-used.ts`).
+- [ ] (in progress) Per-SIM profiles (APN + TTL) applied on SIM change
+      (decided 2026-10-19).
+- [ ] (in progress) Persistent data counter across reboots
+      (`hooks/use-data-used.ts`). The source must include IPA-offloaded
+      traffic: diag_bridge's rates do, but they are rates with HARQ
+      retransmissions and the bridge reads DIAG only while a page is open;
+      a cumulative IPA-inclusive counter (QMI WDS byte totals) is preferred.
 
 ### Signal Details cleanup (after watching it under traffic)
 Every log is subscribed and every field shown, empty or not, to see what
@@ -76,12 +117,17 @@ this firmware sends (the "DIAG log coverage" card counts each log code).
 - [ ] Then hide the fields that never come (NR SNR, NR path loss, NR TX
       power...) instead of showing a dash, and decide whether the coverage
       card stays or moves to a diagnostics page.
-- [ ] NR timing advance: 0xB825 arrives but `ta_scs_estimated` stays true,
-      so its decoder probably does not extract the SCS (bridge side).
+- [ ] (in progress, bridge repo) NR timing advance: 0xB825 arrives but
+      `ta_scs_estimated` stays true, so its decoder probably does not
+      extract the SCS.
+- [ ] (in progress, bridge repo) A former PCell stays in `lte[]` next to the
+      serving one (seen: B20/PCI 26 still "measured" after the PCell moved to
+      B1/PCI 406), so Recent Activities counts 6 LTE carriers instead of 4
+      and reports a false band change.
 
 ### Gaps in the dashboard
-- [ ] system_bridge: hostname, kernel version, storage of `/data`
-      (`hooks/use-modem-subsys.ts`), connection uptime, LTE category.
+- [ ] (in progress) system_bridge: hostname, kernel version, storage of
+      `/data` (`hooks/use-modem-subsys.ts`), connection uptime, LTE category.
 
 ## Other
 - [ ] Verify a real SMS send through `atcli_smd8 -p` (`cgi-bin/send_sms`).
