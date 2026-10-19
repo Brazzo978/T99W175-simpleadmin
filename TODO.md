@@ -85,7 +85,11 @@ this firmware sends (the "DIAG log coverage" card counts each log code).
       MAC before persistent-mac sets the fixed one); ra-guard withdraws the
       old one, a stable one would make that unnecessary.
 - [ ] Verify a real SMS send through `atcli_smd8 -p` (`cgi-bin/send_sms`).
-- [ ] Verify QMI service rediscovery after an actual modem restart.
+- [ ] QMI service rediscovery while Linux keeps running (a modem subsystem
+      restart): `AT+CFUN=1,1` and `reboot` both restart the whole system,
+      after which system_bridge finds every service again (checked
+      2026-10-19); the in-process path (`qmi_lookup` when a service is
+      marked lost) has no way to be triggered from AT.
 - [ ] Remove the unused `cgi-bin/get_sys_info`?
 - [ ] `config/simpleadmin.conf` is readable without login and holds
       `SIMPLEADMIN_GUI_TOGGLE_KEY` (predates the new interface).
