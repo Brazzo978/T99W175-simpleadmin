@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeftRightIcon,
@@ -26,7 +27,6 @@ import {
 } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
-  RADIO_EVENT_CATEGORIES,
   describeEvent,
   eventCategory,
   eventSucceeded,
@@ -38,7 +38,7 @@ import type { RadioEventCategory, RadioRat, RrcInfo } from "@/types/bridge";
 
 // --- Classification ----------------------------------------------------------
 // The categories themselves live in lib/bridge/events.ts, shared with the
-// dashboard's Recent Activities.
+// dashboard's Recent Activities; their names in common:radio_category.
 
 type Category = RadioEventCategory;
 
@@ -52,19 +52,14 @@ const CATEGORY_ICONS: Record<Category, LucideIcon> = {
   other: CircleDotIcon,
 };
 
-const FILTERS: { value: "all" | Category; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "failure", label: "Failures" },
-  { value: "mobility", label: "Mobility" },
-  { value: "rrc", label: "RRC" },
-  { value: "rach", label: "RACH" },
-  { value: "ca", label: "CA" },
-];
+/** Filter tabs; each label is events.filter.<value>. */
+const FILTERS: ("all" | Category)[] = ["all", "failure", "mobility", "rrc", "rach", "ca"];
 
 // --- Pieces ------------------------------------------------------------------
 
 function CategoryBadge({ category, ok }: { category: Category; ok: boolean }) {
-  const label = RADIO_EVENT_CATEGORIES[category];
+  const { t } = useTranslation("signal");
+  const label = t(`common:radio_category.${category}`);
   const Icon = CATEGORY_ICONS[category];
   const tint =
     category === "failure"
@@ -133,12 +128,13 @@ function clock(ts: number): string {
 }
 
 function StateBadge({ rrc }: { rrc?: RrcInfo }) {
+  const { t } = useTranslation("signal");
   const state = rrc?.lte_state;
   if (!state) {
     return (
       <Badge variant="outline" className="border-muted-foreground/30 bg-muted/50 text-muted-foreground">
         <RadioTowerIcon className="size-3" />
-        LTE RRC unknown
+        {t("events.rrc_unknown")}
       </Badge>
     );
   }
@@ -151,7 +147,7 @@ function StateBadge({ rrc }: { rrc?: RrcInfo }) {
   return (
     <Badge variant="outline" className={tint}>
       <RadioTowerIcon className="size-3" />
-      LTE RRC {state}
+      {t("events.rrc_state", { state })}
       {typeof rrc?.lte_state_age_s === "number" && (
         <span className="font-normal opacity-80">· {duration(rrc.lte_state_age_s)}</span>
       )}
@@ -159,14 +155,15 @@ function StateBadge({ rrc }: { rrc?: RrcInfo }) {
   );
 }
 
-const COUNTERS: { key: string; label: string; failure: boolean }[] = [
-  { key: "lte_rlf", label: "LTE radio link failures", failure: true },
-  { key: "lte_oos", label: "LTE out of service", failure: true },
-  { key: "lte_ho_fail", label: "LTE handover failures", failure: true },
-  { key: "nr_ho", label: "5G handovers", failure: false },
-  { key: "nr_ho_fail", label: "5G handover failures", failure: true },
-  { key: "nr_scg_fail", label: "5G SCG failures", failure: true },
-  { key: "nr_mcg_fail", label: "5G MCG failures", failure: true },
+/** RRC counters of the bridge; each label is events.counters.<key>. */
+const COUNTERS: { key: string; failure: boolean }[] = [
+  { key: "lte_rlf", failure: true },
+  { key: "lte_oos", failure: true },
+  { key: "lte_ho_fail", failure: true },
+  { key: "nr_ho", failure: false },
+  { key: "nr_ho_fail", failure: true },
+  { key: "nr_scg_fail", failure: true },
+  { key: "nr_mcg_fail", failure: true },
 ];
 
 // --- Card --------------------------------------------------------------------
@@ -181,6 +178,7 @@ export function RadioEventsCard({
   rrc?: RrcInfo;
   live: boolean;
 }) {
+  const { t } = useTranslation("signal");
   const [filter, setFilter] = useState<"all" | Category>("all");
   const rows = useMemo(
     () =>
@@ -202,12 +200,8 @@ export function RadioEventsCard({
   return (
     <Card className="@container/card @3xl/main:col-span-2">
       <CardHeader>
-        <CardTitle>Radio events</CardTitle>
-        <CardDescription>
-          DIAG events, newest first: the bridge&apos;s last 20 when the page opens, then every
-          one while it stays open. State changes, handovers, failures, RACH and carrier
-          aggregation come only when something happens.
-        </CardDescription>
+        <CardTitle>{t("events.title")}</CardTitle>
+        <CardDescription>{t("events.description")}</CardDescription>
         <CardAction>
           <StateBadge rrc={rrc} />
         </CardAction>
@@ -225,7 +219,9 @@ export function RadioEventsCard({
                   bad ? "border-destructive/30 bg-destructive/5" : "bg-muted/30",
                 )}
               >
-                <span className="text-[11px] leading-tight text-muted-foreground">{c.label}</span>
+                <span className="text-[11px] leading-tight text-muted-foreground">
+                  {t(`events.counters.${c.key}`)}
+                </span>
                 <span className={cn("text-lg font-semibold tabular-nums", bad && "text-destructive")}>
                   {typeof v === "number" ? v : "—"}
                 </span>
@@ -234,7 +230,7 @@ export function RadioEventsCard({
           })}
         </div>
         <p className="-mt-2 text-[11px] text-muted-foreground">
-          Counters since diag_bridge started; they reset when it restarts.
+          {t("events.counters_note")}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -244,14 +240,14 @@ export function RadioEventsCard({
             size="sm"
             value={filter}
             onValueChange={(v) => v && setFilter(v as "all" | Category)}
-            aria-label="Event category"
+            aria-label={t("events.filter_aria")}
             className="flex-wrap"
           >
             {FILTERS.map((f) => (
-              <ToggleGroupItem key={f.value} value={f.value} className="px-2.5">
-                {f.label}
+              <ToggleGroupItem key={f} value={f} className="px-2.5">
+                {t(`events.filter.${f}`)}
                 <span className="ml-1 text-muted-foreground tabular-nums">
-                  {f.value === "all" ? rows.length : (counts[f.value] ?? 0)}
+                  {f === "all" ? rows.length : (counts[f] ?? 0)}
                 </span>
               </ToggleGroupItem>
             ))}
@@ -264,7 +260,7 @@ export function RadioEventsCard({
             disabled={events.length === 0}
           >
             <Trash2Icon />
-            Clear
+            {t("events.clear")}
           </Button>
         </div>
 
@@ -272,15 +268,15 @@ export function RadioEventsCard({
           className="h-96 overflow-y-auto rounded-lg border"
           role="log"
           aria-live="polite"
-          aria-label="Radio events"
+          aria-label={t("events.log_aria")}
         >
           {shown.length === 0 ? (
             <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
               {!live
-                ? "Needs diag_bridge: QMI does not report events."
+                ? t("events.empty_qmi")
                 : events.length === 0
-                  ? "No radio event since this page opened. A stable cell can stay quiet for a long time."
-                  : "No event of this category yet."}
+                  ? t("events.empty_none")
+                  : t("events.empty_category")}
             </div>
           ) : (
             <ul className="divide-y">

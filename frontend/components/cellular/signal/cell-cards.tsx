@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import { getValueColorClass } from "@/components/dashboard/signal-card-utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,7 +43,8 @@ const RSRP_RANGE = [-140, -44] as const;
 const SINR_RANGE = [-20, 30] as const;
 const TX_RANGE = [-40, 23] as const;
 
-const ANTENNA_NAMES = ["Main (PRX)", "Diversity (DRX)", "MIMO 3 (RX2)", "MIMO 4 (RX3)"];
+/** Receive chains in port order (keys under cell.antenna). */
+const ANTENNA_KEYS = ["main", "diversity", "mimo3", "mimo4"];
 
 const has = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
@@ -84,22 +86,24 @@ function ChainBars({
   range: readonly [number, number];
   thresholds: SignalThresholds;
 }) {
+  const { t } = useTranslation("signal");
   const chains = (values ?? []).map((v, i) => ({ v, i })).filter((c) => has(c.v));
   return (
     <div className="grid gap-2">
       <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">{label}</span>
-      {chains.length === 0 && <span className="text-sm text-muted-foreground">Not reported</span>}
+      {chains.length === 0 && <span className="text-sm text-muted-foreground">{t("cell.not_reported")}</span>}
       {chains.map(({ v, i }) => {
         const value = v as number;
+        const antenna = ANTENNA_KEYS[i] ? t(`cell.antenna.${ANTENNA_KEYS[i]}`) : "";
         return (
           <div key={i} className="grid grid-cols-[7.5rem_1fr_5rem] items-center gap-3 text-sm">
-            <span className="truncate text-muted-foreground">{ANTENNA_NAMES[i]}</span>
+            <span className="truncate text-muted-foreground">{antenna}</span>
             <RangeMeter
               value={value}
               min={range[0]}
               max={range[1]}
               quality={quality(value, thresholds)}
-              label={`${label} ${ANTENNA_NAMES[i]}`}
+              label={t("cell.chain_aria", { metric: label, antenna })}
             />
             <span className="text-right tabular-nums">{fmt(value, unit)}</span>
           </div>
@@ -123,6 +127,7 @@ function LinkAdaptation({
   txPower?: number;
   pcmax?: number;
 }) {
+  const { t } = useTranslation("signal");
   const cqiQ = quality(cqi, CQI_THRESHOLDS);
   const txQ = txPowerQuality(txPower);
   const rank = has(ri) ? ri : layers;
@@ -136,27 +141,34 @@ function LinkAdaptation({
             <span className="text-xs font-normal text-muted-foreground"> / 15</span>
           </span>
         </div>
-        <SegmentMeter value={cqi} max={15} quality={cqiQ} label="Wideband CQI" />
+        <SegmentMeter value={cqi} max={15} quality={cqiQ} label={t("cell.link_adaptation.cqi_aria")} />
       </div>
       <div className="grid content-start gap-2">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-xs text-muted-foreground">MIMO</span>
           <span className="font-semibold tabular-nums">
-            {has(rank) ? `rank ${Math.round(rank)}` : "—"}
+            {has(rank) ? t("cell.link_adaptation.rank_value", { rank: Math.round(rank) }) : "—"}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <RankDots rank={rank} label={has(rank) ? `Rank ${Math.round(rank)} of 4` : "Rank unknown"} />
+          <RankDots
+            rank={rank}
+            label={
+              has(rank)
+                ? t("cell.link_adaptation.rank_of", { rank: Math.round(rank) })
+                : t("cell.link_adaptation.rank_unknown")
+            }
+          />
           {has(layers) && has(ri) && (
             <span className="text-[11px] text-muted-foreground tabular-nums">
-              {layers.toFixed(1)} layers used
+              {t("cell.link_adaptation.layers_used", { layers: layers.toFixed(1) })}
             </span>
           )}
         </div>
       </div>
       <div className="grid content-start gap-2">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-xs text-muted-foreground">TX power</span>
+          <span className="text-xs text-muted-foreground">{t("cell.link_adaptation.tx_power")}</span>
           <span className={cn("font-semibold tabular-nums", getValueColorClass(txQ))}>
             {fmt(txPower, "dBm")}
           </span>
@@ -167,12 +179,12 @@ function LinkAdaptation({
           max={TX_RANGE[1]}
           quality={txQ}
           marker={pcmax}
-          label="PUSCH TX power"
+          label={t("cell.link_adaptation.tx_power_aria")}
         />
         <span className="text-[11px] text-muted-foreground">
           {has(txPower)
-            ? "Last PUSCH transmission, not an average"
-            : "No PUSCH in the last 5 s"}
+            ? t("cell.link_adaptation.tx_last")
+            : t("cell.link_adaptation.tx_none")}
         </span>
       </div>
     </div>
@@ -187,14 +199,15 @@ interface LinkRow {
 
 /** DL against UL, one row per quantity; a dash where the modem reports nothing. */
 function LinkTable({ rows }: { rows: LinkRow[] }) {
+  const { t } = useTranslation("signal");
   const shown = rows;
   return (
     <Table>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead className="h-8 text-xs">Link</TableHead>
-          <TableHead className="h-8 text-right text-xs">Downlink</TableHead>
-          <TableHead className="h-8 text-right text-xs">Uplink</TableHead>
+          <TableHead className="h-8 text-xs">{t("cell.link.head")}</TableHead>
+          <TableHead className="h-8 text-right text-xs">{t("cell.link.downlink")}</TableHead>
+          <TableHead className="h-8 text-right text-xs">{t("cell.link.uplink")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -242,25 +255,38 @@ function TimingAdvance({
   scs?: number;
   scsEstimated?: boolean;
 }) {
-  if (!has(ta)) return <Detail label="TA" value="— (no RACH logged yet)" />;
+  const { t } = useTranslation("signal");
+  const label = t("cell.detail.ta");
+  if (!has(ta)) return <Detail label={label} value={t("cell.ta.none")} />;
   const parts = [`${ta}`];
   if (has(meters)) {
     parts.push(meters >= 1000 ? `≈ ${(meters / 1000).toFixed(2)} km` : `≈ ${Math.round(meters)} m`);
   }
-  if (has(scs)) parts.push(`SCS ${scs} kHz${scsEstimated ? " (est.)" : ""}`);
-  if (has(age)) parts.push(`${age} s ago`);
-  return <Detail label="TA" value={parts.join(" · ")} />;
+  if (has(scs)) parts.push(t(scsEstimated ? "cell.ta.scs_estimated" : "cell.ta.scs", { scs }));
+  if (has(age)) parts.push(t("cell.ta.age", { age }));
+  return <Detail label={label} value={parts.join(" · ")} />;
+}
+
+/** " · 20 MHz", " · 20 MHz (est.)" or nothing: the tail of a cell description. */
+function useBandwidthSuffix() {
+  const { t } = useTranslation("signal");
+  return (mhz: number | undefined, estimated: boolean | undefined) =>
+    mhz ? t(estimated ? "cell.bandwidth_estimated" : "cell.bandwidth", { mhz }) : "";
 }
 
 export function LteCard({ cell }: { cell: DiagLteCell }) {
-  const title = cell.is_scell ? `LTE SCell ${cell.scell_idx}` : "LTE Primary Cell";
+  const { t } = useTranslation("signal");
+  const bandwidth = useBandwidthSuffix();
+  const title = cell.is_scell
+    ? t("cell.lte_scell", { index: cell.scell_idx })
+    : t("cell.lte_primary");
   return (
     <Card className="@container/card">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Band {cell.band} · EARFCN {cell.earfcn} · PCI {cell.pci}
-          {cell.bandwidth_mhz ? ` · ${cell.bandwidth_mhz} MHz${cell.bandwidth_estimated ? " (est.)" : ""}` : ""}
+          {t("cell.lte_description", { band: cell.band, earfcn: cell.earfcn, pci: cell.pci })}
+          {bandwidth(cell.bandwidth_mhz, cell.bandwidth_estimated)}
         </CardDescription>
         <CardAction>
           <Badge variant="outline">{cell.is_scell ? "SCC" : "PCC"}</Badge>
@@ -269,7 +295,7 @@ export function LteCard({ cell }: { cell: DiagLteCell }) {
       <CardContent className="grid gap-5">
         {cell.measured === false ? (
           <p className="text-sm text-muted-foreground">
-            Configured by the network, not measured by this firmware.
+            {t("cell.not_measured")}
           </p>
         ) : (
           <>
@@ -279,41 +305,41 @@ export function LteCard({ cell }: { cell: DiagLteCell }) {
               <Metric label="RSSI" value={cell.rssi} unit="dBm" />
               <Metric label="SINR" value={cell.sinr} unit="dB" thresholds={SINR_THRESHOLDS} />
             </div>
-            <ChainBars label="RSRP per antenna" values={cell.rsrp_rx} unit="dBm" range={RSRP_RANGE} thresholds={RSRP_THRESHOLDS} />
-            <ChainBars label="SINR per antenna" values={cell.sinr_rx} unit="dB" range={SINR_RANGE} thresholds={SINR_THRESHOLDS} />
+            <ChainBars label={t("cell.rsrp_per_antenna")} values={cell.rsrp_rx} unit="dBm" range={RSRP_RANGE} thresholds={RSRP_THRESHOLDS} />
+            <ChainBars label={t("cell.sinr_per_antenna")} values={cell.sinr_rx} unit="dB" range={SINR_RANGE} thresholds={SINR_THRESHOLDS} />
           </>
         )}
         <LinkAdaptation cqi={cell.cqi} ri={cell.ri} txPower={cell.tx_power_dbm} pcmax={cell.mtpl_dbm} />
         <LinkTable
           rows={[
-            { label: "Modulation", dl: cell.modulation, ul: cell.ul_modulation },
-            { label: "MCS", dl: has(cell.mcs) ? cell.mcs : undefined },
+            { label: t("cell.link.modulation"), dl: cell.modulation, ul: cell.ul_modulation },
+            { label: t("cell.link.mcs"), dl: has(cell.mcs) ? cell.mcs : undefined },
             {
-              label: "Resource blocks",
-              dl: has(cell.bandwidth_prb) ? `${cell.bandwidth_prb} PRB cell` : undefined,
+              label: t("cell.link.resource_blocks"),
+              dl: has(cell.bandwidth_prb) ? t("cell.link.prb_cell", { prb: cell.bandwidth_prb }) : undefined,
               ul: has(cell.ul_rb) ? `${cell.ul_rb.toFixed(1)} RB` : undefined,
             },
-            { label: "BLER", dl: has(cell.dl_bler) ? <Bler value={cell.dl_bler} /> : undefined },
+            { label: t("cell.link.bler"), dl: has(cell.dl_bler) ? <Bler value={cell.dl_bler} /> : undefined },
             {
-              label: "Throughput",
+              label: t("cell.link.throughput"),
               dl: has(cell.dl_mbps) ? <Rate value={cell.dl_mbps} /> : undefined,
               ul: has(cell.ul_mbps) ? <Rate value={cell.ul_mbps} /> : undefined,
             },
             {
-              label: "Power headroom",
+              label: t("cell.link.power_headroom"),
               ul: has(cell.phr_db) ? `${cell.phr_db} dB` : undefined,
             },
             {
-              label: "Max TX power (MTPL)",
+              label: t("cell.link.mtpl"),
               ul: has(cell.mtpl_dbm) ? `${cell.mtpl_dbm} dBm` : undefined,
             },
           ]}
         />
         <div className="flex flex-wrap gap-2">
-          <Detail label="Cell ID" value={cell.cell_id} />
-          <Detail label="TAC" value={cell.tac} />
-          <Detail label="PLMN" value={cell.mcc != null && cell.mnc != null ? `${cell.mcc}-${cell.mnc}` : null} />
-          <Detail label="TX antennas" value={cell.tx_antennas} />
+          <Detail label={t("cell.detail.cell_id")} value={cell.cell_id} />
+          <Detail label={t("cell.detail.tac")} value={cell.tac} />
+          <Detail label={t("cell.detail.plmn")} value={cell.mcc != null && cell.mnc != null ? `${cell.mcc}-${cell.mnc}` : null} />
+          <Detail label={t("cell.detail.tx_antennas")} value={cell.tx_antennas} />
           <TimingAdvance ta={cell.ta} meters={cell.ta_m} age={cell.ta_age_s} />
         </div>
       </CardContent>
@@ -322,10 +348,12 @@ export function LteCard({ cell }: { cell: DiagLteCell }) {
 }
 
 export function NrCard({ cell, index, nsa }: { cell: DiagNrCell; index: number; nsa: boolean }) {
+  const { t } = useTranslation("signal");
+  const bandwidth = useBandwidthSuffix();
   const title = nsa
-    ? index === 0 ? "5G NSA Cell" : `5G NSA Cell ${index + 1}`
-    : index === 0 ? "5G Primary Cell" : `5G SCell ${index}`;
-  const sinrNote = has(cell.sinr_age_s) ? `RRC report, ${cell.sinr_age_s} s ago` : undefined;
+    ? index === 0 ? t("cell.nsa_cell") : t("cell.nsa_cell_n", { index: index + 1 })
+    : index === 0 ? t("cell.nr_primary") : t("cell.nr_scell", { index });
+  const sinrNote = has(cell.sinr_age_s) ? t("cell.sinr_note", { age: cell.sinr_age_s }) : undefined;
   // 0 dBm comes with an idle uplink: the bridge has no Pcmax to report then.
   const pcmax = has(cell.pcmax_dbm) && cell.pcmax_dbm > 0 ? cell.pcmax_dbm : undefined;
   return (
@@ -333,8 +361,10 @@ export function NrCard({ cell, index, nsa }: { cell: DiagNrCell; index: number; 
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>
-          {cell.band ? `Band n${cell.band} · ` : ""}NR-ARFCN {cell.arfcn} · PCI {cell.pci}
-          {cell.bandwidth_mhz ? ` · ${cell.bandwidth_mhz} MHz${cell.bandwidth_estimated ? " (est.)" : ""}` : ""}
+          {cell.band
+            ? t("cell.nr_description_band", { band: cell.band, arfcn: cell.arfcn, pci: cell.pci })
+            : t("cell.nr_description", { arfcn: cell.arfcn, pci: cell.pci })}
+          {bandwidth(cell.bandwidth_mhz, cell.bandwidth_estimated)}
         </CardDescription>
         <CardAction>
           <Badge variant="outline">NR</Badge>
@@ -345,10 +375,10 @@ export function NrCard({ cell, index, nsa }: { cell: DiagNrCell; index: number; 
           <Metric label="RSRP" value={cell.rsrp} unit="dBm" thresholds={RSRP_THRESHOLDS} />
           <Metric label="RSRQ" value={cell.rsrq} unit="dB" thresholds={RSRQ_THRESHOLDS} />
           <Metric label="SINR" value={cell.sinr} unit="dB" thresholds={SINR_THRESHOLDS} note={sinrNote} />
-          <Metric label="SNR (best)" value={cell.snr} unit="dB" thresholds={SINR_THRESHOLDS} />
+          <Metric label={t("cell.snr_best")} value={cell.snr} unit="dB" thresholds={SINR_THRESHOLDS} />
         </div>
-        <ChainBars label="RSRP per antenna" values={cell.rsrp_rx} unit="dBm" range={RSRP_RANGE} thresholds={RSRP_THRESHOLDS} />
-        <ChainBars label="SNR per antenna" values={cell.snr_rx} unit="dB" range={SINR_RANGE} thresholds={SINR_THRESHOLDS} />
+        <ChainBars label={t("cell.rsrp_per_antenna")} values={cell.rsrp_rx} unit="dBm" range={RSRP_RANGE} thresholds={RSRP_THRESHOLDS} />
+        <ChainBars label={t("cell.snr_per_antenna")} values={cell.snr_rx} unit="dB" range={SINR_RANGE} thresholds={SINR_THRESHOLDS} />
         <LinkAdaptation
           cqi={cell.cqi}
           ri={cell.ri}
@@ -358,48 +388,48 @@ export function NrCard({ cell, index, nsa }: { cell: DiagNrCell; index: number; 
         />
         <LinkTable
           rows={[
-            { label: "Modulation", dl: cell.modulation },
+            { label: t("cell.link.modulation"), dl: cell.modulation },
             {
-              label: "MCS (avg)",
+              label: t("cell.link.mcs_avg"),
               dl: has(cell.dl_mcs) ? cell.dl_mcs.toFixed(1) : undefined,
               ul: has(cell.ul_mcs) ? cell.ul_mcs.toFixed(1) : undefined,
             },
-            { label: "Layers (avg)", dl: has(cell.dl_layers) ? cell.dl_layers.toFixed(1) : undefined },
+            { label: t("cell.link.layers_avg"), dl: has(cell.dl_layers) ? cell.dl_layers.toFixed(1) : undefined },
             {
-              label: "Resource blocks",
+              label: t("cell.link.resource_blocks"),
               dl: has(cell.dl_rb) ? `${cell.dl_rb.toFixed(0)} RB` : undefined,
               ul: has(cell.ul_prb) ? `${cell.ul_prb.toFixed(0)} PRB` : undefined,
             },
             {
-              label: "Bandwidth",
+              label: t("cell.link.bandwidth"),
               dl: cell.bandwidth_mhz ? `${cell.bandwidth_mhz} MHz` : undefined,
               ul: cell.ul_bandwidth_mhz ? `${cell.ul_bandwidth_mhz} MHz` : undefined,
             },
-            { label: "BLER", dl: has(cell.dl_bler) ? <Bler value={cell.dl_bler} /> : undefined },
+            { label: t("cell.link.bler"), dl: has(cell.dl_bler) ? <Bler value={cell.dl_bler} /> : undefined },
             {
-              label: "Throughput",
+              label: t("cell.link.throughput"),
               dl: has(cell.dl_mbps) ? <Rate value={cell.dl_mbps} /> : undefined,
               ul: has(cell.ul_mbps) ? <Rate value={cell.ul_mbps} /> : undefined,
             },
             {
-              label: "Path loss",
+              label: t("cell.link.path_loss"),
               dl: has(cell.pathloss_db) ? `${cell.pathloss_db.toFixed(1)} dB` : undefined,
             },
             {
-              label: "Power headroom",
+              label: t("cell.link.power_headroom"),
               ul: has(cell.phr_db) ? `${cell.phr_db.toFixed(1)} dB` : undefined,
             },
             {
-              label: "Pcmax",
+              label: t("cell.link.pcmax"),
               ul: has(pcmax) ? `${pcmax.toFixed(1)} dBm` : undefined,
             },
           ]}
         />
         <div className="flex flex-wrap gap-2">
-          <Detail label="SSB" value={cell.ssb} />
-          <Detail label="Beams" value={cell.num_beams} />
-          <Detail label="Neighbours" value={cell.neighbor_cells} />
-          <Detail label="Cell ID" value={cell.cell_id} />
+          <Detail label={t("cell.detail.ssb")} value={cell.ssb} />
+          <Detail label={t("cell.detail.beams")} value={cell.num_beams} />
+          <Detail label={t("cell.detail.neighbours")} value={cell.neighbor_cells} />
+          <Detail label={t("cell.detail.cell_id")} value={cell.cell_id} />
           <TimingAdvance
             ta={cell.ta}
             meters={cell.ta_m}

@@ -1,9 +1,11 @@
 import enCommon from "@/locales/en/common.json";
 import enSidebar from "@/locales/en/sidebar.json";
 import enDashboard from "@/locales/en/dashboard.json";
+import enSignal from "@/locales/en/signal.json";
 import itCommon from "@/locales/it/common.json";
 import itSidebar from "@/locales/it/sidebar.json";
 import itDashboard from "@/locales/it/dashboard.json";
+import itSignal from "@/locales/it/signal.json";
 
 // Static resources for i18next. Every bundled language declares every
 // namespace: one per page (or page group), plus common, sidebar and
@@ -14,11 +16,13 @@ export const resources = {
     common: enCommon,
     sidebar: enSidebar,
     dashboard: enDashboard,
+    signal: enSignal,
   },
   it: {
     common: itCommon,
     sidebar: itSidebar,
     dashboard: itDashboard,
+    signal: itSignal,
   },
 } as const;
 
@@ -27,4 +31,5 @@ export const ALL_NAMESPACES = [
   "common",
   "sidebar",
   "dashboard",
+  "signal",
 ] as const;

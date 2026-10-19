@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import {
   Card,
@@ -64,8 +65,10 @@ function EmptyChart({ height, children }: { height: string; children: React.Reac
 
 /** One metric over time, LTE PCell against the first NR cell. */
 export function TrendCard({ samples, from, to }: { samples: RadioSample[]; from: number; to: number }) {
+  const { t } = useTranslation("signal");
   const [key, setKey] = useState<MetricKey>("sinr");
   const def = METRICS[key];
+  const label = t(`metrics.${key}`);
   const scale = def.scale ?? 1;
   const data = useMemo(
     () =>
@@ -89,20 +92,20 @@ export function TrendCard({ samples, from, to }: { samples: RadioSample[]; from:
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Trends</CardTitle>
+        <CardTitle>{t("trend.title")}</CardTitle>
         <CardDescription>
-          {def.label}
-          {def.unit ? ` (${def.unit})` : ""} over the window, PCell against the 5G cell.
+          {def.unit
+            ? t("trend.description_unit", { metric: label, unit: def.unit })
+            : t("trend.description", { metric: label })}
         </CardDescription>
         <CardAction>
-          <MetricPicker value={key} onChange={setKey} options={TREND_METRICS} ariaLabel="Trend metric" />
+          <MetricPicker value={key} onChange={setKey} options={TREND_METRICS} ariaLabel={t("trend.picker_aria")} />
         </CardAction>
       </CardHeader>
       <CardContent className="grid gap-4">
         {!hasLte && !hasNr ? (
           <EmptyChart height="h-[240px]">
-            No {def.label} samples in this window.
-            {key === "tx_power" ? " TX power is the last PUSCH transmission, kept for 5 s." : ""}
+            {t(key === "tx_power" ? "chart_empty.no_samples_tx_power" : "chart_empty.no_samples", { metric: label })}
           </EmptyChart>
         ) : (
           <ChartContainer config={ratConfig} className="aspect-auto h-[240px] w-full">
@@ -163,11 +166,13 @@ export function TrendCard({ samples, from, to }: { samples: RadioSample[]; from:
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="h-8 text-xs">{def.label}{def.unit ? ` (${def.unit})` : ""}</TableHead>
-                <TableHead className="h-8 text-right text-xs">Now</TableHead>
-                <TableHead className="h-8 text-right text-xs">Min</TableHead>
-                <TableHead className="h-8 text-right text-xs">Mean</TableHead>
-                <TableHead className="h-8 text-right text-xs">Max</TableHead>
+                <TableHead className="h-8 text-xs">
+                  {def.unit ? t("stats.metric_unit", { metric: label, unit: def.unit }) : label}
+                </TableHead>
+                <TableHead className="h-8 text-right text-xs">{t("stats.now")}</TableHead>
+                <TableHead className="h-8 text-right text-xs">{t("stats.min")}</TableHead>
+                <TableHead className="h-8 text-right text-xs">{t("stats.mean")}</TableHead>
+                <TableHead className="h-8 text-right text-xs">{t("stats.max")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -194,6 +199,8 @@ export function TrendCard({ samples, from, to }: { samples: RadioSample[]; from:
 }
 
 function SummaryTable({ lte, nr, def }: { lte: Summary | null; nr: Summary | null; def: MetricDef }) {
+  const { t } = useTranslation("signal");
+  const label = t(`metrics.${def.key}`);
   const rows = [
     { name: "LTE", swatch: "bg-chart-lte", s: lte },
     { name: "5G NR", swatch: "bg-chart-nr", s: nr },
@@ -204,14 +211,16 @@ function SummaryTable({ lte, nr, def }: { lte: Summary | null; nr: Summary | nul
     <Table>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead className="h-8 text-xs">{def.label}{def.unit ? ` (${def.unit})` : ""}</TableHead>
-          <TableHead className="h-8 text-right text-xs">Samples</TableHead>
-          <TableHead className="h-8 text-right text-xs">Min</TableHead>
-          <TableHead className="h-8 text-right text-xs">P10</TableHead>
-          <TableHead className="h-8 text-right text-xs">Median</TableHead>
-          <TableHead className="h-8 text-right text-xs">Mean</TableHead>
-          <TableHead className="h-8 text-right text-xs">P90</TableHead>
-          <TableHead className="h-8 text-right text-xs">Max</TableHead>
+          <TableHead className="h-8 text-xs">
+            {def.unit ? t("stats.metric_unit", { metric: label, unit: def.unit }) : label}
+          </TableHead>
+          <TableHead className="h-8 text-right text-xs">{t("stats.samples")}</TableHead>
+          <TableHead className="h-8 text-right text-xs">{t("stats.min")}</TableHead>
+          <TableHead className="h-8 text-right text-xs">{t("stats.p10")}</TableHead>
+          <TableHead className="h-8 text-right text-xs">{t("stats.median")}</TableHead>
+          <TableHead className="h-8 text-right text-xs">{t("stats.mean")}</TableHead>
+          <TableHead className="h-8 text-right text-xs">{t("stats.p90")}</TableHead>
+          <TableHead className="h-8 text-right text-xs">{t("stats.max")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -239,13 +248,17 @@ function SummaryTable({ lte, nr, def }: { lte: Summary | null; nr: Summary | nul
 
 /** Histogram of one metric, each RAT normalized to its own sample count. */
 export function DistributionCard({ samples }: { samples: RadioSample[] }) {
+  const { t } = useTranslation("signal");
   const [key, setKey] = useState<MetricKey>("cqi");
   const def = METRICS[key];
+  const label = t(`metrics.${key}`);
   const { bins, lteSum, nrSum } = useMemo(() => {
     const lte = seriesValues(samples, "lte", key);
     const nr = seriesValues(samples, "nr", key);
-    return { bins: histogram(lte, nr, def), lteSum: summarize(lte), nrSum: summarize(nr) };
-  }, [samples, key, def]);
+    const binLabel = (lo: number, hi: number, integer: boolean) =>
+      integer ? `${label} ${lo}` : t("distribution.range", { lo, hi, unit: def.unit }).trim();
+    return { bins: histogram(lte, nr, def, binLabel), lteSum: summarize(lte), nrSum: summarize(nr) };
+  }, [samples, key, def, label, t]);
   const hasLte = lteSum !== null;
   const hasNr = nrSum !== null;
   const top = Math.min(
@@ -255,19 +268,18 @@ export function DistributionCard({ samples }: { samples: RadioSample[] }) {
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Distributions</CardTitle>
+        <CardTitle>{t("distribution.title")}</CardTitle>
         <CardDescription>
-          Share of the window&apos;s samples in each {def.label} bin, per radio technology.
+          {t("distribution.description", { metric: label })}
         </CardDescription>
         <CardAction>
-          <MetricPicker value={key} onChange={setKey} options={DIST_METRICS} ariaLabel="Distribution metric" />
+          <MetricPicker value={key} onChange={setKey} options={DIST_METRICS} ariaLabel={t("distribution.picker_aria")} />
         </CardAction>
       </CardHeader>
       <CardContent className="grid gap-4">
         {bins.length === 0 ? (
           <EmptyChart height="h-[240px]">
-            No {def.label} samples in this window.
-            {key === "tx_power" ? " TX power is the last PUSCH transmission, kept for 5 s." : ""}
+            {t(key === "tx_power" ? "chart_empty.no_samples_tx_power" : "chart_empty.no_samples", { metric: label })}
           </EmptyChart>
         ) : (
           <ChartContainer config={ratConfig} className="aspect-auto h-[240px] w-full">

@@ -1,6 +1,8 @@
 "use client";
 
 import { CheckCircle2Icon, ClockIcon, MinusCircleIcon } from "lucide-react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { getValueColorClass } from "@/components/dashboard/signal-card-utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,6 +29,7 @@ const NUM = "text-right tabular-nums";
 
 /** LTE neighbour cells (0xB180), strongest first, against the serving cell. */
 export function NeighbourCard({ snapshot, live }: { snapshot: DiagSnapshot; live: boolean }) {
+  const { t } = useTranslation("signal");
   const rows = (snapshot.lte_neighbors ?? []).slice().sort((a, b) => b.rsrp - a.rsrp);
   const serving = snapshot.lte.filter((c) => c.measured !== false && typeof c.rsrp === "number");
   const pcell = serving.find((c) => !c.is_scell);
@@ -35,33 +38,28 @@ export function NeighbourCard({ snapshot, live }: { snapshot: DiagSnapshot; live
   return (
     <Card className="@container/card @3xl/main:col-span-2">
       <CardHeader>
-        <CardTitle>LTE neighbour cells</CardTitle>
-        <CardDescription>
-          Cells the modem measured in the last 10 s (0xB180), strongest first. Δ is against
-          the serving cell on the same EARFCN, else the PCell.
-        </CardDescription>
+        <CardTitle>{t("neighbours.title")}</CardTitle>
+        <CardDescription>{t("neighbours.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>EARFCN</TableHead>
-              <TableHead>Band</TableHead>
-              <TableHead className={NUM}>PCI</TableHead>
-              <TableHead className={NUM}>RSRP</TableHead>
-              <TableHead className={NUM}>RSRQ</TableHead>
-              <TableHead className={NUM}>RSSI</TableHead>
-              <TableHead className={NUM}>Δ RSRP</TableHead>
-              <TableHead className={NUM}>Age</TableHead>
+              <TableHead>{t("neighbours.head.earfcn")}</TableHead>
+              <TableHead>{t("neighbours.head.band")}</TableHead>
+              <TableHead className={NUM}>{t("neighbours.head.pci")}</TableHead>
+              <TableHead className={NUM}>{t("neighbours.head.rsrp")}</TableHead>
+              <TableHead className={NUM}>{t("neighbours.head.rsrq")}</TableHead>
+              <TableHead className={NUM}>{t("neighbours.head.rssi")}</TableHead>
+              <TableHead className={NUM}>{t("neighbours.head.delta_rsrp")}</TableHead>
+              <TableHead className={NUM}>{t("neighbours.head.age")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={8} className="py-6 text-center text-sm text-muted-foreground">
-                  {live
-                    ? "No neighbour measurement in the last 10 s."
-                    : "Needs diag_bridge: QMI does not report neighbour cells."}
+                  {live ? t("neighbours.empty_live") : t("neighbours.empty_qmi")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -83,7 +81,9 @@ export function NeighbourCard({ snapshot, live }: { snapshot: DiagSnapshot; live
                     <TableCell className={NUM}>
                       {delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta.toFixed(1)}`}
                     </TableCell>
-                    <TableCell className={cn(NUM, "text-muted-foreground")}>{n.age_s} s</TableCell>
+                    <TableCell className={cn(NUM, "text-muted-foreground")}>
+                      {t("neighbours.age", { age: n.age_s })}
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -95,47 +95,49 @@ export function NeighbourCard({ snapshot, live }: { snapshot: DiagSnapshot; live
   );
 }
 
-/** What each subscribed log is and which JSON keys it fills. */
+/** What each subscribed log is (its Qualcomm name) and which JSON keys it
+ *  fills (a key under diag_logs.feeds). */
 const LOG_INFO: Record<string, { name: string; feeds: string }> = {
-  "0xB17F": { name: "LTE ML1 serving cell meas & eval", feeds: "LTE serving measurements" },
-  "0xB193": { name: "LTE ML1 serving cell meas response", feeds: "LTE RSRP/RSRQ/RSSI, per-chain RSRP/SINR" },
-  "0xB197": { name: "LTE ML1 serving cell info", feeds: "LTE bandwidth" },
-  "0xB0C2": { name: "LTE RRC serving cell info", feeds: "LTE cell ID, TAC, bandwidth" },
-  "0xB0C0": { name: "LTE RRC OTA message", feeds: "SCells, cell identity, NR bandwidth" },
-  "0xB173": { name: "LTE PDSCH stat indication", feeds: "LTE DL rate, BLER, modulation, MCS" },
-  "0xB063": { name: "LTE MAC DL transport block", feeds: "LTE DL transport blocks" },
-  "0xB139": { name: "LTE PUSCH TX report", feeds: "LTE UL rate, UL RB, UL modulation" },
-  "0xB823": { name: "NR RRC serving cell info", feeds: "NR band, cell identity" },
-  "0xB97F": { name: "NR ML1 measurement database", feeds: "NR RSRP/RSRQ, SSB, beams, neighbours" },
-  "0xB88F": { name: "NR ML1 DL demapper config", feeds: "NR modulation" },
-  "0xB888": { name: "NR MAC PDSCH stats", feeds: "NR DL rate, BLER" },
-  "0xB881": { name: "NR MAC UL TB stats", feeds: "NR UL rate, MCS, PRB, PHR, Pcmax" },
-  "0xB887": { name: "NR MAC PDSCH status", feeds: "NR DL MCS, RB, layers" },
-  "0xB8A7": { name: "NR MAC CSF report", feeds: "NR CQI, rank" },
-  "0xB14D": { name: "LTE LL1 PUCCH CSF", feeds: "LTE CQI, rank" },
-  "0xB16D": { name: "LTE ML1 GM TX report", feeds: "LTE TX power" },
-  "0xB184": { name: "LTE ML1 CA metrics", feeds: "bandwidths, SCells after a restart" },
-  "0xB168": { name: "LTE ML1 RAR (Msg2)", feeds: "LTE timing advance" },
-  "0xB88A": { name: "NR MAC RACH attempt", feeds: "NR timing advance" },
-  "0xB825": { name: "NR RRC configuration info", feeds: "NR bandwidths, SCS" },
-  "0xB0C1": { name: "LTE RRC MIB message", feeds: "LTE bandwidth" },
-  "0xB8D8": { name: "NR LL1 serving SNR", feeds: "NR SNR per chain" },
-  "0xB884": { name: "NR MAC UL power control", feeds: "NR TX power, path loss" },
-  "0xB180": { name: "LTE ML1 neighbour measurements", feeds: "LTE neighbour cells" },
-  "0xB14E": { name: "LTE PDSCH demapper config", feeds: "— (not decoded)" },
-  "0xB187": { name: "LTE ML1 intra-freq neighbour meas req", feeds: "— (not decoded)" },
-  "0xB897": { name: "NR ML1 PDSCH demapper config", feeds: "— (not decoded)" },
-  "0xB8A1": { name: "NR ML1 PDSCH decode result", feeds: "— (debug output only)" },
-  "0xB9CD": { name: "NR MAC DL TB stats", feeds: "— (not decoded)" },
+  "0xB17F": { name: "LTE ML1 serving cell meas & eval", feeds: "0xB17F" },
+  "0xB193": { name: "LTE ML1 serving cell meas response", feeds: "0xB193" },
+  "0xB197": { name: "LTE ML1 serving cell info", feeds: "0xB197" },
+  "0xB0C2": { name: "LTE RRC serving cell info", feeds: "0xB0C2" },
+  "0xB0C0": { name: "LTE RRC OTA message", feeds: "0xB0C0" },
+  "0xB173": { name: "LTE PDSCH stat indication", feeds: "0xB173" },
+  "0xB063": { name: "LTE MAC DL transport block", feeds: "0xB063" },
+  "0xB139": { name: "LTE PUSCH TX report", feeds: "0xB139" },
+  "0xB823": { name: "NR RRC serving cell info", feeds: "0xB823" },
+  "0xB97F": { name: "NR ML1 measurement database", feeds: "0xB97F" },
+  "0xB88F": { name: "NR ML1 DL demapper config", feeds: "0xB88F" },
+  "0xB888": { name: "NR MAC PDSCH stats", feeds: "0xB888" },
+  "0xB881": { name: "NR MAC UL TB stats", feeds: "0xB881" },
+  "0xB887": { name: "NR MAC PDSCH status", feeds: "0xB887" },
+  "0xB8A7": { name: "NR MAC CSF report", feeds: "0xB8A7" },
+  "0xB14D": { name: "LTE LL1 PUCCH CSF", feeds: "0xB14D" },
+  "0xB16D": { name: "LTE ML1 GM TX report", feeds: "0xB16D" },
+  "0xB184": { name: "LTE ML1 CA metrics", feeds: "0xB184" },
+  "0xB168": { name: "LTE ML1 RAR (Msg2)", feeds: "0xB168" },
+  "0xB88A": { name: "NR MAC RACH attempt", feeds: "0xB88A" },
+  "0xB825": { name: "NR RRC configuration info", feeds: "0xB825" },
+  "0xB0C1": { name: "LTE RRC MIB message", feeds: "0xB0C1" },
+  "0xB8D8": { name: "NR LL1 serving SNR", feeds: "0xB8D8" },
+  "0xB884": { name: "NR MAC UL power control", feeds: "0xB884" },
+  "0xB180": { name: "LTE ML1 neighbour measurements", feeds: "0xB180" },
+  "0xB14E": { name: "LTE PDSCH demapper config", feeds: "not_decoded" },
+  "0xB187": { name: "LTE ML1 intra-freq neighbour meas req", feeds: "not_decoded" },
+  "0xB897": { name: "NR ML1 PDSCH demapper config", feeds: "not_decoded" },
+  "0xB8A1": { name: "NR ML1 PDSCH decode result", feeds: "debug_only" },
+  "0xB9CD": { name: "NR MAC DL TB stats", feeds: "not_decoded" },
 };
 
 /** Receiving within the last 10 s, seen earlier, or never. */
 function LogState({ stat }: { stat: DiagLogStat }) {
+  const { t } = useTranslation("signal");
   if (stat.n > 0 && stat.age_s >= 0 && stat.age_s <= 10) {
     return (
       <Badge variant="outline" className="border-success/30 bg-success/15 text-success hover:bg-success/20">
         <CheckCircle2Icon className="size-3" />
-        Receiving
+        {t("diag_logs.state.receiving")}
       </Badge>
     );
   }
@@ -143,23 +145,23 @@ function LogState({ stat }: { stat: DiagLogStat }) {
     return (
       <Badge variant="outline" className="border-info/30 bg-info/15 text-info hover:bg-info/20">
         <ClockIcon className="size-3" />
-        Seen
+        {t("diag_logs.state.seen")}
       </Badge>
     );
   }
   return (
     <Badge variant="outline" className="border-muted-foreground/30 bg-muted/50 text-muted-foreground">
       <MinusCircleIcon className="size-3" />
-      Never
+      {t("diag_logs.state.never")}
     </Badge>
   );
 }
 
-function ago(s: number): string {
+function ago(t: TFunction, s: number): string {
   if (s < 0) return "—";
-  if (s < 120) return `${s} s ago`;
-  if (s < 7200) return `${Math.round(s / 60)} min ago`;
-  return `${(s / 3600).toFixed(1)} h ago`;
+  if (s < 120) return t("diag_logs.ago.seconds", { value: s });
+  if (s < 7200) return t("diag_logs.ago.minutes", { value: Math.round(s / 60) });
+  return t("diag_logs.ago.hours", { value: (s / 3600).toFixed(1) });
 }
 
 /** Which subscribed DIAG logs this firmware emits, and how often. */
@@ -175,6 +177,7 @@ export function DiagLogsCard({
   /** First sighting of each counter in this page session (bridge store) */
   base: Record<string, { t: number; n: number }>;
 }) {
+  const { t } = useTranslation("signal");
   const logs = snapshot.diag_logs ?? [];
   const seen = logs.filter((l) => l.n > 0).length;
   const rate = (l: DiagLogStat): string => {
@@ -185,13 +188,13 @@ export function DiagLogsCard({
   return (
     <Card className="@container/card @3xl/main:col-span-2">
       <CardHeader>
-        <CardTitle>DIAG log coverage</CardTitle>
+        <CardTitle>{t("diag_logs.title")}</CardTitle>
         <CardDescription>
           {logs.length
-            ? `${seen} of ${logs.length} subscribed logs received since diag_bridge started. Event-driven ones (RACH, MIB, RRC configuration) only come at attach, handover or reconfiguration.`
+            ? t("diag_logs.description", { seen, total: logs.length })
             : live
-              ? "This diag_bridge does not publish log statistics."
-              : "Needs diag_bridge."}
+              ? t("diag_logs.no_stats")
+              : t("diag_logs.needs_bridge")}
         </CardDescription>
       </CardHeader>
       {logs.length > 0 && (
@@ -199,13 +202,13 @@ export function DiagLogsCard({
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Code</TableHead>
-                <TableHead>Log</TableHead>
-                <TableHead>Feeds</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead className={NUM}>Received</TableHead>
-                <TableHead className={NUM}>Per min</TableHead>
-                <TableHead className={NUM}>Last</TableHead>
+                <TableHead>{t("diag_logs.head.code")}</TableHead>
+                <TableHead>{t("diag_logs.head.log")}</TableHead>
+                <TableHead>{t("diag_logs.head.feeds")}</TableHead>
+                <TableHead>{t("diag_logs.head.state")}</TableHead>
+                <TableHead className={NUM}>{t("diag_logs.head.received")}</TableHead>
+                <TableHead className={NUM}>{t("diag_logs.head.per_min")}</TableHead>
+                <TableHead className={NUM}>{t("diag_logs.head.last")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -215,13 +218,15 @@ export function DiagLogsCard({
                   <TableRow key={l.code}>
                     <TableCell className="font-mono text-xs">{l.code}</TableCell>
                     <TableCell className="whitespace-normal">{info?.name ?? "—"}</TableCell>
-                    <TableCell className="whitespace-normal text-muted-foreground">{info?.feeds ?? "—"}</TableCell>
+                    <TableCell className="whitespace-normal text-muted-foreground">
+                      {info ? t(`diag_logs.feeds.${info.feeds}`) : "—"}
+                    </TableCell>
                     <TableCell>
                       <LogState stat={l} />
                     </TableCell>
                     <TableCell className={NUM}>{l.n.toLocaleString("en-US")}</TableCell>
                     <TableCell className={NUM}>{l.n > 0 ? rate(l) : "—"}</TableCell>
-                    <TableCell className={cn(NUM, "text-muted-foreground")}>{ago(l.age_s)}</TableCell>
+                    <TableCell className={cn(NUM, "text-muted-foreground")}>{ago(t, l.age_s)}</TableCell>
                   </TableRow>
                 );
               })}

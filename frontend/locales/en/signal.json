@@ -1,0 +1,276 @@
+{
+  "page": {
+    "title": "Signal Details",
+    "description": "Every carrier the modem uses, live, with trends and distributions over the last minutes. Source: {{source}}.",
+    "description_aggregated": "Every carrier the modem uses, live, with trends and distributions over the last minutes. Source: {{source}} · {{total}} MHz aggregated.",
+    "source": {
+      "diag": "DIAG",
+      "qmi": "QMI (diag_bridge not connected)",
+      "none": "no data"
+    }
+  },
+  "source_badge": {
+    "diag": "DIAG live",
+    "qmi": "QMI fallback",
+    "none": "No radio data"
+  },
+  "toolbar": {
+    "aria": "Chart window",
+    "window": "Window",
+    "samples_one": "{{count}} sample at 1 s",
+    "samples_other": "{{count}} samples at 1 s",
+    "reset": "Reset"
+  },
+  "metrics": {
+    "rsrp": "RSRP",
+    "rsrq": "RSRQ",
+    "sinr": "SINR",
+    "cqi": "CQI",
+    "mcs": "DL MCS",
+    "ri": "Rank",
+    "tx_power": "TX power",
+    "bler": "DL BLER"
+  },
+  "stats": {
+    "metric_unit": "{{metric}} ({{unit}})",
+    "now": "Now",
+    "min": "Min",
+    "mean": "Mean",
+    "max": "Max",
+    "samples": "Samples",
+    "p10": "P10",
+    "median": "Median",
+    "p90": "P90"
+  },
+  "chart_empty": {
+    "no_samples": "No {{metric}} samples in this window.",
+    "no_samples_tx_power": "No {{metric}} samples in this window. TX power is the last PUSCH transmission, kept for 5 s."
+  },
+  "trend": {
+    "title": "Trends",
+    "description": "{{metric}} over the window, PCell against the 5G cell.",
+    "description_unit": "{{metric}} ({{unit}}) over the window, PCell against the 5G cell.",
+    "picker_aria": "Trend metric"
+  },
+  "distribution": {
+    "title": "Distributions",
+    "description": "Share of the window's samples in each {{metric}} bin, per radio technology.",
+    "picker_aria": "Distribution metric",
+    "range": "{{lo}} to {{hi}} {{unit}}"
+  },
+  "carriers": {
+    "title": "Carriers",
+    "description": "Every carrier in use, one row each. Colors follow the signal quality ramp; a dash is a value the modem did not report.",
+    "head": {
+      "carrier": "Carrier",
+      "band": "Band",
+      "arfcn": "ARFCN",
+      "pci": "PCI",
+      "bw": "BW",
+      "rsrp": "RSRP",
+      "rsrq": "RSRQ",
+      "sinr": "SINR",
+      "cqi": "CQI",
+      "rank": "Rank",
+      "dl_mod": "DL mod.",
+      "mcs": "MCS",
+      "bler": "BLER",
+      "dl_mbps": "DL Mbps",
+      "ul_mbps": "UL Mbps",
+      "tx_dbm": "TX dBm"
+    },
+    "not_measured": "not measured",
+    "total_one": "Total, {{count}} carrier",
+    "total_other": "Total, {{count}} carriers",
+    "estimated_note": "* Band default bandwidth, not yet learnt from the network."
+  },
+  "cell": {
+    "lte_primary": "LTE Primary Cell",
+    "lte_scell": "LTE SCell {{index}}",
+    "nsa_cell": "5G NSA Cell",
+    "nsa_cell_n": "5G NSA Cell {{index}}",
+    "nr_primary": "5G Primary Cell",
+    "nr_scell": "5G SCell {{index}}",
+    "lte_description": "Band {{band}} · EARFCN {{earfcn}} · PCI {{pci}}",
+    "nr_description": "NR-ARFCN {{arfcn}} · PCI {{pci}}",
+    "nr_description_band": "Band n{{band}} · NR-ARFCN {{arfcn}} · PCI {{pci}}",
+    "bandwidth": " · {{mhz}} MHz",
+    "bandwidth_estimated": " · {{mhz}} MHz (est.)",
+    "not_measured": "Configured by the network, not measured by this firmware.",
+    "sinr_note": "RRC report, {{age}} s ago",
+    "snr_best": "SNR (best)",
+    "rsrp_per_antenna": "RSRP per antenna",
+    "sinr_per_antenna": "SINR per antenna",
+    "snr_per_antenna": "SNR per antenna",
+    "not_reported": "Not reported",
+    "antenna": {
+      "main": "Main (PRX)",
+      "diversity": "Diversity (DRX)",
+      "mimo3": "MIMO 3 (RX2)",
+      "mimo4": "MIMO 4 (RX3)"
+    },
+    "chain_aria": "{{metric}} {{antenna}}",
+    "link_adaptation": {
+      "cqi_aria": "Wideband CQI",
+      "rank_value": "rank {{rank}}",
+      "rank_of": "Rank {{rank}} of 4",
+      "rank_unknown": "Rank unknown",
+      "layers_used": "{{layers}} layers used",
+      "tx_power": "TX power",
+      "tx_power_aria": "PUSCH TX power",
+      "tx_last": "Last PUSCH transmission, not an average",
+      "tx_none": "No PUSCH in the last 5 s"
+    },
+    "link": {
+      "head": "Link",
+      "downlink": "Downlink",
+      "uplink": "Uplink",
+      "modulation": "Modulation",
+      "mcs": "MCS",
+      "mcs_avg": "MCS (avg)",
+      "layers_avg": "Layers (avg)",
+      "resource_blocks": "Resource blocks",
+      "prb_cell": "{{prb}} PRB cell",
+      "bandwidth": "Bandwidth",
+      "bler": "BLER",
+      "throughput": "Throughput",
+      "path_loss": "Path loss",
+      "power_headroom": "Power headroom",
+      "mtpl": "Max TX power (MTPL)",
+      "pcmax": "Pcmax"
+    },
+    "detail": {
+      "cell_id": "Cell ID",
+      "tac": "TAC",
+      "plmn": "PLMN",
+      "tx_antennas": "TX antennas",
+      "ssb": "SSB",
+      "beams": "Beams",
+      "neighbours": "Neighbours",
+      "ta": "TA"
+    },
+    "ta": {
+      "none": "— (no RACH logged yet)",
+      "scs": "SCS {{scs}} kHz",
+      "scs_estimated": "SCS {{scs}} kHz (est.)",
+      "age": "{{age}} s ago"
+    }
+  },
+  "neighbours": {
+    "title": "LTE neighbour cells",
+    "description": "Cells the modem measured in the last 10 s (0xB180), strongest first. Δ is against the serving cell on the same EARFCN, else the PCell.",
+    "head": {
+      "earfcn": "EARFCN",
+      "band": "Band",
+      "pci": "PCI",
+      "rsrp": "RSRP",
+      "rsrq": "RSRQ",
+      "rssi": "RSSI",
+      "delta_rsrp": "Δ RSRP",
+      "age": "Age"
+    },
+    "empty_live": "No neighbour measurement in the last 10 s.",
+    "empty_qmi": "Needs diag_bridge: QMI does not report neighbour cells.",
+    "age": "{{age}} s"
+  },
+  "diag_logs": {
+    "title": "DIAG log coverage",
+    "description": "{{seen}} of {{total}} subscribed logs received since diag_bridge started. Event-driven ones (RACH, MIB, RRC configuration) only come at attach, handover or reconfiguration.",
+    "no_stats": "This diag_bridge does not publish log statistics.",
+    "needs_bridge": "Needs diag_bridge.",
+    "head": {
+      "code": "Code",
+      "log": "Log",
+      "feeds": "Feeds",
+      "state": "State",
+      "received": "Received",
+      "per_min": "Per min",
+      "last": "Last"
+    },
+    "state": {
+      "receiving": "Receiving",
+      "seen": "Seen",
+      "never": "Never"
+    },
+    "ago": {
+      "seconds": "{{value}} s ago",
+      "minutes": "{{value}} min ago",
+      "hours": "{{value}} h ago"
+    },
+    "feeds": {
+      "0xB17F": "LTE serving measurements",
+      "0xB193": "LTE RSRP/RSRQ/RSSI, per-chain RSRP/SINR",
+      "0xB197": "LTE bandwidth",
+      "0xB0C2": "LTE cell ID, TAC, bandwidth",
+      "0xB0C0": "SCells, cell identity, NR bandwidth",
+      "0xB173": "LTE DL rate, BLER, modulation, MCS",
+      "0xB063": "LTE DL transport blocks",
+      "0xB139": "LTE UL rate, UL RB, UL modulation",
+      "0xB823": "NR band, cell identity",
+      "0xB97F": "NR RSRP/RSRQ, SSB, beams, neighbours",
+      "0xB88F": "NR modulation",
+      "0xB888": "NR DL rate, BLER",
+      "0xB881": "NR UL rate, MCS, PRB, PHR, Pcmax",
+      "0xB887": "NR DL MCS, RB, layers",
+      "0xB8A7": "NR CQI, rank",
+      "0xB14D": "LTE CQI, rank",
+      "0xB16D": "LTE TX power",
+      "0xB184": "bandwidths, SCells after a restart",
+      "0xB168": "LTE timing advance",
+      "0xB88A": "NR timing advance",
+      "0xB825": "NR bandwidths, SCS",
+      "0xB0C1": "LTE bandwidth",
+      "0xB8D8": "NR SNR per chain",
+      "0xB884": "NR TX power, path loss",
+      "0xB180": "LTE neighbour cells",
+      "not_decoded": "— (not decoded)",
+      "debug_only": "— (debug output only)"
+    }
+  },
+  "events": {
+    "title": "Radio events",
+    "description": "DIAG events, newest first: the bridge's last 20 when the page opens, then every one while it stays open. State changes, handovers, failures, RACH and carrier aggregation come only when something happens.",
+    "filter": {
+      "all": "All",
+      "failure": "Failures",
+      "mobility": "Mobility",
+      "rrc": "RRC",
+      "rach": "RACH",
+      "ca": "CA"
+    },
+    "filter_aria": "Event category",
+    "clear": "Clear",
+    "log_aria": "Radio events",
+    "rrc_unknown": "LTE RRC unknown",
+    "rrc_state": "LTE RRC {{state}}",
+    "counters": {
+      "lte_rlf": "LTE radio link failures",
+      "lte_oos": "LTE out of service",
+      "lte_ho_fail": "LTE handover failures",
+      "nr_ho": "5G handovers",
+      "nr_ho_fail": "5G handover failures",
+      "nr_scg_fail": "5G SCG failures",
+      "nr_mcg_fail": "5G MCG failures"
+    },
+    "counters_note": "Counters since diag_bridge started; they reset when it restarts.",
+    "empty_qmi": "Needs diag_bridge: QMI does not report events.",
+    "empty_none": "No radio event since this page opened. A stable cell can stay quiet for a long time.",
+    "empty_category": "No event of this category yet."
+  },
+  "throughput": {
+    "peak_avg": "peak {{peak}} · avg {{avg}}",
+    "collecting": "Collecting samples…",
+    "aggregate_title": "Aggregate throughput",
+    "aggregate_live": "All carriers, counted at the radio layer: includes IPA-offloaded traffic and HARQ retransmissions.",
+    "needs_bridge": "Needs diag_bridge: QMI does not report data rates.",
+    "download": "Download",
+    "upload": "Upload",
+    "aggregated_bandwidth": "Aggregated bandwidth",
+    "carriers": "Carriers",
+    "spectral_efficiency": "DL spectral efficiency",
+    "ul_dl_ratio": "UL / DL ratio",
+    "by_carrier_title": "Throughput by carrier",
+    "by_carrier_description": "How the current rate splits across the carriers, colored by radio technology.",
+    "total": "{{total}} Mbps total"
+  }
+}

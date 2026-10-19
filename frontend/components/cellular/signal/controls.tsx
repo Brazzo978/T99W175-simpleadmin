@@ -6,6 +6,7 @@ import {
   RotateCcwIcon,
   TriangleAlertIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { RadioSource } from "@/lib/bridge/radio";
-import { METRICS, type MetricKey } from "./metrics";
+import type { MetricKey } from "./metrics";
 
 export const WINDOWS = [
   { ms: 60_000, label: "1 min" },
@@ -26,11 +27,12 @@ export const WINDOWS = [
 ] as const;
 
 export function SourceBadge({ source }: { source: RadioSource }) {
+  const { t } = useTranslation("signal");
   if (source === "diag") {
     return (
       <Badge variant="outline" className="border-success/30 bg-success/15 text-success hover:bg-success/20">
         <CheckCircle2Icon className="size-3" />
-        DIAG live
+        {t("source_badge.diag")}
       </Badge>
     );
   }
@@ -38,14 +40,14 @@ export function SourceBadge({ source }: { source: RadioSource }) {
     return (
       <Badge variant="outline" className="border-warning/30 bg-warning/15 text-warning hover:bg-warning/20">
         <TriangleAlertIcon className="size-3" />
-        QMI fallback
+        {t("source_badge.qmi")}
       </Badge>
     );
   }
   return (
     <Badge variant="outline" className="border-muted-foreground/30 bg-muted/50 text-muted-foreground">
       <MinusCircleIcon className="size-3" />
-      No radio data
+      {t("source_badge.none")}
     </Badge>
   );
 }
@@ -64,11 +66,12 @@ export function SignalToolbar({
   samples: number;
   onReset: () => void;
 }) {
+  const { t } = useTranslation("signal");
   return (
-    <div className="flex flex-wrap items-center gap-3 @3xl/main:col-span-2" role="toolbar" aria-label="Chart window">
+    <div className="flex flex-wrap items-center gap-3 @3xl/main:col-span-2" role="toolbar" aria-label={t("toolbar.aria")}>
       <SourceBadge source={source} />
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Window</span>
+        <span className="text-sm text-muted-foreground">{t("toolbar.window")}</span>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -84,11 +87,11 @@ export function SignalToolbar({
         </ToggleGroup>
       </div>
       <span className="text-sm text-muted-foreground tabular-nums" role="status" aria-live="polite">
-        {samples} sample{samples === 1 ? "" : "s"} at 1 s
+        {t("toolbar.samples", { count: samples })}
       </span>
       <Button variant="outline" size="sm" className="ml-auto" onClick={onReset}>
         <RotateCcwIcon />
-        Reset
+        {t("toolbar.reset")}
       </Button>
     </div>
   );
@@ -106,6 +109,7 @@ export function MetricPicker({
   options: MetricKey[];
   ariaLabel: string;
 }) {
+  const { t } = useTranslation("signal");
   return (
     <>
       <ToggleGroup
@@ -119,7 +123,7 @@ export function MetricPicker({
       >
         {options.map((key) => (
           <ToggleGroupItem key={key} value={key}>
-            {METRICS[key].label}
+            {t(`metrics.${key}`)}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
@@ -130,7 +134,7 @@ export function MetricPicker({
         <SelectContent className="rounded-xl">
           {options.map((key) => (
             <SelectItem key={key} value={key} className="rounded-lg">
-              {METRICS[key].label}
+              {t(`metrics.${key}`)}
             </SelectItem>
           ))}
         </SelectContent>

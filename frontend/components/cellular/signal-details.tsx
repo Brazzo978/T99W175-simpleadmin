@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { PageShell } from "@/components/page-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBridgeState, useNow } from "@/hooks/use-bridge";
-import { pickRadio, type RadioSource } from "@/lib/bridge/radio";
+import { pickRadio } from "@/lib/bridge/radio";
 import { clearRadioHistory } from "@/lib/bridge/store";
 import { DistributionCard, TrendCard } from "./signal/analysis-cards";
 import { CarrierTableCard } from "./signal/carrier-table";
@@ -18,13 +19,8 @@ import {
   CarrierThroughputCard,
 } from "./signal/throughput-cards";
 
-const SOURCE_LABEL: Record<RadioSource, string> = {
-  diag: "DIAG",
-  qmi: "QMI (diag_bridge not connected)",
-  none: "no data",
-};
-
 export default function SignalDetailsComponent() {
+  const { t } = useTranslation("signal");
   const state = useBridgeState();
   const now = useNow();
   const [windowMs, setWindowMs] = useState(300_000);
@@ -43,10 +39,11 @@ export default function SignalDetailsComponent() {
 
   return (
     <PageShell
-      title="Signal Details"
-      description={`Every carrier the modem uses, live, with trends and distributions over the last minutes. Source: ${SOURCE_LABEL[source]}${
-        total ? ` · ${total} MHz aggregated` : ""
-      }.`}
+      title={t("page.title")}
+      description={t(total ? "page.description_aggregated" : "page.description", {
+        source: t(`page.source.${source}`),
+        total,
+      })}
     >
       {!snapshot ? (
         <>

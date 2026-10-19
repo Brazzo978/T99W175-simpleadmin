@@ -1,0 +1,276 @@
+{
+  "page": {
+    "title": "Dettagli del segnale",
+    "description": "Tutte le portanti usate dal modem, in tempo reale, con andamenti e distribuzioni degli ultimi minuti. Fonte: {{source}}.",
+    "description_aggregated": "Tutte le portanti usate dal modem, in tempo reale, con andamenti e distribuzioni degli ultimi minuti. Fonte: {{source}} · {{total}} MHz aggregati.",
+    "source": {
+      "diag": "DIAG",
+      "qmi": "QMI (diag_bridge non connesso)",
+      "none": "nessun dato"
+    }
+  },
+  "source_badge": {
+    "diag": "DIAG in tempo reale",
+    "qmi": "Ripiego su QMI",
+    "none": "Nessun dato radio"
+  },
+  "toolbar": {
+    "aria": "Finestra dei grafici",
+    "window": "Finestra",
+    "samples_one": "{{count}} campione a 1 s",
+    "samples_other": "{{count}} campioni a 1 s",
+    "reset": "Azzera"
+  },
+  "metrics": {
+    "rsrp": "RSRP",
+    "rsrq": "RSRQ",
+    "sinr": "SINR",
+    "cqi": "CQI",
+    "mcs": "MCS DL",
+    "ri": "Rank",
+    "tx_power": "Potenza TX",
+    "bler": "BLER DL"
+  },
+  "stats": {
+    "metric_unit": "{{metric}} ({{unit}})",
+    "now": "Ora",
+    "min": "Min",
+    "mean": "Media",
+    "max": "Max",
+    "samples": "Campioni",
+    "p10": "P10",
+    "median": "Mediana",
+    "p90": "P90"
+  },
+  "chart_empty": {
+    "no_samples": "Nessun campione di {{metric}} in questa finestra.",
+    "no_samples_tx_power": "Nessun campione di {{metric}} in questa finestra. La potenza TX è quella dell'ultima trasmissione PUSCH, mantenuta per 5 s."
+  },
+  "trend": {
+    "title": "Andamenti",
+    "description": "{{metric}} nella finestra, PCell a confronto con la cella 5G.",
+    "description_unit": "{{metric}} ({{unit}}) nella finestra, PCell a confronto con la cella 5G.",
+    "picker_aria": "Metrica dell'andamento"
+  },
+  "distribution": {
+    "title": "Distribuzioni",
+    "description": "Quota dei campioni della finestra in ciascun intervallo di {{metric}}, per tecnologia radio.",
+    "picker_aria": "Metrica della distribuzione",
+    "range": "da {{lo}} a {{hi}} {{unit}}"
+  },
+  "carriers": {
+    "title": "Portanti",
+    "description": "Tutte le portanti in uso, una per riga. I colori seguono la scala della qualità del segnale; un trattino indica un valore che il modem non ha riportato.",
+    "head": {
+      "carrier": "Portante",
+      "band": "Banda",
+      "arfcn": "ARFCN",
+      "pci": "PCI",
+      "bw": "BW",
+      "rsrp": "RSRP",
+      "rsrq": "RSRQ",
+      "sinr": "SINR",
+      "cqi": "CQI",
+      "rank": "Rank",
+      "dl_mod": "Mod. DL",
+      "mcs": "MCS",
+      "bler": "BLER",
+      "dl_mbps": "Mbps DL",
+      "ul_mbps": "Mbps UL",
+      "tx_dbm": "TX dBm"
+    },
+    "not_measured": "non misurata",
+    "total_one": "Totale, {{count}} portante",
+    "total_other": "Totale, {{count}} portanti",
+    "estimated_note": "* Larghezza di banda predefinita della banda, non ancora appresa dalla rete."
+  },
+  "cell": {
+    "lte_primary": "Cella primaria LTE",
+    "lte_scell": "SCell LTE {{index}}",
+    "nsa_cell": "Cella 5G NSA",
+    "nsa_cell_n": "Cella 5G NSA {{index}}",
+    "nr_primary": "Cella primaria 5G",
+    "nr_scell": "SCell 5G {{index}}",
+    "lte_description": "Banda {{band}} · EARFCN {{earfcn}} · PCI {{pci}}",
+    "nr_description": "NR-ARFCN {{arfcn}} · PCI {{pci}}",
+    "nr_description_band": "Banda n{{band}} · NR-ARFCN {{arfcn}} · PCI {{pci}}",
+    "bandwidth": " · {{mhz}} MHz",
+    "bandwidth_estimated": " · {{mhz}} MHz (stim.)",
+    "not_measured": "Configurata dalla rete, non misurata da questo firmware.",
+    "sinr_note": "Report RRC, {{age}} s fa",
+    "snr_best": "SNR (migliore)",
+    "rsrp_per_antenna": "RSRP per antenna",
+    "sinr_per_antenna": "SINR per antenna",
+    "snr_per_antenna": "SNR per antenna",
+    "not_reported": "Non riportato",
+    "antenna": {
+      "main": "Principale (PRX)",
+      "diversity": "Diversità (DRX)",
+      "mimo3": "MIMO 3 (RX2)",
+      "mimo4": "MIMO 4 (RX3)"
+    },
+    "chain_aria": "{{metric}} {{antenna}}",
+    "link_adaptation": {
+      "cqi_aria": "CQI wideband",
+      "rank_value": "rank {{rank}}",
+      "rank_of": "Rank {{rank}} su 4",
+      "rank_unknown": "Rank sconosciuto",
+      "layers_used": "{{layers}} layer in uso",
+      "tx_power": "Potenza TX",
+      "tx_power_aria": "Potenza TX PUSCH",
+      "tx_last": "Ultima trasmissione PUSCH, non una media",
+      "tx_none": "Nessun PUSCH negli ultimi 5 s"
+    },
+    "link": {
+      "head": "Collegamento",
+      "downlink": "Downlink",
+      "uplink": "Uplink",
+      "modulation": "Modulazione",
+      "mcs": "MCS",
+      "mcs_avg": "MCS (media)",
+      "layers_avg": "Layer (media)",
+      "resource_blocks": "Resource block",
+      "prb_cell": "{{prb}} PRB della cella",
+      "bandwidth": "Larghezza di banda",
+      "bler": "BLER",
+      "throughput": "Throughput",
+      "path_loss": "Path loss",
+      "power_headroom": "Margine di potenza",
+      "mtpl": "Potenza TX max (MTPL)",
+      "pcmax": "Pcmax"
+    },
+    "detail": {
+      "cell_id": "ID cella",
+      "tac": "TAC",
+      "plmn": "PLMN",
+      "tx_antennas": "Antenne TX",
+      "ssb": "SSB",
+      "beams": "Fasci",
+      "neighbours": "Celle adiacenti",
+      "ta": "TA"
+    },
+    "ta": {
+      "none": "— (nessun RACH registrato finora)",
+      "scs": "SCS {{scs}} kHz",
+      "scs_estimated": "SCS {{scs}} kHz (stim.)",
+      "age": "{{age}} s fa"
+    }
+  },
+  "neighbours": {
+    "title": "Celle adiacenti LTE",
+    "description": "Celle misurate dal modem negli ultimi 10 s (0xB180), dalla più forte. Δ è rispetto alla cella servente sullo stesso EARFCN, altrimenti rispetto alla PCell.",
+    "head": {
+      "earfcn": "EARFCN",
+      "band": "Banda",
+      "pci": "PCI",
+      "rsrp": "RSRP",
+      "rsrq": "RSRQ",
+      "rssi": "RSSI",
+      "delta_rsrp": "Δ RSRP",
+      "age": "Età"
+    },
+    "empty_live": "Nessuna misura di celle adiacenti negli ultimi 10 s.",
+    "empty_qmi": "Richiede diag_bridge: QMI non riporta le celle adiacenti.",
+    "age": "{{age}} s"
+  },
+  "diag_logs": {
+    "title": "Copertura dei log DIAG",
+    "description": "{{seen}} log su {{total}} sottoscritti ricevuti dall'avvio di diag_bridge. Quelli legati agli eventi (RACH, MIB, configurazione RRC) arrivano solo all'attach, a un handover o a una riconfigurazione.",
+    "no_stats": "Questo diag_bridge non pubblica le statistiche dei log.",
+    "needs_bridge": "Richiede diag_bridge.",
+    "head": {
+      "code": "Codice",
+      "log": "Log",
+      "feeds": "Fornisce",
+      "state": "Stato",
+      "received": "Ricevuti",
+      "per_min": "Al min",
+      "last": "Ultimo"
+    },
+    "state": {
+      "receiving": "In ricezione",
+      "seen": "Visto",
+      "never": "Mai"
+    },
+    "ago": {
+      "seconds": "{{value}} s fa",
+      "minutes": "{{value}} min fa",
+      "hours": "{{value}} h fa"
+    },
+    "feeds": {
+      "0xB17F": "Misure LTE della cella servente",
+      "0xB193": "RSRP/RSRQ/RSSI LTE, RSRP/SINR per catena",
+      "0xB197": "Larghezza di banda LTE",
+      "0xB0C2": "ID cella LTE, TAC, larghezza di banda",
+      "0xB0C0": "SCell, identità della cella, larghezza di banda NR",
+      "0xB173": "Velocità DL LTE, BLER, modulazione, MCS",
+      "0xB063": "Transport block DL LTE",
+      "0xB139": "Velocità UL LTE, RB UL, modulazione UL",
+      "0xB823": "Banda NR, identità della cella",
+      "0xB97F": "RSRP/RSRQ NR, SSB, fasci, celle adiacenti",
+      "0xB88F": "Modulazione NR",
+      "0xB888": "Velocità DL NR, BLER",
+      "0xB881": "Velocità UL NR, MCS, PRB, PHR, Pcmax",
+      "0xB887": "MCS DL NR, RB, layer",
+      "0xB8A7": "CQI NR, rank",
+      "0xB14D": "CQI LTE, rank",
+      "0xB16D": "Potenza TX LTE",
+      "0xB184": "larghezze di banda, SCell dopo un riavvio",
+      "0xB168": "Timing Advance LTE",
+      "0xB88A": "Timing Advance NR",
+      "0xB825": "Larghezze di banda NR, SCS",
+      "0xB0C1": "Larghezza di banda LTE",
+      "0xB8D8": "SNR NR per catena",
+      "0xB884": "Potenza TX NR, path loss",
+      "0xB180": "Celle adiacenti LTE",
+      "not_decoded": "— (non decodificato)",
+      "debug_only": "— (solo output di debug)"
+    }
+  },
+  "events": {
+    "title": "Eventi radio",
+    "description": "Eventi DIAG, dal più recente: gli ultimi 20 del bridge all'apertura della pagina, poi tutti quelli che arrivano finché resta aperta. Cambi di stato, handover, errori, RACH e aggregazione di portanti arrivano solo quando succede qualcosa.",
+    "filter": {
+      "all": "Tutti",
+      "failure": "Errori",
+      "mobility": "Mobilità",
+      "rrc": "RRC",
+      "rach": "RACH",
+      "ca": "CA"
+    },
+    "filter_aria": "Categoria di eventi",
+    "clear": "Cancella",
+    "log_aria": "Eventi radio",
+    "rrc_unknown": "LTE RRC sconosciuto",
+    "rrc_state": "LTE RRC {{state}}",
+    "counters": {
+      "lte_rlf": "Radio link failure LTE",
+      "lte_oos": "LTE fuori servizio",
+      "lte_ho_fail": "Handover LTE falliti",
+      "nr_ho": "Handover 5G",
+      "nr_ho_fail": "Handover 5G falliti",
+      "nr_scg_fail": "Errori SCG 5G",
+      "nr_mcg_fail": "Errori MCG 5G"
+    },
+    "counters_note": "Contatori dall'avvio di diag_bridge; si azzerano quando si riavvia.",
+    "empty_qmi": "Richiede diag_bridge: QMI non riporta gli eventi.",
+    "empty_none": "Nessun evento radio dall'apertura della pagina. Una cella stabile può restare silenziosa a lungo.",
+    "empty_category": "Ancora nessun evento di questa categoria."
+  },
+  "throughput": {
+    "peak_avg": "picco {{peak}} · media {{avg}}",
+    "collecting": "Raccolta dei campioni…",
+    "aggregate_title": "Throughput aggregato",
+    "aggregate_live": "Tutte le portanti, contate al livello radio: include il traffico in offload IPA e le ritrasmissioni HARQ.",
+    "needs_bridge": "Richiede diag_bridge: QMI non riporta le velocità dati.",
+    "download": "Download",
+    "upload": "Upload",
+    "aggregated_bandwidth": "Banda aggregata",
+    "carriers": "Portanti",
+    "spectral_efficiency": "Efficienza spettrale DL",
+    "ul_dl_ratio": "Rapporto UL / DL",
+    "by_carrier_title": "Throughput per portante",
+    "by_carrier_description": "Come si ripartisce la velocità attuale tra le portanti, con i colori della tecnologia radio.",
+    "total": "{{total}} Mbps in totale"
+  }
+}

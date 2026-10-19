@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import {
   Area,
@@ -52,6 +53,7 @@ function RatePanel({
   from: number;
   to: number;
 }) {
+  const { t } = useTranslation("signal");
   const fillId = useId().replace(/:/g, "");
   const values = series.flatMap((p) => (p.mbps === null ? [] : [p.mbps]));
   const stats = summarize(values);
@@ -64,7 +66,7 @@ function RatePanel({
         </span>
         {stats && (
           <span className="text-xs text-muted-foreground tabular-nums">
-            peak {fmtMbps(stats.max)} · avg {fmtMbps(stats.mean)}
+            {t("throughput.peak_avg", { peak: fmtMbps(stats.max), avg: fmtMbps(stats.mean) })}
           </span>
         )}
       </div>
@@ -113,7 +115,7 @@ function RatePanel({
         </ChartContainer>
       ) : (
         <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
-          Collecting samples…
+          {t("throughput.collecting")}
         </div>
       )}
     </div>
@@ -145,6 +147,7 @@ export function AggregateThroughputCard({
   from: number;
   to: number;
 }) {
+  const { t } = useTranslation("signal");
   const live = source === "diag";
   const rates = live ? aggregateRates(snapshot) : null;
   const rows = carrierRows(snapshot);
@@ -157,17 +160,15 @@ export function AggregateThroughputCard({
   return (
     <Card className="@container/card border-primary/30 bg-primary/5 @3xl/main:col-span-2">
       <CardHeader>
-        <CardTitle>Aggregate throughput</CardTitle>
+        <CardTitle>{t("throughput.aggregate_title")}</CardTitle>
         <CardDescription>
-          {live
-            ? "All carriers, counted at the radio layer: includes IPA-offloaded traffic and HARQ retransmissions."
-            : "Needs diag_bridge: QMI does not report data rates."}
+          {live ? t("throughput.aggregate_live") : t("throughput.needs_bridge")}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid gap-4 @[640px]/card:grid-cols-2">
           <RatePanel
-            label="Download"
+            label={t("throughput.download")}
             icon={<ArrowDownIcon className="size-4" />}
             current={rates ? rates.dl : null}
             series={dl}
@@ -175,7 +176,7 @@ export function AggregateThroughputCard({
             to={to}
           />
           <RatePanel
-            label="Upload"
+            label={t("throughput.upload")}
             icon={<ArrowUpIcon className="size-4" />}
             current={rates ? rates.ul : null}
             series={ul}
@@ -184,17 +185,17 @@ export function AggregateThroughputCard({
           />
         </div>
         <div className="grid grid-cols-2 gap-4 @[640px]/card:grid-cols-4">
-          <Stat label="Aggregated bandwidth" value={bandwidth ? `${bandwidth} MHz` : "—"} />
+          <Stat label={t("throughput.aggregated_bandwidth")} value={bandwidth ? `${bandwidth} MHz` : "—"} />
           <Stat
-            label="Carriers"
+            label={t("throughput.carriers")}
             value={[lte ? `${lte} LTE` : "", nr ? `${nr} NR` : ""].filter(Boolean).join(" + ") || "—"}
           />
           <Stat
-            label="DL spectral efficiency"
+            label={t("throughput.spectral_efficiency")}
             value={efficiency === null ? "—" : `${efficiency.toFixed(2)} b/s/Hz`}
           />
           <Stat
-            label="UL / DL ratio"
+            label={t("throughput.ul_dl_ratio")}
             value={rates && rates.dl > 0.05 ? `${((rates.ul / rates.dl) * 100).toFixed(0)}%` : "—"}
           />
         </div>
@@ -216,13 +217,16 @@ function CarrierBars({
   data: { name: string; rat: "lte" | "nr"; mbps: number }[];
   total: number;
 }) {
+  const { t } = useTranslation("signal");
   const height = Math.max(96, data.length * 36 + 24);
   const top = niceCeil(Math.max(1, ...data.map((d) => d.mbps)));
   return (
     <div className="grid gap-2">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">{title}</span>
-        <span className="text-xs text-muted-foreground tabular-nums">{fmtMbps(total)} Mbps total</span>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {t("throughput.total", { total: fmtMbps(total) })}
+        </span>
       </div>
       <ChartContainer config={carrierConfig} className="aspect-auto w-full" style={{ height }}>
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 56, bottom: 0, left: 0 }}>
@@ -282,6 +286,7 @@ export function CarrierThroughputCard({
   snapshot: DiagSnapshot;
   source: RadioSource;
 }) {
+  const { t } = useTranslation("signal");
   const rows = carrierRows(snapshot).filter((r) => r.measured || r.dl_mbps || r.ul_mbps);
   const live = source === "diag";
   const rates = live ? aggregateRates(snapshot) : { dl: 0, ul: 0 };
@@ -290,19 +295,17 @@ export function CarrierThroughputCard({
   return (
     <Card className="@container/card @3xl/main:col-span-2">
       <CardHeader>
-        <CardTitle>Throughput by carrier</CardTitle>
-        <CardDescription>
-          How the current rate splits across the carriers, colored by radio technology.
-        </CardDescription>
+        <CardTitle>{t("throughput.by_carrier_title")}</CardTitle>
+        <CardDescription>{t("throughput.by_carrier_description")}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {!live ? (
-          <p className="text-sm text-muted-foreground">Needs diag_bridge: QMI does not report data rates.</p>
+          <p className="text-sm text-muted-foreground">{t("throughput.needs_bridge")}</p>
         ) : (
           <>
             <div className="grid gap-6 @[640px]/card:grid-cols-2">
-              <CarrierBars title="Download" data={dl} total={rates.dl} />
-              <CarrierBars title="Upload" data={ul} total={rates.ul} />
+              <CarrierBars title={t("throughput.download")} data={dl} total={rates.dl} />
+              <CarrierBars title={t("throughput.upload")} data={ul} total={rates.ul} />
             </div>
             <RatLegend lte={rows.some((r) => r.rat === "lte")} nr={rows.some((r) => r.rat === "nr")} />
           </>

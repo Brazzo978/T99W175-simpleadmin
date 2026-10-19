@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import { getValueColorClass } from "@/components/dashboard/signal-card-utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -54,38 +55,36 @@ export function CarrierTableCard({
   snapshot: DiagSnapshot;
   live: boolean;
 }) {
+  const { t } = useTranslation("signal");
   const rows = carrierRows(snapshot);
   const rates = live ? aggregateRates(snapshot) : null;
   const bandwidth = rows.reduce((s, r) => s + (r.bandwidth_mhz ?? 0), 0);
   return (
     <Card className="@container/card @3xl/main:col-span-2">
       <CardHeader>
-        <CardTitle>Carriers</CardTitle>
-        <CardDescription>
-          Every carrier in use, one row each. Colors follow the signal quality
-          ramp; a dash is a value the modem did not report.
-        </CardDescription>
+        <CardTitle>{t("carriers.title")}</CardTitle>
+        <CardDescription>{t("carriers.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Carrier</TableHead>
-              <TableHead>Band</TableHead>
-              <TableHead className={NUM}>ARFCN</TableHead>
-              <TableHead className={NUM}>PCI</TableHead>
-              <TableHead className={NUM}>BW</TableHead>
-              <TableHead className={NUM}>RSRP</TableHead>
-              <TableHead className={NUM}>RSRQ</TableHead>
-              <TableHead className={NUM}>SINR</TableHead>
-              <TableHead className={NUM}>CQI</TableHead>
-              <TableHead className={NUM}>Rank</TableHead>
-              <TableHead>DL mod.</TableHead>
-              <TableHead className={NUM}>MCS</TableHead>
-              <TableHead className={NUM}>BLER</TableHead>
-              <TableHead className={NUM}>DL Mbps</TableHead>
-              <TableHead className={NUM}>UL Mbps</TableHead>
-              <TableHead className={NUM}>TX dBm</TableHead>
+              <TableHead>{t("carriers.head.carrier")}</TableHead>
+              <TableHead>{t("carriers.head.band")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.arfcn")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.pci")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.bw")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.rsrp")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.rsrq")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.sinr")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.cqi")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.rank")}</TableHead>
+              <TableHead>{t("carriers.head.dl_mod")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.mcs")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.bler")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.dl_mbps")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.ul_mbps")}</TableHead>
+              <TableHead className={NUM}>{t("carriers.head.tx_dbm")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -125,7 +124,7 @@ export function CarrierTableCard({
                   </>
                 ) : (
                   <TableCell colSpan={3} className="text-center text-xs text-muted-foreground">
-                    not measured
+                    {t("carriers.not_measured")}
                   </TableCell>
                 )}
                 <TableCell className={NUM}>
@@ -150,7 +149,7 @@ export function CarrierTableCard({
           <TableFooter>
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={4} className="font-medium">
-                Total, {rows.length} carrier{rows.length === 1 ? "" : "s"}
+                {t("carriers.total", { count: rows.length })}
               </TableCell>
               <TableCell className={NUM}>{bandwidth || "—"}</TableCell>
               <TableCell colSpan={8} />
@@ -162,7 +161,7 @@ export function CarrierTableCard({
         </Table>
         {rows.some((r) => r.bandwidth_estimated) && (
           <p className="mt-3 text-xs text-muted-foreground">
-            * Band default bandwidth, not yet learnt from the network.
+            {t("carriers.estimated_note")}
           </p>
         )}
       </CardContent>

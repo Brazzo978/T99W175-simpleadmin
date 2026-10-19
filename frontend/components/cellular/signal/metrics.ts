@@ -260,11 +260,21 @@ export interface HistogramBin {
 
 const MAX_RANGE_BINS = 24;
 
-/** Histogram of both RATs on shared bins, each normalized to its own count. */
+/** Tooltip text of a bin: one value of an integer scale, or a range. */
+export type BinLabel = (lo: number, hi: number, integer: boolean) => string;
+
+const englishBinLabel =
+  (def: MetricDef): BinLabel =>
+  (lo, hi, integer) =>
+    integer ? `${def.label} ${lo}` : `${lo} to ${hi} ${def.unit}`.trim();
+
+/** Histogram of both RATs on shared bins, each normalized to its own count.
+ *  `binLabel` writes each bin's range (the UI passes a translated one). */
 export function histogram(
   lte: number[],
   nr: number[],
   def: MetricDef,
+  binLabel: BinLabel = englishBinLabel(def),
 ): HistogramBin[] {
   const all = [...lte, ...nr];
   if (all.length === 0) return [];
@@ -303,9 +313,7 @@ export function histogram(
     const hi = edges[i + 1];
     return {
       bin: `${lo}`,
-      range: integer
-        ? `${def.label} ${lo}`
-        : `${lo} to ${hi} ${def.unit}`.trim(),
+      range: binLabel(lo, hi, integer),
       lte: lte.length ? (lteCount / lte.length) * 100 : null,
       nr: nr.length ? (nrCount / nr.length) * 100 : null,
       lteCount,

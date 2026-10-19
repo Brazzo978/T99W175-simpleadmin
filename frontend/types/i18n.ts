@@ -8,7 +8,8 @@ export type LanguageCode = string; // BCP-47 (e.g., "en", "zh-CN", "it", "id")
 export type Namespace =
   | "common"
   | "sidebar"
-  | "dashboard";
+  | "dashboard"
+  | "signal";
 
 export interface LanguageMeta {
   code: LanguageCode;
