@@ -127,8 +127,17 @@ removed. Worked on together with the proxmox-infra session.
       useless for RouterOS, harmless
 
 ## Page strings to locales
-- [ ] Move the English page strings to `locales/` (en, it), after every
-      page change above is merged
+- [x] Move the English page strings to `locales/` (en, it): one namespace
+      per page (registered in `lib/i18n/resources.ts`), the shell, the
+      shadcn primitives that show text, and the Recent Activities and AT
+      messages built outside React (`lib/i18n/message.ts`, translated at
+      render)
+- [ ] Translate the Connection Monitoring files left out while the watchdog
+      work changed them: `components/system/watchdog.tsx`,
+      `latency-history.tsx`, `connectivity-status.tsx`,
+      `watchdog-settings-card.tsx`, `watchdog-activity.tsx`,
+      `hooks/use-watchdog.ts`, `lib/bridge/store.ts`
+- [ ] Check the Italian pages on the modem (switch in the user menu)
 
 ## Signal Details cleanup (last, after watching it under traffic)
 Every log is subscribed and every field shown, empty or not; the "DIAG log
