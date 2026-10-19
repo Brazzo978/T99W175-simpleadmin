@@ -45,7 +45,12 @@ const navigation: { groupKey: string; items: NavItem[] }[] = [
   {
     groupKey: "cellular",
     items: [
-      { t_key: "signal_details", url: "/cellular/signal", icon: RadioTowerIcon },
+      {
+        t_key: "signal_details",
+        url: "/cellular/signal",
+        icon: RadioTowerIcon,
+        items: [{ t_key: "antenna_statistics", url: "/cellular/antenna-statistics" }],
+      },
       { t_key: "settings", url: "/cellular/settings", icon: Settings2Icon },
       {
         t_key: "band_locking",

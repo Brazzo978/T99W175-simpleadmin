@@ -26,6 +26,13 @@ const SYSTEM = { group: 'groups.system', groupHref: '/system/monitoring' };
 const TRAILS: Record<string, Trail> = {
   '/dashboard': { group: 'groups.dashboard', groupHref: '/dashboard', items: [{ key: 'items.home', href: '/dashboard' }] },
   '/cellular/signal': { ...CELLULAR, items: [{ key: 'items.signal_details', href: '/cellular/signal' }] },
+  '/cellular/antenna-statistics': {
+    ...CELLULAR,
+    items: [
+      { key: 'items.signal_details', href: '/cellular/signal' },
+      { key: 'items.antenna_statistics', href: '/cellular/antenna-statistics' },
+    ],
+  },
   '/cellular/settings': { ...CELLULAR, items: [{ key: 'items.settings', href: '/cellular/settings' }] },
   '/cellular/band-locking': { ...CELLULAR, items: [{ key: 'items.band_locking', href: '/cellular/band-locking' }] },
   '/cellular/cell-locking': {

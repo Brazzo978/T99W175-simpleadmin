@@ -1,6 +1,7 @@
 // =============================================================================
 // Radio history — one sample per second of the live radio, for trends and
-// distributions on the Signal Details page
+// distributions on the Signal Details page and the per-chain statistics and
+// recordings of the antenna pages
 // =============================================================================
 // The bridge store takes a sample at most once a second while the sockets
 // are open (a page subscribed, tab visible) and keeps the last ten minutes.
@@ -9,7 +10,12 @@
 // from QMI, and null whenever the bridge omits the key (no fresh value).
 // =============================================================================
 
-import type { DiagLteCell, DiagNrCell, DiagSnapshot } from "@/types/bridge";
+import type {
+  ChainValues,
+  DiagLteCell,
+  DiagNrCell,
+  DiagSnapshot,
+} from "@/types/bridge";
 import type { RadioSource } from "./radio";
 
 /** Sampling period and depth: ten minutes at 1 s. */
@@ -32,6 +38,11 @@ export interface CellSample {
   bler: number | null;
   dl_mbps: number | null;
   ul_mbps: number | null;
+  /** Per receive chain (Main, Diversity, MIMO 3, MIMO 4); null when no
+   *  chain reports, to keep ten minutes of samples small */
+  rsrp_rx: ChainValues | null;
+  /** LTE per-chain SINR (DIAG only), NR per-chain SNR (when logged) */
+  sinr_rx: ChainValues | null;
 }
 
 export interface RadioSample {
@@ -48,6 +59,12 @@ export interface RadioSample {
 const num = (v: number | null | undefined): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null;
 
+function chains(values: ChainValues | undefined): ChainValues | null {
+  if (!values) return null;
+  const out = [0, 1, 2, 3].map((i) => num(values[i]));
+  return out.some((v) => v !== null) ? out : null;
+}
+
 function lteSample(c: DiagLteCell, diag: boolean): CellSample {
   return {
     rsrp: num(c.rsrp),
@@ -63,6 +80,8 @@ function lteSample(c: DiagLteCell, diag: boolean): CellSample {
     // The bridge omits an idle carrier's rate: zero, not unknown.
     dl_mbps: diag ? (num(c.dl_mbps) ?? 0) : null,
     ul_mbps: diag ? (num(c.ul_mbps) ?? 0) : null,
+    rsrp_rx: chains(c.rsrp_rx),
+    sinr_rx: chains(c.sinr_rx),
   };
 }
 
@@ -80,6 +99,8 @@ function nrSample(c: DiagNrCell, diag: boolean): CellSample {
     bler: diag ? num(c.dl_bler) : null,
     dl_mbps: diag ? (num(c.dl_mbps) ?? 0) : null,
     ul_mbps: diag ? (num(c.ul_mbps) ?? 0) : null,
+    rsrp_rx: chains(c.rsrp_rx),
+    sinr_rx: chains(c.snr_rx),
   };
 }
 

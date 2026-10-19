@@ -332,6 +332,7 @@ neither understands nor needs. Here the pages read the two WebSocket bridges
 |---|---|---|
 | Dashboard | network, LTE/5G cells, device, latency, signal chart, recent activities | WebSockets |
 | Signal Details | aggregate DL/UL throughput with its trend, a carrier table, a radio events log (LTE RRC state, failure counters, events by category), throughput by carrier, metric trends and histograms (CQI, MCS, rank, SINR, RSRP, TX power, BLER), LTE neighbour cells, one card per carrier (per-antenna RSRP/SINR/SNR, CQI, rank, TX power, timing advance distance, DL/UL link table) and the DIAG log coverage | WebSockets |
+| Antenna Statistics | the four receive chains (Main, Diversity, MIMO 3, MIMO 4) of the LTE PCell and the 5G cell: which are in use, live RSRP and SINR/SNR, the RSRP spread between them, and per chain the distribution, mean, standard deviation and gap to the Main chain over a 1, 5 or 10 minute window | WebSockets |
 | Cellular Settings | network mode, 5G NSA/SA, SIM slot, APN | `^SLMODE`, `^NR5G_MODE`, `^SWITCH_SLOT`, `+CGDCONT` |
 | Band Locking / Cell Locking | LTE, NSA, SA bands; LTE and 5G SA cell locks | `^BAND_PREF_EXT`, `^LTE_LOCK`, `^NR5G_LOCK` |
 | SMS Center | inbox, send, delete | `+CMGL`, `send_sms` |
@@ -375,8 +376,9 @@ upload across every carrier; the rate is counted from the transport blocks the
 modem decodes, so it includes the traffic the IPA hardware-offloads (which the
 kernel interface counters miss) and HARQ retransmissions. While the page is
 open the browser keeps one radio sample a second for ten minutes (PCell and
-first NR cell): the trend and distribution cards, and the throughput trend,
-read it over a 1, 5 or 10 minute window. The radio events log keeps every
+first NR cell, per-chain RSRP and SINR included): the trend and distribution
+cards, the throughput trend and the Antenna Statistics page read it over a 1,
+5 or 10 minute window. The radio events log keeps every
 DIAG event of the session (the bridge sends its last 20), with a badge per
 category (failure, mobility, RRC state, RACH, carrier aggregation). Values the
 bridge does not send are shown as a dash, never as zero; the DIAG log

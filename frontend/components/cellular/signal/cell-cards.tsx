@@ -46,7 +46,7 @@ const ANTENNA_NAMES = ["Main (PRX)", "Diversity (DRX)", "MIMO 3 (RX2)", "MIMO 4 
 
 const has = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
-function Metric({
+export function Metric({
   label,
   value,
   unit,
