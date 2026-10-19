@@ -123,7 +123,6 @@ Modem and network:
 - `get_atcommand`: URL-decodes `atcmd`, runs it through `atcli_smd8` with retries; read-only accounts may only send queries.
 - `user_atcommand`: variant of `get_atcommand` for the terminal in `settings.html` (ANSI sequences stripped).
 - `send_sms`: sends an SMS through AT commands.
-- `get_sys_info`: uptime and system figures for the dashboard.
 - `get_ping`: connectivity test against `SIMPLEADMIN_PING_TARGETS`.
 - `get_lanip`: reads the LAN address from `/etc/data/mobileap_cfg.xml`.
 - `get_arp`: ARP table of the LAN clients.

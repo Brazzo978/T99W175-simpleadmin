@@ -1555,8 +1555,9 @@ function processAllInfos() {
   },
 
   /**
-   * Uptime, link speed, CPU and memory for the dashboard, from a
-   * get_sys_info-shaped object (system_bridge data is converted to it).
+   * Uptime, link speed, CPU and memory for the dashboard, from the object
+   * applySystemData() builds out of system_bridge data (the shape of the
+   * former get_sys_info CGI).
    */
   applySysInfo(data) {
     if (data.status !== 'ok') {
