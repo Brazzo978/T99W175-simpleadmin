@@ -68,7 +68,11 @@ export default function SignalDetailsComponent() {
           <CarrierThroughputCard snapshot={snapshot} source={source} />
           <TrendCard samples={samples} from={from} to={now} />
           <DistributionCard samples={samples} />
-          <NeighbourCard snapshot={snapshot} live={source === "diag"} />
+          {/* 0xB180 is not logged by this firmware: the card shows only if a
+              firmware sends neighbour measurements. */}
+          {(snapshot.lte_neighbors?.length ?? 0) > 0 && (
+            <NeighbourCard snapshot={snapshot} live={source === "diag"} />
+          )}
           {lte.map((cell) => (
             <LteCard key={`lte-${cell.earfcn}-${cell.pci}`} cell={cell} />
           ))}

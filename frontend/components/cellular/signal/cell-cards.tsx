@@ -79,15 +79,19 @@ function ChainBars({
   unit,
   range,
   thresholds,
+  optional = false,
 }: {
   label: string;
   values: ChainValues | undefined;
   unit: string;
   range: readonly [number, number];
   thresholds: SignalThresholds;
+  /** Hidden rather than "not reported" when no chain has a value */
+  optional?: boolean;
 }) {
   const { t } = useTranslation("signal");
   const chains = (values ?? []).map((v, i) => ({ v, i })).filter((c) => has(c.v));
+  if (optional && chains.length === 0) return null;
   return (
     <div className="grid gap-2">
       <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">{label}</span>
@@ -120,19 +124,27 @@ function LinkAdaptation({
   layers,
   txPower,
   pcmax,
+  showTx = true,
 }: {
   cqi?: number;
   ri?: number;
   layers?: number;
   txPower?: number;
   pcmax?: number;
+  /** Whether this carrier ever reports a TX power (NR does not here) */
+  showTx?: boolean;
 }) {
   const { t } = useTranslation("signal");
   const cqiQ = quality(cqi, CQI_THRESHOLDS);
   const txQ = txPowerQuality(txPower);
   const rank = has(ri) ? ri : layers;
   return (
-    <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/30 p-3 @sm/card:grid-cols-3">
+    <div
+      className={cn(
+        "grid grid-cols-1 gap-3 rounded-lg border bg-muted/30 p-3",
+        showTx ? "@sm/card:grid-cols-3" : "@sm/card:grid-cols-2",
+      )}
+    >
       <div className="grid content-start gap-2">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-xs text-muted-foreground">CQI</span>
@@ -166,6 +178,7 @@ function LinkAdaptation({
           )}
         </div>
       </div>
+      {showTx && (
       <div className="grid content-start gap-2">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-xs text-muted-foreground">{t("cell.link_adaptation.tx_power")}</span>
@@ -187,6 +200,7 @@ function LinkAdaptation({
             : t("cell.link_adaptation.tx_none")}
         </span>
       </div>
+      )}
     </div>
   );
 }
@@ -371,20 +385,25 @@ export function NrCard({ cell, index, nsa }: { cell: DiagNrCell; index: number; 
         </CardAction>
       </CardHeader>
       <CardContent className="grid gap-5">
-        <div className="grid grid-cols-2 gap-4 @sm/card:grid-cols-4">
+        {/* This firmware never logs NR SNR (0xB8D8) nor NR UL power and path
+            loss (0xB884): those fields show only when a firmware sends them. */}
+        <div className={cn("grid grid-cols-2 gap-4", has(cell.snr) ? "@sm/card:grid-cols-4" : "@sm/card:grid-cols-3")}>
           <Metric label="RSRP" value={cell.rsrp} unit="dBm" thresholds={RSRP_THRESHOLDS} />
           <Metric label="RSRQ" value={cell.rsrq} unit="dB" thresholds={RSRQ_THRESHOLDS} />
           <Metric label="SINR" value={cell.sinr} unit="dB" thresholds={SINR_THRESHOLDS} note={sinrNote} />
-          <Metric label={t("cell.snr_best")} value={cell.snr} unit="dB" thresholds={SINR_THRESHOLDS} />
+          {has(cell.snr) && (
+            <Metric label={t("cell.snr_best")} value={cell.snr} unit="dB" thresholds={SINR_THRESHOLDS} />
+          )}
         </div>
         <ChainBars label={t("cell.rsrp_per_antenna")} values={cell.rsrp_rx} unit="dBm" range={RSRP_RANGE} thresholds={RSRP_THRESHOLDS} />
-        <ChainBars label={t("cell.snr_per_antenna")} values={cell.snr_rx} unit="dB" range={SINR_RANGE} thresholds={SINR_THRESHOLDS} />
+        <ChainBars label={t("cell.snr_per_antenna")} values={cell.snr_rx} unit="dB" range={SINR_RANGE} thresholds={SINR_THRESHOLDS} optional />
         <LinkAdaptation
           cqi={cell.cqi}
           ri={cell.ri}
           layers={cell.dl_layers}
           txPower={cell.tx_power_dbm}
           pcmax={pcmax}
+          showTx={has(cell.tx_power_dbm)}
         />
         <LinkTable
           rows={[
@@ -411,10 +430,9 @@ export function NrCard({ cell, index, nsa }: { cell: DiagNrCell; index: number; 
               dl: has(cell.dl_mbps) ? <Rate value={cell.dl_mbps} /> : undefined,
               ul: has(cell.ul_mbps) ? <Rate value={cell.ul_mbps} /> : undefined,
             },
-            {
-              label: t("cell.link.path_loss"),
-              dl: has(cell.pathloss_db) ? `${cell.pathloss_db.toFixed(1)} dB` : undefined,
-            },
+            ...(has(cell.pathloss_db)
+              ? [{ label: t("cell.link.path_loss"), dl: `${cell.pathloss_db.toFixed(1)} dB` }]
+              : []),
             {
               label: t("cell.link.power_headroom"),
               ul: has(cell.phr_db) ? `${cell.phr_db.toFixed(1)} dB` : undefined,

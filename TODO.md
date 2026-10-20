@@ -145,15 +145,16 @@ removed. Worked on together with the proxmox-infra session.
 - [x] Italian pages checked on the modem: 18 pages, no raw keys, no
       console errors, no 4xx (2026-10-19)
 
-## Signal Details cleanup (last, after watching it under traffic)
-Every log is subscribed and every field shown, empty or not; the "DIAG log
-coverage" card counts each log code.
-- [ ] Trim the diag_bridge subscription to the logs that arrive. Never seen
-      so far: 0xB823, 0xB8D8 (NR SNR), 0xB884 (NR UL power, path loss),
-      0xB180 (LTE neighbours), 0xB9CD. 0xB8A1 arrives at thousands a minute
-      and is debug-only: first to drop
-- [ ] Hide the fields that never come instead of showing a dash
-- [ ] Decide whether the coverage card stays or moves to a diagnostics page
+## Signal Details cleanup ✅
+Done on 2026-10-20 after 13 h with every log subscribed.
+- [x] diag_bridge subscribes in service mode only the 21 logs that arrive and
+      feed the JSON; 0xB823, 0xB8D8, 0xB884, 0xB180, 0xB9CD (never seen),
+      0xB14E, 0xB187, 0xB897 (no decoder) and 0xB8A1 (debug-only, about 20000
+      a minute) only with `-d`/`-s` (bridge `9b48341`)
+- [x] Fields this firmware never sends are hidden instead of a dash: NR SNR
+      and per-chain SNR, NR TX power and path loss, the LTE neighbour card
+- [x] The DIAG log coverage card stays at the bottom of Signal Details
+      (cheap, and it is how a new firmware shows what it logs)
 
 ## Modem actions not exercised yet
 They send the same commands as the classic pages did.

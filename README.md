@@ -429,9 +429,11 @@ cards, the throughput trend and the Antenna Statistics page read it over a 1,
 5 or 10 minute window. The radio events log keeps every
 DIAG event of the session (the bridge sends its last 20), with a badge per
 category (failure, mobility, RRC state, RACH, carrier aggregation). Values the
-bridge does not send are shown as a dash, never as zero; the DIAG log
-coverage card says which logs this firmware emits (timing advance, for
-instance, only comes at attach or handover). The dashboard's *Recent
+bridge does not send at the moment are shown as a dash, never as zero; those
+this firmware never logs (NR SNR, NR UL power and path loss, LTE neighbour
+cells) are hidden and appear only with a firmware that sends them. The DIAG
+log coverage card says which logs arrive (timing advance, for instance, only
+comes at attach or handover). The dashboard's *Recent
 Activities* keeps the events worth a glance (failures, cell changes,
 abnormal RRC transitions) with the band, cell, carrier aggregation and 5G NR
 changes seen between radio snapshots, internet lost/restored and high
