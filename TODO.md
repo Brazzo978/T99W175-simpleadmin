@@ -18,14 +18,17 @@ Installed on 2026-10-19 at 18:55 with a full `./install.sh`.
       own after typing the current one), as implemented
 - [x] GUI toggle key moved to `/data/simpleadmin/gui_toggle.key`:
       `config/simpleadmin.conf` served without it
-- [ ] GUI lock/unlock with a key set (none is set today)
+- [x] GUI lock/unlock with a temporary key (2026-10-20): lock, wrong key
+      refused (403), unlock; without the key file the toggle is off (500)
 - [x] Next.js navigation and prefetches (`__next.*.txt`, the `HEAD` that
       16.4 sends) answer 200 with the gzip-only web root
 - [x] Antenna Statistics: `rx_diversity` matches the chains that report
       (LTE PCell 1 → one chain, 5G 15 → four chains)
 - [ ] NR per-chain SNR (`snr_rx`): never sent by this firmware so far
 - [ ] Antenna Alignment: a recording, also under QMI fallback (2 s polls)
-- [ ] Frequency Calculator: bands and channels against the serving carriers
+- [x] Frequency Calculator against the serving carriers (2026-10-20): B1
+      100, B3 1650 (1850/1755 MHz), B7 3350, B20 6200 (796/837 MHz), n78
+      638016 (3570.24 MHz) match TS 36.101/38.104
 - [ ] Recent Activities: hold times and the dashboard filter stay readable
       over RRC idle/connected cycles and SCell churn
 
@@ -44,8 +47,8 @@ Installed on 2026-10-19 at 18:55 with a full `./install.sh`.
 - [x] Installed: `bgCheckInterval` 60 in the config; with no page open
       system_bridge sent 6 pings in 3 minutes (one round a minute, two
       targets), checked on `/proc/net/snmp` OutEchos
-- [ ] The 24 h chart at 1-minute slots, and a new interval saved from
-      Connection Monitoring restarting it
+- [x] The 24 h history at 1-minute slots (786 after 13 h) and a new
+      interval restarting it at the new step (30 s, then back to 60 s)
 - [ ] Decide: the watchdog pings on its own every 10 s (`WD_CHECK_INTERVAL`,
       18 of the 24 echoes in those 3 minutes, about 1.7 MB a day); align it
       with the background interval, or keep its faster detection
@@ -97,12 +100,12 @@ Applied automatically when the ICCID changes (decided 2026-10-19).
       after an apply
 
 ## diag_bridge fixes (bridge repository)
-- [ ] A former PCell stays in `lte[]` next to the serving one (B20/PCI 26
-      still "measured" after the PCell moved to B1/PCI 406): Recent
-      Activities counts 6 LTE carriers instead of 4 and reports a false band
-      change (in progress)
-- [ ] NR timing advance: 0xB825 arrives but `ta_scs_estimated` stays true,
-      the decoder does not extract the SCS (in progress)
+- [x] A former PCell stayed in `lte[]` next to the serving one: the PCell
+      is now the serving cell named by RRC message headers and CA metrics
+      (bridge `34534b4`, installed)
+- [x] NR timing advance SCS taken from the SCG configuration in 0xB0C0 (and
+      any 0xB825 that carries one): `ta_scs_estimated` gone on 2026-10-20
+      (bridge `ea7cc88`, installed)
 - [x] Merged to the bridge's `main` (`bc5f297`), installed: one PCell
       published, `diag_logs` carries each log's version
 - [ ] Watch a real handover/reselection with the new build; capture a
@@ -159,8 +162,9 @@ They send the same commands as the classic pages did.
 - [ ] IMEI write
 - [ ] Watchdog save
 - [ ] eSIM download
-- [ ] Unlocking a cell leaves `AT^SLMODE` at 1,0 (automatic), not at the
-      previous value (1,7 here): restore it, or confirm it is equivalent
+- [x] Unlocking a cell leaves `AT^SLMODE` at 1,0 instead of 1,7: same RATs
+      (0 is automatic, 7 the 3G+4G+5G mask, every RAT of this modem); Cellular
+      Settings then shows Automatic. Accepted (2026-10-20)
 
 ## Other
 - [ ] QMI service rediscovery while Linux keeps running (a modem subsystem
