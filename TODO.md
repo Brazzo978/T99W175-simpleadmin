@@ -61,18 +61,30 @@ Installed on 2026-10-19 at 18:55 with a full `./install.sh`.
       UE capability information at attach (0xB0C0, diag_bridge)
 
 ## Persistent data counter that includes IPA-offloaded traffic
-system_bridge counts `rmnet_ipa0`, which equals the `rmnet_dataN` counters
+system_bridge counted `rmnet_ipa0`, which equals the `rmnet_dataN` counters
 plus the 8-byte QMAP header per packet: LAN flows the IPA forwards in
-hardware (eth0 offload is on) are likely missing.
+hardware (eth0 offload is on) were missing. diag_bridge now counts the
+radio bytes.
 - [x] Counter kept across reboots, saved every 10 min and on stop, reset
       through `cgi-bin/reset_data_usage`
-- [ ] Confirm the gap with a known download from a LAN client (compare with
-      the Signal Details throughput)
-- [ ] IPA-inclusive source: QMI WDS packet statistics on clients bound like
-      QCMAP's (Bind Mux Data Port with the IPA endpoint and the call's mux
-      id, one client per IP family), or diag_bridge counting transport
-      blocks continuously (it would keep the DIAG subscription without
-      clients; MAC bytes, retransmissions included)
+- [x] Confirm the gap: 5 minutes of real LAN traffic, radio DL 0.89 MB /
+      UL 1.09 MB against `rmnet_ipa0` rx 0.32 MB / tx 0.01 MB. The old file
+      was also corrupted: rx=100014384041 after 6 days with
+      raw_rx_bytes=1230298011, about 23 x 4 GiB added (counter drops taken
+      as 32-bit wraps)
+- [x] IPA-inclusive source: diag_bridge counts the radio transport blocks
+      all the time (LTE DL 0xB063, LTE UL 0xB139 first transmissions, NR
+      DL/UL growth of the 0xB888/0xB881 cumulative counters) into
+      `/data/simpleadmin/radio_usage`, published as `usage` and shown as
+      Data Used; the reset CGI leaves `radio_usage.reset` for it.
+      system_bridge's `rmnet_ipa0` counter is gone, the installer deletes
+      `/data/simpleadmin/data_usage`
+- [ ] Verify on the modem after deploy: `usage` in the diag_bridge
+      snapshot grows with LAN traffic (against a known download/upload),
+      `/data/simpleadmin/radio_usage` written within 10 min and on
+      `systemctl stop diag_bridge`, reset button zeroes it (file `since`
+      updated, `radio_usage.reset` gone), `data_usage` deleted, no `data`
+      object in system_bridge's snapshot
 
 ## 4-tier watchdog
 COPS → CFUN=4/1 → SIM switch → reboot, with rate limits, replacing

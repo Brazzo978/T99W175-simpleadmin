@@ -309,7 +309,7 @@ installs are removed.
 | What | Source in this repo | On the modem |
 |---|---|---|
 | Web UI | `deploy/www/` plus `deploy/www-nextjs/` (default) or `deploy/www-alpine/` | `/WEBSERVER/www` (`qcmap_httpd` restarted) |
-| `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled); system_bridge's data counter in `/data/simpleadmin/data_usage` |
+| `diag_bridge`, `system_bridge` | `deploy/diag_bridge/` (`bin/diag_bridge` symlink into the bridge repository, see its `README.md`) and `deploy/system_bridge/` (`src/`, `build.sh`, `bin/system_bridge`), each with `systemd/<daemon>.service` | `/data/simpleadmin/bin/<daemon>` linked from `/usr/bin/<daemon>`, `/lib/systemd/system/<daemon>.service` (enabled); diag_bridge's data-used counter in `/data/simpleadmin/radio_usage` |
 | `curl`, `jq` | `deploy/curl/`, `deploy/jq/` (`bin/`, `lib/`) | `/data/simpleadmin/{bin,lib}` with wrappers in `/usr/bin`; the firmware's `libcurl.so.4` is left untouched |
 | System scripts | `deploy/ttl/`, `deploy/crontab/`, `deploy/watchdog/`, `deploy/euicc/` | `/opt/scripts/{ttl,watchdog}`, `/etc/init.d/crontab`, units in `/lib/systemd/system`, watchdog state in `/data/simpleadmin/watchdog` (see "Connection watchdog" below and `docs/Enable_New_feature.md`) |
 | SIM profiles | `deploy/sim-profiles/` (`scripts/sim-profiles`, `systemd/sim-profiles.{service,timer}`) | `/opt/scripts/sim-profiles/sim-profiles`, run every 30 s by `sim-profiles.timer`; profiles in `/data/simpleadmin/sim-profiles` (see "SIM profiles" below) |
@@ -372,19 +372,18 @@ WebSockets, without polling AT commands:
 - **`diag_bridge`** (port 9001) decodes the Qualcomm DIAG interface: serving
   and aggregated cells, per-antenna RSRP/SINR, modulation, MCS, BLER and
   throughput per carrier, UL MCS/PRB/power headroom, LTE RRC (SCells, cell
-  identity, NR bandwidth). It is the source of all radio data.
+  identity, NR bandwidth). It is the source of all radio data, and of the
+  dashboard's *Data Used*.
 - **`system_bridge`** (port 9002) uses QMI over QRTR for what DIAG does not
   carry: NR SINR, temperatures, SIM state and slot, IMEI/IMSI/ICCID,
   firmware, operator, APN; it also reports uptime, CPU, memory, link speed,
   hostname, kernel, `/data` usage, WAN address, the age of the data session
-  (the kernel's creation time of the WWAN address), the persistent data
-  counter and the connectivity checks of `simpleadmin.conf` (ping, DNS and a
-  captive portal probe). When `diag_bridge` is not connected, its QMI radio
+  (the kernel's creation time of the WWAN address) and the connectivity
+  checks of `simpleadmin.conf` (ping, DNS and a captive portal probe). When `diag_bridge` is not connected, its QMI radio
   data (serving cells, per-chain RSRP, active SCells) takes over.
 
-`system_bridge` keeps working while nobody is connected, for three things:
-the connectivity checks, a QMI signal sample every 10 s, and the data
-counter. The checks run every 10 s while a page is open (pings, DNS and the
+`system_bridge` keeps working while nobody is connected, for two things:
+the connectivity checks and a QMI signal sample every 10 s. The checks run every 10 s while a page is open (pings, DNS and the
 HTTP probe) and once per background check interval while none is (pings
 only): `SIMPLEADMIN_BG_CHECK_INTERVAL`, 60 s by default, 10 to 600 in steps
 of 10, set with the checks in *Connection Monitoring*. The background pings
@@ -407,15 +406,22 @@ redirect or a page means a login, billing or activation page intercepts web
 traffic: the internet status turns to *Carrier Limited* on the dashboard and
 *Connection Monitoring* says what answered.
 
-The data counter adds up the `rmnet_ipa0` byte counters (every data call,
-IPv4 and IPv6) across reboots, interface re-creations and 4 GiB wraps, saved
-to `/data/simpleadmin/data_usage` every 10 minutes and on stop; the reset
-button calls `cgi-bin/reset_data_usage`. It does not see what the IPA
-hardware forwards between the LAN and the modem without the kernel: read on
-the modem, `rmnet_ipa0` was exactly the sum of the `rmnet_dataN` counters
-plus the 8-byte QMAP header of each packet, so no offloaded byte is folded
-into it, and LAN traffic taking the offload path is missing from the total
-(see `TODO.md`).
+The dashboard's *Data Used* is counted by `diag_bridge` from the radio
+transport blocks, LTE and 5G NR, download and upload, page open or not, and
+kept across restarts and reboots in `/data/simpleadmin/radio_usage` (saved
+every 10 minutes when it changed and on stop). Radio bytes include the LAN
+traffic the IPA forwards in hardware, which the kernel interface counters
+never see: over 5 minutes of LAN traffic the radio carried 0.89 MB down and
+1.09 MB up while `rmnet_ipa0` counted 0.32 MB and 0.01 MB. They read a few
+percent above the operator's count (RLC/PDCP/MAC headers and padding);
+HARQ retransmissions are left out. Lost are only the bytes while
+`diag_bridge` is not running, and up to 10 minutes on a crash or a power
+cut. The reset button calls `cgi-bin/reset_data_usage`, which leaves
+`/data/simpleadmin/radio_usage.reset` for `diag_bridge` and answers once
+the zeroed counter is saved. How each RAT is counted: the bridge
+repository's `README.md` ("Data used"). The installer deletes
+`/data/simpleadmin/data_usage`, the `rmnet_ipa0` counter `system_bridge`
+used to keep.
 
 Signal Details names the radio source: **DIAG**, or **QMI** when
 `diag_bridge` is down, with the DIAG-only details (DL/UL rows, per-chain SINR,
