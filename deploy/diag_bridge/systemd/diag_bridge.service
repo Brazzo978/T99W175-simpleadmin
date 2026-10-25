@@ -8,7 +8,7 @@ RequiresMountsFor=/data
 Type=forking
 ExecStart=/usr/bin/diag_bridge -i bridge0
 PIDFile=/run/diag_bridge.pid
-Restart=on-failure
+Restart=always
 RestartSec=5
 
 [Install]

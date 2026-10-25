@@ -79,12 +79,15 @@ radio bytes.
       Data Used; the reset CGI leaves `radio_usage.reset` for it.
       system_bridge's `rmnet_ipa0` counter is gone, the installer deletes
       `/data/simpleadmin/data_usage`
-- [ ] Verify on the modem after deploy: `usage` in the diag_bridge
-      snapshot grows with LAN traffic (against a known download/upload),
-      `/data/simpleadmin/radio_usage` written within 10 min and on
-      `systemctl stop diag_bridge`, reset button zeroes it (file `since`
-      updated, `radio_usage.reset` gone), `data_usage` deleted, no `data`
-      object in system_bridge's snapshot
+- [x] Verified on the modem (2026-10-25): over 5 minutes of real LAN
+      traffic the counter grew DL 215.95 MB / UL 105.08 MB against radio
+      rates of 216.30 / 121.07 MB (UL retransmissions excluded) and
+      `rmnet_ipa0` 190.8 / 0.004 MB; saved on stop and reloaded; LTE UL
+      retransmissions 4 % of first transmissions (Re-tx Index bit plausible),
+      no refused steps; reset through the CGI zeroes it and sets `since`
+- [x] diag_bridge exited with status 0 after a poll error and stayed down
+      (systemd restarted only on failure): it now exits with an error and
+      the unit uses `Restart=always`
 
 ## 4-tier watchdog
 COPS → CFUN=4/1 → SIM switch → reboot, with rate limits, replacing
