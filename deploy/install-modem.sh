@@ -484,6 +484,8 @@ install_daemon() {
 }
 install_daemon diag_bridge
 install_daemon system_bridge
+# system_bridge's old rmnet_ipa0 counter: diag_bridge keeps data used now.
+remove "$BASE/data_usage" "$BASE/data_usage.tmp"
 # Deprecates old IPv6 prefixes and routers on the LAN after the mobile
 # network hands out a new prefix (deploy/ra-guard/src/ra-guard.c).
 install_daemon ra-guard

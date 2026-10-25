@@ -22,8 +22,8 @@
  * once per background check interval (SIMPLEADMIN_BG_CHECK_INTERVAL, 60 s
  * by default), pings only. With or without clients it keeps the histories a
  * new client receives at once (ping latency for 24 h, one slot per
- * background check interval; QMI signal every 10 s for 30 min) and the
- * persistent data counter.
+ * background check interval; QMI signal every 10 s for 30 min). The data
+ * used counter is diag_bridge's (radio transport blocks).
  *
  * The same binary is the serialized AT client: called as atcli_smd8 (the
  * firmware's client is replaced by a link to it) or as "system_bridge at",
@@ -694,187 +694,6 @@ static void poll_system(void) {
     }
 }
 
-/* ============= DATA COUNTER ============= */
-
-/* Bytes through the cellular data path, kept across reboots, daemon
-   restarts and counter restarts in DATA_FILE_DEFAULT (UBIFS: written every
-   DATA_SAVE_MS when it changed, on SIGTERM and on a reset, never more).
-
-   Source: the kernel counters of rmnet_ipa0, the IPA netdev that every data
-   call's rmnet_dataN rides on, so the sum over all calls, IPv4 and IPv6
-   (plus the 8-byte QMAP header of each packet, under 1 %). They restart at
-   0 at boot and when the IPA driver re-creates the interface (modem
-   restart: new ifindex), and they are unsigned long: on this 32-bit kernel
-   they wrap at 4 GiB.
-
-   What they miss: flows the IPA forwards in hardware between eth0 and the
-   modem (eth0 offload is "Ready" in /sys/kernel/debug/ipa/ethernet) never
-   reach the kernel. Read on the modem on 2026-10-19: rmnet_ipa0 RX was
-   exactly the rmnet_dataN RX plus 8 bytes per packet, so nothing offloaded
-   is folded into it (QManager's claim that IPA flushes offloaded bytes into
-   the netdev counters does not hold here), and eth0's own counters do not
-   even see local LAN traffic. The counts that include offloaded traffic
-   live on the modem side and none is reachable from here as-is: QMI WDS Get
-   Packet Statistics answers only for the data port, mux and IP family a
-   client is bound to (QCMAP binds its own clients through the IPA endpoint
-   ioctls), the Q6 tethering statistics need /dev/wwan_ioctl, and
-   diag_bridge's transport-block rates count MAC bytes (retransmissions
-   included) and only while it is subscribed. So this counts the traffic of
-   the modem itself and of the LAN flows the kernel routes, which is what
-   the "rmnet_ipa0" counter name in the snapshot stands for. */
-
-#define DATA_FILE_DEFAULT "/data/simpleadmin/data_usage"
-#define DATA_IFACE        "rmnet_ipa0"
-#define DATA_SAMPLE_MS    10000
-#define DATA_SAVE_MS      600000
-
-/* Interface counters of one sample: bytes and packets, RX and TX. */
-enum { DU_RX, DU_TX, DU_RX_PKT, DU_TX_PKT, DU_N };
-static const char *const du_stat[DU_N] = { "rx_bytes", "tx_bytes", "rx_packets", "tx_packets" };
-
-static struct {
-    uint64_t rx, tx;              /* accumulated since reset_at */
-    uint64_t raw[DU_N];           /* interface counters at the last sample */
-    int ifindex;                  /* of DATA_IFACE then; 0 no baseline yet,
-                                     -1 counters since this boot's start */
-    time_t sampled_at, reset_at, saved_at;
-    unsigned resets;              /* counter restarts since reset_at */
-    int ok;                       /* the last read succeeded */
-    int dirty;                    /* changed since the last save */
-    int loaded;                   /* the file was read */
-} du;
-static const char *data_file = DATA_FILE_DEFAULT;
-static char boot_id[40];
-static volatile sig_atomic_t data_reset_req;
-
-static int read_u64(const char *path, uint64_t *v) {
-    char b[32];
-    if (read_file(path, b, sizeof(b)) <= 0) return -1;
-    *v = strtoull(b, NULL, 10);
-    return 0;
-}
-
-/* Growth of a byte counter between two samples of the same interface.
-   Backwards is a 32-bit wrap or a restart; the packet counter tells them
-   apart: bytes cannot wrap without packets moving forward, while a restart
-   takes the packets back too. (A packet counter wrapping in the same
-   interval reads as a restart: one interval lost, never phantom bytes.) */
-static uint64_t counter_delta(uint64_t prev, uint64_t now, uint64_t prev_pkt, uint64_t now_pkt, int *restarted) {
-    if (now >= prev) return now - prev;
-    if (now_pkt > prev_pkt && prev <= 0xFFFFFFFFULL) return now + (0x100000000ULL - prev);
-    *restarted = 1;
-    return now;
-}
-
-static void data_sample(void) {
-    char b[16], path[64];
-    uint64_t c[DU_N];
-    int idx = read_file("/sys/class/net/" DATA_IFACE "/ifindex", b, sizeof(b)) > 0 ? atoi(b) : 0;
-    du.ok = idx > 0;
-    for (int k = 0; k < DU_N && du.ok; k++) {
-        snprintf(path, sizeof(path), "/sys/class/net/" DATA_IFACE "/statistics/%s", du_stat[k]);
-        du.ok = read_u64(path, &c[k]) == 0;
-    }
-    if (!du.ok) return;
-    if (!du.ifindex) {
-        /* No baseline (first run, or a reset without a sample): count
-           from now on. */
-    } else if (du.ifindex < 0) {
-        /* First sample of a new boot: the counters started at 0. */
-        du.rx += c[DU_RX]; du.tx += c[DU_TX];
-    } else if (idx != du.ifindex) {
-        /* Re-created interface: its counters started again from 0. */
-        du.rx += c[DU_RX]; du.tx += c[DU_TX]; du.resets++;
-    } else {
-        int restarted = 0;
-        du.rx += counter_delta(du.raw[DU_RX], c[DU_RX], du.raw[DU_RX_PKT], c[DU_RX_PKT], &restarted);
-        du.tx += counter_delta(du.raw[DU_TX], c[DU_TX], du.raw[DU_TX_PKT], c[DU_TX_PKT], &restarted);
-        if (restarted) du.resets++;
-    }
-    if (memcmp(c, du.raw, sizeof(c)) || idx != du.ifindex) du.dirty = 1;
-    memcpy(du.raw, c, sizeof(c));
-    du.ifindex = idx;
-    du.sampled_at = time(NULL);
-}
-
-/* key=value lines; the interface baseline only counts within the boot that
-   wrote it. After a reboot the counters started from 0 at boot, so the
-   first sample adds all of them. */
-static void data_load(void) {
-    char b[1024];
-    if (read_file("/proc/sys/kernel/random/boot_id", boot_id, sizeof(boot_id)) > 0)
-        boot_id[strcspn(boot_id, "\n")] = 0;
-    du.reset_at = time(NULL);
-    if (read_file(data_file, b, sizeof(b)) <= 0) { du.dirty = 1; return; }
-    char file_boot[40] = "", key[24];
-    unsigned long long v;
-    int idx = 0, have_idx = 0;
-    uint64_t raw[DU_N] = { 0 };
-    for (char *line = strtok(b, "\n"); line; line = strtok(NULL, "\n")) {
-        if (sscanf(line, "boot_id=%39s", file_boot) == 1) continue;
-        if (sscanf(line, "ifindex=%d", &idx) == 1) { have_idx = 1; continue; }   /* may be -1 */
-        if (sscanf(line, "%23[a-z_]=%llu", key, &v) != 2) continue;
-        if (!strcmp(key, "rx")) du.rx = v;
-        else if (!strcmp(key, "tx")) du.tx = v;
-        else if (!strcmp(key, "reset_at")) du.reset_at = (time_t)v;
-        else if (!strcmp(key, "resets")) du.resets = (unsigned)v;
-        else if (!strcmp(key, "saved_at")) du.saved_at = (time_t)v;
-        else if (!strncmp(key, "raw_", 4))
-            for (int k = 0; k < DU_N; k++) if (!strcmp(key + 4, du_stat[k])) raw[k] = v;
-    }
-    du.loaded = 1;
-    if (boot_id[0] && !strcmp(file_boot, boot_id)) {
-        /* Same boot: the kernel kept counting while this daemon was down. */
-        du.ifindex = have_idx ? idx : 0;
-        memcpy(du.raw, raw, sizeof(raw));
-    } else {
-        /* Bytes after the last save of the previous boot are lost: on a
-           clean reboot systemd's SIGTERM saved them. */
-        du.ifindex = -1;
-        du.resets++;
-        du.dirty = 1;
-    }
-}
-
-/* Written beside the file and renamed over it, then the directory synced,
-   so a power cut leaves the old or the new copy, never half of one, and a
-   saved reset is not undone. */
-static void data_save(void) {
-    char tmp[256], dir[256];
-    snprintf(tmp, sizeof(tmp), "%s.tmp", data_file);
-    FILE *f = fopen(tmp, "w");
-    if (!f) { dbg("[data] cannot write %s: %s\n", tmp, strerror(errno)); return; }
-    time_t now = time(NULL);
-    fprintf(f, "boot_id=%s\nifindex=%d\n", boot_id, du.ifindex);
-    for (int k = 0; k < DU_N; k++) fprintf(f, "raw_%s=%llu\n", du_stat[k], (unsigned long long)du.raw[k]);
-    fprintf(f, "rx=%llu\ntx=%llu\nreset_at=%lld\nresets=%u\nsaved_at=%lld\n",
-            (unsigned long long)du.rx, (unsigned long long)du.tx,
-            (long long)du.reset_at, du.resets, (long long)now);
-    int bad = fflush(f) != 0 || fsync(fileno(f)) != 0;
-    if (fclose(f) != 0 || bad || rename(tmp, data_file) != 0) {
-        dbg("[data] cannot write %s: %s\n", data_file, strerror(errno));
-        unlink(tmp);
-        return;
-    }
-    snprintf(dir, sizeof(dir), "%s", data_file);
-    int dfd = open(dirname(dir), O_RDONLY);
-    if (dfd >= 0) { fsync(dfd); close(dfd); }
-    du.saved_at = now;
-    du.dirty = 0;
-}
-
-/* SIGUSR1 (cgi-bin/reset_data_usage): zero and save at once. Without a
-   fresh sample the old baseline would bring pre-reset bytes back: count
-   from the next sample instead. */
-static void data_reset(void) {
-    data_sample();
-    if (!du.ok) du.ifindex = 0;
-    du.rx = du.tx = 0;
-    du.resets = 0;
-    du.reset_at = time(NULL);
-    data_save();
-}
-
 /* ============= CONNECTIVITY ============= */
 
 /* The checks run in rounds: every CONN_MS with pings, DNS and the captive
@@ -1442,10 +1261,6 @@ static size_t serialize(char *out, size_t cap) {
     else jcat(&j, ",\"conn_uptime_s\":null");
     jcat(&j, ",\"dns\":["); jstr(&j, sys.dns[0]); if (sys.dns[1][0]) { jcat(&j, ","); jstr(&j, sys.dns[1]); }
     jcat(&j, "],\"apn\":"); jstr(&j, md.apn);
-    jcat(&j, "},\"data\":{\"counter\":\"" DATA_IFACE "\",\"ok\":%s,\"rx\":%llu,\"tx\":%llu,"
-             "\"sampled_at\":%lld,\"reset_at\":%lld,\"resets\":%u,\"saved_at\":%lld",
-         du.ok ? "true" : "false", (unsigned long long)du.rx, (unsigned long long)du.tx,
-         (long long)du.sampled_at, (long long)du.reset_at, du.resets, (long long)du.saved_at);
 
     /* Connectivity: the last finished round, same shape as cgi-bin/get_ping.
        The status counts the checks that ran: all passed "ok", some
@@ -1696,7 +1511,6 @@ static int at_main(int argc, char **argv) {
 /* ============= MAIN ============= */
 
 static void on_signal(int s) { (void)s; running = 0; }
-static void on_usr1(int s) { (void)s; data_reset_req = 1; }
 
 /* A new client gets the histories before its first snapshot; -1 drops it
    when they cannot be sent whole. */
@@ -1707,14 +1521,13 @@ static int send_history(int fd) {
 }
 
 static void usage(const char *prog) {
-    fprintf(stderr, "Usage: %s [-d] [-1] [-p PORT] [-i IFACE] [-C CONF] [-D FILE]\n"
+    fprintf(stderr, "Usage: %s [-d] [-1] [-p PORT] [-i IFACE] [-C CONF]\n"
                     "  -d        debug: foreground, log to stderr\n"
                     "  -1        print one JSON snapshot on stdout and exit\n"
                     "  -p PORT   WebSocket port (default %d)\n"
                     "  -i IFACE  accept clients only on IFACE (e.g. bridge0)\n"
-                    "  -C CONF   simpleadmin.conf with the ping/DNS/HTTP targets (default %s)\n"
-                    "  -D FILE   persistent data counter (default %s; SIGUSR1 zeroes it)\n",
-            prog, WS_PORT_DEFAULT, CONF_FILE_DEFAULT, DATA_FILE_DEFAULT);
+                    "  -C CONF   simpleadmin.conf with the ping/DNS/HTTP targets (default %s)\n",
+            prog, WS_PORT_DEFAULT, CONF_FILE_DEFAULT);
 }
 
 int main(int argc, char **argv) {
@@ -1731,12 +1544,10 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-p") && i + 1 < argc) port = (uint16_t)atoi(argv[++i]);
         else if (!strcmp(argv[i], "-i") && i + 1 < argc) iface = argv[++i];
         else if (!strcmp(argv[i], "-C") && i + 1 < argc) conf_file = ws_conf_file = argv[++i];
-        else if (!strcmp(argv[i], "-D") && i + 1 < argc) data_file = argv[++i];
         else { usage(argv[0]); return strcmp(argv[i], "-h") ? 1 : 0; }
     }
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
-    signal(SIGUSR1, on_usr1);
     signal(SIGPIPE, SIG_IGN);
     srand((unsigned)time(NULL) ^ (unsigned)getpid());
     echo_id = (uint16_t)(getpid() & 0xffff);
@@ -1745,10 +1556,8 @@ int main(int argc, char **argv) {
     icmp_fd = socket(AF_INET, SOCK_RAW | SOCK_NONBLOCK, IPPROTO_ICMP);
     if (icmp_fd < 0) fprintf(stderr, "WARN: no ICMP socket (%s), ping reported as failed\n", strerror(errno));
 
-    data_load();
     static char out[16384];
     if (once) {
-        data_sample();      /* shown, not saved */
         poll_identity(); poll_serving(); poll_radio(); poll_system();
         conn_start(1, 1);
         uint64_t wait_ms = (uint64_t)hp.timeout_s * 1000 + 500;
@@ -1784,10 +1593,7 @@ int main(int argc, char **argv) {
     FILE *pf = fopen("/run/system_bridge.pid", "w");
     if (pf) { fprintf(pf, "%d\n", getpid()); fclose(pf); }
 
-    data_sample();
-    if (!du.loaded) data_save();      /* first run: create the file */
     uint64_t next_push = 0, next_radio = 0, next_serving = 0, next_identity = 0, next_conn = 0, next_signal = 0;
-    uint64_t next_data = monotonic_ms() + DATA_SAMPLE_MS, next_save = monotonic_ms() + DATA_SAVE_MS;
     int had_clients = 0;
     ws_on_open = send_history;
     while (running) {
@@ -1835,8 +1641,7 @@ int main(int argc, char **argv) {
             next_identity = 0;      /* re-read everything from the new endpoints */
         }
 
-        /* With or without clients: the data counter, the check rounds and
-           the signal samples. Rounds run every CONN_MS while a client is
+        /* With or without clients: the check rounds and the signal samples. Rounds run every CONN_MS while a client is
            connected (a first client gets a full round at once, after the
            pings in flight), once per history step otherwise; the round
            nearest the end of a step closes it. Rounds and steps keep their
@@ -1844,12 +1649,6 @@ int main(int argc, char **argv) {
            step). A changed configuration is read between rounds and
            applies at once: a client gets a round with the new targets
            (load_conf cleared the shown results). */
-        if (data_reset_req) { data_reset_req = 0; data_reset(); }
-        if (now >= next_data) { data_sample(); next_data = now + DATA_SAMPLE_MS; }
-        if (now >= next_save) {
-            if (du.dirty) data_save();
-            next_save = now + DATA_SAVE_MS;
-        }
         static uint64_t next_conf;
         if (!round_open && now >= next_conf) {
             if (load_conf() && ws_nclients) next_conn = now;
@@ -1882,7 +1681,6 @@ int main(int argc, char **argv) {
         if (now >= next_radio) { poll_radio(); next_radio = now + RADIO_MS; }
         if (now >= next_push) {
             poll_system();
-            data_sample();
             size_t n = serialize(out, sizeof(out));
             ws_broadcast(out, n);
             next_push = now + PUSH_MS;
@@ -1890,8 +1688,6 @@ int main(int argc, char **argv) {
     }
     ws_stop();
     http_stop();
-    data_sample();
-    data_save();
     unlink("/run/system_bridge.pid");
     return 0;
 }
