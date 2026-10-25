@@ -62,6 +62,9 @@ const TEMP_DANGER = 75; // °C
 const CPU_WARN = 70; // percentage
 const CPU_DANGER = 90; // percentage
 
+/** Unix seconds (modem clock) in the browser's locale. */
+const formatUnixTime = (s: number) => new Date(s * 1000).toLocaleString();
+
 const DeviceMetricsComponent = ({
   deviceData,
   lteData,
@@ -85,12 +88,14 @@ const DeviceMetricsComponent = ({
   const isCpuHigh = cpu !== null && cpu >= CPU_WARN;
   const memPct = memTotal > 0 ? (memUsed / memTotal) * 100 : 0;
 
-  // Persistent data-usage counter — system_bridge's snapshot (rmnet_ipa0)
+  // Data used — diag_bridge's radio byte counter (snapshot `usage`)
   const {
     data: dataUsed,
     isResetting,
     resetCounter,
   } = useDataUsed();
+  const usageSince = dataUsed?.since ?? null;
+  const dataUsedSince = usageSince != null ? formatUnixTime(usageSince) : null;
 
   // /data partition usage — from system_bridge via modem-subsys
   const { data: subsysData } = useModemSubsys();
@@ -108,7 +113,7 @@ const DeviceMetricsComponent = ({
       toast.error(t("metrics.reset_error"));
     }
     setResetDialogOpen(false);
-  }, [resetCounter, t]);
+  }, [resetCounter, t, setResetDialogOpen]);
 
   if (isLoading) {
     return (
@@ -226,13 +231,38 @@ const DeviceMetricsComponent = ({
             )}
           </div>
 
-          {/* Data Used (system_bridge's persistent rmnet_ipa0 byte counter) */}
+          {/* Data Used (diag_bridge's radio byte counter, kept across reboots) */}
           <Separator />
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <p className="font-semibold text-muted-foreground text-sm shrink-0">
                 {t("metrics.data_used_label")}
               </p>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex"
+                    aria-label={t("metrics.more_info_aria")}
+                  >
+                    <TbInfoCircleFilled className="size-4 text-info" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  {dataUsed ? (
+                    <>
+                      <p>{t("metrics.data_used_tooltip")}</p>
+                      {dataUsedSince && (
+                        <p className="mt-1">
+                          {t("metrics.data_used_since", { date: dataUsedSince })}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p>{t("metrics.data_used_unavailable")}</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
               {/* Reset button */}
               <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
                 <AlertDialogTrigger asChild>
@@ -266,13 +296,13 @@ const DeviceMetricsComponent = ({
               <div className="flex items-center gap-1">
                 <TbCircleArrowDownFilled className="text-info size-5 shrink-0" />
                 <p className="font-semibold text-sm tabular-nums">
-                  {formatBytes(dataUsed?.accumulated_rx_bytes ?? 0)}
+                  {dataUsed ? formatBytes(dataUsed.dl_bytes) : "-"}
                 </p>
               </div>
               <div className="flex items-center gap-1">
                 <TbCircleArrowUpFilled className="text-purple-500 size-5 shrink-0" />
                 <p className="font-semibold text-sm tabular-nums">
-                  {formatBytes(dataUsed?.accumulated_tx_bytes ?? 0)}
+                  {dataUsed ? formatBytes(dataUsed.ul_bytes) : "-"}
                 </p>
               </div>
             </div>

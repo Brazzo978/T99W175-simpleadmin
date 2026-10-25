@@ -42,8 +42,6 @@ export interface ModemStatus {
   sim_failover: SimFailoverStatus;
   /** SIM swap detection (physical SIM card change at boot) */
   sim_swap: SimSwapStatus;
-  /** Persistent data-usage counter (optional — absent on older firmware or before first poller write) */
-  data_used?: DataUsedBlock;
 }
 
 // --- Enums & Unions ----------------------------------------------------------
@@ -259,40 +257,6 @@ export interface DeviceStatus {
   supported_nsa_nr5g_bands: string;
   /** Hardware-supported SA NR5G bands, colon-delimited (boot-only) */
   supported_sa_nr5g_bands: string;
-}
-
-/**
- * Persistent data-usage counter maintained by the poller across modem
- * reboots and interface flaps. Sourced from the kernel rmnet interface
- * byte counters (/proc/net/dev) — the kernel labels rx/tx identically on
- * every firmware, so no AT-counter orientation calibration is needed.
- * Served by /cgi-bin/quecmanager/network/data_used.sh
- */
-export interface DataUsedBlock {
-  /** Cumulative received bytes (download), persisted across reboots */
-  accumulated_rx_bytes: number;
-  /** Cumulative transmitted bytes (upload), persisted across reboots */
-  accumulated_tx_bytes: number;
-  /** Counter source — the kernel interface name (e.g. "rmnet_ipa0"). */
-  selected_counter: string;
-  /** Unix epoch (seconds) of the last poller write to this block */
-  last_update_ts: number;
-  /**
-   * Unix epoch (seconds) of the last user-triggered reset.
-   * 0 means never reset (fresh install).
-   */
-  last_reset_ts: number;
-  /**
-   * Times the kernel interface counter reset (modem reboot / interface
-   * re-creation) since the last user reset. Each reset rebases the
-   * baseline without accumulating the in-flight bytes.
-   */
-  modem_reset_count: number;
-  /**
-   * True when the poller has not updated this block recently (cache is
-   * stale). CGI sets this when the on-disk file is older than expected.
-   */
-  stale: boolean;
 }
 
 // --- Utility Types -----------------------------------------------------------

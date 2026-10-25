@@ -1,50 +1,39 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useBridgeState } from "@/hooks/use-bridge";
 import { authFetch } from "@/lib/auth-fetch";
-import type { DataUsedBlock } from "@/types/modem-status";
+import type { RadioUsage } from "@/types/bridge";
 
 // =============================================================================
-// useDataUsed — persistent data-usage counter
+// useDataUsed — data used over the radio
 // =============================================================================
-// system_bridge accumulates the rmnet_ipa0 byte counters across reboots in
-// /data/simpleadmin/data_usage and pushes the totals in its snapshot (`data`).
-// The reset goes through cgi-bin/reset_data_usage (admin), which signals the
-// daemon; the next snapshot carries the zeroed totals.
+// diag_bridge adds up the bytes of the radio transport blocks (LTE and 5G,
+// download and upload) across restarts in /data/simpleadmin/radio_usage and
+// sends the totals in every snapshot (`usage`). Radio bytes include the LAN
+// traffic the IPA forwards in hardware, which the kernel interface counters
+// miss, and read a few percent above the operator's count (protocol
+// headers). The reset goes through cgi-bin/reset_data_usage (admin), which
+// returns once diag_bridge has zeroed and saved the counter; the next
+// snapshot carries the zeroed totals.
 // =============================================================================
 
 const RESET_ENDPOINT = "/cgi-bin/reset_data_usage";
 
 export interface UseDataUsedReturn {
-  /** Latest data-usage block (null until system_bridge sends one) */
-  data: DataUsedBlock | null;
+  /** Totals since the last reset (null until diag_bridge sends them) */
+  data: RadioUsage | null;
   isLoading: boolean;
   isResetting: boolean;
   error: string | null;
   /** Reset the counter. Returns true on success. */
   resetCounter: () => Promise<boolean>;
-  refresh: () => void;
 }
 
 export function useDataUsed(): UseDataUsedReturn {
-  const { system } = useBridgeState();
+  const { diag } = useBridgeState();
   const [isResetting, setIsResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const block = system?.data;
-  const data = useMemo<DataUsedBlock | null>(() => {
-    if (!block) return null;
-    return {
-      accumulated_rx_bytes: block.rx,
-      accumulated_tx_bytes: block.tx,
-      selected_counter: block.counter,
-      last_update_ts: block.sampled_at,
-      last_reset_ts: block.reset_at,
-      modem_reset_count: block.resets,
-      stale: !block.ok,
-    };
-  }, [block]);
 
   const resetCounter = useCallback(async () => {
     setIsResetting(true);
@@ -67,13 +56,11 @@ export function useDataUsed(): UseDataUsedReturn {
     }
   }, []);
 
-  const refresh = useCallback(() => {}, []);
   return {
-    data,
-    isLoading: !system,
+    data: diag?.usage ?? null,
+    isLoading: !diag,
     isResetting,
     error,
     resetCounter,
-    refresh,
   };
 }

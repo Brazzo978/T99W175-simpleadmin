@@ -175,6 +175,22 @@ export type RadioEventCategory =
 /** Radio access technology a DIAG event belongs to. */
 export type RadioRat = "LTE" | "5G";
 
+/** Data used, counted by diag_bridge from the radio transport blocks (LTE
+ *  and NR, both directions) and kept across restarts. MAC bytes: they
+ *  include the LAN traffic the IPA forwards in hardware (which the kernel
+ *  interface counters miss) and read a few percent above the operator's IP
+ *  count (protocol headers). */
+export interface RadioUsage {
+  /** Bytes since `since`, download and upload */
+  dl_bytes: number;
+  ul_bytes: number;
+  /** Unix seconds (modem clock) of the last reset, null while the modem
+   *  clock was not set yet */
+  since: number | null;
+  /** Unix seconds of the last save to /data, null before the first */
+  saved_at: number | null;
+}
+
 /** One diag_bridge radio snapshot (also the shape QMI radio is converted to). */
 export interface DiagSnapshot {
   lte: DiagLteCell[];
@@ -185,6 +201,8 @@ export interface DiagSnapshot {
   rrc?: RrcInfo;
   /** Last 20 events, newest first */
   events?: DiagEvent[];
+  /** Data used (absent from an older diag_bridge) */
+  usage?: RadioUsage;
 }
 
 export interface QmiScell {
@@ -295,21 +313,6 @@ export interface SystemSnapshot {
     conn_uptime_s?: number | null;
     dns?: string[];
     apn?: string;
-  };
-  /** Persistent data counter (bytes since reset_at, kept across reboots) */
-  data?: {
-    /** Kernel interface the bytes are read from */
-    counter: string;
-    /** false when the interface could not be read at the last sample */
-    ok: boolean;
-    rx: number;
-    tx: number;
-    /** Unix seconds (modem clock): last sample, last reset, last save */
-    sampled_at: number;
-    reset_at: number;
-    saved_at: number;
-    /** Counter restarts (reboot, interface re-created) since reset_at */
-    resets: number;
   };
   conn: {
     /** pending: no round has finished yet */
